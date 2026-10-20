@@ -1,7 +1,5 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { DataTable } from "../ui/data-table";
-import { Button } from "../ui/button";
+import { useState, useMemo } from "react";
+import { NeonTable, type NeonTableColumn } from "../ui/NeonTable";
 import type { SubjectData } from "../../types/exam";
 import { Edit, Trash, BookOpen } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
@@ -12,6 +10,9 @@ interface SubjectTableProps {
   onSelectChange: (ids: string[]) => void;
   onEdit: (subject: SubjectData) => void;
   onDelete: (subject: SubjectData) => void;
+  isLoading?: boolean;
+  activeKey?: string;
+  onRowClick?: (subject: SubjectData) => void;
 }
 
 export const SubjectTable = ({ 
@@ -19,115 +20,122 @@ export const SubjectTable = ({
   selectedIds, 
   onSelectChange, 
   onEdit, 
-  onDelete 
+  onDelete,
+  isLoading,
+  activeKey,
+  onRowClick
 }: SubjectTableProps) => {
   const { terminology } = useTenant();
-  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      onSelectChange(subjects.map(s => s.id));
-    } else {
-      onSelectChange([]);
-    }
-  };
+  const filteredSubjects = useMemo(() => {
+    if (!search.trim()) return subjects;
+    const q = search.toLowerCase();
+    return subjects.filter(s => s.name.toLowerCase().includes(q));
+  }, [subjects, search]);
 
-  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
-    let newSelectedIds = [...selectedIds];
-
-    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
-      const start = Math.min(lastSelectedIndex, index);
-      const end = Math.max(lastSelectedIndex, index);
-      const idsInRange = subjects.slice(start, end + 1).map(s => s.id);
-      
-      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
-    } else {
-      if (checked) {
-        if (!newSelectedIds.includes(id)) {
-          newSelectedIds.push(id);
-        }
-      } else {
-        newSelectedIds = newSelectedIds.filter((item) => item !== id);
-      }
-    }
-
-    onSelectChange(newSelectedIds);
-    setLastSelectedIndex(index);
-  };
-
-  const isAllSelected = subjects.length > 0 && subjects.every(s => selectedIds.includes(s.id));
-
-  const columns = [
-    {
-      key: "selection",
-      label: (
-        <input
-          type="checkbox"
-          checked={isAllSelected}
-          onChange={(e) => handleSelectAll(e.target.checked)}
-          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
-        />
-      ),
-      render: (_: any, item: SubjectData, index?: number) => (
-        <input
-          type="checkbox"
-          checked={selectedIds.includes(item.id)}
-          onChange={(e) => handleSelectOne(item.id, e.target.checked, index ?? 0, e)}
-          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
-        />
-      ),
-      className: "w-[40px] text-center",
-    },
+  const columns: NeonTableColumn<SubjectData>[] = useMemo(() => [
     {
       key: "index",
-      label: "No",
-      render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
-      className: "w-[60px]",
+      header: "#",
+      width: "40px",
+      align: "center",
+      render: (_item, index) => (
+        <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
+          {index + 1}
+        </span>
+      ),
     },
     { 
       key: "name", 
-      label: terminology.subject, 
-      sortable: true,
-      render: (name: string) => (
-        <span className="font-bold text-slate-700 dark:text-slate-200">{name}</span>
+      header: `Nama ${terminology.subject} & Kurikulum`,
+      className: "min-w-[220px]",
+      render: (subject) => (
+        <div className="flex items-center gap-2.5 py-0.5">
+          <div className="h-7 w-7 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center shrink-0">
+            <BookOpen className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span 
+              className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm leading-tight truncate hover:underline cursor-pointer"
+              onClick={() => onEdit(subject)}
+              title={`Edit data ${subject.name}`}
+            >
+              {subject.name}
+            </span>
+            <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5">
+              <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                Kurikulum Aktif
+              </span>
+              <span>•</span>
+              <span>Mata Pelajaran Ujian</span>
+            </div>
+          </div>
+        </div>
       )
     },
-  ];
-
-  const renderActions = (subject: SubjectData) => (
-    <div className="flex justify-end gap-2">
-      <button 
-        className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
-        onClick={() => onEdit(subject)}
-        title={`Edit ${terminology.subject}`}
-      >
-        <Edit className="h-4 w-4" />
-      </button>
-      <button 
-        className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
-        onClick={() => onDelete(subject)}
-        title={`Hapus ${terminology.subject}`}
-      >
-        <Trash className="h-4 w-4" />
-      </button>
-    </div>
-  );
+    {
+      key: "status",
+      header: "Status",
+      className: "hidden sm:table-cell w-36",
+      headerClassName: "hidden sm:table-cell w-36",
+      render: () => (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+          Tersinkron
+        </span>
+      )
+    },
+    {
+      key: "actions",
+      header: "Aksi",
+      width: "90px",
+      align: "right",
+      render: (subject) => (
+        <div className="flex justify-end items-center gap-1 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+          <button 
+            type="button"
+            className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+            onClick={() => onEdit(subject)}
+            title={`Edit ${terminology.subject}`}
+          >
+            <Edit className="h-3.5 w-3.5" />
+          </button>
+          <button 
+            type="button"
+            className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors shadow-2xs cursor-pointer"
+            onClick={() => onDelete(subject)}
+            title={`Hapus ${terminology.subject}`}
+          >
+            <Trash className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )
+    }
+  ], [terminology, onEdit, onDelete]);
 
   return (
-    <Card>
-      <CardHeader className="p-4">
-        <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar {terminology.subject}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <DataTable
-          data={subjects}
-          columns={columns}
-          searchPlaceholder={`Cari ${terminology.subject}...`}
-          actions={renderActions}
-          emptyMessage={`Belum ada data ${terminology.subject}.`}
-        />
-      </CardContent>
-    </Card>
+    <NeonTable<SubjectData>
+      data={filteredSubjects}
+      columns={columns}
+      keyExtractor={(s) => s.id}
+      compact
+      selectable
+      selectedKeys={selectedIds}
+      onSelectionChange={onSelectChange}
+      searchValue={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={`Cari ${terminology.subject.toLowerCase()}...`}
+      title={`Daftar ${terminology.subject}`}
+      subtitle={`Kurikulum mata pelajaran aktif yang diujikan.`}
+      activeKey={activeKey}
+      onRowClick={onRowClick}
+      pagination
+      pageSize={25}
+      pageSizeOptions={[10, 25, 50, 100]}
+      emptyTitle={`Belum ada data ${terminology.subject.toLowerCase()}`}
+      emptySubtitle={`Tambahkan mata pelajaran baru dengan klik tombol Tambah ${terminology.subject} di atas.`}
+      isLoading={isLoading}
+    />
   );
 };
 

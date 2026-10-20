@@ -1,12 +1,30 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Key, Layers, Target, Info, MoreHorizontal } from "lucide-react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Key, Layers, Target, Info, MoreHorizontal, Filter, RotateCw } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
 import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, generateFromMaterialAI, generateObjectivesAI, AI_MODELS } from "../../lib/ai";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
+import { NeonTable, type NeonTableColumn } from "../../components/ui/NeonTable";
+import {
+  NeonInspector,
+  InspectorSection,
+  InspectorHeader,
+  InspectorField,
+  InspectorGrid,
+  InspectorActions,
+  InspectorButton,
+  InspectorCard,
+  InspectorEmpty,
+  InspectorNav,
+  InspectorToggle,
+} from "../../components/ui/NeonInspector";
+import { NeonTabs } from "../../components/ui/NeonTabs";
+import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { getExamTypeColorClass } from "./ExamsPage";
+import { cn } from "../../lib/utils";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import BatchProgressDialog from "../../components/dialogs/BatchProgressDialog";
 import QuestionRepositoryDialog from "../../components/dialogs/QuestionRepositoryDialog";
@@ -443,6 +461,52 @@ const hasUnbalancedRumpang = (text: string): boolean => {
   return openCount !== closeCount;
 };
 
+export const QUESTION_TYPE_LABELS: Record<string, string> = {
+  pilihan_ganda: "Pilihan Ganda",
+  pilihan_ganda_kompleks: "PG Kompleks",
+  benar_salah: "Benar / Salah",
+  menjodohkan: "Menjodohkan",
+  isian_singkat: "Isian Singkat",
+  uraian: "Uraian / Esai",
+  matriks: "Matriks",
+  klasifikasi: "Klasifikasi",
+  isian_rumpang: "Isian Rumpang",
+  hotspot: "Hotspot",
+  urutkan: "Urutkan",
+  drag_drop: "Drag & Drop"
+};
+
+export const getQuestionTypeColor = (type?: string): string => {
+  switch (type) {
+    case "pilihan_ganda":
+      return "bg-blue-500/15 border-blue-500/30 text-blue-700 dark:text-blue-300 shadow-[0_0_8px_rgba(59,130,246,0.12)]";
+    case "pilihan_ganda_kompleks":
+      return "bg-indigo-500/15 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 shadow-[0_0_8px_rgba(99,102,241,0.12)]";
+    case "benar_salah":
+      return "bg-cyan-500/15 border-cyan-500/30 text-cyan-700 dark:text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.12)]";
+    case "menjodohkan":
+      return "bg-purple-500/15 border-purple-500/30 text-purple-700 dark:text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.12)]";
+    case "isian_singkat":
+      return "bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.12)]";
+    case "uraian":
+      return "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.12)]";
+    case "matriks":
+      return "bg-teal-500/15 border-teal-500/30 text-teal-700 dark:text-teal-300 shadow-[0_0_8px_rgba(20,184,166,0.12)]";
+    case "klasifikasi":
+      return "bg-violet-500/15 border-violet-500/30 text-violet-700 dark:text-violet-300 shadow-[0_0_8px_rgba(139,92,246,0.12)]";
+    case "isian_rumpang":
+      return "bg-lime-500/15 border-lime-500/30 text-lime-700 dark:text-lime-300 shadow-[0_0_8px_rgba(132,204,22,0.12)]";
+    case "hotspot":
+      return "bg-sky-500/15 border-sky-500/30 text-sky-700 dark:text-sky-300 shadow-[0_0_8px_rgba(14,165,233,0.12)]";
+    case "urutkan":
+      return "bg-fuchsia-500/15 border-fuchsia-500/30 text-fuchsia-700 dark:text-fuchsia-300 shadow-[0_0_8px_rgba(217,70,239,0.12)]";
+    case "drag_drop":
+      return "bg-rose-500/15 border-rose-500/30 text-rose-700 dark:text-rose-300 shadow-[0_0_8px_rgba(244,63,94,0.12)]";
+    default:
+      return "bg-neutral-100 border-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300";
+  }
+};
+
 
 
 interface QuestionCacheEntry {
@@ -522,6 +586,109 @@ const QuestionsPage = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [isRepoDialogOpen, setIsRepoDialogOpen] = useState(false);
+
+  // NeonTable Search, Filters & Inspector States
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [groupFilter, setGroupFilter] = useState("all");
+  const [inspectedQuestionId, setInspectedQuestionId] = useState<string | null>(null);
+  const [showInspector, setShowInspector] = useState(true);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+
+  const groupsList = useMemo(() => {
+    const set = new Set<string>();
+    questions.forEach(q => {
+      if (q.groupId) set.add(q.groupId);
+    });
+    return Array.from(set).sort();
+  }, [questions]);
+
+  const displayQuestions = useMemo(() => {
+    return questions.filter((q) => {
+      // 1. Filter Tipe Soal & Tab Cepat
+      const qType = q.type || "pilihan_ganda";
+      if (typeFilter === "complex") {
+        if (qType === "pilihan_ganda") return false;
+      } else if (typeFilter === "image") {
+        if (!q.imageUrl && !q.text.includes("<img")) return false;
+      } else if (typeFilter === "stimulus") {
+        if (!q.groupId) return false;
+      } else if (typeFilter !== "all" && qType !== typeFilter) {
+        return false;
+      }
+
+      // 2. Filter Grup/Paket Stimulus
+      if (groupFilter !== "all" && q.groupId !== groupFilter) return false;
+
+      // 3. Pencarian Teks
+      if (!searchQuery.trim()) return true;
+      const qLower = searchQuery.toLowerCase();
+      const plainText = (q.text || "").replace(/<[^>]*>/g, " ").toLowerCase();
+      if (plainText.includes(qLower)) return true;
+      if (q.groupId && q.groupId.toLowerCase().includes(qLower)) return true;
+      if (q.groupText && q.groupText.replace(/<[^>]*>/g, " ").toLowerCase().includes(qLower)) return true;
+      if (q.answerKey && q.answerKey.toLowerCase().includes(qLower)) return true;
+      if (q.choices) {
+        for (const key of Object.keys(q.choices)) {
+          const choiceText = (q.choices[key]?.text || "").replace(/<[^>]*>/g, " ").toLowerCase();
+          if (choiceText.includes(qLower)) return true;
+        }
+      }
+      return false;
+    });
+  }, [questions, typeFilter, groupFilter, searchQuery]);
+
+  const inspectedQuestion = useMemo(() => {
+    if (inspectedQuestionId) {
+      const found = questions.find(q => q.id === inspectedQuestionId);
+      if (found) return found;
+    }
+    return displayQuestions[0] || questions[0] || null;
+  }, [questions, inspectedQuestionId, displayQuestions]);
+
+  const targetQuestionsList = useMemo(() => {
+    return displayQuestions.length > 0 ? displayQuestions : questions;
+  }, [displayQuestions, questions]);
+
+  const currentInspectedIndex = useMemo(() => {
+    if (!inspectedQuestion) return -1;
+    return targetQuestionsList.findIndex(q => q.id === inspectedQuestion.id);
+  }, [inspectedQuestion, targetQuestionsList]);
+
+  const hasPreviousQuestion = currentInspectedIndex > 0;
+  const hasNextQuestion = currentInspectedIndex >= 0 && currentInspectedIndex < targetQuestionsList.length - 1;
+
+  const handlePreviousQuestion = useCallback(() => {
+    if (currentInspectedIndex > 0) {
+      setInspectedQuestionId(targetQuestionsList[currentInspectedIndex - 1].id);
+    }
+  }, [currentInspectedIndex, targetQuestionsList]);
+
+  const handleNextQuestion = useCallback(() => {
+    if (currentInspectedIndex >= 0 && currentInspectedIndex < targetQuestionsList.length - 1) {
+      setInspectedQuestionId(targetQuestionsList[currentInspectedIndex + 1].id);
+    }
+  }, [currentInspectedIndex, targetQuestionsList]);
+
+  // Keyboard navigation for inspector (Left/Right arrows when not typing in inputs)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!showInspector || !inspectedQuestion) return;
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      if (e.key === "ArrowLeft" && hasPreviousQuestion) {
+        e.preventDefault();
+        handlePreviousQuestion();
+      } else if (e.key === "ArrowRight" && hasNextQuestion) {
+        e.preventDefault();
+        handleNextQuestion();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showInspector, inspectedQuestion, hasPreviousQuestion, hasNextQuestion, handlePreviousQuestion, handleNextQuestion]);
 
   const handleBatchImportQuestions = async (questionsToImport: Partial<QuestionData>[]) => {
     const targetId = examId || (exam && exam.id);
@@ -3798,290 +3965,295 @@ const QuestionsPage = () => {
     }
   };
 
-  const columns = useMemo(() => [
-    {
-      key: "selection",
-      label: (
-        <div className="flex items-center px-1">
-          <input
-            type="checkbox"
-            className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 dark:bg-slate-800 transition-all cursor-pointer accent-indigo-600"
-            checked={questions.length > 0 && selectedIds.length === questions.length}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setSelectedIds(questions.map((q) => q.id));
-              } else {
-                setSelectedIds([]);
-              }
-            }}
-          />
+  const renderQuestionDetails = (item: QuestionData) => {
+    const type = item.type || "pilihan_ganda";
+
+    if (type === "benar_salah") {
+      const stList = item.statements || item.options?.statements || [];
+      if (stList.length > 0) {
+        return (
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 text-xs font-semibold border border-cyan-500/20">
+              {stList.length} Pernyataan
+            </span>
+            <div
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 cursor-help"
+              title={stList.map((s: any, idx: number) => `${idx + 1}. ${s.text ? s.text.replace(/<[^>]*>/g, '').trim() : 'Pernyataan'}: ${(s.answer || 'benar').toUpperCase()}`).join("\n")}
+            >
+              <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-bold mr-0.5">Kunci:</span>
+              {stList.slice(0, 4).map((s: any, idx: number) => {
+                const isBenar = (s.answer || "benar").toLowerCase() === "benar";
+                return (
+                  <span
+                    key={s.id || idx}
+                    className={`inline-flex items-center justify-center px-1 rounded text-[10px] font-black font-mono ${isBenar
+                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                        : "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30"
+                      }`}
+                  >
+                    {idx + 1}:{isBenar ? "B" : "S"}
+                  </span>
+                );
+              })}
+              {stList.length > 4 && <span className="text-[10px] text-neutral-400 font-mono">+{stList.length - 4}</span>}
+            </div>
+          </div>
+        );
+      }
+
+      const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
+      const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
+      if (keys.length > 0) {
+        const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
+        return (
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs border border-neutral-200 dark:border-neutral-700 font-medium">
+              {keys.length} Opsi
+            </span>
+            {correctKeys && (
+              <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                Kunci: {correctKeys}
+              </span>
+            )}
+          </div>
+        );
+      }
+
+      return (
+        <span className="text-xs text-neutral-400 dark:text-neutral-500 italic">Belum ada pernyataan</span>
+      );
+    }
+
+    if (type === "matriks") {
+      const cols = item.options?.columns || [];
+      const stList = item.options?.statements || [];
+      if (stList.length > 0 || cols.length > 0) {
+        return (
+          <span className="px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-700 dark:text-teal-400 text-xs font-semibold border border-teal-500/20 whitespace-nowrap">
+            {stList.length} Baris × {cols.length} Kolom
+          </span>
+        );
+      }
+      return <span className="text-xs text-neutral-400 italic">Belum ada matriks</span>;
+    }
+
+    if (type === "klasifikasi") {
+      const cats = item.options?.categories || [];
+      const stList = item.options?.statements || [];
+      if (stList.length > 0 || cats.length > 0) {
+        return (
+          <span className="px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-400 text-xs font-semibold border border-violet-500/20 whitespace-nowrap">
+            {stList.length} Baris × {cats.length} Kat.
+          </span>
+        );
+      }
+      return <span className="text-xs text-neutral-400 italic">Belum ada data</span>;
+    }
+
+    if (type === "isian_rumpang") {
+      const blanks = item.options?.blanks || [];
+      return (
+        <span className="px-2 py-0.5 rounded-md bg-lime-500/10 text-lime-700 dark:text-lime-400 text-xs font-semibold border border-lime-500/20 whitespace-nowrap">
+          {blanks.length} Isian Rumpang
+        </span>
+      );
+    }
+
+    if (type === "hotspot") {
+      const areas = item.options?.areas || [];
+      return (
+        <span className="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-400 text-xs font-semibold border border-sky-500/20 whitespace-nowrap">
+          {areas.length} Area Hotspot
+        </span>
+      );
+    }
+
+    if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks") {
+      const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
+      const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
+      const correctCount = keys.filter(k => item.choices?.[k]?.isCorrect).length;
+      const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
+
+      return (
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs font-medium border border-neutral-200/80 dark:border-neutral-700/80">
+            {keys.length} Opsi
+          </span>
+          {correctCount > 0 ? (
+            <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+              Kunci: {correctKeys}
+            </span>
+          ) : (
+            <span className="text-[11px] text-amber-600 dark:text-amber-400 italic">
+              Belum ada kunci
+            </span>
+          )}
         </div>
-      ),
-      className: "w-[40px]",
-      render: (_: any, item: QuestionData, index?: number) => (
-        <div className="flex items-center px-1">
-          <input
-            type="checkbox"
-            className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 dark:bg-slate-800 transition-all cursor-pointer accent-indigo-600"
-            checked={selectedIds.includes(item.id)}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => handleCheckboxChange(item.id, e.target.checked, index ?? 0, e)}
-          />
+      );
+    }
+
+    if (type === "menjodohkan") {
+      return (
+        <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs font-semibold border border-amber-500/20 whitespace-nowrap">
+          {(item.pairs || []).length} Pasangan
+        </span>
+      );
+    }
+
+    if (type === "isian_singkat" || type === "uraian") {
+      return (
+        <div className="text-xs font-medium text-neutral-600 dark:text-neutral-300 truncate max-w-[170px] whitespace-nowrap" title={item.answerKey || "-"}>
+          <span className="text-neutral-400 mr-1">Kunci:</span>
+          <span className="font-semibold text-neutral-800 dark:text-neutral-200">{item.answerKey || "-"}</span>
         </div>
-      )
-    },
+      );
+    }
+
+    if (type === "urutkan" || type === "drag_drop") {
+      return (
+        <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-semibold border border-indigo-500/20 whitespace-nowrap">
+          {(item.items || []).length} Item Urutan
+        </span>
+      );
+    }
+
+    return null;
+  };
+
+  const neonColumns: NeonTableColumn<QuestionData>[] = useMemo(() => [
     {
-      key: "index",
-      label: "No",
-      className: "w-[50px]",
-      render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
+      key: "no",
+      header: "#",
+      width: "50px",
+      align: "center",
+      className: "text-center",
+      render: (item, index) => {
+        const isInspected = inspectedQuestion?.id === item.id;
+        return (
+          <div className="flex items-center justify-center">
+            <span
+              className={cn(
+                "h-6 min-w-6 px-1.5 rounded-md font-mono text-xs font-bold flex items-center justify-center transition-all",
+                isInspected
+                  ? "bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.6)] scale-105"
+                  : "text-neutral-400 dark:text-neutral-500 group-hover:text-neutral-800 dark:group-hover:text-neutral-200"
+              )}
+            >
+              {index + 1}
+            </span>
+          </div>
+        );
+      }
     },
     {
       key: "text",
-      label: "Teks Pertanyaan",
-      sortable: true,
-      render: (v: string, item: QuestionData) => (
-        <div className="max-w-lg min-w-[250px]">
-          <MathText content={item.text} className="line-clamp-2 text-sm font-serif text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" />
-          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+      header: "Teks Pertanyaan & Stimulus",
+      className: "min-w-0",
+      render: (item) => (
+        <div className="space-y-1.5 py-0.5">
+          <MathText
+            content={item.text}
+            className="line-clamp-2 text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4"
+          />
+          <div className="flex items-center gap-1.5 flex-wrap">
             {(item.imageUrl || item.text.includes("<img")) && (
-              <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-semibold text-xs border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30 text-[10px] font-semibold tracking-tight uppercase shadow-[0_0_8px_rgba(14,165,233,0.15)]">
+                <Image className="h-3 w-3" />
                 Bergambar
               </span>
             )}
             {item.groupId && (
-              <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-semibold text-xs border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight">
-                Paket: {item.groupId}
-                {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-500 text-white text-xs font-black">MAIN</span>}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[10px] font-semibold tracking-tight uppercase shadow-[0_0_8px_rgba(245,158,11,0.15)]">
+                <span>Paket: {item.groupId}</span>
+                {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && (
+                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[9px] font-black shadow-[0_0_6px_rgba(245,158,11,0.4)]">
+                    MAIN
+                  </span>
+                )}
               </span>
             )}
           </div>
         </div>
-      ),
+      )
     },
     {
       key: "type",
-      label: "Tipe Soal",
-      className: "min-w-[120px]",
-      render: (v: string, item: QuestionData) => {
-        const typeLabels: Record<string, string> = {
-          pilihan_ganda: "Pilihan Ganda",
-          pilihan_ganda_kompleks: "PG Kompleks",
-          menjodohkan: "Menjodohkan",
-          benar_salah: "Benar / Salah",
-          isian_singkat: "Isian Singkat",
-          uraian: "Uraian / Esai",
-          urutkan: "Urutkan",
-          drag_drop: "Drag and Drop",
-          matriks: "Matriks",
-          klasifikasi: "Klasifikasi",
-          isian_rumpang: "Isian Rumpang",
-          hotspot: "Hotspot"
-        };
+      header: "Tipe Soal",
+      width: "135px",
+      className: "hidden sm:table-cell",
+      headerClassName: "hidden sm:table-cell",
+      render: (item) => {
+        const qType = item.type || "pilihan_ganda";
         return (
-          <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-xs font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
-            {typeLabels[item.type || "pilihan_ganda"]}
+          <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-semibold border whitespace-nowrap ${getQuestionTypeColor(qType)}`}>
+            {QUESTION_TYPE_LABELS[qType] || qType}
           </span>
         );
       }
     },
     {
       key: "details",
-      label: "Detil Jawaban",
-      className: "min-w-[150px]",
-      render: (v: any, item: QuestionData) => {
-        const type = item.type || "pilihan_ganda";
-
-        if (type === "benar_salah") {
-          const stList = item.statements || item.options?.statements || [];
-          if (stList.length > 0) {
-            return (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="p-1 px-2 rounded-md bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 text-xs font-semibold border border-cyan-200 dark:border-cyan-800/40 whitespace-nowrap">
-                  {stList.length} Pernyataan
-                </span>
-                <div
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
-                  title={stList.map((s: any, idx: number) => `${idx + 1}. ${s.text ? s.text.replace(/<[^>]*>/g, '').trim() : 'Pernyataan'}: ${(s.answer || 'benar').toUpperCase()}`).join("\n")}
-                >
-                  <span className="text-xs text-slate-500 dark:text-slate-400 font-bold mr-0.5">Kunci:</span>
-                  {stList.map((s: any, idx: number) => {
-                    const isBenar = (s.answer || "benar").toLowerCase() === "benar";
-                    return (
-                      <span
-                        key={s.id || idx}
-                        className={`inline-flex items-center justify-center px-1.5 py-0.2 rounded text-xs font-black font-mono shadow-xs ${isBenar
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/50"
-                            : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700/50"
-                          }`}
-                        title={`${idx + 1}. ${s.text ? s.text.replace(/<[^>]*>/g, '').trim() : 'Pernyataan'}: ${isBenar ? 'BENAR' : 'SALAH'}`}
-                      >
-                        {idx + 1}:{isBenar ? "B" : "S"}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          }
-
-          // Fallback untuk tipe benar_salah format lama (pilihan biasa)
-          const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
-          const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
-          if (keys.length > 0) {
-            const correctCount = keys.filter(k => item.choices?.[k]?.isCorrect).length;
-            const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
-            return (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap">
-                  {keys.length} Opsi
-                </span>
-                {correctCount > 0 && (
-                  <span className="p-1 px-2 text-xs font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
-                    Kunci: {correctKeys}
-                  </span>
-                )}
-              </div>
-            );
-          }
-
-          return (
-            <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
-              Belum ada pernyataan
-            </span>
-          );
-        }
-
-        if (type === "matriks") {
-          const cols = item.options?.columns || [];
-          const stList = item.options?.statements || [];
-          if (stList.length > 0 || cols.length > 0) {
-            return (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="p-1 px-2 rounded-md bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 text-xs font-semibold border border-teal-200 dark:border-teal-800/40 whitespace-nowrap">
-                  {stList.length} Pernyataan × {cols.length} Kolom
-                </span>
-                {cols.length > 0 && (
-                  <span
-                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
-                    title={cols.map((c: any) => c.text).join(" | ")}
-                  >
-                    {cols.map((c: any) => c.text).join(" / ").slice(0, 30)}
-                  </span>
-                )}
-              </div>
-            );
-          }
-          return (
-            <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
-              Belum ada data matriks
-            </span>
-          );
-        }
-
-        if (type === "klasifikasi") {
-          const cats = item.options?.categories || [];
-          const stList = item.options?.statements || [];
-          if (stList.length > 0 || cats.length > 0) {
-            return (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="p-1 px-2 rounded-md bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 text-xs font-semibold border border-violet-200 dark:border-violet-800/40 whitespace-nowrap">
-                  {stList.length} Pernyataan × {cats.length} Kategori
-                </span>
-                {cats.length > 0 && (
-                  <span
-                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
-                    title={cats.map((c: any) => c.text).join(" | ")}
-                  >
-                    {cats.map((c: any) => c.text).join(" / ").slice(0, 30)}
-                  </span>
-                )}
-              </div>
-            );
-          }
-          return (
-            <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
-              Belum ada data klasifikasi
-            </span>
-          );
-        }
-
-        if (type === "isian_rumpang") {
-          const blanks = item.options?.blanks || [];
-          const passage = item.options?.text || "";
-          if (blanks.length > 0 || passage) {
-            return (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="p-1 px-2 rounded-md bg-lime-50 text-lime-700 dark:bg-lime-950/40 dark:text-lime-300 text-xs font-semibold border border-lime-200 dark:border-lime-800/40 whitespace-nowrap">
-                  {blanks.length} Rumpang
-                </span>
-                {blanks.length > 0 && (
-                  <span
-                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
-                    title={blanks.map((b: any) => `[[${b.id}]]: ${(b.answers || []).join(" / ")}`).join("\n")}
-                  >
-                    {blanks.map((b: any) => `[[${b.id}]]`).join(" ").slice(0, 30)}
-                  </span>
-                )}
-              </div>
-            );
-          }
-          return (
-            <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
-              Belum ada rumpang
-            </span>
-          );
-        }
-
-        if (type === "hotspot") {
-          const areas = item.options?.areas || [];
-          const mode = item.options?.mode || "any";
-          return (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="p-1 px-2 rounded-md bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 text-xs font-semibold border border-sky-200 dark:border-sky-800/40 whitespace-nowrap">
-                {areas.length} Area
-              </span>
-              <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap">
-                {mode === "all" ? "Semua area" : "Satu saja"}
-              </span>
-            </div>
-          );
-        }
-
-        if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks") {
-          const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
-          const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
-          const correctCount = keys.filter(k => item.choices?.[k]?.isCorrect).length;
-          const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
-
-          return (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap">{keys.length} Opsi</span>
-              {correctCount > 0 && (
-                <span className="p-1 px-2 text-xs font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
-                  Kunci: {correctKeys}
-                </span>
-              )}
-            </div>
-          );
-        }
-
-        if (type === "menjodohkan") {
-          return <span className="text-xs text-slate-500 whitespace-nowrap">{(item.pairs || []).length} Pasangan</span>;
-        }
-
-        if (type === "isian_singkat" || type === "uraian") {
-          return <div className="text-xs text-slate-500 line-clamp-1 max-w-[150px]">{item.answerKey || "-"}</div>;
-        }
-
-        if (type === "urutkan" || type === "drag_drop") {
-          return <span className="text-xs text-slate-500 whitespace-nowrap">{(item.items || []).length} Item</span>;
-        }
-
-        return null;
-      }
+      header: "Detil & Kunci",
+      width: "180px",
+      className: "hidden md:table-cell",
+      headerClassName: "hidden md:table-cell",
+      render: (item) => renderQuestionDetails(item)
+    },
+    {
+      key: "actions",
+      header: "Aksi",
+      width: "90px",
+      align: "right",
+      className: "text-right",
+      headerClassName: "text-right",
+      render: (item) => (
+        <div className="flex justify-end items-center gap-1 whitespace-nowrap">
+          <button
+            type="button"
+            className="p-1.5 rounded-md bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              const idx = questions.findIndex(q => q.id === item.id);
+              setPreviewIndex(idx >= 0 ? idx : 0);
+              setPreviewQuestion(item);
+              setIsPreviewOpen(true);
+            }}
+            title="Pratinjau Soal"
+          >
+            <Search className="h-3.5 w-3.5" />
+          </button>
+          {isOwner && (
+            <>
+              <button
+                type="button"
+                className="p-1.5 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 transition-colors cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditClick(item);
+                }}
+                title="Edit Soal"
+              >
+                <Edit className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className="p-1.5 rounded-md bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 transition-colors cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteClick(item);
+                }}
+                title="Hapus Soal"
+              >
+                <Trash className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      )
     }
-  ], [questions, selectedIds]);
+  ], [questions, isOwner]);
+
+  const columns = neonColumns;
 
   const handleImportWord = async (file: File) => {
     if (!pb) return;
@@ -5290,239 +5462,728 @@ const QuestionsPage = () => {
   };
 
   return (
-    <div className="space-y-5 relative">
+    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
       {/* Global Progress Bar */}
       {(isImporting || isSavingBatch || isParsing || isDeleting || isBulkDeleting) && (
         <div className="fixed top-0 left-0 w-full h-1.5 z-[100] bg-slate-100 dark:bg-slate-800 overflow-hidden">
           <div
-            className="h-full bg-indigo-600 transition-all duration-300 shadow-[0_0_10px_rgba(79,70,229,0.5)]"
+            className="h-full bg-emerald-500 transition-all duration-300 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
             style={{ width: `${importProgress}%` }}
           />
         </div>
       )}
 
-      <div className="relative z-20 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-        <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate("/admin/bank-soal")}>
-            <ArrowLeft className="h-5 w-5" />
+      <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
+        {/* ── 1. Top Bar: Back, Breadcrumbs, Title, Metadata Pills, Top Actions ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-200 dark:border-neutral-800">
+        <div className="flex items-start sm:items-center gap-3 min-w-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900"
+            onClick={() => navigate("/admin/bank-soal")}
+          >
+            <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground">Daftar Soal</h2>
-            <div className="text-sm text-muted-foreground break-words">
-              {loading ? (
-                <Skeleton className="h-4 w-64 mt-1" />
-              ) : (
-                <>
-                  {exam?.title || "Ujian"}
-                  {exam?.subject ? ` - ${exam?.subject}` : ""}
-                  {exam?.teacherName ? ` - ${exam?.teacherName}` : ""}
-                  {exam?.teacherCode ? ` (${exam?.teacherCode})` : ""}
-                </>
+
+          <div className="min-w-0 space-y-1">
+            {/* Breadcrumb line */}
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 flex-wrap">
+              <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
+                Semua Modul
+              </Link>
+              <span>/</span>
+              <span className="text-neutral-700 dark:text-neutral-300 font-medium">
+                {school?.slug || "modalbangsa"}
+              </span>
+              <span>/</span>
+              <Link to="/admin/bank-soal" className="flex items-center gap-1 hover:text-neutral-800 dark:hover:text-neutral-200 font-medium transition-colors">
+                <BookOpen className="h-3.5 w-3.5 text-neutral-400" />
+                <span>bank-soal</span>
+              </Link>
+              <span>/</span>
+              <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-[200px]">
+                {exam?.title || "Daftar Butir Soal"}
+              </span>
+            </div>
+
+            {/* Title & Metadata Badges */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                Kelola Butir Soal
+              </h1>
+
+              {exam?.examType && (
+                <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-semibold border", getExamTypeColorClass(exam.examType))}>
+                  {exam.examType}
+                </span>
+              )}
+
+              {exam?.subject && (
+                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
+                  {exam.subject}
+                </span>
+              )}
+
+              {(exam?.teacherName || exam?.teacherCode) && (
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100/80 dark:bg-neutral-800/80 text-neutral-600 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-700/60">
+                  <Avatar className="h-4 w-4">
+                    <AvatarFallback className="text-[9px] font-bold bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300">
+                      {(exam?.teacherName || "G").slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate max-w-[150px]">{exam.teacherName}</span>
+                  {exam.teacherCode && <span className="font-mono text-[10px] text-neutral-400">({exam.teacherCode})</span>}
+                </div>
               )}
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
-          {loading ? (
-            <>
-              <Skeleton className="h-9 w-28 rounded-2xl" />
-              <Skeleton className="h-9 w-28 rounded-2xl" />
-              <Skeleton className="h-9 w-28 rounded-2xl" />
-            </>
-          ) : (
-            <>
-              {/* Tombol Import hanya untuk owner atau admin */}
+        {/* Action Buttons Top Right */}
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {/* OPSI DATA DROPDOWN */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Opsi Data</span>
+                <ChevronDown className="h-3 w-3 text-neutral-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64 p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                Import & Export
+              </DropdownMenuLabel>
               {isOwner && (
-                <div className="relative">
-                  {loading ? (
-                    <div className="flex gap-2">
-                      <Skeleton className="h-9 w-24 rounded-2xl" />
-                      <Skeleton className="h-9 w-28 rounded-2xl" />
-                      <Skeleton className="h-9 w-24 rounded-2xl" />
+                <DropdownMenuItem
+                  onClick={() => document.getElementById("unified-import-input")?.click()}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                >
+                  <Download className="h-3.5 w-3.5 rotate-180 text-blue-600 dark:text-blue-400" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold">Import Soal</span>
+                    <span className="text-[10px] text-neutral-400">Excel (.xlsx), Word (.docx), JSON</span>
+                  </div>
+                </DropdownMenuItem>
+              )}
+              {questions.length > 0 && (
+                <>
+                  <DropdownMenuItem
+                    onClick={handleExportToWord}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span>Export ke Word (.docx)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleExportToJson}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <FileJson className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>Export ke JSON</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+              <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                Template Format
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => downloadQuestionTemplate()}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+              >
+                <Download className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Template Excel Standard</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => window.open("/templates/Template_Soal_Tabel.docx")}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+              >
+                <FileText className="h-3.5 w-3.5 text-blue-600" />
+                <span>Template Word Tabel & Literasi</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setIsLiterasiGuideOpen(true)}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/40 cursor-pointer"
+              >
+                <BookOpen className="h-3.5 w-3.5 text-sky-600" />
+                <span>Panduan Soal Literasi & AKM</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* LAINNYA DROPDOWN */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5 text-neutral-500" />
+                <span>Lainnya</span>
+                <ChevronDown className="h-3 w-3 text-neutral-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                Aksi Tambahan
+              </DropdownMenuLabel>
+              {examId && (
+                <DropdownMenuItem
+                  onClick={() => navigate(`/admin/simulate/${examId}`)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                >
+                  <Eye className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span>Simulasi Tampilan Siswa</span>
+                </DropdownMenuItem>
+              )}
+              {role === "admin" && (
+                <DropdownMenuItem
+                  onClick={() => setIsRepoDialogOpen(true)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                >
+                  <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>Bank Repository / Wayground</span>
+                </DropdownMenuItem>
+              )}
+              {isOwner && questions.length > 0 && selectedIds.length === 0 && (
+                <>
+                  <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                  <DropdownMenuItem
+                    onClick={() => setDeleteAllDialogOpen(true)}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                  >
+                    <Trash className="h-3.5 w-3.5" />
+                    <span>Hapus Semua Soal</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* TAMBAH SOAL BUTTON / DROPDOWN */}
+          {isOwner && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-md shadow-xs transition-colors cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Tambah Soal</span>
+                  <ChevronDown className="h-3 w-3 text-white/60 dark:text-neutral-600" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                  Metode Pembuatan
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={handleCreateClick}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5 text-blue-600" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold">Input Manual</span>
+                    <span className="text-[10px] text-neutral-400">Editor soal interaktif</span>
+                  </div>
+                </DropdownMenuItem>
+                {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => setIsAIModalOpen(true)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <div className="flex flex-col">
+                        <span className="font-semibold">Generasi AI</span>
+                        <span className="text-[10px] text-neutral-400">Buat soal otomatis dari materi</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsAIImportOpen(true)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <div className="flex flex-col">
+                        <span className="font-semibold">Smart AI Import PDF</span>
+                        <span className="text-[10px] text-neutral-400">Ekstrak soal otomatis dari PDF</span>
+                      </div>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {role === "admin" && (
+                  <DropdownMenuItem
+                    onClick={() => setIsRepoDialogOpen(true)}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold">Bank / Wayground</span>
+                      <span className="text-[10px] text-neutral-400">Import soal lama atau Wayground</span>
                     </div>
-                  ) : (
-                    <>
-                    <div className="hidden sm:flex flex-wrap items-center gap-2 justify-start sm:justify-end">
-                      {/* OPSI DATA DROPDOWN (Combined Import/Export) */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="secondary" size="sm" className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm transition-all h-9 px-4">
-                            <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-                            Opsi Data
-                            <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Soal</DropdownMenuLabel>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
 
-                          <DropdownMenuItem
-                            className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
-                            onClick={() => document.getElementById("unified-import-input")?.click()}
-                          >
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <Download className="h-5 w-5 rotate-180" />
-                            </div>
-                            <div className="flex flex-col min-w-0 text-left">
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import Soal</span>
-                              <div className="flex items-center gap-1 mt-1">
-                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-black uppercase">.xlsx</span>
-                                <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 text-xs font-black uppercase">.docx</span>
-                                <span className="px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 text-xs font-black uppercase">.json</span>
-                              </div>
-                            </div>
-                          </DropdownMenuItem>
+      {/* ── Signature Neon Horizontal Tabs: Kategori & Filter Cepat ── */}
+      <NeonTabs
+        activeTab={typeFilter}
+        onChange={setTypeFilter}
+        tabs={[
+          {
+            id: "all",
+            label: "Semua Butir Soal",
+            icon: Layers,
+            count: questions.length,
+            countFormat: "badge",
+          },
+          {
+            id: "pilihan_ganda",
+            label: "Pilihan Ganda",
+            indicator: true,
+            count: questions.filter(q => (q.type || "pilihan_ganda") === "pilihan_ganda").length,
+            countFormat: "badge",
+          },
+          {
+            id: "complex",
+            label: "Variasi & Kompleks",
+            icon: Sparkles,
+            count: questions.filter(q => (q.type || "pilihan_ganda") !== "pilihan_ganda").length,
+            countFormat: "badge",
+          },
+          {
+            id: "image",
+            label: "Soal Bergambar",
+            icon: Image,
+            count: questions.filter(q => q.imageUrl || q.text.includes("<img")).length,
+            countFormat: "badge",
+          },
+          ...(groupsList.length > 0 ? [{
+            id: "stimulus",
+            label: "Paket Stimulus (AKM)",
+            icon: BookOpen,
+            count: `${groupsList.length} paket`,
+            countFormat: "badge" as const,
+          }] : []),
+        ]}
+      />
 
-                          {questions.length > 0 && (
-                            <DropdownMenuItem
-                              onClick={handleExportToWord}
-                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+      {/* ── 2. Main Console: 2-Column Grid (Table + Inspector) ── */}
+      <div className="flex flex-col xl:flex-row items-start gap-4">
+        {/* Left: NeonTable */}
+        <div className="w-full xl:flex-1 min-w-0">
+          <NeonTable<QuestionData>
+            data={displayQuestions}
+            columns={neonColumns}
+            keyExtractor={(q) => q.id}
+            isLoading={loading}
+            title="Daftar Butir Soal"
+            subtitle="Klik baris soal untuk melihat pratinjau stimulus, gambar, dan kunci di panel detail."
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Cari pertanyaan, stimulus, kunci..."
+            filterSlot={
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Type Filter */}
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="h-8 text-xs rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 px-2.5 text-neutral-700 dark:text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-400 cursor-pointer"
+                >
+                  <option value="all">Semua Tipe Soal</option>
+                  {Object.entries(QUESTION_TYPE_LABELS).map(([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                  ))}
+                </select>
+
+                {/* Stimulus / Group Filter */}
+                {groupsList.length > 0 && (
+                  <select
+                    value={groupFilter}
+                    onChange={(e) => setGroupFilter(e.target.value)}
+                    className="h-8 text-xs rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 px-2.5 text-neutral-700 dark:text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-400 cursor-pointer"
+                  >
+                    <option value="all">Semua Paket Stimulus</option>
+                    {groupsList.map((gid) => (
+                      <option key={gid} value={gid}>Paket {gid}</option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Toggle Inspector Button */}
+                <InspectorToggle
+                  active={showInspector}
+                  onToggle={() => setShowInspector(!showInspector)}
+                />
+              </div>
+            }
+            selectable={isOwner}
+            selectedKeys={selectedIds}
+            onSelectionChange={setSelectedIds}
+            batchActions={
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                  {selectedIds.length} terpilih:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBulkDeleteDialogOpen(true)}
+                  className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-rose-600 dark:text-rose-400 font-medium hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Trash className="h-3 w-3" />
+                  <span>Hapus</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportSelectedToWord}
+                  className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-750 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <FileText className="h-3 w-3" />
+                  <span>Word</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportSelectedToJson}
+                  className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-750 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <FileJson className="h-3 w-3" />
+                  <span>JSON</span>
+                </button>
+              </div>
+            }
+            activeKey={inspectedQuestion?.id}
+            onRowClick={(q) => {
+              setInspectedQuestionId(q.id);
+              if (!showInspector) setShowInspector(true);
+            }}
+            pagination={true}
+            pageSize={10}
+            pageSizeOptions={[10, 25, 50, 100]}
+            emptyTitle="Belum ada butir soal"
+            emptySubtitle="Klik 'Tambah Soal' atau gunakan 'Opsi Data' untuk mengimpor dari file Word/Excel."
+          />
+        </div>
+
+        {/* Right: Sticky Inspector Panel (Style Parity with ExamRoomsPage) */}
+        {showInspector && (
+          <NeonInspector
+            scrollable
+            widthClassName="w-full xl:w-[360px] 2xl:w-[380px]"
+          >
+            {/* 1. Detail Butir Soal Terpilih (Inspector) */}
+            <InspectorSection>
+              <InspectorHeader
+                title="Detail Butir Soal"
+                icon={FileText}
+                badge={
+                  inspectedQuestion && currentInspectedIndex >= 0
+                    ? `${currentInspectedIndex + 1} / ${targetQuestionsList.length}`
+                    : "Ringkasan"
+                }
+                actions={
+                  <div className="flex items-center gap-0.5 border-l border-neutral-200 dark:border-neutral-800 pl-1.5 ml-0.5">
+                    <button
+                      type="button"
+                      onClick={handlePreviousQuestion}
+                      disabled={!hasPreviousQuestion}
+                      className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                      title="Soal Sebelumnya (←)"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextQuestion}
+                      disabled={!hasNextQuestion}
+                      className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                      title="Soal Selanjutnya (→)"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                }
+                onClose={() => setShowInspector(false)}
+              />
+
+              {inspectedQuestion ? (
+                <div className="space-y-2.5 text-xs">
+                  {/* Tipe Soal & Stimulus */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={cn("px-2 py-0.5 rounded text-[10px] font-semibold border", getQuestionTypeColor(inspectedQuestion.type))}>
+                      {QUESTION_TYPE_LABELS[inspectedQuestion.type || "pilihan_ganda"] || inspectedQuestion.type}
+                    </span>
+                    {inspectedQuestion.groupId && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-[10px] font-semibold">
+                        Paket Stimulus: {inspectedQuestion.groupId}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Stimulus Preview (if available) */}
+                  {inspectedQuestion.groupText && (
+                    <div className="p-2.5 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                        <span>Teks Stimulus (AKM)</span>
+                        <span className="font-normal lowercase">wacana terkait</span>
+                      </div>
+                      <MathText
+                        content={inspectedQuestion.groupText}
+                        className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed line-clamp-4 overflow-hidden"
+                      />
+                    </div>
+                  )}
+
+                  {/* Question Text */}
+                  <div>
+                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Pertanyaan</div>
+                    <div className="mt-1 p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800">
+                      <MathText
+                        content={inspectedQuestion.text}
+                        className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 [&_p]:m-0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Question Image (if available) */}
+                  {inspectedQuestion.imageUrl && (
+                    <div className="rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 p-2 flex justify-center">
+                      <img
+                        src={inspectedQuestion.imageUrl}
+                        alt="Gambar Soal"
+                        className="max-h-40 object-contain rounded"
+                      />
+                    </div>
+                  )}
+
+                  {/* Choices / Answers Preview */}
+                  {(inspectedQuestion.type === "pilihan_ganda" || inspectedQuestion.type === "pilihan_ganda_kompleks") && inspectedQuestion.choices && (
+                    <div className="space-y-2 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                      <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                        <span>Pilihan Jawaban</span>
+                        <span className="font-mono text-[10px]">{Object.keys(inspectedQuestion.choices).length} Opsi</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {Object.keys(inspectedQuestion.choices).sort().map((key) => {
+                          const choice = inspectedQuestion.choices![key];
+                          const isCorrect = choice?.isCorrect;
+                          return (
+                            <div
+                              key={key}
+                              className={cn(
+                                "flex items-start gap-2 p-2 rounded-lg border text-xs transition-colors",
+                                isCorrect
+                                  ? "bg-emerald-500/[0.08] border-emerald-500/40 text-emerald-950 dark:text-emerald-100 font-medium"
+                                  : "bg-neutral-50/60 dark:bg-neutral-850/40 border-neutral-200/60 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300"
+                              )}
                             >
-                              <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <FileText className="h-5 w-5" />
+                              <span
+                                className={cn(
+                                  "h-4.5 w-4.5 shrink-0 rounded flex items-center justify-center font-mono text-[10px] font-bold mt-0.5",
+                                  isCorrect
+                                    ? "bg-emerald-500 text-white"
+                                    : "bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300"
+                                )}
+                              >
+                                {key.toUpperCase()}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <MathText content={choice?.text || ""} className="text-xs ql-editor !p-0 [&_p]:m-0 leading-relaxed" />
+                                {choice?.imageUrl && (
+                                  <img src={choice.imageUrl} alt={`Opsi ${key}`} className="h-12 object-contain rounded mt-1 border border-neutral-200 dark:border-neutral-700" />
+                                )}
                               </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Export ke Word</span>
-                                <span className="text-xs text-slate-400 mt-1">Simpan naskah & kunci</span>
-                              </div>
-                            </DropdownMenuItem>
-                          )}
-
-                          {questions.length > 0 && (
-                            <DropdownMenuItem
-                              onClick={handleExportToJson}
-                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                            >
-                              <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <FileJson className="h-5 w-5" />
-                              </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Export ke JSON</span>
-                                <span className="text-xs text-slate-400 mt-1">Format data mentah</span>
-                              </div>
-                            </DropdownMenuItem>
-                          )}
-
-                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-                          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Template Format</DropdownMenuLabel>
-
-                          <DropdownMenuItem
-                            onClick={() => downloadQuestionTemplate()}
-                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                          >
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <Download className="h-5 w-5" />
+                              {isCorrect && (
+                                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider shrink-0 mt-0.5">
+                                  KUNCI
+                                </span>
+                              )}
                             </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Template Excel</span>
-                              <span className="text-xs text-slate-400 mt-1">Download format standard</span>
-                            </div>
-                          </DropdownMenuItem>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
-                          <DropdownMenuItem
-                            onClick={() => window.open("/templates/Template_Soal_Tabel.docx")}
-                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                          >
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <FileText className="h-5 w-5" />
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Template Word</span>
-                                <span className="px-2.5 py-1 rounded-full bg-emerald-500 text-white text-xs font-semibold">˜…</span>
-                              </div>
-                              <span className="text-xs text-slate-400 mt-0.5">Format tabel + literasi + rumus</span>
-                            </div>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => setIsLiterasiGuideOpen(true)}
-                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group border border-dashed border-sky-200 bg-sky-50/30 mt-2"
-                          >
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-sky-100 dark:bg-sky-900/30 text-sky-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <BookOpen className="h-5 w-5" />
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-bold text-sky-700 dark:text-sky-300 leading-tight">Panduan Literasi</span>
-                              <span className="text-xs text-sky-500 mt-1">WAJIB BACA: Cara buat soal AKM</span>
-                            </div>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                  {/* Non-MCQ Answer Summary */}
+                  {inspectedQuestion.type !== "pilihan_ganda" && inspectedQuestion.type !== "pilihan_ganda_kompleks" && (
+                    <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800 space-y-1">
+                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Konfigurasi Jawaban</div>
+                      <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800">
+                        {renderQuestionDetails(inspectedQuestion)}
+                      </div>
+                    </div>
+                  )}
 
+                  {/* Next / Previous Quick Bar */}
+                  <InspectorNav
+                    onPrevious={handlePreviousQuestion}
+                    onNext={handleNextQuestion}
+                    hasPrevious={hasPreviousQuestion}
+                    hasNext={hasNextQuestion}
+                  />
 
-                      {/* MODAL PANDUAN LITERASI */}
-                      <Dialog open={isLiterasiGuideOpen} onOpenChange={setIsLiterasiGuideOpen}>
-                        <DialogContent className="max-w-2xl rounded-2xl overflow-hidden p-0 border-none shadow-2xl">
-                          <div className="bg-gradient-to-br from-sky-600 to-indigo-700 p-8 text-white relative">
-                            <BookOpen className="h-16 w-16 opacity-10 absolute right-8 top-8" />
-                            <h2 className="text-2xl font-bold mb-2">Panduan Soal Literasi</h2>
-                            <p className="text-sky-100 text-sm">Pelajari cara mengelompokkan soal berdasarkan stimulus (AKM/Literasi).</p>
-                          </div>
+                  {/* Action Buttons in ExamRoomsPage style */}
+                  <InspectorActions>
+                    <InspectorButton
+                      variant="secondary"
+                      icon={Search}
+                      onClick={() => {
+                        const idx = questions.findIndex(q => q.id === inspectedQuestion.id);
+                        setPreviewIndex(idx >= 0 ? idx : 0);
+                        setPreviewQuestion(inspectedQuestion);
+                        setIsPreviewOpen(true);
+                      }}
+                    >
+                      Pratinjau Soal Lengkap
+                    </InspectorButton>
 
-                          <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-950">
-                            <div className="space-y-4">
-                              <h3 className="text-xl font-bold flex items-center gap-3 text-emerald-700 dark:text-emerald-400">
-                                <FileText className="h-6 w-6" />
-                                1. Import dari Word (.docx)
-                              </h3>
-                              <div className="bg-emerald-50/50 dark:bg-emerald-900/20 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-800/50 space-y-3">
-                                <p className="text-sm text-slate-700 dark:text-slate-300">Tulis kata kunci <b className="text-emerald-600">LITERASI:</b> diikuti narasi Anda di luar tabel soal. Tabel data di dalam soal akan otomatis dipreservasi.</p>
-                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 font-mono text-xs shadow-sm leading-relaxed">
-                                  <div className="text-emerald-600 font-bold mb-1 underline">LITERASI: Mengenal Ekosistem Hutan</div>
-                                  <div className="text-slate-400 mb-4 italic">Hutan adalah paruparu dunia yang harus kita jaga...</div>
+                    {isOwner && (
+                      <div className="flex items-center gap-1.5">
+                        <InspectorButton
+                          variant="primary"
+                          icon={Edit}
+                          onClick={() => handleEditClick(inspectedQuestion)}
+                          className="flex-1"
+                        >
+                          Edit Butir Soal
+                        </InspectorButton>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(inspectedQuestion)}
+                          className="flex items-center justify-center p-1.5 rounded-md text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/20 transition-colors cursor-pointer shadow-2xs"
+                          title="Hapus Soal"
+                        >
+                          <Trash className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </InspectorActions>
+                </div>
+              ) : (
+                <InspectorEmpty message="Pilih atau arahkan kursor ke salah satu butir soal di tabel." />
+              )}
+            </InspectorSection>
 
-                                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 p-2 rounded mb-1 text-slate-600">
-                                    [Tabel Soal Nomor 1]
-                                  </div>
-                                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 p-2 rounded text-slate-600">
-                                    [Tabel Soal Nomor 2]
-                                  </div>
-                                </div>
-                                <div className="flex items-start gap-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded-lg italic">
-                                  <Check className="h-3 w-3 mt-0.5 shrink-0" />
-                                  <span>Semua soal di bawah judul tsb akan otomatis menjadi satu grup literasi. Tabel data dari Word juga akan ditampilkan dengan rapi.</span>
-                                </div>
-                              </div>
-                            </div>
+            {/* 2. Format & Rumus KaTeX Helper Box */}
+            <InspectorCard
+              title="Panduan Format & Rumus"
+              icon={BookOpen}
+              description={
+                <>Ketik rumus matematika diapit tanda <code>\( ... \)</code>, misalnya <code>\( x^2 + y^2 = r^2 \)</code>.</>
+              }
+              actionSlot={
+                <button
+                  type="button"
+                  onClick={() => setIsGuideOpen(!isGuideOpen)}
+                  className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-0.5 cursor-pointer"
+                  title={isGuideOpen ? "Tutup panduan" : "Buka panduan"}
+                >
+                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isGuideOpen && "rotate-180")} />
+                </button>
+              }
+            >
+              {isGuideOpen && (
+                <div className="pt-1 space-y-1.5 text-[11px] text-neutral-600 dark:text-neutral-400 border-t border-neutral-200/60 dark:border-neutral-800/60">
+                  <p><strong className="text-neutral-800 dark:text-neutral-200">Stimulus AKM:</strong> Kelompokkan butir dengan GroupId sama agar berbagi narasi stimulus.</p>
+                  <button
+                    type="button"
+                    onClick={() => setIsLiterasiGuideOpen(true)}
+                    className="w-full mt-1 py-1 px-2 text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <BookOpen className="h-3 w-3" />
+                    <span>Buka Panduan Lengkap Literasi</span>
+                  </button>
+                </div>
+              )}
+            </InspectorCard>
 
-                            <Separator />
+          </NeonInspector>
+        )}
+      </div>
+      </div>
 
-                            <div className="space-y-4">
-                              <h3 className="text-xl font-bold flex items-center gap-3 text-indigo-700 dark:text-indigo-400">
-                                <FileSpreadsheet className="h-6 w-6" />
-                                2. Import dari Excel
-                              </h3>
-                              <div className="bg-indigo-50/50 dark:bg-indigo-900/20 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-800/50 space-y-4">
-                                <p className="text-sm text-slate-700 dark:text-slate-300">Gunakan kolom <b className="text-indigo-600">GroupId</b> untuk mengelompokkan soal.</p>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Kolom GroupId</div>
-                                    <div className="text-indigo-600 font-bold text-sm">GAJAH-01</div>
-                                  </div>
-                                  <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Teks Literasi</div>
-                                    <div className="text-slate-600 dark:text-slate-300 text-xs line-clamp-2">Gajah adalah mamalia...</div>
-                                  </div>
-                                </div>
-                                <p className="text-xs text-slate-500 italic">Cukup tuliskan Teks Literasi pada baris pertama dalam satu grup ID.</p>
-                              </div>
-                            </div>
+      {/* MODAL PANDUAN LITERASI */}
+      <Dialog open={isLiterasiGuideOpen} onOpenChange={setIsLiterasiGuideOpen}>
+        <DialogContent className="max-w-2xl rounded-2xl overflow-hidden p-0 border border-neutral-200 dark:border-neutral-800 shadow-2xl">
+          <div className="bg-gradient-to-br from-sky-600 to-indigo-700 p-8 text-white relative">
+            <BookOpen className="h-16 w-16 opacity-10 absolute right-8 top-8" />
+            <h2 className="text-2xl font-bold mb-2">Panduan Soal Literasi</h2>
+            <p className="text-sky-100 text-sm">Pelajari cara mengelompokkan soal berdasarkan stimulus (AKM/Literasi).</p>
+          </div>
 
-                            <Separator />
+          <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-950">
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold flex items-center gap-3 text-emerald-700 dark:text-emerald-400">
+                <FileText className="h-6 w-6" />
+                1. Import dari Word (.docx)
+              </h3>
+              <div className="bg-emerald-50/50 dark:bg-emerald-900/20 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-800/50 space-y-3">
+                <p className="text-sm text-slate-700 dark:text-slate-300">Tulis kata kunci <b className="text-emerald-600">LITERASI:</b> diikuti narasi Anda di luar tabel soal. Tabel data di dalam soal akan otomatis dipreservasi.</p>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 font-mono text-xs shadow-sm leading-relaxed">
+                  <div className="text-emerald-600 font-bold mb-1 underline">LITERASI: Mengenal Ekosistem Hutan</div>
+                  <div className="text-slate-400 mb-4 italic">Hutan adalah paruparu dunia yang harus kita jaga...</div>
 
-                            <div className="space-y-4">
-                              <h3 className="text-xl font-bold flex items-center gap-3 text-orange-700 dark:text-orange-400">
-                                <FileJson className="h-6 w-6" />
-                                3. Import dari JSON
-                              </h3>
-                              <div className="bg-orange-50/50 dark:bg-orange-900/20 p-5 rounded-2xl border border-orange-100 dark:border-orange-800/50 space-y-3">
-                                <p className="text-sm text-slate-700 dark:text-slate-300">Gunakan field <b className="text-orange-600">groupId</b> dan <b className="text-orange-600">groupText</b> untuk literasi. Bisa juga minta ChatGPT buatkan soal dengan format ini.</p>
+                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 p-2 rounded mb-1 text-slate-600">
+                    [Tabel Soal Nomor 1]
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 p-2 rounded text-slate-600">
+                    [Tabel Soal Nomor 2]
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded-lg italic">
+                  <Check className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span>Semua soal di bawah judul tsb akan otomatis menjadi satu grup literasi. Tabel data dari Word juga akan ditampilkan dengan rapi.</span>
+                </div>
+              </div>
+            </div>
 
-                                <div className="space-y-2">
-                                  <p className="text-xs font-black text-orange-600 uppercase tracking-widest">Template Prompt untuk ChatGPT (Klik untuk Salin):</p>
-                                  <div
-                                    onClick={() => {
-                                      const prompt = `Buatkan 10 soal pilihan ganda untuk mata pelajaran [ISI MAPEL] kelas [ISI KELAS] dengan format JSON berikut. Gunakan format KaTeX \\(...\\) untuk rumus matematika. Untuk soal literasi, isi groupId dan groupText.
+            <Separator />
+
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold flex items-center gap-3 text-indigo-700 dark:text-indigo-400">
+                <FileSpreadsheet className="h-6 w-6" />
+                2. Import dari Excel
+              </h3>
+              <div className="bg-indigo-50/50 dark:bg-indigo-900/20 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-800/50 space-y-4">
+                <p className="text-sm text-slate-700 dark:text-slate-300">Gunakan kolom <b className="text-indigo-600">GroupId</b> untuk mengelompokkan soal.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Kolom GroupId</div>
+                    <div className="text-indigo-600 font-bold text-sm">GAJAH-01</div>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Teks Literasi</div>
+                    <div className="text-slate-600 dark:text-slate-300 text-xs line-clamp-2">Gajah adalah mamalia...</div>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 italic">Cukup tuliskan Teks Literasi pada baris pertama dalam satu grup ID.</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold flex items-center gap-3 text-orange-700 dark:text-orange-400">
+                <FileJson className="h-6 w-6" />
+                3. Import dari JSON
+              </h3>
+              <div className="bg-orange-50/50 dark:bg-orange-900/20 p-5 rounded-2xl border border-orange-100 dark:border-orange-800/50 space-y-3">
+                <p className="text-sm text-slate-700 dark:text-slate-300">Gunakan field <b className="text-orange-600">groupId</b> dan <b className="text-orange-600">groupText</b> untuk literasi. Bisa juga minta ChatGPT buatkan soal dengan format ini.</p>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-black text-orange-600 uppercase tracking-widest">Template Prompt untuk ChatGPT (Klik untuk Salin):</p>
+                  <div
+                    onClick={() => {
+                      const prompt = `Buatkan 10 soal pilihan ganda untuk mata pelajaran [ISI MAPEL] kelas [ISI KELAS] dengan format JSON berikut. Gunakan format KaTeX \\(...\\) untuk rumus matematika. Untuk soal literasi, isi groupId dan groupText.
 
 Format JSON:
 [{"text": "<p>Teks pertanyaan \\\\(rumus\\\\) ...</p>","type": "pilihan_ganda","groupId": "","groupText": "","choices": {"a": {"isCorrect": false,"text": "Pilihan A"},"b": {"isCorrect": false,"text": "Pilihan B"},"c": {"isCorrect": true,"text": "Pilihan C"},"d": {"isCorrect": false,"text": "Pilihan D"},"e": {"isCorrect": false,"text": "Pilihan E"}},"answerKey": "c","order": 1}]
@@ -5534,562 +6195,58 @@ Aturan:
 - Untuk rumus: gunakan \\\\(...\\\\) sebagai delimiter
 - answerKey: huruf kecil dari jawaban benar
 - Output HANYA JSON array, tanpa penjelasan`;
-                                      navigator.clipboard.writeText(prompt);
-                                      addToast({ title: "Tersalin!", description: "Prompt template sudah di-copy. Paste ke ChatGPT.", type: "success", duration: 3000 });
-                                    }}
-                                    className="p-3 bg-white dark:bg-slate-900 border border-orange-200 dark:border-orange-800 rounded-xl cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-all group"
-                                  >
-                                    <code className="text-xs font-mono text-slate-600 dark:text-slate-400 leading-relaxed block">
-                                      Buatkan 10 soal pilihan ganda untuk mata pelajaran [MAPEL] kelas [KELAS] dengan format JSON... (klik untuk salin prompt lengkap)
-                                    </code>
-                                    <div className="flex items-center gap-1.5 mt-2 text-xs font-bold text-orange-500 group-hover:text-orange-700">
-                                      <Copy className="w-3 h-3" /> Klik untuk salin prompt ke ChatGPT
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                  <p className="text-xs font-black text-orange-600 uppercase tracking-widest">Contoh Hasil JSON (Klik untuk Salin):</p>
-                                  <div
-                                    onClick={() => {
-                                      const sample = JSON.stringify([{ "text": "<p>Perangkat keras komputer yang berfungsi menampilkan hasil proses adalah ...</p>", "type": "pilihan_ganda", "groupId": "", "groupText": "", "choices": { "a": { "isCorrect": false, "text": "Keyboard" }, "b": { "isCorrect": false, "text": "Mouse" }, "c": { "isCorrect": true, "text": "Monitor" }, "d": { "isCorrect": false, "text": "Scanner" }, "e": { "isCorrect": false, "text": "Microphone" } }, "answerKey": "c", "order": 1 }], null, 2);
-                                      navigator.clipboard.writeText(sample);
-                                      addToast({ title: "Tersalin!", description: "Contoh JSON sudah di-copy.", type: "success", duration: 3000 });
-                                    }}
-                                    className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl cursor-pointer hover:bg-slate-50 transition-all group max-h-24 overflow-hidden"
-                                  >
-                                    <code className="text-xs font-mono text-slate-500 leading-relaxed block">
-                                      {'[{"text":"<p>Perangkat keras...</p>","type":"pilihan_ganda","choices":{"a":{"isCorrect":false,"text":"Keyboard"},...},"answerKey":"c"}]'}
-                                    </code>
-                                    <div className="flex items-center gap-1.5 mt-2 text-xs font-bold text-slate-400 group-hover:text-indigo-600">
-                                      <Copy className="w-3 h-3" /> Klik untuk salin contoh JSON
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <p className="text-xs text-orange-600/80 italic">Paste hasil dari ChatGPT ke tab "Import JSON" di Smart AI Import. Tidak perlu API key.</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <DialogFooter className="p-6 bg-slate-50 dark:bg-slate-900/50 flex flex-col sm:flex-row justify-between gap-3 items-center">
-                            <div className="text-xs text-slate-400 italic">Pastikan format file sesuai panduan.</div>
-                            <div className="flex gap-2">
-                              <Button onClick={() => setIsLiterasiGuideOpen(false)} variant="ghost" className="rounded-xl px-6 font-bold text-slate-500 hover:text-slate-700">Tutup</Button>
-                              <Button onClick={() => { setIsLiterasiGuideOpen(false); downloadWordTemplateLiterasi(); }} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-6 font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2">
-                                <Download className="h-4 w-4" />
-                                Download Word
-                              </Button>
-                            </div>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-
-                      {questions.length > 0 && selectedIds.length > 0 && isOwner && (
-                        <>
-                          <Button
-                            onClick={() => setBulkDeleteDialogOpen(true)}
-                            variant="default"
-                            size="sm"
-                            className="bg-orange-600 hover:bg-orange-700 dark:bg-orange-950/40 dark:text-orange-400 dark:border dark:border-orange-800/40 text-white rounded-2xl font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-95 flex items-center gap-2 h-9 px-4 text-xs"
-                          >
-                            <Trash className="h-3.5 w-3.5" />
-                            Hapus ({selectedIds.length})
-                          </Button>
-                          <Button
-                            onClick={handleExportSelectedToWord}
-                            variant="secondary"
-                            size="sm"
-                            className="rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/30 font-bold h-9 px-4 text-xs"
-                          >
-                            <Download className="h-3.5 w-3.5 mr-1.5" />
-                            Word
-                          </Button>
-                          <Button
-                            onClick={handleExportSelectedToJson}
-                            variant="secondary"
-                            size="sm"
-                            className="rounded-2xl bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-bold h-9 px-4 text-xs"
-                          >
-                            <FileJson className="h-3.5 w-3.5 mr-1.5" />
-                            JSON
-                          </Button>
-                        </>
-                      )}
-
-                      {isOwner && (
-                        <>
-                          {((questions.length > 0 && selectedIds.length === 0) || role === "admin" || examId) && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  className="rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-700 font-bold shadow-sm transition-all h-9 px-4"
-                                >
-                                  <MoreHorizontal className="mr-1.5 h-3.5 w-3.5" />
-                                  Lainnya
-                                  <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                                <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Aksi Lainnya</DropdownMenuLabel>
-                                {examId && (
-                                  <DropdownMenuItem
-                                    onClick={() => navigate(`/admin/simulate/${examId}`)}
-                                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
-                                  >
-                                    <Eye className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Simulasi Ujian</span>
-                                  </DropdownMenuItem>
-                                )}
-                                {role === "admin" && (
-                                  <DropdownMenuItem
-                                    onClick={() => setIsRepoDialogOpen(true)}
-                                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
-                                  >
-                                    <Database className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Bank / Wayground</span>
-                                  </DropdownMenuItem>
-                                )}
-                                {questions.length > 0 && selectedIds.length === 0 && (
-                                  <>
-                                    <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-                                    <DropdownMenuItem
-                                      onClick={() => setDeleteAllDialogOpen(true)}
-                                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                                    >
-                                      <Trash className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                                      <span className="text-sm font-semibold text-rose-600 dark:text-rose-400">Hapus Semua Soal</span>
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                          <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm transition-all h-9 px-4"
-                            >
-                              <Plus className="mr-1.5 h-3.5 w-3.5" />
-                              Tambah
-                              <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
-                            </Button>
-                          </DropdownMenuTrigger><DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                            <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Opsi Pembuatan</DropdownMenuLabel>
-
-                            <DropdownMenuItem
-                              onClick={handleCreateClick}
-                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                            >
-                              <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Plus className="h-5 w-5" />
-                              </div>
-                              <div className="flex flex-col min-w-0 text-left">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Tambah Soal</span>
-                                <span className="text-xs text-slate-400 mt-1">Input manual satu per satu</span>
-                              </div>
-                            </DropdownMenuItem>
-
-                            {role === "admin" && (
-                              <DropdownMenuItem
-                                onClick={() => setIsRepoDialogOpen(true)}
-                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                              >
-                                <div className="h-10 w-10 shrink-0 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-                                  <Database className="h-5 w-5" />
-                                </div>
-                                <div className="flex flex-col min-w-0 text-left">
-                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Ambil dari Bank / Wayground</span>
-                                  <span className="text-xs text-slate-400 mt-1">Impor soal lama atau Wayground API</span>
-                                </div>
-                              </DropdownMenuItem>
-                            )}
-
-
-
-
-                            <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-
-                            {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
-                              <>
-                                <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Fitur Cerdas AI</DropdownMenuLabel>
-                                <DropdownMenuItem
-                                  onClick={() => setIsAIModalOpen(true)}
-                                  className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                                >
-                                  <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-                                    <Sparkles className="h-5 w-5" />
-                                  </div>
-                                  <div className="flex flex-col min-w-0 text-left">
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Generasi AI</span>
-                                    <span className="text-xs text-slate-400 mt-1">Buat soal otomatis dari materi</span>
-                                  </div>
-                                </DropdownMenuItem>
-
-                                <DropdownMenuItem
-                                  onClick={() => setIsAIImportOpen(true)}
-                                  className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                                >
-                                  <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-                                    <FileText className="h-5 w-5" />
-                                  </div>
-                                  <div className="flex flex-col min-w-0 text-left">
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Smart AI Import (PDF)</span>
-                                    <span className="text-xs text-slate-400 mt-1">Ekstrak soal otomatis dari PDF</span>
-                                  </div>
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        </>
-                      )}
+                      navigator.clipboard.writeText(prompt);
+                      addToast({ title: "Tersalin!", description: "Prompt template sudah di-copy. Paste ke ChatGPT.", type: "success", duration: 3000 });
+                    }}
+                    className="p-3 bg-white dark:bg-slate-900 border border-orange-200 dark:border-orange-800 rounded-xl cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-all group"
+                  >
+                    <code className="text-xs font-mono text-slate-600 dark:text-slate-400 leading-relaxed block">
+                      Buatkan 10 soal pilihan ganda untuk mata pelajaran [MAPEL] kelas [KELAS] dengan format JSON... (klik untuk salin prompt lengkap)
+                    </code>
+                    <div className="flex items-center gap-1.5 mt-2 text-xs font-bold text-orange-500 group-hover:text-orange-700">
+                      <Copy className="w-3 h-3" /> Klik untuk salin prompt ke ChatGPT
                     </div>
-                    {/* MOBILE (<sm): [+ Tambah] + menu ⋯ */}
-                    <div className="flex sm:hidden items-center gap-2 w-full">
-                      <Button
-                        onClick={handleCreateClick}
-                        size="sm"
-                        className="flex-1 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-700 text-white font-bold shadow-sm transition-all h-10 px-4 dark:bg-blue-600 dark:hover:bg-blue-500 dark:text-white"
-                      >
-                        <Plus className="mr-1.5 h-4 w-4" />
-                        Tambah
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="h-10 w-10 shrink-0 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-sm"
-                            aria-label="Menu lainnya"
-                          >
-                            <MoreHorizontal className="h-5 w-5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Soal</DropdownMenuLabel>
-
-                          <DropdownMenuItem
-                            className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
-                            onClick={() => document.getElementById("unified-import-input")?.click()}
-                          >
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <Download className="h-5 w-5 rotate-180" />
-                            </div>
-                            <div className="flex flex-col min-w-0 text-left">
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import Soal</span>
-                              <span className="text-xs text-slate-400 mt-1">Excel, Word, atau JSON</span>
-                            </div>
-                          </DropdownMenuItem>
-
-                          {questions.length > 0 && (
-                            <DropdownMenuItem
-                              onClick={handleExportToWord}
-                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                            >
-                              <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <FileText className="h-5 w-5" />
-                              </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Export ke Word</span>
-                                <span className="text-xs text-slate-400 mt-1">Simpan naskah & kunci</span>
-                              </div>
-                            </DropdownMenuItem>
-                          )}
-
-                          {questions.length > 0 && (
-                            <DropdownMenuItem
-                              onClick={handleExportToJson}
-                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                            >
-                              <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <FileJson className="h-5 w-5" />
-                              </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Export ke JSON</span>
-                                <span className="text-xs text-slate-400 mt-1">Format data mentah</span>
-                              </div>
-                            </DropdownMenuItem>
-                          )}
-
-                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-                          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Template Format</DropdownMenuLabel>
-
-                          <DropdownMenuItem
-                            onClick={() => downloadQuestionTemplate()}
-                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                          >
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <Download className="h-5 w-5" />
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Template Excel</span>
-                              <span className="text-xs text-slate-400 mt-1">Download format standard</span>
-                            </div>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem
-                            onClick={() => window.open("/templates/Template_Soal_Tabel.docx")}
-                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                          >
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <FileText className="h-5 w-5" />
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Template Word</span>
-                              <span className="text-xs text-slate-400 mt-0.5">Format tabel + literasi + rumus</span>
-                            </div>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem
-                            onClick={() => setIsLiterasiGuideOpen(true)}
-                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group border border-dashed border-sky-200 bg-sky-50/30 mt-2"
-                          >
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-sky-100 dark:bg-sky-900/30 text-sky-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <BookOpen className="h-5 w-5" />
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-bold text-sky-700 dark:text-sky-300 leading-tight">Panduan Literasi</span>
-                              <span className="text-xs text-sky-500 mt-1">WAJIB BACA: Cara buat soal AKM</span>
-                            </div>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-                          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Aksi Lainnya</DropdownMenuLabel>
-
-                          {examId && (
-                            <DropdownMenuItem
-                              onClick={() => navigate(`/admin/simulate/${examId}`)}
-                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
-                            >
-                              <Eye className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Simulasi Ujian</span>
-                            </DropdownMenuItem>
-                          )}
-                          {role === "admin" && (
-                            <DropdownMenuItem
-                              onClick={() => setIsRepoDialogOpen(true)}
-                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
-                            >
-                              <Database className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Bank / Wayground</span>
-                            </DropdownMenuItem>
-                          )}
-                          {questions.length > 0 && selectedIds.length === 0 && (
-                            <DropdownMenuItem
-                              onClick={() => setDeleteAllDialogOpen(true)}
-                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                            >
-                              <Trash className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                              <span className="text-sm font-semibold text-rose-600 dark:text-rose-400">Hapus Semua Soal</span>
-                            </DropdownMenuItem>
-                          )}
-
-                          {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
-                            <>
-                              <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-                              <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Fitur Cerdas AI</DropdownMenuLabel>
-                              <DropdownMenuItem
-                                onClick={() => setIsAIModalOpen(true)}
-                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                              >
-                                <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-                                  <Sparkles className="h-5 w-5" />
-                                </div>
-                                <div className="flex flex-col min-w-0 text-left">
-                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Generasi AI</span>
-                                  <span className="text-xs text-slate-400 mt-1">Buat soal otomatis dari materi</span>
-                                </div>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => setIsAIImportOpen(true)}
-                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                              >
-                                <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-                                  <FileText className="h-5 w-5" />
-                                </div>
-                                <div className="flex flex-col min-w-0 text-left">
-                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Smart AI Import (PDF)</span>
-                                  <span className="text-xs text-slate-400 mt-1">Ekstrak soal otomatis dari PDF</span>
-                                </div>
-                              </DropdownMenuItem>
-                            </>
-                          )}
-
-                          {questions.length > 0 && selectedIds.length > 0 && (
-                            <>
-                              <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-                              <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Soal Terpilih ({selectedIds.length})</DropdownMenuLabel>
-                              <DropdownMenuItem
-                                onClick={() => setBulkDeleteDialogOpen(true)}
-                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors group"
-                              >
-                                <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                  <Trash className="h-5 w-5" />
-                                </div>
-                                <div className="flex flex-col min-w-0 text-left">
-                                  <span className="text-sm font-bold text-rose-600 dark:text-rose-400 leading-tight">Hapus Terpilih ({selectedIds.length})</span>
-                                  <span className="text-xs text-slate-400 mt-1">Hapus soal yang dicentang</span>
-                                </div>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={handleExportSelectedToWord}
-                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
-                              >
-                                <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                  <FileText className="h-5 w-5" />
-                                </div>
-                                <div className="flex flex-col min-w-0 text-left">
-                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export Terpilih ke Word</span>
-                                  <span className="text-xs text-slate-400 mt-1">Naskah & kunci soal terpilih</span>
-                                </div>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={handleExportSelectedToJson}
-                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
-                              >
-                                <div className="h-10 w-10 shrink-0 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                  <FileJson className="h-5 w-5" />
-                                </div>
-                                <div className="flex flex-col min-w-0 text-left">
-                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export Terpilih ke JSON</span>
-                                  <span className="text-xs text-slate-400 mt-1">Format data mentah</span>
-                                </div>
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    </>
-                  )}
+                  </div>
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
 
-      <div className="space-y-3">
-        {loading ? (
-          <Card>
-            <CardHeader className="p-4">
-              <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Soal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-card border rounded-2xl shadow-sm border-slate-200/60 dark:border-slate-800 overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
-                    <TableRow>
-                      <TableHead className="w-[40px] px-4">
-                        <Skeleton className="h-4 w-4" />
-                      </TableHead>
-                      <TableHead className="w-[50px] uppercase tracking-wide text-xs">No</TableHead>
-                      <TableHead className="uppercase tracking-wide text-xs">Teks Pertanyaan</TableHead>
-                      <TableHead className="min-w-[120px] uppercase tracking-wide text-xs">Tipe Soal</TableHead>
-                      <TableHead className="min-w-[150px] uppercase tracking-wide text-xs">Detil Jawaban</TableHead>
-                      <TableHead className="text-right pr-6 uppercase tracking-wide text-xs">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="px-4"><Skeleton className="h-4 w-4" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                        <TableCell>
-                          <div className="space-y-2 max-w-lg min-w-[250px]">
-                            <Skeleton className="h-4 w-full" />
-                            <div className="flex gap-1.5">
-                              <Skeleton className="h-3 w-20 rounded-md" />
-                              <Skeleton className="h-3 w-24 rounded-md" />
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-6 w-24 rounded-md" />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1.5">
-                            <Skeleton className="h-5 w-16 rounded-md" />
-                            <Skeleton className="h-5 w-20 rounded-md" />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right pr-6">
-                          <div className="flex justify-end gap-1.5">
-                            <Skeleton className="h-8 w-8 rounded-lg" />
-                            <Skeleton className="h-8 w-8 rounded-lg" />
-                            <Skeleton className="h-8 w-8 rounded-lg" />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="space-y-2">
+                  <p className="text-xs font-black text-orange-600 uppercase tracking-widest">Contoh Hasil JSON (Klik untuk Salin):</p>
+                  <div
+                    onClick={() => {
+                      const sample = JSON.stringify([{ "text": "<p>Perangkat keras komputer yang berfungsi menampilkan hasil proses adalah ...</p>", "type": "pilihan_ganda", "groupId": "", "groupText": "", "choices": { "a": { "isCorrect": false, "text": "Keyboard" }, "b": { "isCorrect": false, "text": "Mouse" }, "c": { "isCorrect": true, "text": "Monitor" }, "d": { "isCorrect": false, "text": "Scanner" }, "e": { "isCorrect": false, "text": "Microphone" } }, "answerKey": "c", "order": 1 }], null, 2);
+                      navigator.clipboard.writeText(sample);
+                      addToast({ title: "Tersalin!", description: "Contoh JSON sudah di-copy.", type: "success", duration: 3000 });
+                    }}
+                    className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl cursor-pointer hover:bg-slate-50 transition-all group max-h-24 overflow-hidden"
+                  >
+                    <code className="text-xs font-mono text-slate-500 leading-relaxed block">
+                      {'[{"text":"<p>Perangkat keras...</p>","type":"pilihan_ganda","choices":{"a":{"isCorrect":false,"text":"Keyboard"},...},"answerKey":"c"}]'}
+                    </code>
+                    <div className="flex items-center gap-1.5 mt-2 text-xs font-bold text-slate-400 group-hover:text-indigo-600">
+                      <Copy className="w-3 h-3" /> Klik untuk salin contoh JSON
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-orange-600/80 italic">Paste hasil dari ChatGPT ke tab "Import JSON" di Smart AI Import. Tidak perlu API key.</p>
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {questions.length === 0 ? (
-              <div className="text-center py-12 px-4 border bg-card rounded-2xl">
-                <FileText className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Belum ada soal untuk ujian ini.</p>
-              </div>
-            ) : (
-              <Card>
-                <CardHeader className="p-4">
-                  <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Soal</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <DataTable
-                    data={questions}
-                    columns={columns}
-                    searchPlaceholder="Cari soal..."
-                    emptyMessage="Tidak ada soal ditemukan."
-                    actions={(q: QuestionData) => (
-                      <div className="flex justify-end items-center gap-1.5 whitespace-nowrap">
-                        <button
-                          className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-xl dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40 transition-all hover:scale-110"
-                          onClick={() => {
-                            const idx = questions.findIndex(item => item.id === q.id);
-                            setPreviewIndex(idx >= 0 ? idx : 0);
-                            setPreviewQuestion(q);
-                            setIsPreviewOpen(true);
-                          }}
-                          title="Pratinjau Soal"
-                        >
-                          <Search className="h-4 w-4" />
-                        </button>
-                        {isOwner && (
-                          <>
-                            <button
-                              className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40 transition-all hover:scale-110"
-                              onClick={() => handleEditClick(q)}
-                              title="Edit Soal"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40 transition-all hover:scale-110"
-                              onClick={() => handleDeleteClick(q)}
-                              title="Hapus Soal"
-                            >
-                              <Trash className="h-4 w-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-            )}
+            </div>
           </div>
-        )}
+
+          <DialogFooter className="p-6 bg-slate-50 dark:bg-slate-900/50 flex flex-col sm:flex-row justify-between gap-3 items-center border-t border-neutral-200 dark:border-neutral-800">
+            <div className="text-xs text-slate-400 italic">Pastikan format file sesuai panduan.</div>
+            <div className="flex gap-2">
+              <Button onClick={() => setIsLiterasiGuideOpen(false)} variant="ghost" className="rounded-xl px-6 font-bold text-slate-500 hover:text-slate-700">Tutup</Button>
+              <Button onClick={() => { setIsLiterasiGuideOpen(false); downloadWordTemplateLiterasi(); }} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-6 font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                Download Word
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div>
 
         {/* Dialog for Create/Edit Question */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

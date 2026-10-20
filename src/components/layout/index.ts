@@ -10,6 +10,9 @@ export * from "./LoadingScreen";
 export { default as SuperAdminLayout } from "./SuperAdminLayout";
 export * from "./SuperAdminLayout";
 
+export { default as AdminLayout } from "./AdminLayout";
+export * from "./AdminLayout";
+
 export { default as InventoryLayout } from "./InventoryLayout";
 export * from "./InventoryLayout";
 

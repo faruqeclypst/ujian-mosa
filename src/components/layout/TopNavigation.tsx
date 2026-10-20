@@ -1,4 +1,4 @@
-import { LogOut, Menu, Search, User, Settings, Clock, Bell, ShieldAlert, Unlock, UserX, Sun, Moon, Monitor, Sparkles, KeyRound, Check, X, Loader2 } from "lucide-react";
+import { LogOut, Menu, Search, User, Settings, Clock, Bell, ShieldAlert, Unlock, UserX, Sun, Moon, Monitor, Sparkles, KeyRound, Check, X, Loader2, Rocket, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 
@@ -275,59 +275,91 @@ const TopNavigation = () => {
   };
 
   return (
-    <header className="flex w-full items-center gap-2 sm:gap-4 border-b bg-card/95 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-3 shadow-sm shrink-0 relative z-30">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="lg:hidden shrink-0 touch-manipulation hover:bg-accent min-h-[44px] min-w-[44px]"
-        onClick={() => setMobileOpen(true)}
-      >
-        <Menu className="h-5 w-5" />
-        <span className="sr-only">Menu</span>
-      </Button>
-      <div className="flex-1" />
+    <header className="flex w-full items-center justify-between border-b border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-[#0c0d0e]/95 backdrop-blur-xs px-3 sm:px-6 shrink-0 relative z-30 h-[52px]">
+      {/* Left: Mobile Toggle & Project Switcher */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden shrink-0 touch-manipulation hover:bg-neutral-100 dark:hover:bg-neutral-800 h-8 w-8 rounded-md"
+          onClick={() => setMobileOpen(true)}
+        >
+          <Menu className="h-4 w-4" />
+          <span className="sr-only">Menu</span>
+        </Button>
 
-      {/* Universal Token */}
-      {!universalToken && useExamData().loading ? (
-        <Skeleton className="h-8 w-24 rounded-lg hidden sm:block" />
-      ) : universalToken && (
-        <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-lg text-amber-700 dark:text-amber-400 shadow-sm shrink-0">
-          <span className="text-xs sm:text-sm font-black font-mono tracking-widest tabular-nums">{universalToken}</span>
-          {timeLeft && <span className="text-[10px] font-medium text-amber-600 dark:text-amber-500 opacity-80 border-l pl-1.5 border-amber-200 dark:border-amber-800/40">{timeLeft}</span>}
+        <div className="flex items-center gap-1.5 text-xs text-neutral-800 dark:text-neutral-200 select-none">
+          <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+            {school?.slug || "ppdb"}
+          </span>
+          <span className="text-neutral-400">/</span>
+          <span className="font-medium text-neutral-600 dark:text-neutral-300 flex items-center gap-1">
+            production
+            <ChevronDown className="h-3 w-3 text-neutral-400" />
+          </span>
         </div>
-      )}
+      </div>
 
-      {/* Live Clock - Hidden on Mobile */}
-      {!currentTime ? (
-        <Skeleton className="h-8 w-24 rounded-lg hidden sm:block" />
-      ) : (
-        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-lg text-slate-600 dark:text-slate-300 shadow-sm shrink-0">
-          <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-          <span className="text-xs sm:text-sm font-semibold tabular-nums tracking-wide">{currentTime}</span>
-        </div>
-      )}
+      {/* Right Controls */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <Link
+          to="/admin/invoice"
+          className="hidden sm:inline-flex items-center gap-1.5 h-7 px-2.5 text-xs font-medium text-neutral-800 dark:text-neutral-200 bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-700/80 rounded-md hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors shadow-2xs select-none"
+        >
+          <Rocket className="h-3 w-3 text-neutral-500 dark:text-neutral-400" />
+          <span>Upgrade</span>
+        </Link>
 
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Notification Bell */}
-        <div className="relative" ref={notifRef}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "relative min-h-[44px] min-w-[44px] h-10 w-10 sm:h-10 sm:w-10 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
-              isNotifOpen && "bg-slate-100 dark:bg-slate-800"
-            )}
-            onClick={() => setIsNotifOpen(!isNotifOpen)}
+        {/* Universal Token (Neon Console Badge) */}
+        {!universalToken && useExamData().loading ? (
+          <Skeleton className="h-7 w-20 rounded-md hidden sm:block" />
+        ) : universalToken && (
+          <div
+            title="Token Ujian Aktif"
+            className="flex items-center gap-1.5 h-7 px-2 bg-neutral-100 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 rounded-md text-neutral-800 dark:text-neutral-200 select-none shadow-2xs shrink-0"
           >
-            <Bell className={cn("h-5 w-5", totalNotifications > 0 ? "text-red-500 animate-pulse-slow" : "text-slate-500")} />
+            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-mono font-bold tracking-wider text-amber-600 dark:text-amber-400">
+              {universalToken}
+            </span>
+            {timeLeft && (
+              <span className="text-[10px] font-mono text-neutral-500 dark:text-neutral-400 border-l border-neutral-200 dark:border-neutral-700 pl-1.5">
+                {timeLeft}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Live Clock (Neon Console Clean Time) */}
+        {!currentTime ? (
+          <Skeleton className="h-7 w-16 rounded-md hidden sm:block" />
+        ) : (
+          <div className="hidden sm:flex items-center gap-1.5 h-7 px-2 text-xs font-mono text-neutral-500 dark:text-neutral-400 select-none shrink-0">
+            <Clock className="w-3.5 h-3.5 text-neutral-400" />
+            <span className="tabular-nums">{currentTime}</span>
+          </div>
+        )}
+
+        {/* Notification Bell (Neon Style) */}
+        <div className="relative" ref={notifRef}>
+          <button
+            type="button"
+            onClick={() => setIsNotifOpen(!isNotifOpen)}
+            className={cn(
+              "relative h-7 w-7 rounded-md flex items-center justify-center text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer",
+              isNotifOpen && "bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
+            )}
+            title="Notifikasi"
+          >
+            <Bell className={cn("h-3.5 w-3.5", totalNotifications > 0 ? "text-red-500 animate-pulse-slow" : "text-neutral-500")} />
             {totalNotifications > 0 && (
-              <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              <span className="absolute top-1 right-1 flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
               </span>
             )}
             <span className="sr-only">Notifikasi</span>
-          </Button>
+          </button>
 
           {/* Notif Dropdown */}
           {isNotifOpen && (
@@ -545,32 +577,24 @@ const TopNavigation = () => {
           )}
         </div>
 
-        {!user ? (
-          <div className="hidden md:flex md:flex-col gap-2 min-w-0">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-3 w-32" />
-          </div>
-        ) : (
-          <div className="hidden text-right md:flex md:flex-col min-w-0">
-            <span className="text-sm font-medium text-foreground truncate">{displayName}</span>
-            <span className="text-xs text-muted-foreground truncate">{user?.email ?? ""}</span>
-          </div>
-        )}
-
-        {/* Profile Dropdown */}
+        {/* Profile Dropdown Trigger */}
         <div className="relative" ref={dropdownRef}>
-          <Button
-            variant="ghost"
-            className="relative min-h-[44px] min-w-[44px] h-10 w-10 sm:h-10 sm:w-10 rounded-full p-0 hover:bg-transparent touch-manipulation"
+          <button
+            type="button"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="flex items-center gap-1.5 h-7 px-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 text-xs font-medium text-neutral-800 dark:text-neutral-200 transition-colors select-none cursor-pointer"
           >
-            <Avatar className="h-9 w-9 sm:h-10 sm:w-10">
+            <Avatar className="h-5 w-5 rounded-full ring-1 ring-neutral-200/80 dark:ring-neutral-700/80">
               <AvatarImage src={(user as any)?.avatar || undefined} alt={displayName} />
-              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xs sm:text-sm">
-                {initials}
+              <AvatarFallback className="bg-red-600 text-white text-[10px] font-bold">
+                {initials[0]}
               </AvatarFallback>
             </Avatar>
-          </Button>
+            <span className="font-medium text-xs text-neutral-800 dark:text-neutral-200 truncate max-w-[100px]">
+              {displayName}
+            </span>
+            <ChevronDown className="h-3 w-3 text-neutral-400" />
+          </button>
 
           {/* Dropdown Menu */}
           {isDropdownOpen && (

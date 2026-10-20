@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useTenant } from "../context/TenantContext";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -9,15 +10,27 @@ import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
 import { StudentTable } from "../components/tables/StudentTable";
 import { ExportButton } from "../components/ui/export-button";
 import { exportStudentToExcel } from "../lib/studentExcel";
-import { ArrowLeftRight, Check, X, RotateCw, Trash, Users } from "lucide-react";
+import { ArrowLeftRight, Check, X, RotateCw, Trash, Users, GraduationCap, Sparkles, User, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import FormField from "../components/forms/FormField";
 import { Select } from "../components/ui/select";
 import type { StudentData } from "../types/exam";
+import { NeonStatGrid, NeonStatCard } from "../components/ui/NeonStats";
+import { cn } from "../lib/utils";
+import {
+  NeonInspector,
+  InspectorSection,
+  InspectorHeader,
+  InspectorField,
+  InspectorGrid,
+  InspectorActions,
+  InspectorButton,
+  InspectorEmpty,
+} from "../components/ui/NeonInspector";
 
 const AlumniPage = () => {
   const { students, classes, loading, deleteStudent, updateStudent, updateStudentClassBatch } = useExamData();
-  const { terminology } = useTenant();
+  const { terminology, school } = useTenant();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<StudentData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -50,6 +63,17 @@ const AlumniPage = () => {
       .filter((s) => s.classId === "ALUMNI")
       .map((s) => ({ ...s, className: "Alumni / Lulus" }));
   }, [students]);
+
+  // ── Inspector State & Memo ──
+  const [inspectedAlumniId, setInspectedAlumniId] = useState<string | null>(null);
+
+  const inspectedAlumni = useMemo(() => {
+    if (inspectedAlumniId) {
+      const found = mappedStudents.find((s) => s.id === inspectedAlumniId);
+      if (found) return found;
+    }
+    return mappedStudents[0] || null;
+  }, [inspectedAlumniId, mappedStudents]);
 
   const sortedClasses = useMemo(() => {
     return [...classes].sort((a, b) => 
@@ -127,39 +151,86 @@ const AlumniPage = () => {
     );
   };
 
-  return (
-    <div className="space-y-5">
-      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
-            Data Alumni / Lulusan
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Daftar {terminology.student.toLowerCase()} yang sudah lulus atau menyelesaikan pendidikan.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {loading ? (
-            <Skeleton className="h-9 w-28 rounded-xl" />
-          ) : (
-            <ExportButton onExport={() => exportStudentToExcel({ students: mappedStudents, classes, filename: "data-alumni.xlsx" })} />
-          )}
-        </div>
-      </div>
+  const schoolSlug = school?.slug || school?.name?.toLowerCase().replace(/\s+/g, "-") || "modalbangsa";
 
-      {selectedIds.length > 0 && (
-        <div className="flex items-center justify-between">
-          <div className="flex flex-wrap items-center gap-3">
+  return (
+    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+      <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
+        {/* ── Page Header Bar (Title, Breadcrumb & Primary Actions) ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+              Data Alumni / Lulusan
+            </h1>
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+              <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
+                Semua Modul
+              </Link>
+              <span>/</span>
+              <span className="text-neutral-700 dark:text-neutral-300 font-medium">{schoolSlug}</span>
+              <span>/</span>
+              <span className="text-neutral-500 dark:text-neutral-400">master-data</span>
+              <span>/</span>
+              <span className="text-neutral-900 dark:text-neutral-100 font-semibold">alumni</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {loading ? (
+              <Skeleton className="h-8 w-28 rounded-lg" />
+            ) : (
+              <ExportButton 
+                onExport={() => exportStudentToExcel({ students: mappedStudents, classes, filename: "data-alumni.xlsx" })} 
+              />
+            )}
+          </div>
+        </div>
+
+        {/* ── Top Stats Strip (3 Kartu Ringkas) ── */}
+        <NeonStatGrid cols={3}>
+          <NeonStatCard
+            label="Total Alumni"
+            value={String(mappedStudents.length)}
+            unit="alumni"
+            subText="Siswa yang telah menyelesaikan pendidikan"
+            isLoading={loading}
+          />
+          <NeonStatCard
+            label="Status Data"
+            value="Arsip Lulus"
+            unit=""
+            indicator={true}
+            subText="Bisa dipulihkan kapan saja ke rombel aktif"
+            isLoading={loading}
+          />
+          <NeonStatCard
+            label={`Rombel ${terminology.class} Tersedia`}
+            value={String(sortedClasses.length)}
+            unit="kelas"
+            subText="Pilihan tujuan pemulihan kelas"
+            isLoading={loading}
+          />
+        </NeonStatGrid>
+
+        {selectedIds.length > 0 && (
+          <div className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 flex flex-wrap items-center gap-2.5">
             <Dialog open={isBatchOpen} onOpenChange={setIsBatchOpen}>
               <DialogTrigger asChild>
-                <Button variant="default" className="bg-orange-600 hover:bg-orange-700 h-9 text-xs">
-                  <ArrowLeftRight className="mr-2 h-4 w-4" />
-                  Pindah/Kembalikan ke {terminology.class} ({selectedIds.length})
+                <Button 
+                  size="sm" 
+                  className="h-8 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <ArrowLeftRight className="h-3.5 w-3.5" />
+                  <span>Pindah/Kembalikan ke {terminology.class} ({selectedIds.length})</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-md bg-white dark:bg-[#0c0d0e] border border-neutral-200 dark:border-neutral-800">
                 <DialogHeader>
-                  <DialogTitle>Kembalikan ke {terminology.class}</DialogTitle>
+                  <DialogTitle className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Kembalikan ke {terminology.class}
+                  </DialogTitle>
                 </DialogHeader>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
                   Pindahkan {selectedIds.length} {terminology.student.toLowerCase()} terpilih ke {terminology.class.toLowerCase()} tujuan.
                 </p>
                 
@@ -175,7 +246,11 @@ const AlumniPage = () => {
                   
                   <div className="flex justify-end gap-2 pt-2">
                     <Button variant="outline" onClick={() => setIsBatchOpen(false)}>Batal</Button>
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleBatchUpdateClass} disabled={!targetClassId}>
+                    <Button 
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-xs" 
+                      onClick={handleBatchUpdateClass} 
+                      disabled={!targetClassId}
+                    >
                       Proses
                     </Button>
                   </div>
@@ -186,112 +261,180 @@ const AlumniPage = () => {
             <Button 
               variant="outline" 
               size="sm" 
-              className="hover:bg-green-50 hover:text-green-600 h-9 text-xs border-dashed border-green-200"
+              className="h-8 px-3 text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
               onClick={handleBatchRestore}
             >
-              <Check className="mr-1 w-4 h-4" /> Pulihkan Tanpa {terminology.class}
+              <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Pulihkan Tanpa {terminology.class}</span>
             </Button>
           </div>
+        )}
+
+        {/* ── Main Content Grid: Table + Right Inspector ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-6 items-start">
+          <div className="min-w-0 space-y-6">
+            <StudentTable 
+              students={mappedStudents} 
+              classes={classes}
+              selectedIds={selectedIds} 
+              onSelectChange={setSelectedIds} 
+              onEdit={() => {}} 
+              onDelete={handleDeleteClick} 
+              title="Daftar Alumni"
+              tableLoading={loading}
+              activeKey={inspectedAlumni?.id}
+              onRowClick={(std) => setInspectedAlumniId(std.id)}
+              customActions={(student) => (
+                <div className="flex justify-end gap-1.5 items-center">
+                  <button 
+                    className="p-1.5 bg-neutral-50 dark:bg-neutral-850 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg border border-neutral-200 dark:border-neutral-800 transition-colors cursor-pointer"
+                    onClick={() => handleRestore(student.id)}
+                    title={`Pulihkan ${terminology.student}`}
+                  >
+                    <RotateCw className="h-3.5 w-3.5" />
+                  </button>
+                  <button 
+                    className="p-1.5 bg-neutral-50 dark:bg-neutral-850 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg border border-neutral-200 dark:border-neutral-800 transition-colors cursor-pointer"
+                    onClick={() => handleDeleteClick(student)}
+                    title={`Hapus ${terminology.student}`}
+                  >
+                    <Trash className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+            />
+          </div>
+
+          {/* ── Right Sidebar / Inspector Panel ── */}
+          <NeonInspector>
+            <InspectorSection>
+              <InspectorHeader
+                title="Detail Alumni"
+                icon={GraduationCap}
+                badge={inspectedAlumni ? "Terpilih" : "Ringkasan"}
+              />
+
+              {inspectedAlumni ? (
+                <div className="space-y-3.5 text-xs">
+                  {/* Alumni Profile Card */}
+                  <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850/60 border border-neutral-200/80 dark:border-neutral-800 flex items-center gap-3">
+                    <div className={cn(
+                      "w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border",
+                      inspectedAlumni.gender === "P"
+                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                        : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                    )}>
+                      {inspectedAlumni.name?.charAt(0)?.toUpperCase() || "A"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100 truncate">
+                        {inspectedAlumni.name}
+                      </div>
+                      <div className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400 truncate">
+                        NISN: {inspectedAlumni.nisn}
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                          Alumni / Lulus
+                        </span>
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[10px] font-semibold border",
+                          inspectedAlumni.gender === "P"
+                            ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
+                            : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                        )}>
+                          {inspectedAlumni.gender === "P" ? "Perempuan" : "Laki-laki"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <InspectorGrid>
+                    <InspectorField
+                      label="Tempat, Tgl Lahir"
+                      value={
+                        inspectedAlumni.birthPlace || inspectedAlumni.birthDate
+                          ? `${inspectedAlumni.birthPlace || "-"}, ${inspectedAlumni.birthDate || "-"}`
+                          : "-"
+                      }
+                    />
+                    <InspectorField
+                      label="No. Peserta Arsip"
+                      value={inspectedAlumni.examNumber || "-"}
+                    />
+                  </InspectorGrid>
+
+                  <InspectorField label="Status Arsip CBT">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-200/60 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700">
+                      Arsip Non-Aktif (Bebas Kuota)
+                    </span>
+                  </InspectorField>
+
+                  <InspectorActions>
+                    <InspectorButton
+                      variant="primary"
+                      icon={RotateCw}
+                      onClick={() => handleRestore(inspectedAlumni.id)}
+                    >
+                      Pulihkan ke Aktif
+                    </InspectorButton>
+                    <InspectorButton
+                      variant="danger"
+                      icon={Trash}
+                      onClick={() => handleDeleteClick(inspectedAlumni)}
+                    >
+                      Hapus Permanen
+                    </InspectorButton>
+                  </InspectorActions>
+                </div>
+              ) : (
+                <InspectorEmpty
+                  icon={GraduationCap}
+                  title="Pilih Alumni"
+                  description="Klik salah satu baris alumni di tabel untuk melihat arsip lengkap atau memulihkan statusnya."
+                />
+              )}
+            </InspectorSection>
+
+            <InspectorSection divided>
+              <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850/40 border border-neutral-200/80 dark:border-neutral-800 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <span>Informasi Data Alumni</span>
+                </div>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                  Data alumni tersimpan sebagai arsip historis nilai dan sertifikat tanpa mengurangi kapasitas kuota aktif institusi Anda.
+                </p>
+              </div>
+            </InspectorSection>
+          </NeonInspector>
         </div>
-      )}
 
-      {loading ? (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 border-b mb-4">
-            <CardTitle className="text-lg font-bold text-slate-800 dark:text-slate-100">Daftar Alumni</CardTitle>
-          </CardHeader>
-          <CardContent>
-             <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
-                    <TableRow>
-                      <TableHead className="w-[40px] text-center">
-                         <div className="h-4 w-4 border border-slate-300 rounded mx-auto" />
-                      </TableHead>
-                      <TableHead className="w-[60px] text-center">No</TableHead>
-                      <TableHead>{terminology.id}</TableHead>
-                      <TableHead>Nama {terminology.student}</TableHead>
-                      <TableHead className="w-[60px] text-center">L/P</TableHead>
-                      <TableHead>{terminology.class}</TableHead>
-                      <TableHead className="text-right">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
-                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                        <TableCell className="text-right">
-                           <div className="flex justify-end gap-2">
-                              <Skeleton className="h-8 w-8 rounded-lg" />
-                              <Skeleton className="h-8 w-8 rounded-lg" />
-                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <StudentTable 
-          students={mappedStudents} 
-          classes={classes}
-          selectedIds={selectedIds} 
-          onSelectChange={setSelectedIds} 
-          onEdit={() => {}} 
-          onDelete={handleDeleteClick} 
-          title="Daftar Alumni"
-          customActions={(student) => (
-            <div className="flex justify-end gap-2">
-              <button 
-                className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg dark:bg-emerald-900/10 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40"
-                onClick={() => handleRestore(student.id)}
-                title={`Pulihkan ${terminology.student}`}
-              >
-                <RotateCw className="h-4 w-4" />
-              </button>
-              <button 
-                className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
-                onClick={() => handleDeleteClick(student)}
-                title={`Hapus ${terminology.student}`}
-              >
-                <Trash className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+        <ConfirmationDialog 
+          isOpen={deleteDialogOpen} 
+          onClose={() => setDeleteDialogOpen(false)} 
+          onConfirm={handleConfirmDelete} 
+          type="danger"
+          title="Hapus Alumni" 
+          description={`Apakah Anda yakin ingin menghapus data alumni "${studentToDelete?.name || ""}"?`} 
+          confirmLabel="Hapus" 
+          isLoading={isDeleting} 
         />
-      )}
 
-      <ConfirmationDialog 
-        isOpen={deleteDialogOpen} 
-        onClose={() => setDeleteDialogOpen(false)} 
-        onConfirm={handleConfirmDelete} 
-        type="danger"
-        title="Hapus Alumni" 
-        description={`Apakah Anda yakin ingin menghapus data alumni "${studentToDelete?.name || ""}"?`} 
-        confirmLabel="Hapus" 
-        isLoading={isDeleting} 
-      />
-
-      <ConfirmationDialog
-        isOpen={alertDialog.isOpen}
-        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
-        onConfirm={() => {
-          if (alertDialog.onConfirm) alertDialog.onConfirm();
-          setAlertDialog({ ...alertDialog, isOpen: false });
-        }}
-        title={alertDialog.title}
-        description={alertDialog.description}
-        type={alertDialog.type}
-        confirmLabel={alertDialog.confirmLabel || "OK"}
-        showCancel={alertDialog.showCancel}
-      />
+        <ConfirmationDialog
+          isOpen={alertDialog.isOpen}
+          onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+          onConfirm={() => {
+            if (alertDialog.onConfirm) alertDialog.onConfirm();
+            setAlertDialog({ ...alertDialog, isOpen: false });
+          }}
+          title={alertDialog.title}
+          description={alertDialog.description}
+          type={alertDialog.type}
+          confirmLabel={alertDialog.confirmLabel || "OK"}
+          showCancel={alertDialog.showCancel}
+        />
+      </div>
     </div>
   );
 };

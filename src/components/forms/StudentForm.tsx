@@ -373,7 +373,7 @@ export const StudentForm = ({
         <Button
           type="submit"
           disabled={isSubmitting || isUploadingPhoto}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl px-5"
+          className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition-colors cursor-pointer px-5"
         >
           {isSubmitting ? "Menyimpan..." : submitLabel}
         </Button>

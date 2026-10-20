@@ -73,7 +73,7 @@ export const SubjectForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold rounded-xl"
+          className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
         >
           {isSubmitting ? "Menyimpan..." : submitLabel}
         </Button>

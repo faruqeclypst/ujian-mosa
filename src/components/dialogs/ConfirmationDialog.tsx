@@ -38,59 +38,52 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
 
   const isConfirmDisabled = isLoading || (requireWord ? inputValue !== requireWord : false);
   const icons = {
-    danger: <AlertOctagon className="h-5 w-5 text-red-600" />,
-    warning: <AlertTriangle className="h-5 w-5 text-amber-600" />,
-    info: <HelpCircle className="h-5 w-5 text-blue-600" />,
-    success: <AlertCircle className="h-5 w-5 text-green-600" />,
+    danger: <AlertOctagon className="h-4 w-4 text-rose-600 dark:text-rose-400" />,
+    warning: <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
+    info: <HelpCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />,
+    success: <AlertCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />,
   };
 
-  const bgColors = {
-    danger: "bg-red-100 dark:bg-red-900/20",
-    warning: "bg-amber-100 dark:bg-amber-900/20",
-    info: "bg-blue-100 dark:bg-blue-900/20",
-    success: "bg-green-100 dark:bg-green-900/20",
+  const iconContainers = {
+    danger: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20",
+    warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
+    info: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
   };
 
-  const btnClasses = {
-    danger: "bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/40 dark:text-rose-400 dark:border-rose-800/20 dark:hover:bg-rose-900/50",
-    warning: "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-800/20 dark:hover:bg-amber-900/50",
-    info: "bg-blue-50 text-blue-700 !hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/20 dark:!hover:bg-blue-900/50",
-    success: "bg-green-50 text-green-700 !hover:bg-green-100 border border-green-100 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800/20 dark:!hover:bg-green-900/50",
-  };
-
-  const iconColors = {
-    danger: "text-red-600",
-    warning: "text-amber-600",
-    info: "text-blue-600",
-    success: "text-green-600",
+  const confirmBtnClasses = {
+    danger: "bg-rose-600 hover:bg-rose-700 text-white border border-rose-600/50 shadow-2xs",
+    warning: "bg-amber-600 hover:bg-amber-700 text-white border border-amber-600/50 shadow-2xs",
+    info: "bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs",
+    success: "bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600/50 shadow-2xs",
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 !p-7 sm:!p-8">
-        <DialogHeader className="space-y-4">
-          <div className="flex items-center gap-4 text-left">
-            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${bgColors[type]}`}>
-              {React.cloneElement(icons[type] as React.ReactElement, { 
-                className: `h-6 w-6 ${iconColors[type]}` 
-              })}
+      <DialogContent className="sm:max-w-md bg-white dark:bg-[#0c0d0e] border border-neutral-200 dark:border-neutral-800 p-5 rounded-xl shadow-2xl">
+        <DialogHeader className="space-y-3">
+          <div className="flex items-center gap-3 text-left">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${iconContainers[type]}`}>
+              {icons[type]}
             </div>
             <div>
-              <DialogTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              <DialogTitle className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                 {title}
               </DialogTitle>
             </div>
           </div>
-          <DialogDescription className="text-base text-gray-600 dark:text-gray-400 text-left leading-relaxed pt-2">
+          <DialogDescription className="text-xs text-neutral-500 dark:text-neutral-400 text-left leading-relaxed pt-1">
             {description}
           </DialogDescription>
           {requireWord && (
-            <div className="mt-4 space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Ketik "{requireWord}" untuk melanjutkan:</p>
+            <div className="mt-3 space-y-1.5">
+              <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                Ketik <span className="font-mono font-semibold text-neutral-800 dark:text-neutral-200 uppercase">"{requireWord}"</span> untuk melanjutkan:
+              </p>
               <input
                 type="text"
                 autoFocus
-                className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-bold uppercase"
+                className="w-full h-8 px-3 rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-mono font-semibold uppercase text-neutral-900 dark:text-neutral-100"
                 placeholder={requireWord}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value.toUpperCase())}
@@ -99,14 +92,14 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
           )}
         </DialogHeader>
 
-        <DialogFooter className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end mt-10">
+        <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-850">
           {showCancel && (
             <Button 
               type="button" 
               variant="outline" 
               onClick={onClose} 
               disabled={isLoading}
-              className="h-11 px-6 text-sm font-medium border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+              className="h-8 px-3.5 text-xs font-medium rounded-md border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-850 text-neutral-700 dark:text-neutral-300"
             >
               {cancelLabel}
             </Button>
@@ -115,7 +108,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={isConfirmDisabled}
-            className={`${btnClasses[type]} inline-flex items-center justify-center whitespace-nowrap h-11 px-6 text-sm font-medium rounded-xl transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 active:scale-95 ${!showCancel ? "w-full" : ""}`}
+            className={`${confirmBtnClasses[type]} inline-flex items-center justify-center whitespace-nowrap h-8 px-3.5 text-xs font-semibold rounded-md transition-colors disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${!showCancel ? "w-full" : ""}`}
           >
             {isLoading ? "Memuat..." : confirmLabel}
           </button>

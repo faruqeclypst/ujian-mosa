@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useTenant } from "../context/TenantContext";
 import { masterPb } from "../lib/pocketbase";
 import { uploadInventoryImage, deleteImageFromStorage, isOfflineEnvironment } from "../lib/storage";
@@ -16,6 +16,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "../components/ui/badge";
 import { cn } from "../lib/utils";
 import { APP_VERSION } from "../utils/version";
+import {
+  NeonPageHeader,
+  NeonInspector,
+  InspectorSection,
+  InspectorHeader,
+  InspectorField,
+  InspectorGrid,
+  InspectorActions,
+  InspectorButton,
+  InspectorCard,
+  NeonTabs,
+  NeonBadge,
+  NeonCard,
+  NeonCardHeader,
+  NeonCardBody,
+  NeonSwitch,
+} from "../components/ui";
 import { SharedGalleryModal } from "../components/dialogs/SharedGalleryModal";
 import {
   Upload,
@@ -47,7 +64,19 @@ import {
   Server,
   Activity,
   ArrowRight,
-  RotateCw
+  RotateCw,
+  GitBranch,
+  CheckSquare,
+  ArrowLeftRight,
+  GripVertical,
+  Layers,
+  LayoutGrid,
+  FileText,
+  FileCheck,
+  BookOpen,
+  Terminal,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { forceHardReload } from "../utils/hardReload";
 import { getSchoolDomain, getSchoolUrl } from "../utils/domainHelper";
@@ -91,6 +120,7 @@ const SettingsPage = () => {
   const [saving, setSaving] = useState(false);
   const [isTestingAI, setIsTestingAI] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showApiKey, setShowApiKey] = useState(false);
   const { addToast } = useToast();
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -117,14 +147,14 @@ const SettingsPage = () => {
     const parts = clean.split(".");
     const twoLevelTlds = [".sch.id", ".ac.id", ".go.id", ".my.id", ".co.id", ".or.id", ".ponpes.id"];
     const hasTwoLevelTld = twoLevelTlds.some(tld => clean.endsWith(tld));
-    
+
     if (hasTwoLevelTld) {
       if (parts.length > 3) {
         return parts.slice(0, parts.length - 3).join(".");
       }
       return "@";
     }
-    
+
     if (parts.length > 2) {
       return parts.slice(0, parts.length - 2).join(".");
     }
@@ -257,19 +287,109 @@ const SettingsPage = () => {
 
 
   const questionTypes = [
-    { id: "pilihan_ganda", label: "Pilihan Ganda (Single)" },
-    { id: "pilihan_ganda_kompleks", label: "Pilihan Ganda Kompleks" },
-    { id: "menjodohkan", label: "Menjodohkan (Matching)" },
-    { id: "benar_salah", label: "Benar / Salah" },
-    { id: "isian_singkat", label: "Isian Singkat" },
-    { id: "urutkan", label: "Mengurutkan (Ordering)" },
-    { id: "drag_drop", label: "Drag & Drop" },
-    { id: "uraian", label: "Uraian / Essay" },
-    { id: "klasifikasi", label: "Klasifikasi" },
-    { id: "hotspot", label: "Hotspot (Klik Gambar)" },
-    { id: "isian_rumpang", label: "Isian Rumpang" },
-    { id: "matriks", label: "Matriks" },
+    {
+      id: "pilihan_ganda",
+      label: "Pilihan Ganda (Single)",
+      description: "1 pilihan jawaban benar dari opsi A-E",
+      category: "Obyektif",
+      icon: CheckCircle2,
+    },
+    {
+      id: "pilihan_ganda_kompleks",
+      label: "Pilihan Ganda Kompleks",
+      description: "Siswa dapat memilih lebih dari satu jawaban benar",
+      category: "Obyektif",
+      icon: CheckSquare,
+    },
+    {
+      id: "menjodohkan",
+      label: "Menjodohkan (Matching)",
+      description: "Menghubungkan premis ke pasangan respons yang cocok",
+      category: "Interaktif",
+      icon: ArrowLeftRight,
+    },
+    {
+      id: "benar_salah",
+      label: "Benar / Salah",
+      description: "Pernyataan validasi dengan pilihan Benar atau Salah",
+      category: "Obyektif",
+      icon: Check,
+    },
+    {
+      id: "isian_singkat",
+      label: "Isian Singkat",
+      description: "Jawaban kata/angka pendek dengan koreksi teks otomatis",
+      category: "Tekstual",
+      icon: FileText,
+    },
+    {
+      id: "urutkan",
+      label: "Mengurutkan (Ordering)",
+      description: "Menyusun urutan atau kronologi langkah yang benar",
+      category: "Interaktif",
+      icon: GripVertical,
+    },
+    {
+      id: "drag_drop",
+      label: "Drag & Drop",
+      description: "Memindahkan kartu elemen ke zona klasifikasi target",
+      category: "Interaktif",
+      icon: Layers,
+    },
+    {
+      id: "uraian",
+      label: "Uraian / Essay",
+      description: "Jawaban narasi bebas dinilai manual atau rubrik AI",
+      category: "Tekstual",
+      icon: BookOpen,
+    },
+    {
+      id: "klasifikasi",
+      label: "Klasifikasi",
+      description: "Mengelompokkan opsi ke wadah kategori yang ditentukan",
+      category: "Interaktif",
+      icon: LayoutGrid,
+    },
+    {
+      id: "hotspot",
+      label: "Hotspot Gambar",
+      description: "Memilih area koordinat tertentu pada gambar stimulus",
+      category: "Visual",
+      icon: ImageIcon,
+    },
+    {
+      id: "isian_rumpang",
+      label: "Isian Rumpang",
+      description: "Melengkapi kata atau frasa yang hilang di tengah kalimat",
+      category: "Tekstual",
+      icon: FileCheck,
+    },
+    {
+      id: "matriks",
+      label: "Matriks Grid",
+      description: "Tabel penilaian silang baris kriteria dan kolom opsi",
+      category: "Obyektif",
+      icon: LayoutGrid,
+    },
   ];
+
+  const activeQuestionTypesCount = questionTypes.filter(t => allowedTypes[t.id] !== false).length;
+
+  const handleSelectAllTypes = () => {
+    const all: Record<string, boolean> = {};
+    questionTypes.forEach(t => {
+      all[t.id] = true;
+    });
+    setAllowedTypes(all);
+  };
+
+  const handleResetMinimumTypes = () => {
+    const min: Record<string, boolean> = {};
+    questionTypes.forEach(t => {
+      min[t.id] = (t.id === "pilihan_ganda" || t.id === "uraian");
+    });
+    setAllowedTypes(min);
+  };
 
   const fetchSettings = useCallback(async () => {
     if (!pb) return;
@@ -623,7 +743,7 @@ const SettingsPage = () => {
             try {
               const oldKey = new URL(schoolLogo).pathname.replace(/^\//, "");
               if (oldKey) deleteImageFromStorage(oldKey); // fire & forget
-            } catch {}
+            } catch { }
           }
           const uploadRes = await uploadInventoryImage(`schools/${schoolFolder}/identity`, fileToUpload);
           if (uploadRes && uploadRes.url) {
@@ -744,7 +864,7 @@ const SettingsPage = () => {
       try {
         const oldKey = new URL(schoolLogo).pathname.replace(/^\//, "");
         if (oldKey) deleteImageFromStorage(oldKey);
-      } catch {}
+      } catch { }
     }
     setSchoolLogo("");
     setLogoPreview(null);
@@ -1018,186 +1138,336 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="space-y-5 pb-20 animate-in fade-in duration-500">
+    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+      <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
 
-      {/* ── Page Header ── */}
-      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
-            Pengaturan Sistem
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Kelola branding institusi, konfigurasi server, dan pencadangan.
-          </p>
+        {/* 1. Header Bar: Title, Breadcrumbs & Save Action */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+              Pengaturan Sistem
+            </h1>
+            {/* Breadcrumb line */}
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+              <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
+                Semua Modul
+              </Link>
+              <span>/</span>
+              <span className="text-neutral-700 dark:text-neutral-300 font-medium">
+                {school?.slug || "modalbangsa"}
+              </span>
+              <span>/</span>
+              <div className="flex items-center gap-1 text-neutral-800 dark:text-neutral-200 font-medium">
+                <GitBranch className="h-3.5 w-3.5 text-neutral-500" />
+                <span>pengaturan</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Button: Simpan Pengaturan */}
+          <div className="flex items-center gap-2 shrink-0">
+            {loading ? (
+              <Skeleton className="h-8 w-36 rounded-md" />
+            ) : (
+              <Button
+                form="settings-form"
+                type="submit"
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-md shadow-xs transition-colors cursor-pointer"
+              >
+                {saving ? (
+                  <><RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Menyimpan...</>
+                ) : (
+                  <><Save className="mr-1.5 h-3.5 w-3.5" /> Simpan Pengaturan</>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {loading ? (
-            <Skeleton className="h-9 w-40 rounded-xl" />
-          ) : (
-            <Button
-              form="settings-form"
-              type="submit"
-              disabled={saving}
-              className="w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm shadow-blue-500/20 h-9 px-4 transition-all active:scale-95"
-            >
-              {saving ? (
-                <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...</>
-              ) : (
-                <><Save className="mr-2 h-4 w-4" /> Simpan Pengaturan</>
-              )}
-            </Button>
-          )}
-        </div>
-      </div>
+        {/* 2. Grid Layout: Left Content & Right Inspector */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_340px] gap-8 items-start">
+          {/* ── Left Column: Form Settings ── */}
+          <div className="min-w-0 space-y-6">
+            <form id="settings-form" onSubmit={handleSave} className="space-y-6">
+              {/* Card 1: Profil Institusi */}
+              <NeonCard>
+                <NeonCardHeader
+                  icon={Building}
+                  title="Profil & Branding Institusi"
+                  subtitle="Identitas visual, nama sekolah, dan kontrol kebijakan ujian"
+                  badge={
+                    <div className="flex items-center gap-1.5">
+                      <NeonBadge variant="neutral">
+                        {(school as any)?.code || school?.slug || "INSTITUSI"}
+                      </NeonBadge>
+                      <NeonBadge variant="emerald">
+                        Aktif
+                      </NeonBadge>
+                    </div>
+                  }
+                />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* ── Left Column: Form & Tools ── */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
-            <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <Building size={14} /> Profil Institusi
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <form id="settings-form" onSubmit={handleSave} className="space-y-6">
-
-                {/* Logo & Name */}
-                <div className="flex flex-col sm:flex-row gap-5">
-                  <div className="w-full sm:w-24 group relative">
-                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-1.5 block">Logo</label>
-                    <div className="w-24 h-24 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center overflow-hidden relative cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors mx-auto sm:mx-0">
+                <NeonCardBody className="space-y-6">
+                  {/* Identitas Visual & Nama Sekolah */}
+                  <div className="flex flex-col sm:flex-row gap-5 items-start">
+                    {/* Logo Uploader */}
+                    <div className="w-full sm:w-28 group relative shrink-0">
+                      <label className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5 block">
+                        Logo Institusi
+                      </label>
+                      <div className="w-28 h-28 rounded-2xl bg-neutral-50/80 dark:bg-neutral-900/60 border-2 border-dashed border-neutral-300 dark:border-neutral-750 flex flex-col items-center justify-center overflow-hidden relative cursor-pointer hover:border-emerald-500/60 dark:hover:border-emerald-500/50 hover:bg-neutral-100/50 dark:hover:bg-neutral-850/50 transition-all mx-auto sm:mx-0 shadow-2xs">
+                        {logoPreview ? (
+                          <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2.5" />
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5 text-neutral-400 dark:text-neutral-500">
+                            <ImageIcon className="h-7 w-7" />
+                            <span className="text-[10px] font-medium">Unggah Logo</span>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-neutral-950/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white pointer-events-none gap-1">
+                          <Upload className="h-5 w-5" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Ubah</span>
+                        </div>
+                        <input
+                          id="logoInput"
+                          type="file"
+                          accept="image/*"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          onChange={handleLogoChange}
+                          title="Upload Logo"
+                        />
+                      </div>
                       {logoPreview ? (
-                        <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2" />
+                        <button
+                          type="button"
+                          onClick={handleDeleteLogo}
+                          className="text-[11px] text-rose-500 hover:text-rose-600 dark:text-rose-400 font-semibold block mt-1.5 text-center w-28 cursor-pointer transition-colors"
+                        >
+                          Hapus Logo
+                        </button>
                       ) : (
-                        <ImageIcon size={24} className="text-slate-400" />
-                      )}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                        <Upload size={16} className="text-white" />
-                      </div>
-                      <input
-                        id="logoInput"
-                        type="file"
-                        accept="image/*"
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        onChange={handleLogoChange}
-                        title="Upload Logo"
-                      />
-                    </div>
-                    {logoPreview && (
-                      <button
-                        type="button"
-                        onClick={handleDeleteLogo}
-                        className="text-[10px] text-red-500 hover:text-red-700 font-bold block mt-2 text-center w-24"
-                      >
-                        Hapus Logo
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="flex-1 space-y-4">
-                    <FormField id="schoolName" label={`Nama ${terminology.school} / Institusi Utama`} error={undefined}>
-                      <Input
-                        value={schoolName}
-                        onChange={(e) => setSchoolName(e.target.value)}
-                        placeholder={`Contoh: ${terminology.school} Maju Bersama`}
-                        className="rounded-xl font-semibold h-11 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
-                      />
-                    </FormField>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsPickerOpen(true)}
-                        className="px-4 py-2 bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-slate-200 hover:bg-blue-100 dark:hover:bg-slate-700 border border-transparent dark:border-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
-                      >
-                        <FolderOpen size={14} /> Pilih dari Galeri Server
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <div className="flex flex-col justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group gap-3">
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0 text-orange-600 dark:text-orange-500">
-                          <Monitor size={16} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">Wajib Exambro</h4>
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight pr-2">Blokir browser biasa, wajib pakai aplikasi resmi atau SEB.</p>
-                        </div>
-                      </div>
-                      {loading ? (
-                        <Skeleton className="h-6 w-11 rounded-full shrink-0" />
-                      ) : (
-                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                          <input type="checkbox" className="sr-only peer" checked={isExambroEnabled} onChange={(e) => setIsExambroEnabled(e.target.checked)} />
-                          <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
-                        </label>
+                        <span className="text-[10px] text-neutral-400 dark:text-neutral-500 block mt-1.5 text-center w-28 font-mono">
+                          PNG / JPG / WEBP
+                        </span>
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setIsExambroGuideOpen(true)}
-                      className="w-full py-1.5 px-3 rounded-lg bg-orange-100/70 hover:bg-orange-100 dark:bg-orange-950/40 dark:hover:bg-orange-950/60 text-orange-700 dark:text-orange-300 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors border border-orange-200/60 dark:border-orange-900/40"
-                    >
-                      <Download size={12} /> Unduh APK & Setup SEB (.seb)
-                    </button>
-                  </div>
+                    {/* School Name & Preview */}
+                    <div className="flex-1 min-w-0 space-y-3.5 w-full">
+                      <FormField
+                        id="schoolName"
+                        label={`Nama ${terminology.school} / Institusi Utama`}
+                        error={undefined}
+                      >
+                        <Input
+                          value={schoolName}
+                          onChange={(e) => setSchoolName(e.target.value)}
+                          placeholder={`Contoh: ${terminology.school} Modal Bangsa`}
+                          className="rounded-xl font-semibold text-sm h-11 border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/80 focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30"
+                        />
+                      </FormField>
 
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-500">
-                        <CheckCircle2 size={16} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">Akses {terminology.teacher} Penuh</h4>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight pr-4">{terminology.teacher} bisa buat ruang dan reset ujian {terminology.student.toLowerCase()} secara mandiri.</p>
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsPickerOpen(true)}
+                          className="inline-flex items-center gap-2 px-3.5 py-2 bg-neutral-100 dark:bg-neutral-850 hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <FolderOpen className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400" />
+                          Pilih dari Galeri Server
+                        </button>
+
+                        {/* Live Header Simulation */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-100/80 dark:bg-neutral-900/80 border border-neutral-200/70 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 max-w-full">
+                          <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-400">Preview Siswa:</span>
+                          {logoPreview ? (
+                            <img src={logoPreview} alt="" className="h-4 w-4 object-contain shrink-0" />
+                          ) : (
+                            <Building className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                          )}
+                          <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-[180px] sm:max-w-[260px]">
+                            {schoolName || "EXAMKU"}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    {loading ? (
-                      <Skeleton className="h-6 w-11 rounded-full shrink-0" />
-                    ) : (
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input type="checkbox" className="sr-only peer" checked={teacherFullAccess} onChange={(e) => setTeacherFullAccess(e.target.checked)} />
-                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                      </label>
-                    )}
                   </div>
 
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group sm:col-span-2">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-500">
-                        <Cpu size={16} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">{terminology.teacher} Pakai AI Sekolah</h4>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight pr-4">{terminology.teacher} bisa gunakan fitur AI menggunakan API Key sekolah tanpa perlu key sendiri.</p>
-                      </div>
-                    </div>
-                    {loading ? (
-                      <Skeleton className="h-6 w-11 rounded-full shrink-0" />
-                    ) : (
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input type="checkbox" className="sr-only peer" checked={teacherAIAccess} onChange={(e) => setTeacherAIAccess(e.target.checked)} />
-                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── AI Engine Config ── */}
-                <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  {/* Kebijakan Keamanan & Hak Akses */}
+                  <div className="space-y-3 pt-3 border-t border-neutral-100 dark:border-neutral-800/80">
                     <div className="flex items-center gap-2">
-                      <Cpu size={16} className="text-indigo-500" />
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">API Gen-AI Engine</h4>
+                      <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+                        Kebijakan Keamanan & Hak Akses
+                      </h4>
                     </div>
-                    <div className="w-full sm:w-64">
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Wajib Exambro */}
+                      <div className="flex flex-col justify-between p-3.5 rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900/40 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors gap-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                              <Monitor className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <h5 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
+                                Wajib Aplikasi Exambro
+                              </h5>
+                              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 leading-relaxed">
+                                Blokir browser umum. Siswa wajib login dari Exambro Android atau Safe Exam Browser (SEB).
+                              </p>
+                            </div>
+                          </div>
+                          {loading ? (
+                            <Skeleton className="h-5 w-9 rounded-full shrink-0" />
+                          ) : (
+                            <NeonSwitch
+                              checked={isExambroEnabled}
+                              onChange={setIsExambroEnabled}
+                              variant="amber"
+                            />
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsExambroGuideOpen(true)}
+                          className="w-full py-1.5 px-3 rounded-lg bg-neutral-100/80 dark:bg-neutral-850 hover:bg-neutral-200/80 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-neutral-200/70 dark:border-neutral-750 shadow-2xs cursor-pointer"
+                        >
+                          <Download className="h-3 w-3 text-neutral-500 dark:text-neutral-400" />
+                          Unduh APK Siswa & Setup SEB (.seb)
+                        </button>
+                      </div>
+
+                      {/* Akses Guru Penuh */}
+                      <div className="flex flex-col justify-between p-3.5 rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900/40 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors gap-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                              <CheckCircle2 className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <h5 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
+                                Akses Penuh {terminology.teacher}
+                              </h5>
+                              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 leading-relaxed">
+                                {terminology.teacher} dapat membuat ruang ujian, mengatur jadwal, dan mereset sesi peserta secara mandiri.
+                              </p>
+                            </div>
+                          </div>
+                          {loading ? (
+                            <Skeleton className="h-5 w-9 rounded-full shrink-0" />
+                          ) : (
+                            <NeonSwitch
+                              checked={teacherFullAccess}
+                              onChange={setTeacherFullAccess}
+                              variant="emerald"
+                            />
+                          )}
+                        </div>
+                        {/* <div className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500 px-1">
+                          Role Policy: teacher.can_manage_rooms = {teacherFullAccess ? "true" : "false"}
+                        </div> */}
+                      </div>
+
+                      {/* Subsidi AI Institusi */}
+                      <div className="sm:col-span-2 flex items-start justify-between p-3.5 rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900/40 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                            <Cpu className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <h5 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
+                              Subsidi Kuota AI untuk {terminology.teacher}
+                            </h5>
+                            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 leading-relaxed">
+                              {terminology.teacher} dapat membuat butir soal otomatis menggunakan kuota API Key institusi tanpa perlu registrasi key pribadi.
+                            </p>
+                          </div>
+                        </div>
+                        {loading ? (
+                          <Skeleton className="h-5 w-9 rounded-full shrink-0" />
+                        ) : (
+                          <NeonSwitch
+                            checked={teacherAIAccess}
+                            onChange={setTeacherAIAccess}
+                            variant="blue"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </NeonCardBody>
+              </NeonCard>
+
+              {/* Card 2: API Gen-AI Engine */}
+              <NeonCard>
+                <NeonCardHeader
+                  icon={Cpu}
+                  title="API Gen-AI Engine"
+                  subtitle="Konektivitas Large Language Model (LLM) untuk generator soal dan koreksi analitis"
+                  badge={
+                    <div className="flex items-center gap-1.5">
+                      <NeonBadge variant={aiProvider === "groq" ? "emerald" : aiProvider === "puter" ? "sky" : "neutral"}>
+                        {(aiProvider || "groq").toUpperCase()}
+                      </NeonBadge>
+                      <NeonBadge variant="neutral">OpenAI Compatible</NeonBadge>
+                    </div>
+                  }
+                />
+
+                <NeonCardBody className="space-y-5">
+                  {/* Provider Quick Picker */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                        Pilih Provider LLM
+                      </label>
+                      <span className="text-[10px] font-mono text-neutral-400">
+                        {aiProvider === "groq" ? "LPU Hardware Acceleration" : aiProvider === "puter" ? "Free Tier / No Key" : "REST API"}
+                      </span>
+                    </div>
+
+                    {/* Quick Segmented Buttons */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {[
+                        { id: "groq", name: "Groq Cloud", badge: "⚡ Tercepat" },
+                        { id: "google", name: "Gemini", badge: "🔮 Google" },
+                        { id: "openrouter", name: "OpenRouter", badge: "🌐 Multi" },
+                        { id: "ollama", name: "Ollama", badge: "💻 Lokal" },
+                        { id: "puter", name: "Puter", badge: "🎁 Gratis" },
+                      ].map((item) => {
+                        const isSelected = aiProvider === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setAiProvider(item.id);
+                              setAiModel("");
+                              setRemoteModels([]);
+                            }}
+                            className={cn(
+                              "px-3 py-2 rounded-xl text-left border transition-all duration-150 cursor-pointer flex flex-col justify-between gap-1",
+                              isSelected
+                                ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                : "bg-neutral-50/70 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300 border-neutral-200/80 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700"
+                            )}
+                          >
+                            <span className="text-[10px] font-mono opacity-80">{item.badge}</span>
+                            <span className="text-xs font-bold leading-none truncate">{item.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* All Providers Dropdown */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400 shrink-0">
+                        Atau pilih provider lain:
+                      </span>
                       <select
                         value={aiProvider}
                         onChange={(e) => {
@@ -1205,177 +1475,342 @@ const SettingsPage = () => {
                           setAiModel("");
                           setRemoteModels([]);
                         }}
-                        className="w-full h-9 px-3 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none cursor-pointer text-slate-800 dark:text-slate-200"
+                        className="flex-1 h-8 px-3 rounded-lg text-xs font-semibold bg-neutral-100 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-800 dark:text-neutral-200 outline-none cursor-pointer"
                       >
-                        <option value="groq">Groq Cloud</option>
-                        <option value="ollama">Ollama (Local / Proxy)</option>
-                        <option value="ollama">Ollama (Local / Proxy)</option>
-                        <option value="google">Google AI Studio (Gemini)</option>
-                        <option value="openrouter">OpenRouter</option>
+                        <option value="groq">Groq Cloud (LPU Ultra-Fast)</option>
+                        <option value="google">Google AI Studio (Gemini 1.5 / 2.0)</option>
+                        <option value="openrouter">OpenRouter (Ratusan Model Terpadu)</option>
+                        <option value="ollama">Ollama (Server Lokal / Offline LAN)</option>
+                        <option value="puter">Puter.js (Gratis Tanpa API Key)</option>
                         <option value="together">Together AI</option>
-                        <option value="huggingface">Hugging Face (Serverless)</option>
+                        <option value="huggingface">Hugging Face (Serverless Inference)</option>
                         <option value="fireworks">Fireworks AI</option>
                         <option value="github">GitHub Models</option>
                         <option value="cloudflare">Cloudflare Workers AI</option>
-                        <option value="custom">Custom Endpoint (Lainnya)</option>
-                        <option value="puter">Puter (Gratis, tanpa API Key, limit terbatas)</option>
+                        <option value="custom">Custom Endpoint (OpenAI Compatible Gateway)</option>
                       </select>
+                    </div>
+
+                    {/* Provider Info Helper Box */}
+                    <div className="p-2.5 rounded-lg bg-neutral-100/60 dark:bg-neutral-900/60 border border-neutral-200/60 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 flex items-center gap-2">
+                      <Info className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
+                      <span>
+                        {aiProvider === "groq" && "⚡ Groq LPU: Latency ultra cepat (<1 detik per soal), sangat direkomendasikan untuk pembuatan soal massal."}
+                        {aiProvider === "google" && "🔮 Google Gemini: Penalaran analitis mendalam dan jendela konteks luas untuk soal studi kasus."}
+                        {aiProvider === "openrouter" && "🌐 OpenRouter: Gerbang terpadu untuk mengakses Claude, GPT-4, Llama, Mistral, dan ratusan model lainnya."}
+                        {aiProvider === "ollama" && "💻 Ollama: Menjalankan model AI di server LAN offline sekolah tanpa internet eksternal."}
+                        {aiProvider === "puter" && "🎁 Puter: Layanan gratis bawaan tanpa perlu API Key, siap pakai langsung untuk demo dan pengujian."}
+                        {aiProvider === "together" && "🚀 Together AI: Akses inference cepat untuk open models seperti Llama 3 dan Mixtral."}
+                        {aiProvider === "huggingface" && "🤗 Hugging Face: Inference API serverless untuk ribuan model komunitas open-source."}
+                        {aiProvider === "fireworks" && "🎆 Fireworks AI: Engine performa tinggi untuk model fine-tuned dan generative teks."}
+                        {aiProvider === "github" && "🐙 GitHub Models: Akses model AI via GitHub Personal Access Token."}
+                        {aiProvider === "cloudflare" && "☁️ Cloudflare Workers AI: Inference serverless global di edge network Cloudflare."}
+                        {aiProvider === "custom" && "🛠 Custom Endpoint: Hubungkan ke private proxy atau server LLM internal yang kompatibel dengan format OpenAI."}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Form Inputs Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                     {(aiProvider === "custom" || aiProvider === "cloudflare") && (
                       <div className="sm:col-span-2">
-                        <FormField id="aiGatewayUrl" label={aiProvider === "cloudflare" ? "Cloudflare Account ID" : "Base URL (OpenAI Compatible)"} error={undefined}>
+                        <FormField
+                          id="aiGatewayUrl"
+                          label={aiProvider === "cloudflare" ? "Cloudflare Account ID" : "Base URL Endpoint (OpenAI Compatible)"}
+                          error={undefined}
+                        >
                           <Input
                             type="text"
                             value={aiGatewayUrl}
                             onChange={(e) => setAiGatewayUrl(e.target.value)}
-                            placeholder={aiProvider === "cloudflare" ? "Masukkan Account ID Cloudflare..." : "Contoh: https://openrouter.ai/api/v1"}
-                            className="rounded-xl h-11 text-xs font-mono bg-white dark:bg-slate-900"
+                            placeholder={aiProvider === "cloudflare" ? "Masukkan Account ID Cloudflare..." : "https://api.openai.com/v1 atau http://localhost:11434/v1"}
+                            className="font-mono text-xs rounded-xl h-11 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800"
                           />
                         </FormField>
                       </div>
                     )}
 
-                    <FormField id="apiKey" label={aiProvider === "groq" ? "Kunci API Groq" : "API Key"} error={undefined}>
-                      <Input
-                        type="password"
-                        value={aiProvider === "groq" ? groqApiKey : aiGatewayKey}
-                        onChange={(e) => aiProvider === "groq" ? setGroqApiKey(e.target.value) : setAiGatewayKey(e.target.value)}
-                        placeholder={aiProvider === "groq" ? "gsk_xxxxxxx" : "API Key..."}
-                        className="rounded-xl h-11 text-xs font-mono"
-                      />
-                    </FormField>
-
-                    <FormField id="aiModel" label={isLoadingModels ? "Memuat Model..." : "Model Kecerdasan (LLM)"} error={undefined}>
-                      <div className="relative">
-                        {remoteModels.length > 0 ? (
-                          <select
-                            value={aiModel}
-                            onChange={(e) => setAiModel(e.target.value)}
-                            className="w-full h-11 px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none cursor-pointer"
-                            disabled={isLoadingModels}
-                          >
-                            <optgroup label={`Model ${aiProvider.toUpperCase()}`}>
-                              {remoteModels.map((m: any) => (
-                                <option key={m.id} value={m.id}>{m.name} {m.speed && `(${m.speed})`}{m.dailyLimit ? ` [${m.dailyLimit}]` : ''}</option>
-                              ))}
-                            </optgroup>
-                          </select>
-                        ) : (
-                          <Input
-                            type="text"
-                            value={aiModel}
-                            onChange={(e) => setAiModel(e.target.value)}
-                            placeholder={isLoadingModels ? "Mencari model..." : aiProvider === "custom" ? "Masukkan ID model..." : "Ketik ID Model secara manual"}
-                            className="rounded-xl h-11 text-xs font-bold"
-                          />
+                    {/* API Key */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                          {aiProvider === "groq" ? "Groq API Key" : "API Key / Token"}
+                        </label>
+                        {aiProvider === "puter" && (
+                          <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                            Tidak diperlukan
+                          </span>
                         )}
                       </div>
-                    </FormField>
-
-                    <div className="sm:col-span-2 pt-1 flex justify-end gap-2">
-                      {aiProvider === "custom" && (
-                        <Button
-                          type="button" onClick={handleLoadModels} disabled={isLoadingModels || !aiGatewayUrl || !aiGatewayKey}
-                          variant="outline"
-                          className="h-9 px-4 rounded-xl text-xs font-bold border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 disabled:opacity-50"
-                        >
-                          {isLoadingModels ? <RefreshCw size={14} className="animate-spin mr-2" /> : <Download size={14} className="mr-2" />}
-                          Muat Model
-                        </Button>
-                      )}
-                      <Button
-                        type="button" onClick={handleTestAI} disabled={isTestingAI || (aiProvider === "puter" ? false : (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey))}
-                        variant="outline"
-                        className="h-9 px-4 rounded-xl text-xs font-bold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
-                      >
-                        {isTestingAI ? <RefreshCw size={14} className="animate-spin mr-2" /> : <RefreshCw size={14} className="mr-2" />}
-                        Pinging Server
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Test Results Message */}
-                  {testResult && (
-                    <div className={cn("mt-4 p-3 rounded-xl border text-xs font-bold flex items-center gap-2", testResult.success ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800")}>
-                      {testResult.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-                      {testResult.message}
-                    </div>
-                  )}
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
-            <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <LayoutTemplate size={14} /> Kustomisasi Soal
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {questionTypes.map((type) => (
-                  <div key={type.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{type.label}</span>
-                    {loading ? (
-                      <Skeleton className="h-5 w-9 rounded-full" />
-                    ) : (
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox" className="sr-only peer"
-                          checked={allowedTypes[type.id] !== false}
-                          onChange={(e) => setAllowedTypes(prev => ({ ...prev, [type.id]: e.target.checked }))}
+                      <div className="relative">
+                        <Input
+                          type={showApiKey ? "text" : "password"}
+                          value={aiProvider === "groq" ? groqApiKey : (aiProvider === "puter" ? "puter-no-key-required" : aiGatewayKey)}
+                          disabled={aiProvider === "puter"}
+                          onChange={(e) => aiProvider === "groq" ? setGroqApiKey(e.target.value) : setAiGatewayKey(e.target.value)}
+                          placeholder={aiProvider === "groq" ? "gsk_xxxxxxxxxxxxxxxxxxxx" : aiProvider === "puter" ? "Gratis - Tanpa Key" : "sk-xxxxxxxxxxxxxxxx"}
+                          className="font-mono text-xs rounded-xl h-11 pr-10 border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 disabled:opacity-60"
                         />
-                        <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                        {aiProvider !== "puter" && (
+                          <button
+                            type="button"
+                            onClick={() => setShowApiKey(!showApiKey)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer p-1"
+                            title={showApiKey ? "Sembunyikan API Key" : "Tampilkan API Key"}
+                          >
+                            {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
-        {/* ── Right Column: Domain, Danger Zone & Theme ── */}
-        <div className="space-y-6">
-          {/* ── Domain & Akses Sistem Card ── */}
-          <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
-            <CardHeader className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <Globe size={14} className="text-blue-600 dark:text-blue-400" /> Domain & Akses Sistem
-              </CardTitle>
-              {school?.custom_domain ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Custom Domain Aktif
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                  Subdomain Default
-                </span>
-              )}
-            </CardHeader>
-            <CardContent className="p-5 space-y-4">
-              {/* Alamat Domain */}
-              <div className="space-y-3">
+                    {/* Model ID Selection */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                          Model Kecerdasan (LLM)
+                        </label>
+                        {remoteModels.length > 0 && (
+                          <span className="text-[10px] font-mono text-neutral-400">
+                            {remoteModels.length} Model Terdeteksi
+                          </span>
+                        )}
+                      </div>
+                      {remoteModels.length > 0 ? (
+                        <select
+                          value={aiModel}
+                          onChange={(e) => setAiModel(e.target.value)}
+                          className="w-full h-11 px-3 rounded-xl text-xs font-semibold font-mono bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 outline-none cursor-pointer text-neutral-800 dark:text-neutral-200"
+                          disabled={isLoadingModels}
+                        >
+                          <optgroup label={`Model ${aiProvider.toUpperCase()}`}>
+                            {remoteModels.map((m: any) => (
+                              <option key={m.id} value={m.id}>
+                                {m.name || m.id} {m.speed ? `(${m.speed})` : ""}
+                              </option>
+                            ))}
+                          </optgroup>
+                        </select>
+                      ) : (
+                        <Input
+                          type="text"
+                          value={aiModel}
+                          onChange={(e) => setAiModel(e.target.value)}
+                          placeholder={isLoadingModels ? "Memuat daftar model..." : "Ketik ID Model (cth: llama-3.3-70b-versatile)"}
+                          className="font-mono text-xs rounded-xl h-11 border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Diagnostic Console & Ping Bar */}
+                  <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800/80 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Terminal className="h-4 w-4 text-neutral-500" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+                          Diagnostik Koneksi Engine
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {aiProvider === "custom" && (
+                          <Button
+                            type="button"
+                            onClick={handleLoadModels}
+                            disabled={isLoadingModels || !aiGatewayUrl || !aiGatewayKey}
+                            variant="outline"
+                            className="h-8 px-3 rounded-lg text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-neutral-100 dark:bg-neutral-850 hover:bg-neutral-200 dark:hover:bg-neutral-800 cursor-pointer"
+                          >
+                            {isLoadingModels ? (
+                              <><RefreshCw className="mr-1.5 h-3 w-3 animate-spin" /> Memuat...</>
+                            ) : (
+                              <><Download className="mr-1.5 h-3 w-3" /> Muat Model</>
+                            )}
+                          </Button>
+                        )}
+
+                        <Button
+                          type="button"
+                          onClick={handleTestAI}
+                          disabled={isTestingAI || (aiProvider === "puter" ? false : (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey))}
+                          variant="outline"
+                          className="h-8 px-3.5 rounded-lg text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-850 cursor-pointer shadow-2xs"
+                        >
+                          {isTestingAI ? (
+                            <><RefreshCw className="mr-1.5 h-3 w-3 animate-spin" /> Pinging Gateway...</>
+                          ) : (
+                            <><RefreshCw className="mr-1.5 h-3 w-3" /> Uji Koneksi (Ping)</>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Console Output */}
+                    <div className={cn(
+                      "p-3 rounded-xl border font-mono text-xs transition-colors",
+                      testResult
+                        ? testResult.success
+                          ? "bg-emerald-500/10 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
+                          : "bg-rose-500/10 dark:bg-rose-950/20 border-rose-500/30 text-rose-800 dark:text-rose-300"
+                        : "bg-neutral-100/60 dark:bg-neutral-900/60 border-neutral-200/80 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400"
+                    )}>
+                      {testResult ? (
+                        <div className="flex items-start gap-2.5">
+                          {testResult.success ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                          )}
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="font-bold">
+                              {testResult.success ? "[OK 200] HANDSHAKE BERHASIL" : "[ERROR] KONEKSI GAGAL"}
+                            </div>
+                            <div className="text-[11px] opacity-90 break-words">
+                              {testResult.message}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <span className="w-2 h-2 rounded-full bg-neutral-400 animate-pulse shrink-0" />
+                          <span>[IDLE] Status gateway siap. Tekan "Uji Koneksi (Ping)" untuk memeriksa responsivitas LLM.</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </NeonCardBody>
+              </NeonCard>
+
+              {/* Card 3: Kustomisasi Soal */}
+              <NeonCard>
+                <NeonCardHeader
+                  icon={LayoutTemplate}
+                  title="Kustomisasi Format Soal"
+                  subtitle="Aktifkan atau nonaktifkan jenis interaksi soal yang diizinkan untuk guru"
+                  badge={
+                    <NeonBadge variant="neutral">
+                      {activeQuestionTypesCount} / {questionTypes.length} Tipe Aktif
+                    </NeonBadge>
+                  }
+                  actions={
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleSelectAllTypes}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-neutral-100 dark:bg-neutral-850 hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-neutral-750 transition-colors cursor-pointer"
+                      >
+                        Pilih Semua
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResetMinimumTypes}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-neutral-100 dark:bg-neutral-850 hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-neutral-750 transition-colors cursor-pointer"
+                      >
+                        Reset Minimum
+                      </button>
+                    </div>
+                  }
+                />
+
+                <NeonCardBody>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {questionTypes.map((type) => {
+                      const isAllowed = allowedTypes[type.id] !== false;
+                      const IconComponent = type.icon;
+                      return (
+                        <div
+                          key={type.id}
+                          onClick={() => {
+                            setAllowedTypes(prev => ({ ...prev, [type.id]: !isAllowed }));
+                          }}
+                          className={cn(
+                            "group p-3 rounded-xl border transition-all duration-150 cursor-pointer flex flex-col justify-between gap-2.5 select-none",
+                            isAllowed
+                              ? "bg-white dark:bg-neutral-900/60 border-neutral-300 dark:border-neutral-750 shadow-2xs hover:border-emerald-500/50 dark:hover:border-emerald-500/40"
+                              : "bg-neutral-50/50 dark:bg-neutral-950/30 border-neutral-200/60 dark:border-neutral-850 opacity-60 hover:opacity-80"
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div
+                                className={cn(
+                                  "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                                  isAllowed
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400"
+                                )}
+                              >
+                                <IconComponent className="h-3.5 w-3.5" />
+                              </div>
+                              <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                                {type.category}
+                              </span>
+                            </div>
+
+                            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                              <NeonSwitch
+                                checked={isAllowed}
+                                onChange={(checked) => {
+                                  setAllowedTypes(prev => ({ ...prev, [type.id]: checked }));
+                                }}
+                                size="sm"
+                                variant="emerald"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="min-w-0 space-y-0.5">
+                            <h5 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 leading-snug truncate">
+                              {type.label}
+                            </h5>
+                            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed line-clamp-2">
+                              {type.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </NeonCardBody>
+              </NeonCard>
+            </form>
+          </div>
+
+          {/* ── Right Column: Sidebar Panels ── */}
+          <div className="w-full xl:w-[320px] 2xl:w-[340px] space-y-6 shrink-0">
+            {/* Card 1: Domain & Akses */}
+            <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 shadow-2xs overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between bg-neutral-50/40 dark:bg-neutral-850/20">
+                <div className="flex items-center gap-2">
+                  <Globe size={15} className="text-neutral-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                    Domain & Akses Sistem
+                  </h3>
+                </div>
                 {school?.custom_domain ? (
-                  <>
+                  <NeonBadge variant="emerald" pulse>Custom Domain</NeonBadge>
+                ) : (
+                  <NeonBadge variant="neutral">Default</NeonBadge>
+                )}
+              </div>
+
+              <div className="p-5 space-y-4">
+                {school?.custom_domain ? (
+                  <div className="space-y-3">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">
                         Domain Resmi Sekolah (Utama)
                       </span>
-                      <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                        <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                      <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750">
+                        <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white truncate">
                           https://{school.custom_domain}
                         </span>
                         <a
                           href={`https://${school.custom_domain}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-2.5 py-1 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg hover:shadow-sm transition-all flex items-center gap-1 shrink-0"
+                          className="px-2.5 py-1 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-white dark:bg-neutral-750 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-2xs transition-all flex items-center gap-1 shrink-0"
                         >
                           Buka <ExternalLink size={12} />
                         </a>
@@ -1383,473 +1818,402 @@ const SettingsPage = () => {
                     </div>
 
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">
                         Domain Cadangan (Bawaan Sistem)
                       </span>
-                      <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs">
-                        <span className="font-mono truncate">{getSchoolDomain(school?.slug || "")}</span>
+                      <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-neutral-50/50 dark:bg-neutral-850/50 border border-neutral-100 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 text-xs">
+                        <span className="truncate">{getSchoolDomain(school?.slug || "")}</span>
                         <a
                           href={getSchoolUrl(school?.slug || "")}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-blue-600 text-[11px] font-medium transition-colors shrink-0 flex items-center gap-1"
+                          className="hover:text-neutral-900 dark:hover:text-white text-[11px] font-medium transition-colors shrink-0 flex items-center gap-1"
                         >
                           Buka <ExternalLink size={10} />
                         </a>
                       </div>
                     </div>
-                  </>
+                  </div>
                 ) : (
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                      Alamat Akses Ujian
-                    </span>
-                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                      <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                        {getSchoolDomain(school?.slug || "")}
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">
+                        Alamat Akses Ujian
                       </span>
-                      <a
-                        href={getSchoolUrl(school?.slug || "")}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-2.5 py-1 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg hover:shadow-sm transition-all flex items-center gap-1 shrink-0"
-                      >
-                        Buka <ExternalLink size={12} />
-                      </a>
+                      <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750">
+                        <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                          {getSchoolDomain(school?.slug || "")}
+                        </span>
+                        <a
+                          href={getSchoolUrl(school?.slug || "")}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-white dark:bg-neutral-750 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-2xs transition-all flex items-center gap-1 shrink-0"
+                        >
+                          Buka <ExternalLink size={12} />
+                        </a>
+                      </div>
                     </div>
-                    
+
                     {isHighestPlan ? (
-                      <div className="mt-3 p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 space-y-2">
+                      <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 space-y-2">
                         <div className="flex items-start gap-2">
-                          <Info size={14} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                          <div className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                            Paket Premium mendukung penggunaan domain sekolah sendiri (cth: <code className="text-blue-600 dark:text-blue-400 font-mono font-semibold">cbt.sekolah.sch.id</code>). Hubungi Administrator Pusat untuk mengaktifkannya.
+                          <Info size={14} className="text-neutral-500 shrink-0 mt-0.5" />
+                          <div className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                            Paket Premium mendukung penggunaan domain sekolah sendiri (cth: <code className="font-semibold text-neutral-900 dark:text-neutral-100">cbt.sekolah.sch.id</code>). Hubungi Administrator Pusat untuk mengaktifkannya.
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => setShowDnsGuide(!showDnsGuide)}
-                          className="text-[11px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 pt-1"
+                          className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 hover:underline flex items-center gap-1 pt-0.5 cursor-pointer"
                         >
-                          {showDnsGuide ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          {showDnsGuide ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                           {showDnsGuide ? "Tutup Petunjuk DNS" : "Lihat Petunjuk DNS untuk Admin IT Domain"}
                         </button>
                       </div>
                     ) : (
-                      <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 flex items-center gap-2.5 text-[11px] text-slate-500 dark:text-slate-400">
-                        <ShieldCheck size={15} className="text-slate-400 shrink-0" />
-                        <span>Fitur Custom Domain hanya tersedia pada paket tertinggi (Paket Premium). Hubungi Administrator Pusat untuk upgrade paket.</span>
+                      <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 flex items-center gap-2.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                        <ShieldCheck size={14} className="text-neutral-400 shrink-0" />
+                        <span>Fitur Custom Domain hanya tersedia pada paket tertinggi (Paket Premium). Hubungi Administrator Pusat untuk upgrade.</span>
                       </div>
                     )}
                   </div>
                 )}
-              </div>
 
-              {/* ── Petunjuk DNS (Hanya muncul jika custom_domain diset ATAU paket tertinggi dan tombol dibuka) ── */}
-              {(school?.custom_domain || (isHighestPlan && showDnsGuide)) && (
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
-                    <ShieldCheck size={14} className="text-emerald-500" />
-                    Panduan Konfigurasi DNS di Domain Anda
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Pengelola domain sekolah wajib mengarahkan DNS record di panel penyedia domain (seperti Cloudflare, Niagahoster, Rumahweb, cPanel, dll) ke server CBT:
-                  </p>
+                {/* DNS guide if visible */}
+                {(school?.custom_domain || (isHighestPlan && showDnsGuide)) && (
+                  <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 space-y-2.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 block">
+                      Panduan Konfigurasi DNS
+                    </span>
 
-                  <div className="space-y-2">
-                    {/* Opsi 1: A Record */}
-                    <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 space-y-1.5">
+                    {/* Opsi 1 */}
+                    <div className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-750 bg-neutral-50/50 dark:bg-neutral-850/50 space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200/50 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-bold uppercase text-neutral-700 dark:text-neutral-300 bg-neutral-200/60 dark:bg-neutral-750 px-1.5 py-0.5 rounded">
                           Opsi 1 (A Record - Disarankan)
                         </span>
                         <button
                           type="button"
                           onClick={() => handleCopy(SERVER_IP, "a-record")}
-                          className="text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 flex items-center gap-1 py-0.5 px-2 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 shadow-xs transition-all active:scale-95"
+                          className="text-[10px] font-semibold text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1 py-0.5 px-2 rounded bg-white dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 shadow-2xs transition-all active:scale-95 cursor-pointer"
                         >
-                          {copiedKey === "a-record" ? (
-                            <><Check size={11} className="text-emerald-500" /> Tersalin!</>
-                          ) : (
-                            <><Copy size={11} /> Salin IP</>
-                          )}
+                          {copiedKey === "a-record" ? <><Check size={11} className="text-emerald-500" /> Tersalin!</> : <><Copy size={11} /> Salin IP</>}
                         </button>
                       </div>
                       <div className="grid grid-cols-3 gap-1 text-[11px] font-mono">
                         <div>
-                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Type</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-200">A</span>
+                          <span className="text-[9px] font-sans font-bold text-neutral-400 uppercase block">Type</span>
+                          <span className="font-bold text-neutral-800 dark:text-neutral-200">A</span>
                         </div>
                         <div>
-                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Host / Name</span>
-                          <span className="text-slate-800 dark:text-slate-200 truncate block">
-                            {school?.custom_domain ? getDnsHostName(school.custom_domain) : "cbt (atau @)"}
+                          <span className="text-[9px] font-sans font-bold text-neutral-400 uppercase block">Host</span>
+                          <span className="text-neutral-800 dark:text-neutral-200 truncate block">
+                            {school?.custom_domain ? getDnsHostName(school.custom_domain) : "cbt"}
                           </span>
                         </div>
                         <div>
-                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Value / IP Target</span>
-                          <span className="font-bold text-blue-600 dark:text-blue-400">{SERVER_IP}</span>
+                          <span className="text-[9px] font-sans font-bold text-neutral-400 uppercase block">Value / IP Target</span>
+                          <span className="font-bold text-neutral-900 dark:text-neutral-100">{SERVER_IP}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Opsi 2: CNAME Record */}
-                    <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 space-y-1.5">
+                    {/* Opsi 2 */}
+                    <div className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-750 bg-neutral-50/50 dark:bg-neutral-850/50 space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase text-slate-600 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-bold uppercase text-neutral-700 dark:text-neutral-300 bg-neutral-200/60 dark:bg-neutral-750 px-1.5 py-0.5 rounded">
                           Opsi 2 (CNAME Record)
                         </span>
                         <button
                           type="button"
                           onClick={() => handleCopy(`${school?.slug}.examku.my.id`, "cname")}
-                          className="text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 flex items-center gap-1 py-0.5 px-2 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 shadow-xs transition-all active:scale-95"
+                          className="text-[10px] font-semibold text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1 py-0.5 px-2 rounded bg-white dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 shadow-2xs transition-all active:scale-95 cursor-pointer"
                         >
-                          {copiedKey === "cname" ? (
-                            <><Check size={11} className="text-emerald-500" /> Tersalin!</>
-                          ) : (
-                            <><Copy size={11} /> Salin Target</>
-                          )}
+                          {copiedKey === "cname" ? <><Check size={11} className="text-emerald-500" /> Tersalin!</> : <><Copy size={11} /> Salin Target</>}
                         </button>
                       </div>
                       <div className="grid grid-cols-3 gap-1 text-[11px] font-mono">
                         <div>
-                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Type</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-200">CNAME</span>
+                          <span className="text-[9px] font-sans font-bold text-neutral-400 uppercase block">Type</span>
+                          <span className="font-bold text-neutral-800 dark:text-neutral-200">CNAME</span>
                         </div>
                         <div>
-                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Host / Name</span>
-                          <span className="text-slate-800 dark:text-slate-200 truncate block">
+                          <span className="text-[9px] font-sans font-bold text-neutral-400 uppercase block">Host</span>
+                          <span className="text-neutral-800 dark:text-neutral-200 truncate block">
                             {school?.custom_domain ? getDnsHostName(school.custom_domain) : "cbt"}
                           </span>
                         </div>
                         <div className="truncate">
-                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Target CNAME</span>
-                          <span className="text-blue-600 dark:text-blue-400 truncate block text-[10px]">
+                          <span className="text-[9px] font-sans font-bold text-neutral-400 uppercase block">Target CNAME</span>
+                          <span className="font-bold text-neutral-900 dark:text-neutral-100 truncate block text-[10px]">
                             {school?.slug}.examku.my.id
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
-
-                  {/* Catatan Penting */}
-                  <div className="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-[10px] text-amber-900 dark:text-amber-300 space-y-1">
-                    <p className="font-semibold flex items-center gap-1">
-                      <AlertTriangle size={12} className="text-amber-600 shrink-0" /> Catatan Penting:
-                    </p>
-                    <ul className="list-disc pl-4 space-y-0.5 text-amber-800/90 dark:text-amber-300/90">
-                      <li>Sertifikat SSL (HTTPS) otomatis terbit oleh server kami saat domain pertama kali diakses.</li>
-                      <li>Jika memakai <strong>Cloudflare</strong>, pastikan proxy dimatikan (atur ke <em>DNS Only</em> / awan abu-abu).</li>
-                      <li>Perubahan DNS membutuhkan waktu propagasi antara 5 hingga 30 menit.</li>
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl border border-slate-200 dark:border-indigo-500/20 shadow-sm bg-gradient-to-br from-indigo-600 to-blue-700 dark:from-indigo-950/80 dark:to-slate-900 text-white overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-4 opacity-10 dark:opacity-5">
-              <Database size={80} />
-            </div>
-            <CardHeader className="p-5 pb-2 relative z-10">
-              <CardTitle className="text-sm font-bold flex items-center gap-2 text-indigo-50 dark:text-indigo-200">
-                <Database size={16} /> Manajemen Database
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-5 relative z-10 space-y-4">
-              <p className="text-[11px] font-medium text-indigo-100 dark:text-slate-300 leading-relaxed bg-white/10 dark:bg-slate-800/80 p-3 rounded-xl border border-transparent dark:border-slate-700/50">
-                Amankan data di akhir semester dengan melakukan pencadangan JSON dan hapus riwayat secara total untuk meringankan performa.
-              </p>
-
-              <div className="flex flex-col gap-2.5">
-                {loading ? (
-                  <>
-                    <Skeleton className="h-10 w-full rounded-xl bg-white/20 dark:bg-slate-800" />
-                    <Skeleton className="h-10 w-full rounded-xl bg-white/20 dark:bg-slate-800" />
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      onClick={handleExportDB} disabled={isBackupLoading}
-                      className="w-full bg-white/10 hover:bg-white/20 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/40 dark:text-indigo-300 text-white font-bold text-xs h-10 rounded-xl transition-all"
-                    >
-                      {isBackupLoading ? <RefreshCw size={14} className="animate-spin mr-2" /> : <Download size={14} className="mr-2" />}
-                      Eksport File Backup (.json)
-                    </Button>
-                    <Button
-                      onClick={() => fileInputRef.current?.click()} disabled={isBackupLoading}
-                      className="w-full bg-white text-indigo-600 hover:bg-slate-50 dark:bg-slate-800 dark:text-blue-400 dark:hover:bg-slate-700 dark:hover:text-blue-300 dark:border dark:border-slate-700 font-bold text-xs h-10 rounded-xl shadow-lg dark:shadow-none transition-all"
-                    >
-                      <Upload size={14} className="mr-2" /> Restore Database
-                    </Button>
-                    <input type="file" ref={fileInputRef} onChange={handleImportDB} accept=".json" className="hidden" />
-                  </>
                 )}
               </div>
+            </div>
 
-              <div className="pt-4 border-t border-white/20 mt-2">
-                <button
-                  disabled={isBackupLoading} onClick={() => setIsResetConfirmOpen(true)}
-                  className="w-full py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all text-center border-b-4 border-rose-700 active:border-b-0 active:translate-y-1"
-                >
-                  Hapus Seluruh Data
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
-            <CardHeader className="p-5 pb-3">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <ImageIcon size={14} /> Preferensi Visual
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-5 pt-0">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">Mode Gelap</span>
-                  <span className="text-[10px] font-medium text-slate-400">Sinkron dengan sistem Anda</span>
-                </div>
-                <ThemeToggle />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ── Pembaruan Sistem (1-Click Update untuk Offline Server) ── */}
-          {isOfflineServer && (
-            <Card className="rounded-2xl border border-blue-200 dark:border-blue-900/50 shadow-sm bg-gradient-to-br from-blue-50/60 to-indigo-50/40 dark:from-slate-900 dark:to-blue-950/20 p-5 space-y-3 relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
-                    <RefreshCw size={16} className={isApplyingUpdate ? "animate-spin" : ""} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                      Pembaruan 1-Click
-                      <Badge variant="outline" className="text-[9px] font-black uppercase px-1.5 py-0 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300">
-                        Offline Server
-                      </Badge>
-                    </h4>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Update modul & web tanpa ubah database</p>
-                  </div>
+            {/* Card 2: Manajemen Database */}
+            <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 shadow-2xs overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between bg-neutral-50/40 dark:bg-neutral-850/20">
+                <div className="flex items-center gap-2">
+                  <Database size={15} className="text-neutral-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                    Manajemen Database
+                  </h3>
                 </div>
               </div>
 
-              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                Perbarui tampilan dan fitur CBT offline Anda ke versi cloud terbaru secara otomatis dengan 1 klik.
-              </p>
+              <div className="p-5 space-y-4">
+                <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                  Amankan data di akhir semester dengan melakukan pencadangan JSON dan hapus riwayat secara total untuk meringankan performa server.
+                </p>
 
-              {updateAvailable && (
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-blue-200 dark:border-blue-800 text-[11px] space-y-1">
-                  <div className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
-                    <CheckCircle2 size={13} className="text-emerald-500" />
-                    Versi Rilis: v{updateAvailable.version} ({updateAvailable.release_date})
-                  </div>
-                  {updateAvailable.notes && (
-                    <p className="text-slate-500 dark:text-slate-400 text-[10px]">
-                      {updateAvailable.notes}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-2 pt-1">
-                {updateAvailable ? (
+                <div className="flex flex-col gap-2">
                   <Button
-                    type="button"
-                    disabled={isApplyingUpdate}
-                    onClick={handleApplyUpdate}
-                    className="w-full h-9 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20"
+                    onClick={handleExportDB} disabled={isBackupLoading}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold text-xs h-9 rounded-xl shadow-xs transition-all cursor-pointer"
                   >
-                    {isApplyingUpdate ? (
-                      <><RefreshCw size={13} className="animate-spin mr-1.5" /> Sedang Mengunduh & Memperbarui...</>
-                    ) : (
-                      <><Download size={13} className="mr-1.5" /> Pasang Pembaruan Sekarang</>
-                    )}
+                    {isBackupLoading ? <RefreshCw size={13} className="animate-spin mr-2" /> : <Download size={13} className="mr-2" />}
+                    Eksport Backup (.json)
                   </Button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isCheckingUpdate || isReloading}
-                      onClick={handleCheckUpdate}
-                      className="flex-1 h-9 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-100/60 dark:hover:bg-blue-950/40 border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800"
-                    >
-                      {isCheckingUpdate ? (
-                        <><RefreshCw size={13} className="animate-spin mr-1.5" /> Memeriksa ke Server Pusat...</>
-                      ) : isReloading ? (
-                        <><RefreshCw size={13} className="animate-spin mr-1.5" /> Menyegarkan Sistem...</>
-                      ) : (
-                        <><RefreshCw size={13} className="mr-1.5" /> Cek Pembaruan Sistem</>
-                      )}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isCheckingUpdate || isReloading}
-                      onClick={() => {
-                        addToast({
-                          title: "Hard Reload",
-                          description: "Membersihkan cache browser dan memuat ulang...",
-                          type: "info"
-                        });
-                        setTimeout(() => forceHardReload(), 400);
-                      }}
-                      className="h-9 px-3 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700 shrink-0"
-                      title="Paksa muat ulang browser untuk membersihkan cache tampilan"
-                    >
-                      <RotateCw size={13} className="mr-1 text-slate-500" /> Hard Reload
-                    </Button>
-                  </div>
-                )}
-              </div>
 
-              <div className="pt-2 border-t border-blue-100 dark:border-slate-800 flex items-start gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
-                <ShieldCheck size={13} className="text-emerald-500 shrink-0 mt-0.5" />
-                <span>Database bank soal & siswa (<code className="font-mono text-slate-700 dark:text-slate-300">data.db</code>) dijamin 100% aman dan tidak terhapus.</span>
-              </div>
-            </Card>
-          )}
-
-          {/* ── Status Server & VPS Card ── */}
-          <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                  <Activity size={16} />
+                  <Button
+                    onClick={() => fileInputRef.current?.click()} disabled={isBackupLoading}
+                    variant="outline"
+                    className="w-full font-semibold text-xs h-9 rounded-xl border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-all cursor-pointer"
+                  >
+                    <Upload size={13} className="mr-2" /> Restore Database
+                  </Button>
+                  <input type="file" ref={fileInputRef} onChange={handleImportDB} accept=".json" className="hidden" />
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Status Server & VPS</h4>
-                  <p className="text-[10px] text-slate-400">Monitor CPU, RAM, & Uptime</p>
+
+                <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                  <button
+                    disabled={isBackupLoading} onClick={() => setIsResetConfirmOpen(true)}
+                    className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/20 transition-all text-center cursor-pointer disabled:opacity-40"
+                  >
+                    Hapus Seluruh Data
+                  </button>
                 </div>
               </div>
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-              Pantau performa real-time server sekolah Anda saat ujian online serentak berlangsung.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate("/admin/status-server")}
-              className="w-full h-9 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 border-blue-200 dark:border-blue-800"
-            >
-              Buka Status Server <ArrowRight size={13} className="ml-1" />
-            </Button>
-          </Card>
 
-          {/* ── Active AI Status Card ── */}
-          {!loading && (
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">AI Aktif Sekarang</span>
+            {/* Card 3: Preferensi Visual */}
+            <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 shadow-2xs overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between bg-neutral-50/40 dark:bg-neutral-850/20">
+                <div className="flex items-center gap-2">
+                  <ImageIcon size={15} className="text-neutral-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                    Preferensi Visual
+                  </h3>
+                </div>
               </div>
-              <div className="p-4 space-y-3">
-                {/* Provider */}
+
+              <div className="p-5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Provider</span>
-                  <span className={cn(
-                    "text-[10px] font-black px-2.5 py-1 rounded-full",
-                    aiProvider === "groq" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
-                      aiProvider === "cloudflare" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
-                        aiProvider === "google" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
-                          aiProvider === "openrouter" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
-                            aiProvider === "ollama" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                              "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                  )}>
-                    {{
-                      groq: "⚡ Groq Cloud",
-                      cloudflare: "☁️ Cloudflare AI",
-                      google: "🔵 Google Gemini",
-                      openrouter: "🔀 OpenRouter",
-                      together: "🤝 Together AI",
-                      huggingface: "🤗 Hugging Face",
-                      fireworks: "🎆 Fireworks AI",
-                      github: "🐙 GitHub Models",
-                      ollama: "🦙 Ollama (Local)",
-                      custom: "⚙️ Custom Endpoint",
-                    }[aiProvider] || aiProvider}
-                  </span>
+                  <div>
+                    <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 block">Mode Tampilan</span>
+                    <span className="text-[10px] text-neutral-400">Pilih tema terang atau gelap</span>
+                  </div>
+                  <ThemeToggle />
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: AI Engine Aktif */}
+            {!loading && (
+              <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 shadow-2xs overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between bg-neutral-50/40 dark:bg-neutral-850/20">
+                  <div className="flex items-center gap-2">
+                    <Cpu size={15} className="text-neutral-500" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                      Status AI Engine
+                    </h3>
+                  </div>
+                  <NeonBadge variant="emerald" pulse>Aktif</NeonBadge>
                 </div>
 
-                {/* Model */}
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mt-0.5">Model</span>
-                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 text-right font-mono break-all leading-tight">{
-                    aiModel
-                      ? (AI_MODELS.find(m => m.id === aiModel)?.name || aiModel)
-                      : <span className="text-slate-400 italic">Belum dipilih</span>
-                  }</span>
-                </div>
+                <div className="p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-neutral-400">Provider</span>
+                    <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                      {aiProvider.toUpperCase()}
+                    </span>
+                  </div>
 
-                {/* Mode */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mode</span>
-                  {aiProvider === "groq" ? (
-                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 flex items-center gap-1">
-                      <Zap size={9} /> Direct API
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-neutral-400">Model Aktif</span>
+                    <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 truncate max-w-[180px]">
+                      {aiModel || <span className="text-neutral-400 italic">Belum dipilih</span>}
                     </span>
-                  ) : (
-                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 flex items-center gap-1">
-                      🔒 Via Proxy
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-neutral-400">Mode</span>
+                    <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                      {aiProvider === "groq" ? "Direct API" : "Proxy"}
                     </span>
+                  </div>
+
+                  {AI_MODELS.find(m => m.id === aiModel)?.speed && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-neutral-400">Kecepatan</span>
+                      <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                        {AI_MODELS.find(m => m.id === aiModel)?.speed}
+                      </span>
+                    </div>
                   )}
                 </div>
+              </div>
+            )}
 
-                {/* Speed badge if model found */}
-                {AI_MODELS.find(m => m.id === aiModel)?.speed && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kecepatan</span>
-                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">
-                      {AI_MODELS.find(m => m.id === aiModel)?.speed}
-                    </span>
-                  </div>
-                )}
-                {/* Daily limit info for Groq models */}
-                {(AI_MODELS.find(m => m.id === aiModel) as any)?.dailyLimit && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kuota Harian</span>
-                    <span className={`text-[10px] font-bold ${(AI_MODELS.find(m => m.id === aiModel) as any)?.dailyLimit?.includes('⚠️') ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                      {(AI_MODELS.find(m => m.id === aiModel) as any)?.dailyLimit}
-                    </span>
-                  </div>
-                )}
+            {/* Card 5: Status Server & VPS */}
+            <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 shadow-2xs overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between bg-neutral-50/40 dark:bg-neutral-850/20">
+                <div className="flex items-center gap-2">
+                  <Activity size={15} className="text-neutral-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                    Status Server & VPS
+                  </h3>
+                </div>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+
+              <div className="p-5 space-y-3">
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                  Pantau performa real-time CPU, RAM, & Uptime server saat ujian berlangsung serentak.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/admin/status-server")}
+                  className="w-full h-9 rounded-xl text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-all cursor-pointer"
+                >
+                  Buka Status Server <ArrowRight size={13} className="ml-1" />
+                </Button>
               </div>
             </div>
-          )}
 
-          {/* Info Card */}
-          <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 flex gap-3 text-blue-800 dark:text-blue-300">
-            <HelpCircle size={16} className="shrink-0 mt-0.5 opacity-70" />
-            <p className="text-[11px] font-medium leading-relaxed">
-              Gunakan tab 'Panduan' untuk dokumentasi penggunaan lengkap. Segala modifikasi pada panel ini langsung berdampak seluas aplikasi institusi Anda.
-            </p>
+            {/* Card 6: Pembaruan 1-Click (if offline) */}
+            {isOfflineServer && (
+              <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 shadow-2xs overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between bg-neutral-50/40 dark:bg-neutral-850/20">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw size={15} className={isApplyingUpdate ? "animate-spin text-neutral-500" : "text-neutral-500"} />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                      Pembaruan 1-Click
+                    </h3>
+                  </div>
+                  <NeonBadge variant="neutral">Offline</NeonBadge>
+                </div>
+
+                <div className="p-5 space-y-3">
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                    Perbarui tampilan dan fitur CBT offline Anda ke versi cloud terbaru secara otomatis dengan 1 klik.
+                  </p>
+
+                  {updateAvailable && (
+                    <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-[11px] space-y-1">
+                      <div className="font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                        <CheckCircle2 size={13} className="text-emerald-500" />
+                        Versi Rilis: v{updateAvailable.version} ({updateAvailable.release_date})
+                      </div>
+                      {updateAvailable.notes && (
+                        <p className="text-neutral-500 text-[10px]">
+                          {updateAvailable.notes}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2 pt-1">
+                    {updateAvailable ? (
+                      <Button
+                        type="button"
+                        disabled={isApplyingUpdate}
+                        onClick={handleApplyUpdate}
+                        className="w-full h-9 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs cursor-pointer"
+                      >
+                        {isApplyingUpdate ? (
+                          <><RefreshCw size={13} className="animate-spin mr-1.5" /> Sedang Mengunduh & Memperbarui...</>
+                        ) : (
+                          <><Download size={13} className="mr-1.5" /> Pasang Pembaruan Sekarang</>
+                        )}
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isCheckingUpdate || isReloading}
+                          onClick={handleCheckUpdate}
+                          className="flex-1 h-9 rounded-xl text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                        >
+                          {isCheckingUpdate ? (
+                            <><RefreshCw size={13} className="animate-spin mr-1.5" /> Memeriksa...</>
+                          ) : isReloading ? (
+                            <><RefreshCw size={13} className="animate-spin mr-1.5" /> Menyegarkan...</>
+                          ) : (
+                            <><RefreshCw size={13} className="mr-1.5" /> Cek Pembaruan</>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isCheckingUpdate || isReloading}
+                          onClick={() => {
+                            addToast({
+                              title: "Hard Reload",
+                              description: "Membersihkan cache browser...",
+                              type: "info"
+                            });
+                            setTimeout(() => forceHardReload(), 400);
+                          }}
+                          className="h-9 px-3 rounded-xl text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-50 dark:hover:bg-neutral-800 shrink-0"
+                          title="Paksa muat ulang browser untuk membersihkan cache tampilan"
+                        >
+                          <RotateCw size={13} className="mr-1 text-neutral-500" /> Hard Reload
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 flex items-start gap-1.5 text-[10px] text-neutral-400">
+                    <ShieldCheck size={13} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <span>Database bank soal & siswa dijamin aman dan tidak terhapus.</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* ── Dialog Modals ── */}
       <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
-        <DialogContent className="max-w-sm rounded-[2rem] p-5 border border-slate-200 dark:border-slate-800 shadow-xl bg-white dark:bg-slate-900">
-          <DialogTitle className="text-lg font-bold text-center mb-4">Pilih Sumber Logo</DialogTitle>
-          <DialogDescription className="sr-only">Choose logo source</DialogDescription>
+        <DialogContent className="max-w-sm rounded-2xl p-5 border border-neutral-200 dark:border-neutral-800 shadow-xl bg-white dark:bg-neutral-900">
+          <DialogTitle className="text-base font-bold text-center mb-4 text-neutral-900 dark:text-neutral-100">Pilih Sumber Logo</DialogTitle>
+          <DialogDescription className="sr-only">Pilih sumber logo institusi</DialogDescription>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button" onClick={() => { setIsPickerOpen(false); document.getElementById("logoInput")?.click(); }}
-              className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+              className="flex flex-col items-center justify-center p-5 bg-neutral-50 dark:bg-neutral-850 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 cursor-pointer"
             >
-              <Upload size={24} className="mb-3 text-indigo-500" />
-              <span className="text-xs font-bold text-center">Buka Browser<br />File Sistem</span>
+              <Upload size={22} className="mb-2 text-neutral-500" />
+              <span className="text-xs font-semibold text-center">Buka Browser<br />File Sistem</span>
             </button>
             <button
               type="button" onClick={() => { setIsPickerOpen(false); setIsGalleryOpen(true); loadGalleryImages(); }}
-              className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+              className="flex flex-col items-center justify-center p-5 bg-neutral-50 dark:bg-neutral-850 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 cursor-pointer"
             >
-              <FolderOpen size={24} className="mb-3 text-blue-500" />
-              <span className="text-xs font-bold text-center">Cloud Galeri<br />EXAMKU</span>
+              <FolderOpen size={22} className="mb-2 text-neutral-500" />
+              <span className="text-xs font-semibold text-center">Cloud Galeri<br />EXAMKU</span>
             </button>
           </div>
         </DialogContent>
@@ -1865,38 +2229,38 @@ const SettingsPage = () => {
       />
 
       <Dialog open={isImportConfirmOpen} onOpenChange={(val) => { if (!isBackupLoading) setIsImportConfirmOpen(val); }}>
-        <DialogContent className="z-[100] max-w-sm rounded-[2rem] p-6 text-center border-0 shadow-2xl bg-white dark:bg-slate-900">
+        <DialogContent className="z-[100] max-w-sm rounded-2xl p-6 text-center border border-neutral-200 dark:border-neutral-800 shadow-2xl bg-white dark:bg-neutral-900">
           <DialogDescription className="sr-only">Konfirmasi pemulihan database dari file JSON.</DialogDescription>
           <div className="flex flex-col items-center gap-4">
             {isBackupLoading ? (
-              <div className="h-16 w-16 mb-2 rounded-full border-[3px] border-blue-100 dark:border-blue-900 border-t-blue-600 animate-spin" />
+              <div className="h-14 w-14 mb-1 rounded-full border-[3px] border-neutral-200 dark:border-neutral-800 border-t-neutral-900 dark:border-t-white animate-spin" />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center mb-2">
-                <FileJson size={32} />
+              <div className="w-14 h-14 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-1">
+                <FileJson size={28} />
               </div>
             )}
-            <DialogTitle className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
-              {isBackupLoading ? "Memulihkan..." : "Impor Backup"}
+            <DialogTitle className="text-base font-bold text-neutral-900 dark:text-neutral-100">
+              {isBackupLoading ? "Memulihkan Database..." : "Impor Backup Database"}
             </DialogTitle>
 
             {!isBackupLoading ? (
               <>
-                <p className="text-xs text-slate-500 font-medium">Lanjutkan pemulihan dari file <b>{importFile?.name}</b>?</p>
-                <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-xl border border-amber-100 dark:border-amber-800 w-full text-left flex gap-2">
+                <p className="text-xs text-neutral-500 font-medium">Lanjutkan pemulihan dari file <b>{importFile?.name}</b>?</p>
+                <div className="bg-amber-500/10 text-amber-800 dark:text-amber-300 p-3 rounded-lg border border-amber-500/20 w-full text-left flex gap-2">
                   <AlertTriangle size={14} className="text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold leading-tight">Data dengan ID serupa akan langsung ditimpa permanen.</p>
+                  <p className="text-[11px] font-medium leading-tight">Data dengan ID serupa akan langsung ditimpa secara permanen.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-3 w-full mt-2">
-                  <Button variant="outline" onClick={() => { setIsImportConfirmOpen(false); setImportFile(null); }} className="rounded-xl h-10 text-xs font-bold">Batal</Button>
-                  <Button onClick={executeImport} className="bg-blue-600 text-white rounded-xl h-10 text-xs font-bold shadow-md">Lanjutkan</Button>
+                <div className="grid grid-cols-2 gap-2.5 w-full mt-1">
+                  <Button variant="outline" onClick={() => { setIsImportConfirmOpen(false); setImportFile(null); }} className="rounded-lg h-9 text-xs font-semibold border-neutral-200 dark:border-neutral-800">Batal</Button>
+                  <Button onClick={executeImport} className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg h-9 text-xs font-semibold shadow-xs cursor-pointer">Lanjutkan</Button>
                 </div>
               </>
             ) : (
               <div className="w-full pt-2">
-                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
-                  <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
+                <div className="h-1.5 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden mb-2">
+                  <div className="h-full bg-neutral-900 dark:bg-white transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
                 </div>
-                <p className="text-[10px] font-bold text-slate-500">{importProgress}% • {importStatus}</p>
+                <p className="text-[11px] font-mono text-neutral-500">{importProgress}% • {importStatus}</p>
               </div>
             )}
           </div>
@@ -1904,36 +2268,38 @@ const SettingsPage = () => {
       </Dialog>
 
       <Dialog open={isResetConfirmOpen} onOpenChange={(val) => { if (!isBackupLoading) setIsResetConfirmOpen(val); }}>
-        <DialogContent className="z-[100] max-w-sm rounded-[2rem] p-6 text-center border-0 shadow-2xl bg-white dark:bg-slate-900">
+        <DialogContent className="z-[100] max-w-sm rounded-2xl p-6 text-center border border-neutral-200 dark:border-neutral-800 shadow-2xl bg-white dark:bg-neutral-900">
           <DialogDescription className="sr-only">Tindakan berbahaya untuk menghapus seluruh data database.</DialogDescription>
-          <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
 
-          <div className="flex flex-col items-center gap-4 relative z-10">
-            <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 flex items-center justify-center mb-2 animate-bounce-slow">
-              <AlertTriangle size={32} />
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-1">
+              <AlertTriangle size={28} />
             </div>
-            <DialogTitle className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Format Sistem</DialogTitle>
+            <DialogTitle className="text-base font-bold text-neutral-900 dark:text-neutral-100">Format Seluruh Data</DialogTitle>
 
             {isBackupLoading ? (
               <div className="w-full pt-2">
-                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
-                  <div className="h-full bg-red-600 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
+                <div className="h-1.5 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden mb-2">
+                  <div className="h-full bg-rose-600 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
                 </div>
-                <p className="text-[10px] font-bold text-red-500">{importProgress}% • {importStatus}</p>
+                <p className="text-[11px] font-mono text-rose-600 font-semibold">{importProgress}% • {importStatus}</p>
               </div>
             ) : (
               <>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">Tindakan fatal: <b>Seluruh records</b> (siswa, ujian, nilai) akan dihapus, menyisakan akun login Anda.</p>
-                <div className="w-full text-left mt-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-1 block">Ketik "RESET" di bawah</label>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-snug">
+                  Tindakan fatal: <b>Semua records</b> (siswa, ujian, nilai, ruang) akan dihapus, menyisakan akun administrator login.
+                </p>
+                <div className="w-full text-left mt-2 space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Ketik "RESET" untuk konfirmasi</label>
                   <Input
                     value={resetInput} onChange={(e) => setResetInput(e.target.value.toUpperCase())}
-                    className="text-center font-bold text-red-600 h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border-red-200 dark:border-red-900 focus:border-red-500 focus:ring-red-500"
+                    className="text-center font-mono font-bold text-rose-600 h-10 rounded-lg bg-neutral-50 dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                    placeholder="RESET"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3 w-full mt-2">
-                  <Button variant="outline" onClick={() => { setIsResetConfirmOpen(false); setResetInput(""); }} className="rounded-xl h-11 text-xs font-bold">Urungkan</Button>
-                  <Button onClick={handleResetDB} disabled={resetInput !== "RESET"} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 text-xs font-bold shadow-md">Hapus</Button>
+                <div className="grid grid-cols-2 gap-2.5 w-full mt-2">
+                  <Button variant="outline" onClick={() => { setIsResetConfirmOpen(false); setResetInput(""); }} className="rounded-lg h-9 text-xs font-semibold border-neutral-200 dark:border-neutral-800">Batal</Button>
+                  <Button onClick={handleResetDB} disabled={resetInput !== "RESET"} className="bg-rose-600 hover:bg-rose-700 text-white rounded-lg h-9 text-xs font-semibold shadow-xs disabled:opacity-40">Hapus Permanen</Button>
                 </div>
               </>
             )}

@@ -7,8 +7,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "sans-serif"],
+        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
         display: ["Outfit", "sans-serif"],
+        mono: ["Consolas", "SFMono-Regular", "Menlo", "Monaco", "Liberation Mono", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",

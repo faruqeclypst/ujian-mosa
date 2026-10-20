@@ -1,12 +1,17 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { DataTable } from "../ui/data-table";
+import { useState, useMemo } from "react";
+import { NeonTable, type NeonTableColumn } from "../ui/NeonTable";
 import type { StudentData, ClassData } from "../../types/exam";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
-import { Edit, Trash, Sparkles, KeyRound, ClipboardList, Printer } from "lucide-react";
+import { Edit, Trash, Sparkles, KeyRound, ClipboardList, Printer, MoreHorizontal } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { Badge } from "../ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { cn } from "../../lib/utils";
 
 interface StudentTableProps {
@@ -22,7 +27,7 @@ interface StudentTableProps {
   onPrintExamCard?: (student: StudentData) => void;
   filterActions?: React.ReactNode;
   customActions?: (student: StudentData) => React.ReactNode;
-  // ── Mode server-side (diteruskan ke DataTable) ──
+  // ── Mode server-side ──
   serverSide?: boolean;
   serverTotalItems?: number;
   serverCurrentPage?: number;
@@ -35,6 +40,8 @@ interface StudentTableProps {
   serverSortDirection?: "asc" | "desc";
   onServerSortChange?: (column: string, direction: "asc" | "desc") => void;
   tableLoading?: boolean;
+  activeKey?: string;
+  onRowClick?: (student: StudentData) => void;
 }
 
 export const StudentTable = ({ 
@@ -59,158 +66,102 @@ export const StudentTable = ({
   onServerPageSizeChange,
   serverSearchTerm,
   onServerSearchChange,
-  serverSortColumn,
-  serverSortDirection,
-  onServerSortChange,
   tableLoading = false,
+  activeKey,
+  onRowClick,
 }: StudentTableProps & { title?: string }) => {
   const { terminology } = useTenant();
+  const { role } = useAuth();
   const displayTitle = title || `Daftar ${terminology.student}`;
 
-  // Offset nomor baris global saat mode server-side (untuk shift-select)
-  const rowOffset = serverSide ? (serverCurrentPage - 1) * serverPageSize : 0;
+  const [localSearch, setLocalSearch] = useState("");
 
-  const handleSelectAll = (checked: boolean) => {
-    const currentIds = students.map((s) => s.id);
-    if (checked) {
-      const merged = Array.from(new Set([...selectedIds, ...currentIds]));
-      onSelectChange(merged);
-    } else {
-      onSelectChange(selectedIds.filter((id) => !currentIds.includes(id)));
-    }
-  };
+  const filteredStudents = useMemo(() => {
+    if (serverSide) return students;
+    if (!localSearch.trim()) return students;
+    const q = localSearch.toLowerCase();
+    return students.filter(s => 
+      s.name?.toLowerCase().includes(q) ||
+      s.nisn?.toLowerCase().includes(q) ||
+      s.examNumber?.toLowerCase().includes(q)
+    );
+  }, [students, serverSide, localSearch]);
 
-  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
-
-  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
-    let newSelectedIds = [...selectedIds];
-    // index dari DataTable adalah nomor baris global; ubah ke lokal untuk slice
-    const localIndex = index - rowOffset;
-
-    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
-      const start = Math.min(lastSelectedIndex, localIndex);
-      const end = Math.max(lastSelectedIndex, localIndex);
-      const idsInRange = students.slice(start, end + 1).map(s => s.id);
-      
-      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
-    } else {
-      if (checked) {
-        if (!newSelectedIds.includes(id)) {
-          newSelectedIds.push(id);
-        }
-      } else {
-        newSelectedIds = newSelectedIds.filter((item) => item !== id);
-      }
-    }
-
-    onSelectChange(newSelectedIds);
-    setLastSelectedIndex(localIndex);
-  };
-
-  const isAllSelected = students.length > 0 && students.every(s => selectedIds.includes(s.id));
-
-  const columns = [
-    {
-      key: "selection",
-      label: (
-        <input
-          type="checkbox"
-          checked={isAllSelected}
-          onChange={(e) => handleSelectAll(e.target.checked)}
-          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
-        />
-      ),
-      render: (_: any, item: StudentData, index?: number) => (
-        <input
-          type="checkbox"
-          checked={selectedIds.includes(item.id)}
-          onChange={(e) => handleSelectOne(item.id, e.target.checked, index ?? 0, e)}
-          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
-        />
-      ),
-      className: "w-[40px] text-center",
-    },
+  const columns: NeonTableColumn<StudentData>[] = useMemo(() => [
     {
       key: "index",
-      label: "No",
-      render: (_: any, __: any, index?: number) => (index !== undefined ? index + 1 : 1),
-      className: "w-[60px]",
-    },
-    { 
-      key: "nisn", 
-      label: terminology.id, 
-      sortable: true,
-      className: "w-[120px] text-left",
-      render: (nisn: string, student: StudentData) => (
-        <div className="flex flex-col">
-          <span className="inline-flex items-center justify-start px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[11px] font-black tracking-widest border border-slate-200/50 dark:border-slate-700/50 w-fit">
-            {nisn || "???"}
-          </span>
-          {student.examNumber && student.examNumber !== nisn && (
-            <span className="text-[10px] text-slate-400 font-mono mt-0.5">
-              No: {student.examNumber}
-            </span>
-          )}
-        </div>
-      )
+      header: "#",
+      width: "40px",
+      align: "center",
+      render: (_item, index) => (
+        <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
+          {index + 1}
+        </span>
+      ),
     },
     { 
       key: "name", 
-      label: `Nama ${terminology.student}`, 
-      sortable: true,
-      render: (name: string, student: StudentData) => (
-        <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9 border-2 border-white dark:border-slate-800 shadow-sm flex-shrink-0">
-            {student.photo && <AvatarImage src={student.photo} alt={name} className="object-cover" />}
-            <AvatarFallback className={cn(
-              "text-white text-[10px] font-bold",
-              student.gender === "L" ? "bg-gradient-to-br from-blue-500 to-cyan-600" : "bg-gradient-to-br from-rose-400 to-pink-600"
-            )}>
-              {(name || "S").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col">
-            <span className="font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
-              <span>@{student.nisn}</span>
-              {(student.birthPlace || student.birthDate) && (
-                <>
-                  <span>•</span>
-                  <span>{[student.birthPlace, student.birthDate].filter(Boolean).join(", ")}</span>
-                </>
-              )}
+      header: `Nama ${terminology.student} & Identitas`, 
+      className: "min-w-[200px]",
+      render: (student) => {
+        const initials = (student.name || "S").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+        return (
+          <div className="flex items-center gap-2.5 py-0.5">
+            <Avatar className="h-7 w-7 border border-neutral-200 dark:border-neutral-800 shrink-0">
+              {student.photo && <AvatarImage src={student.photo} alt={student.name} className="object-cover" />}
+              <AvatarFallback className={cn(
+                "text-white text-[10px] font-bold font-mono",
+                student.gender === "L" ? "bg-gradient-to-br from-blue-500 to-indigo-600" : "bg-gradient-to-br from-rose-400 to-pink-600"
+              )}>
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col min-w-0">
+              <span 
+                className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm leading-tight truncate hover:underline cursor-pointer"
+                onClick={() => onEdit(student)}
+                title={`Edit data ${student.name}`}
+              >
+                {student.name}
+              </span>
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5">
+                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                  @{student.nisn || "---"}
+                </span>
+                {student.examNumber && student.examNumber !== student.nisn && (
+                  <>
+                    <span>•</span>
+                    <span>No: {student.examNumber}</span>
+                  </>
+                )}
+                {(student.birthPlace || student.birthDate) && (
+                  <>
+                    <span>•</span>
+                    <span className="truncate max-w-[140px]">
+                      {[student.birthPlace, student.birthDate].filter(Boolean).join(", ")}
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )
-    },
-    { 
-      key: "gender", 
-      label: "L/P", 
-      sortable: true,
-      className: "w-[60px] text-center",
-      render: (gender: string) => (
-        <Badge variant="outline" className={cn(
-          "w-7 h-7 flex items-center justify-center p-0 rounded-full font-black text-[10px]",
-          gender === "L" ? "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400" : "bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-900/20 dark:text-rose-400"
-        )}>
-          {gender}
-        </Badge>
-      )
+        );
+      }
     },
     { 
       key: "classId", 
-      label: terminology.class, 
-      sortable: true,
-      render: (classId: string, student: StudentData) => {
-        const cls = classes.find(c => c.id === classId);
+      header: terminology.class, 
+      className: "w-36",
+      render: (student) => {
+        const cls = classes.find(c => c.id === student.classId);
+        const clsName = cls?.name || (student.classId === "ALUMNI" ? "Alumni" : `Tanpa ${terminology.class}`);
         return (
-          <div className="flex flex-col gap-0.5">
-            <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-transparent text-[10px] font-bold px-2 py-0.5 w-fit">
-              {cls?.name || `Tanpa ${terminology.class}`}
-            </Badge>
+          <div className="flex flex-col gap-0.5 py-0.5">
+            <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
+              {clsName}
+            </span>
             {(student.room || student.session) && (
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">
                 {[student.room, student.session].filter(Boolean).join(" • ")}
               </span>
             )}
@@ -218,126 +169,171 @@ export const StudentTable = ({
         );
       }
     },
+    { 
+      key: "gender", 
+      header: "L/P", 
+      width: "50px",
+      align: "center",
+      render: (student) => (
+        <span className={cn(
+          "inline-flex items-center justify-center h-5 w-5 rounded text-[10px] font-bold font-mono border",
+          student.gender === "L" 
+            ? "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20" 
+            : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20"
+        )}>
+          {student.gender || "-"}
+        </span>
+      )
+    },
     {
       key: "hasChangedPassword",
-      label: "Password",
-      sortable: true,
-      className: "w-[150px]",
-      render: (_: any, student: StudentData) => {
+      header: "Password",
+      width: "110px",
+      render: (student) => {
         const hasChanged = student.hasChangedPassword;
         const isResetReq = !!student.resetRequested;
         return (
-          <div className="flex flex-col gap-1 items-start">
-            {isResetReq && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800 animate-pulse">
-                <KeyRound className="h-3 w-3" /> Minta Reset
+          <div className="flex items-center">
+            {isResetReq ? (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 animate-pulse">
+                Minta Reset
+              </span>
+            ) : hasChanged ? (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                Diubah
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                Default
               </span>
             )}
-            <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-lg inline-flex items-center gap-1", hasChanged ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40" : "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40")}>
-              {hasChanged ? "✓ Diubah" : "⚠ Default"}
-            </span>
           </div>
         );
       }
     },
-  ];
-
-  const { role } = useAuth();
-
-  const renderActions = (student: StudentData) => (
-    customActions ? customActions(student) : (
-      <div className="flex justify-end gap-1.5">
-        {onPrintExamCard && (
-          <button 
-            className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg dark:bg-blue-900/10 dark:text-blue-400 border border-blue-100 dark:border-blue-800/40"
-            onClick={() => onPrintExamCard(student)}
-            title="Cetak Kartu Ujian Siswa Ini"
-          >
-            <Printer className="h-4 w-4" />
-          </button>
-        )}
-        {onViewScores && (
-          <button 
-            className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg dark:bg-emerald-900/10 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40"
-            onClick={() => onViewScores(student)}
-            title="Lihat Nilai"
-          >
-            <ClipboardList className="h-4 w-4" />
-          </button>
-        )}
-        {onViewInterest && (
-          <button 
-            className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40"
-            onClick={() => onViewInterest(student)}
-            title="Lihat Bakat Minat"
-          >
-            <Sparkles className="h-4 w-4" />
-          </button>
-        )}
-        {role === "admin" && (
-          <>
-            <button 
-              className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
-              onClick={() => onEdit(student)}
-              title={`Edit ${terminology.student}`}
-            >
-              <Edit className="h-4 w-4" />
-            </button>
-            {role === "admin" && onResetPassword && (
+    {
+      key: "actions",
+      header: "Aksi",
+      width: "100px",
+      align: "right",
+      render: (student) => {
+        if (customActions) return customActions(student);
+        return (
+          <div className="flex justify-end items-center gap-1 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+            {role === "admin" && (
               <button 
-                className={cn(
-                  "p-1.5 rounded-lg border transition-colors",
-                  student.resetRequested
-                    ? "bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800 animate-pulse"
-                    : "bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/10 dark:text-amber-400 border-amber-100 dark:border-amber-800/40"
-                )}
-                onClick={() => onResetPassword(student)}
-                title={student.resetRequested ? "Siswa ini meminta reset password! Klik untuk reset ke 12345678" : `Reset Password ${terminology.student} ke Default (12345678)`}
+                type="button"
+                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                onClick={() => onEdit(student)}
+                title={`Edit data ${terminology.student}`}
               >
-                <KeyRound className="h-4 w-4" />
+                <Edit className="h-3.5 w-3.5" />
               </button>
             )}
-            <button 
-              className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
-              onClick={() => onDelete(student)}
-              title={`Hapus ${terminology.student}`}
-            >
-              <Trash className="h-4 w-4" />
-            </button>
-          </>
-        )}
-      </div>
-    )
-  );
+
+            {role === "admin" && onResetPassword && (
+              <button 
+                type="button"
+                className={cn(
+                  "h-7 w-7 rounded-md flex items-center justify-center border transition-colors shadow-2xs cursor-pointer",
+                  student.resetRequested
+                    ? "bg-rose-50 border-rose-300 text-rose-600 animate-pulse dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-400"
+                    : "bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                )}
+                onClick={() => onResetPassword(student)}
+                title={student.resetRequested ? "Siswa meminta reset! Klik untuk reset password" : `Reset Password ${terminology.student} (12345678)`}
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+              </button>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  title="Menu Lainnya"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                {onPrintExamCard && (
+                  <DropdownMenuItem
+                    onClick={() => onPrintExamCard(student)}
+                    className="text-xs cursor-pointer gap-2 py-1.5"
+                  >
+                    <Printer className="h-3.5 w-3.5 text-neutral-500" />
+                    <span>Cetak Kartu Ujian</span>
+                  </DropdownMenuItem>
+                )}
+                {onViewScores && (
+                  <DropdownMenuItem
+                    onClick={() => onViewScores(student)}
+                    className="text-xs cursor-pointer gap-2 py-1.5"
+                  >
+                    <ClipboardList className="h-3.5 w-3.5 text-neutral-500" />
+                    <span>Lihat Rekap Nilai</span>
+                  </DropdownMenuItem>
+                )}
+                {onViewInterest && (
+                  <DropdownMenuItem
+                    onClick={() => onViewInterest(student)}
+                    className="text-xs cursor-pointer gap-2 py-1.5"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+                    <span>Bakat & Minat</span>
+                  </DropdownMenuItem>
+                )}
+                {role === "admin" && (
+                  <>
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                    <DropdownMenuItem
+                      onClick={() => onDelete(student)}
+                      className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
+                    >
+                      <Trash className="h-3.5 w-3.5" />
+                      <span>Hapus {terminology.student}</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      }
+    }
+  ], [terminology, classes, role, customActions, onPrintExamCard, onViewScores, onViewInterest, onEdit, onResetPassword, onDelete]);
 
   return (
-    <Card>
-      <CardHeader className="p-4">
-        <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">{displayTitle}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <DataTable
-          data={students}
-          columns={columns}
-          searchPlaceholder={`Cari ${terminology.student}...`}
-          actions={renderActions}
-          emptyMessage={`Belum ada data ${terminology.student}.`}
-          filterActions={filterActions}
-          loading={tableLoading}
-          serverSide={serverSide}
-          serverTotalItems={serverTotalItems}
-          serverCurrentPage={serverCurrentPage}
-          serverPageSize={serverPageSize}
-          onServerPageChange={onServerPageChange}
-          onServerPageSizeChange={onServerPageSizeChange}
-          serverSearchTerm={serverSearchTerm}
-          onServerSearchChange={onServerSearchChange}
-          serverSortColumn={serverSortColumn}
-          serverSortDirection={serverSortDirection}
-          onServerSortChange={onServerSortChange}
-        />
-      </CardContent>
-    </Card>
+    <NeonTable<StudentData>
+      data={filteredStudents}
+      columns={columns}
+      keyExtractor={(s) => s.id}
+      selectable
+      selectedKeys={selectedIds}
+      onSelectionChange={onSelectChange}
+      isLoading={tableLoading}
+      searchValue={serverSide ? (serverSearchTerm || "") : localSearch}
+      onSearchChange={serverSide ? (onServerSearchChange || (() => {})) : setLocalSearch}
+      searchPlaceholder={`Cari nama ${terminology.student.toLowerCase()} atau NISN...`}
+      filterSlot={filterActions}
+      compact
+      title={displayTitle}
+      subtitle={`Kelola data dan status akun login ${terminology.student.toLowerCase()}.`}
+      activeKey={activeKey}
+      onRowClick={onRowClick}
+      pagination
+      serverSide={serverSide}
+      totalCount={serverSide ? serverTotalItems : undefined}
+      currentPage={serverSide ? serverCurrentPage : undefined}
+      pageSize={serverSide ? serverPageSize : 50}
+      pageSizeOptions={[25, 50, 100]}
+      onPageChange={serverSide ? onServerPageChange : undefined}
+      onPageSizeChange={serverSide ? onServerPageSizeChange : undefined}
+      emptyTitle={`Belum ada data ${terminology.student.toLowerCase()}`}
+      emptySubtitle={`Tambahkan data ${terminology.student.toLowerCase()} baru atau import dari file Excel.`}
+    />
   );
 };
 

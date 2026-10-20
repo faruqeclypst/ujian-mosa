@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import {
   Server,
   Activity,
@@ -13,12 +14,15 @@ import {
   ShieldCheck,
   Terminal,
   HelpCircle,
-  ExternalLink,
-  Layers
+  Layers,
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
+import { Button } from "../../components/ui/button";
+import { NeonStatGrid, NeonStatCard } from "../../components/ui/NeonStats";
+import { NeonCard, NeonCardHeader, NeonCardBody } from "../../components/ui/NeonCard";
+import { NeonBadge } from "../../components/ui/NeonBadge";
 
 interface VpsMetrics {
   status: "healthy" | "warning" | "error";
@@ -85,13 +89,12 @@ const ServerStatusPage = () => {
       if (isManual) {
         addToast({
           title: "Status Terkini",
-          description: `Data server berhasil diperbarui (${pingTime} ms).`,
+          description: `Data performa server berhasil diperbarui (${pingTime} ms).`,
           type: "success"
         });
       }
     } catch (err: any) {
       console.error("Gagal mengambil status VPS:", err);
-      // Fallback: uji latensi ke /api/health
       try {
         const pingTime = Math.round(performance.now() - startPing);
         setLatency(pingTime);
@@ -124,284 +127,277 @@ const ServerStatusPage = () => {
   const getMetricColor = (percent: number) => {
     if (percent < 60) return "text-emerald-600 dark:text-emerald-400";
     if (percent < 85) return "text-amber-600 dark:text-amber-400";
-    return "text-red-600 dark:text-red-400";
+    return "text-rose-600 dark:text-rose-400";
   };
 
   const getBarColor = (percent: number) => {
     if (percent < 60) return "bg-emerald-500";
     if (percent < 85) return "bg-amber-500";
-    return "bg-red-500";
+    return "bg-rose-500";
   };
 
   return (
-    <div className="space-y-5 pb-20 animate-in fade-in duration-500">
-      {/* ── Page Header ── */}
-      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
-            Status Server & VPS
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Pemantauan performa real-time dan kesehatan server sekolah Anda.
-          </p>
-        </div>
+    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+      <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
 
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <button
-            type="button"
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 h-9",
-              autoRefresh
-                ? "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400"
-                : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100"
-            )}
-            title="Pembaruan otomatis setiap 10 detik"
-          >
-            <span className={cn("w-2 h-2 rounded-full", autoRefresh ? "bg-blue-500 animate-pulse" : "bg-slate-400")} />
-            Auto-Refresh
-          </button>
-
-          <button
-            type="button"
-            onClick={() => fetchStatus(true)}
-            disabled={loading}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50 h-9"
-          >
-            <RefreshCw size={13} className={cn(loading && "animate-spin")} />
-            <span>Segarkan</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── Status Banner Overview ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* Kondisi Keseluruhan */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kondisi Server</span>
-            <CheckCircle2 size={16} className="text-emerald-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-xl font-black text-slate-900 dark:text-white">
-              {metrics ? (metrics.status === "healthy" ? "Optimal & Sehat" : "Beban Tinggi") : "Memeriksa..."}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1 truncate">
-            {metrics?.hostname || "Host server terhubung"}
-          </p>
-        </div>
-
-        {/* Latensi Respon */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Latensi API</span>
-            <Wifi size={16} className="text-blue-500" />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className={cn("text-xl font-black", latency && latency < 200 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600")}>
-              {latency !== null ? `${latency} ms` : "–"}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {latency !== null && latency < 100 ? "Koneksi sangat cepat" : "Respon jaringan normal"}
-          </p>
-        </div>
-
-        {/* Masa Aktif (Uptime) */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Masa Aktif VPS</span>
-            <Clock size={16} className="text-purple-500" />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-base font-bold text-slate-900 dark:text-white truncate">
-              {metrics?.uptime.formatted || "–"}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Tanpa restart sistem
-          </p>
-        </div>
-
-        {/* Basis Data Tenant */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Database Sekolah</span>
-            <Database size={16} className="text-emerald-500" />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-black text-slate-900 dark:text-white">
-              {metrics?.tenant?.db_size_formatted || "1.34 MB"}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Penyimpanan SQLite WAL
-          </p>
-        </div>
-      </div>
-
-      {/* ── 3 Main Resource Gauges ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* CPU USAGE */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                <Cpu size={16} />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Penggunaan CPU</h3>
-                <p className="text-[11px] text-slate-400">{metrics?.cpu.cores || 1} CPU Core</p>
-              </div>
+        {/* ── 1. Page Header Bar (Title, Breadcrumb & Primary Actions) ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+              Status Server &amp; VPS
+            </h1>
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+              <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
+                Semua Modul
+              </Link>
+              <span>/</span>
+              <span className="text-neutral-700 dark:text-neutral-300 font-medium">
+                {school?.slug || "modalbangsa"}
+              </span>
+              <span>/</span>
+              <span className="text-neutral-900 dark:text-neutral-100 font-semibold">
+                status-server
+              </span>
             </div>
-            <span className={cn("text-lg font-black", getMetricColor(metrics?.cpu.usage_percent || 0))}>
-              {metrics?.cpu.usage_percent ?? 0}%
-            </span>
           </div>
 
-          <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-            <div
-              className={cn("h-full transition-all duration-500", getBarColor(metrics?.cpu.usage_percent || 0))}
-              style={{ width: `${Math.min(metrics?.cpu.usage_percent || 0, 100)}%` }}
-            />
-          </div>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={cn(
+                "h-8 px-3 rounded-lg text-xs font-semibold border transition-all flex items-center gap-2 cursor-pointer shadow-2xs select-none",
+                autoRefresh
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
+                  : "bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-750 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              )}
+              title="Pembaruan otomatis setiap 10 detik"
+            >
+              <span className={cn("w-2 h-2 rounded-full", autoRefresh ? "bg-emerald-500 animate-pulse" : "bg-neutral-400")} />
+              <span>Auto-Refresh (10s)</span>
+            </button>
 
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-[11px] text-slate-500">
-            <span>Rata-rata Beban (1m, 5m, 15m):</span>
-            <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
-              {metrics?.cpu.load_average ? metrics.cpu.load_average.join(", ") : "0.0, 0.0, 0.0"}
-            </span>
+            <Button
+              type="button"
+              onClick={() => fetchStatus(true)}
+              disabled={loading}
+              className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+              <span>{loading ? "Memperbarui..." : "Segarkan"}</span>
+            </Button>
           </div>
         </div>
 
-        {/* RAM USAGE */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                <Layers size={16} />
+        {/* ── 2. Top Stats Strip (4 Kartu Ringkas, Elegan, Presisi Sama dengan Ruang Ujian & Bank Soal) ── */}
+        <NeonStatGrid cols={4}>
+          <NeonStatCard
+            label="Kondisi Server"
+            indicator={
+              metrics?.status === "healthy" ? (
+                <NeonBadge variant="emerald" size="xs" pulse={true}>
+                  Optimal
+                </NeonBadge>
+              ) : (
+                <NeonBadge variant="amber" size="xs">
+                  Tinggi
+                </NeonBadge>
+              )
+            }
+            value={metrics ? (metrics.status === "healthy" ? "Optimal & Sehat" : "Beban Tinggi") : "Memeriksa..."}
+            valueClassName="text-base sm:text-lg font-bold"
+            subText={metrics?.hostname ? `Host: ${metrics.hostname}` : "Host server terhubung"}
+            isLoading={loading && !metrics}
+          />
+
+          <NeonStatCard
+            label="Latensi API"
+            indicator={
+              latency !== null ? (
+                <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", latency < 200 ? "bg-emerald-500" : "bg-amber-500")} />
+              ) : undefined
+            }
+            value={latency !== null ? `${latency}` : "–"}
+            unit="ms"
+            subText={latency !== null && latency < 100 ? "Koneksi sangat cepat" : "Respon jaringan normal"}
+            isLoading={loading && !metrics}
+          />
+
+          <NeonStatCard
+            label="Masa Aktif VPS"
+            value={metrics?.uptime?.formatted || "–"}
+            valueClassName="text-base sm:text-lg font-bold truncate"
+            subText="Tanpa restart sistem"
+            isLoading={loading && !metrics}
+          />
+
+          <NeonStatCard
+            label="Database Sekolah"
+            value={metrics?.tenant?.db_size_formatted || "1.34 MB"}
+            subText="PocketBase SQLite WAL"
+            isLoading={loading && !metrics}
+          />
+        </NeonStatGrid>
+
+        {/* ── 3. Three Resource Gauges (CPU, RAM, Disk) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
+          {/* CPU USAGE */}
+          <NeonCard>
+            <NeonCardHeader
+              icon={Cpu}
+              title="Penggunaan CPU"
+              subtitle={`${metrics?.cpu.cores || 1} CPU Core`}
+              badge={
+                <span className={cn("text-base sm:text-lg font-mono font-bold", getMetricColor(metrics?.cpu.usage_percent || 0))}>
+                  {metrics?.cpu.usage_percent ?? 0}%
+                </span>
+              }
+            />
+            <NeonCardBody className="p-4 sm:p-5 space-y-3.5">
+              <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                <div
+                  className={cn("h-full transition-all duration-500 rounded-full", getBarColor(metrics?.cpu.usage_percent || 0))}
+                  style={{ width: `${Math.min(metrics?.cpu.usage_percent || 0, 100)}%` }}
+                />
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Memori (RAM)</h3>
-                <p className="text-[11px] text-slate-400">
-                  {metrics?.memory.used_formatted || "0 GB"} / {metrics?.memory.total_formatted || "0 GB"}
+
+              <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                <span>Rata-rata Beban (1m, 5m, 15m):</span>
+                <span className="font-mono font-semibold text-neutral-800 dark:text-neutral-200">
+                  {metrics?.cpu.load_average ? metrics.cpu.load_average.join(", ") : "0.0, 0.0, 0.0"}
+                </span>
+              </div>
+            </NeonCardBody>
+          </NeonCard>
+
+          {/* RAM USAGE */}
+          <NeonCard>
+            <NeonCardHeader
+              icon={Layers}
+              title="Memori (RAM)"
+              subtitle={`${metrics?.memory.used_formatted || "0 GB"} / ${metrics?.memory.total_formatted || "0 GB"}`}
+              badge={
+                <span className={cn("text-base sm:text-lg font-mono font-bold", getMetricColor(metrics?.memory.usage_percent || 0))}>
+                  {metrics?.memory.usage_percent ?? 0}%
+                </span>
+              }
+            />
+            <NeonCardBody className="p-4 sm:p-5 space-y-3.5">
+              <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                <div
+                  className={cn("h-full transition-all duration-500 rounded-full", getBarColor(metrics?.memory.usage_percent || 0))}
+                  style={{ width: `${Math.min(metrics?.memory.usage_percent || 0, 100)}%` }}
+                />
+              </div>
+
+              <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                <span>Ketersediaan RAM:</span>
+                <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                  {metrics?.memory.available_bytes ? `${(metrics.memory.available_bytes / (1024**3)).toFixed(2)} GB Tersedia` : "–"}
+                </span>
+              </div>
+            </NeonCardBody>
+          </NeonCard>
+
+          {/* DISK USAGE */}
+          <NeonCard>
+            <NeonCardHeader
+              icon={HardDrive}
+              title="Penyimpanan (Disk)"
+              subtitle={`${metrics?.disk.used_formatted || "0 GB"} / ${metrics?.disk.total_formatted || "0 GB"}`}
+              badge={
+                <span className={cn("text-base sm:text-lg font-mono font-bold", getMetricColor(metrics?.disk.usage_percent || 0))}>
+                  {metrics?.disk.usage_percent ?? 0}%
+                </span>
+              }
+            />
+            <NeonCardBody className="p-4 sm:p-5 space-y-3.5">
+              <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                <div
+                  className={cn("h-full transition-all duration-500 rounded-full", getBarColor(metrics?.disk.usage_percent || 0))}
+                  style={{ width: `${Math.min(metrics?.disk.usage_percent || 0, 100)}%` }}
+                />
+              </div>
+
+              <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                <span>Ruang Bebas Tersisa:</span>
+                <span className="font-mono font-semibold text-neutral-800 dark:text-neutral-200">
+                  {metrics?.disk.free_formatted || "–"}
+                </span>
+              </div>
+            </NeonCardBody>
+          </NeonCard>
+        </div>
+
+        {/* ── 4. Technical Details & Server Environment ── */}
+        <NeonCard>
+          <NeonCardHeader
+            icon={Terminal}
+            title="Rincian Node &amp; Lingkungan Server"
+            subtitle="Spesifikasi runtime instance PocketBase dan host VPS"
+            actions={
+              <span className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400">
+                Pembaruan: {lastRefreshed.toLocaleTimeString("id-ID")}
+              </span>
+            }
+          />
+          <NeonCardBody className="p-5 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 text-xs">
+              <div className="p-3.5 rounded-lg border border-neutral-200/70 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 space-y-1">
+                <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">Sistem Operasi</span>
+                <p className="font-semibold text-neutral-900 dark:text-neutral-100">{metrics?.os || "Linux Ubuntu"}</p>
+              </div>
+
+              <div className="p-3.5 rounded-lg border border-neutral-200/70 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 space-y-1">
+                <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">Nama Host VPS</span>
+                <p className="font-mono font-semibold text-neutral-900 dark:text-neutral-100">{metrics?.hostname || "–"}</p>
+              </div>
+
+              <div className="p-3.5 rounded-lg border border-neutral-200/70 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 space-y-1">
+                <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">Tenant Institusi</span>
+                <p className="font-semibold text-neutral-900 dark:text-neutral-100 truncate">
+                  {school?.name || "Sekolah"} ({school?.slug || "tenant"})
                 </p>
               </div>
-            </div>
-            <span className={cn("text-lg font-black", getMetricColor(metrics?.memory.usage_percent || 0))}>
-              {metrics?.memory.usage_percent ?? 0}%
-            </span>
-          </div>
 
-          <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-            <div
-              className={cn("h-full transition-all duration-500", getBarColor(metrics?.memory.usage_percent || 0))}
-              style={{ width: `${Math.min(metrics?.memory.usage_percent || 0, 100)}%` }}
-            />
-          </div>
-
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-[11px] text-slate-500">
-            <span>Ketersediaan RAM:</span>
-            <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-              {metrics?.memory.available_bytes ? `${(metrics.memory.available_bytes / (1024**3)).toFixed(2)} GB Tersedia` : "–"}
-            </span>
-          </div>
-        </div>
-
-        {/* DISK USAGE */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
-                <HardDrive size={16} />
+              <div className="p-3.5 rounded-lg border border-neutral-200/70 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 space-y-1">
+                <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">Paket CBT Aktif</span>
+                <div className="flex items-center gap-2">
+                  <NeonBadge variant="emerald" size="xs">
+                    {school?.plan || "Free"}
+                  </NeonBadge>
+                  <span className="text-neutral-600 dark:text-neutral-300 font-medium">
+                    (Maks. {school?.student_quota || 50} Siswa)
+                  </span>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Penyimpanan (Disk)</h3>
-                <p className="text-[11px] text-slate-400">
-                  {metrics?.disk.used_formatted || "0 GB"} / {metrics?.disk.total_formatted || "0 GB"}
+
+              <div className="p-3.5 rounded-lg border border-neutral-200/70 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 space-y-1">
+                <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">Database Engine</span>
+                <p className="font-semibold text-neutral-900 dark:text-neutral-100">
+                  PocketBase Embedded SQLite (WAL Mode)
                 </p>
               </div>
+
+              <div className="p-3.5 rounded-lg border border-neutral-200/70 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 space-y-1">
+                <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">Protokol Keamanan</span>
+                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>HTTPS / TLS Terenkripsi Penuh</span>
+                </div>
+              </div>
             </div>
-            <span className={cn("text-lg font-black", getMetricColor(metrics?.disk.usage_percent || 0))}>
-              {metrics?.disk.usage_percent ?? 0}%
-            </span>
-          </div>
 
-          <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-            <div
-              className={cn("h-full transition-all duration-500", getBarColor(metrics?.disk.usage_percent || 0))}
-              style={{ width: `${Math.min(metrics?.disk.usage_percent || 0, 100)}%` }}
-            />
-          </div>
+            {/* Capacity Guide Alert */}
+            <div className="p-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-500/10 text-xs text-neutral-700 dark:text-neutral-300 flex items-start gap-2.5">
+              <HelpCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                <strong className="text-neutral-900 dark:text-neutral-100 font-semibold">Panduan Kapasitas:</strong> Saat pelaksanaan ujian serentak berlangsung, pastikan beban RAM berada di bawah 85% dan CPU di bawah 80%. Server otomatis mendistribusikan caching gambar dan data butir soal agar latensi pengerjaan siswa tetap instan tanpa beban berlebih.
+              </p>
+            </div>
+          </NeonCardBody>
+        </NeonCard>
 
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-[11px] text-slate-500">
-            <span>Ruang Tersisa:</span>
-            <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
-              {metrics?.disk.free_formatted || "–"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Server Technical Details Table ── */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Terminal size={16} className="text-blue-500" />
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Rincian Node & Lingkungan Server</h3>
-          </div>
-          <span className="text-[11px] text-slate-400">
-            Terakhir diperbarui: {lastRefreshed.toLocaleTimeString("id-ID")}
-          </span>
-        </div>
-
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-xs">
-          <div className="space-y-1">
-            <span className="text-slate-400 font-medium">Sistem Operasi</span>
-            <p className="font-semibold text-slate-800 dark:text-slate-200">{metrics?.os || "Linux Ubuntu"}</p>
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-slate-400 font-medium">Nama Host VPS</span>
-            <p className="font-semibold text-slate-800 dark:text-slate-200">{metrics?.hostname || "–"}</p>
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-slate-400 font-medium">Tenant Institusi</span>
-            <p className="font-semibold text-slate-800 dark:text-slate-200">
-              {school?.name || "Sekolah"} ({school?.slug || "tenant"})
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-slate-400 font-medium">Paket CBT Aktif</span>
-            <p className="font-semibold text-slate-800 dark:text-slate-200 capitalize">
-              {school?.plan || "Free"} (Maks. {school?.student_quota || 50} Siswa)
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-slate-400 font-medium">Database Engine</span>
-            <p className="font-semibold text-slate-800 dark:text-slate-200">
-              PocketBase Embedded SQLite (WAL Mode)
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-slate-400 font-medium">Protokol Keamanan</span>
-            <p className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              <ShieldCheck size={14} /> HTTPS / TLS Terenkripsi Penuh
-            </p>
-          </div>
-        </div>
-
-        <div className="p-4 bg-blue-50/60 dark:bg-blue-950/20 border-t border-slate-100 dark:border-slate-800 text-xs text-blue-800 dark:text-blue-300 flex items-start gap-2.5">
-          <HelpCircle size={15} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-          <p className="leading-relaxed">
-            <b>Panduan Kapasitas:</b> Saat pelaksanaan ujian serentak berlangsung, pastikan beban RAM berada di bawah 85% dan CPU di bawah 80%. Server otomatis mendistribusikan caching gambar dan data soal agar respon pengerjaan siswa tetap instan tanpa jeda.
-          </p>
-        </div>
       </div>
     </div>
   );

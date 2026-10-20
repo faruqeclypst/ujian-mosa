@@ -1,11 +1,15 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { DataTable } from "../ui/data-table";
-import { Button } from "../ui/button";
+import { useState, useMemo } from "react";
+import { NeonTable, type NeonTableColumn } from "../ui/NeonTable";
 import type { Teacher } from "../../types/exam";
-import { Edit, Trash, KeyRound, User, Mail, Phone } from "lucide-react";
+import { Edit, Trash, KeyRound, Mail, Phone, MoreHorizontal } from "lucide-react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import { Badge } from "../ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { useTenant } from "../../context/TenantContext";
 
 interface TeacherTableProps {
@@ -15,6 +19,9 @@ interface TeacherTableProps {
   onEdit: (teacher: Teacher) => void;
   onDelete: (teacher: Teacher) => void;
   onResetPassword: (teacherId: string) => void;
+  isLoading?: boolean;
+  activeKey?: string;
+  onRowClick?: (teacher: Teacher) => void;
 }
 
 export const TeacherTable = ({ 
@@ -23,182 +30,205 @@ export const TeacherTable = ({
   onSelectChange, 
   onEdit, 
   onDelete,
-  onResetPassword
+  onResetPassword,
+  isLoading,
+  activeKey,
+  onRowClick
 }: TeacherTableProps) => {
   const { terminology } = useTenant();
-  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      onSelectChange(teachers.map(t => t.id));
-    } else {
-      onSelectChange([]);
-    }
-  };
+  const filteredTeachers = useMemo(() => {
+    if (!search.trim()) return teachers;
+    const q = search.toLowerCase();
+    return teachers.filter(t => 
+      t.name?.toLowerCase().includes(q) || 
+      (t.username && t.username.toLowerCase().includes(q)) ||
+      (t.code && t.code.toLowerCase().includes(q)) ||
+      (t.email && t.email.toLowerCase().includes(q))
+    );
+  }, [teachers, search]);
 
-  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
-    let newSelectedIds = [...selectedIds];
-
-    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
-      const start = Math.min(lastSelectedIndex, index);
-      const end = Math.max(lastSelectedIndex, index);
-      const idsInRange = teachers.slice(start, end + 1).map(t => t.id);
-      
-      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
-    } else {
-      if (checked) {
-        if (!newSelectedIds.includes(id)) {
-          newSelectedIds.push(id);
-        }
-      } else {
-        newSelectedIds = newSelectedIds.filter((item) => item !== id);
-      }
-    }
-
-    onSelectChange(newSelectedIds);
-    setLastSelectedIndex(index);
-  };
-
-  const isAllSelected = teachers.length > 0 && teachers.every(t => selectedIds.includes(t.id));
-
-  const columns = [
-    {
-      key: "selection",
-      label: (
-        <input
-          type="checkbox"
-          checked={isAllSelected}
-          onChange={(e) => handleSelectAll(e.target.checked)}
-          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
-        />
-      ),
-      render: (_: any, item: Teacher, index?: number) => (
-        <input
-          type="checkbox"
-          checked={selectedIds.includes(item.id)}
-          onChange={(e) => handleSelectOne(item.id, e.target.checked, index ?? 0, e)}
-          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
-        />
-      ),
-      className: "w-[40px] text-center",
-    },
+  const columns: NeonTableColumn<Teacher>[] = useMemo(() => [
     {
       key: "index",
-      label: "No",
-      render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
-      className: "w-[60px]",
-    },
-    { 
-      key: "code", 
-      label: "Kode",
-      className: "w-[100px] text-left",
-      render: (code: string) => (
-        <span className="inline-flex items-center justify-start px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[11px] font-black tracking-widest border border-slate-200/50 dark:border-slate-700/50">
-          {code || "???"}
+      header: "#",
+      width: "40px",
+      align: "center",
+      render: (_item, index) => (
+        <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
+          {index + 1}
         </span>
-      )
+      ),
     },
     { 
       key: "name", 
-      label: `Nama ${terminology.teacher}`, 
-      sortable: true,
-      render: (name: string, teacher: Teacher) => (
-        <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9 border-2 border-white dark:border-slate-800 shadow-sm">
-            <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-[10px] font-bold">
-              {teacher.code || (name || "U").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col">
-            <span className="font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
-            <span className="text-[11px] text-slate-400 font-medium">@{teacher.username}</span>
+      header: `Nama ${terminology.teacher} & Identitas`, 
+      className: "min-w-[200px]",
+      render: (teacher) => {
+        const initials = teacher.code || (teacher.name || "G").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+        return (
+          <div className="flex items-center gap-2.5 py-0.5">
+            <Avatar className="h-7 w-7 border border-neutral-200 dark:border-neutral-800 shrink-0">
+              <AvatarFallback className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold font-mono">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col min-w-0">
+              <span 
+                className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm leading-tight truncate hover:underline cursor-pointer"
+                onClick={() => onEdit(teacher)}
+                title={`Edit data ${teacher.name}`}
+              >
+                {teacher.name}
+              </span>
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5">
+                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                  @{teacher.username || teacher.code || "guru"}
+                </span>
+                <span>•</span>
+                <span>Kode: {teacher.code || "-"}</span>
+              </div>
+            </div>
           </div>
-        </div>
-      )
+        );
+      }
     },
     { 
       key: "contact",
-      label: "Kontak",
-      render: (_: any, teacher: Teacher) => (
-        <div className="flex flex-col gap-1">
+      header: "Kontak",
+      className: "hidden md:table-cell w-48",
+      headerClassName: "hidden md:table-cell w-48",
+      render: (teacher) => (
+        <div className="flex flex-col gap-0.5 py-0.5 font-mono text-[11px]">
           {teacher.email ? (
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-              <Mail className="h-3 w-3 shrink-0 text-slate-400" />
-              <span className="truncate max-w-[180px]">{teacher.email}</span>
+            <span className="inline-flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
+              <Mail className="h-3 w-3 shrink-0 text-neutral-400" />
+              <span className="truncate max-w-[170px]">{teacher.email}</span>
             </span>
           ) : null}
           {teacher.phone ? (
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-              <Phone className="h-3 w-3 shrink-0 text-slate-400" />
-              {teacher.phone}
+            <span className="inline-flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
+              <Phone className="h-3 w-3 shrink-0 text-neutral-400" />
+              <span>{teacher.phone}</span>
             </span>
           ) : null}
           {!teacher.email && !teacher.phone && (
-            <span className="text-slate-300 dark:text-slate-700 italic text-[10px]">-</span>
+            <span className="text-neutral-400 dark:text-neutral-600 italic text-[11px]">-</span>
           )}
         </div>
       )
     },
     { 
       key: "subjects", 
-      label: terminology.subject, 
-      render: (subjects: string[]) => (
-        <div className="flex flex-wrap gap-1.5">
-          {(!subjects || subjects.length === 0) ? (
-            <span className="text-slate-300 dark:text-slate-700 italic text-[10px]">Belum diatur</span>
-          ) : (
-            subjects.map((sub, i) => (
-              <Badge key={i} variant="secondary" className="bg-indigo-50/50 hover:bg-indigo-100/80 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400 border-indigo-100/50 dark:border-indigo-800/30 text-[10px] font-bold px-2 py-0 border rounded-md">
+      header: terminology.subject, 
+      className: "w-52",
+      render: (teacher) => {
+        const subjects = teacher.subjects || [];
+        if (subjects.length === 0) {
+          return <span className="text-neutral-400 dark:text-neutral-500 italic text-xs">Belum diatur</span>;
+        }
+        return (
+          <div className="flex flex-wrap gap-1 py-0.5">
+            {subjects.map((sub, i) => (
+              <span 
+                key={i} 
+                className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-750 text-neutral-700 dark:text-neutral-300"
+              >
                 {sub}
-              </Badge>
-            ))
-          )}
+              </span>
+            ))}
+          </div>
+        );
+      }
+    },
+    {
+      key: "actions",
+      header: "Aksi",
+      width: "100px",
+      align: "right",
+      render: (teacher) => (
+        <div className="flex justify-end items-center gap-1 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+          <button 
+            type="button"
+            className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+            onClick={() => onEdit(teacher)}
+            title={`Edit ${terminology.teacher}`}
+          >
+            <Edit className="h-3.5 w-3.5" />
+          </button>
+          <button 
+            type="button"
+            className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+            onClick={() => onResetPassword(teacher.id)}
+            title={`Reset Password ${terminology.teacher} (12345678)`}
+          >
+            <KeyRound className="h-3.5 w-3.5" />
+          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                title="Menu Lainnya"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuItem
+                onClick={() => onEdit(teacher)}
+                className="text-xs cursor-pointer gap-2 py-1.5"
+              >
+                <Edit className="h-3.5 w-3.5 text-neutral-500" />
+                <span>Edit Data {terminology.teacher}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onResetPassword(teacher.id)}
+                className="text-xs cursor-pointer gap-2 py-1.5"
+              >
+                <KeyRound className="h-3.5 w-3.5 text-amber-500" />
+                <span>Reset Password (12345678)</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+              <DropdownMenuItem
+                onClick={() => onDelete(teacher)}
+                className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
+              >
+                <Trash className="h-3.5 w-3.5" />
+                <span>Hapus {terminology.teacher}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )
-    },
-  ];
-
-  const renderActions = (teacher: Teacher) => (
-    <div className="flex justify-end gap-2">
-      <button 
-        className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
-        onClick={() => onEdit(teacher)}
-        title={`Edit ${terminology.teacher}`}
-      >
-        <Edit className="h-4 w-4" />
-      </button>
-      <button 
-        className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40"
-        onClick={() => onResetPassword(teacher.id)}
-        title={`Reset Password ${terminology.teacher}`}
-      >
-        <KeyRound className="h-4 w-4" />
-      </button>
-      <button 
-        className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
-        onClick={() => onDelete(teacher)}
-        title={`Hapus ${terminology.teacher}`}
-      >
-        <Trash className="h-4 w-4" />
-      </button>
-    </div>
-  );
+    }
+  ], [terminology, onEdit, onDelete, onResetPassword]);
 
   return (
-    <Card>
-      <CardHeader className="p-4">
-        <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar {terminology.teacher}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <DataTable
-          data={teachers}
-          columns={columns}
-          searchPlaceholder={`Cari ${terminology.teacher.toLowerCase()}...`}
-          actions={renderActions}
-          emptyMessage={`Belum ada data ${terminology.teacher.toLowerCase()}.`}
-        />
-      </CardContent>
-    </Card>
+    <NeonTable<Teacher>
+      data={filteredTeachers}
+      columns={columns}
+      keyExtractor={(t) => t.id}
+      compact
+      selectable
+      selectedKeys={selectedIds}
+      onSelectionChange={onSelectChange}
+      searchValue={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={`Cari nama ${terminology.teacher.toLowerCase()}, kode, atau username...`}
+      title={`Daftar ${terminology.teacher}`}
+      subtitle={`Tenaga pendidik terdaftar dengan akses pembuatan soal dan monitoring.`}
+      activeKey={activeKey}
+      onRowClick={onRowClick}
+      pagination
+      pageSize={25}
+      pageSizeOptions={[10, 25, 50, 100]}
+      emptyTitle={`Belum ada data ${terminology.teacher.toLowerCase()}`}
+      emptySubtitle={`Tambahkan guru baru dengan klik tombol Tambah ${terminology.teacher} di atas.`}
+      isLoading={isLoading}
+    />
   );
 };
 

@@ -1,5 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy, ClipboardList, Download, Loader2, X, ChevronDown, Eye, MoreHorizontal } from "lucide-react";
+import {
+  Plus,
+  BookOpen,
+  Trash,
+  Edit,
+  Archive,
+  RotateCw,
+  Copy,
+  ClipboardList,
+  Download,
+  Loader2,
+  X,
+  ChevronDown,
+  Eye,
+  MoreHorizontal,
+  Check,
+  Search,
+  FileText,
+  Users,
+  CheckSquare,
+  GitBranch,
+} from "lucide-react";
 import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
@@ -7,10 +28,9 @@ import { Progress } from "../../components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { getR2WorkerUrl, getR2PublicBaseUrl } from "../../lib/storage";
-import FormField from "../../components/forms/FormField";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useExamData } from "../../context/ExamDataContext";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import { BatchProgressDialog, type BatchProgressState } from "../../components/dialogs/BatchProgressDialog";
@@ -22,7 +42,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
-import { DataTable } from "../../components/ui/data-table";
+import { NeonTable, type NeonTableColumn } from "../../components/ui/NeonTable";
+import {
+  NeonInspector,
+  InspectorSection,
+  InspectorHeader,
+  InspectorField,
+  InspectorGrid,
+  InspectorActions,
+  InspectorButton,
+  InspectorCard,
+  InspectorEmpty,
+} from "../../components/ui/NeonInspector";
+import { NeonTabs } from "../../components/ui/NeonTabs";
+import { NeonStatGrid, NeonStatCard } from "../../components/ui/NeonStats";
+import { NeonBadge } from "../../components/ui/NeonBadge";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { useToast } from "../../components/ui/toast";
@@ -43,15 +77,29 @@ export interface ExamData {
 
 export const getExamTypeColorClass = (type: string) => {
   switch (type) {
-    case "Latihan Biasa": return "bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:border-slate-700/60 dark:text-slate-300";
-    case "Ulangan Harian": return "bg-emerald-50 border-emerald-200/60 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:text-emerald-400";
-    case "Ujian Tengah Semester (PTS)": return "bg-amber-50 border-amber-200/60 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800/60 dark:text-amber-500";
-    case "Ujian Akhir Semester (PAS / PAT)": return "bg-rose-50 border-rose-200/60 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800/60 dark:text-rose-400";
-    case "Ujian Sekolah (US)": return "bg-indigo-50 border-indigo-200/60 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800/60 dark:text-indigo-400";
-    case "Tryout": return "bg-fuchsia-50 border-fuchsia-200/60 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:border-fuchsia-800/60 dark:text-fuchsia-400";
-    case "Tugas Terstruktur": return "bg-blue-50 border-blue-200/60 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800/60 dark:text-blue-400";
-    case "Ujian Praktik": return "bg-cyan-50 border-cyan-200/60 text-cyan-700 dark:bg-cyan-950/40 dark:border-cyan-800/60 dark:text-cyan-400";
-    default: return "bg-indigo-50 border-indigo-200/60 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800/60 dark:text-indigo-400";
+    case "Latihan":
+    case "Latihan Biasa":
+      return "bg-neutral-100 border-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300";
+    case "Ulangan":
+    case "Ulangan Harian":
+      return "bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400";
+    case "PTS":
+    case "Ujian Tengah Semester (PTS)":
+      return "bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400";
+    case "PAS":
+    case "Ujian Akhir Semester (PAS / PAT)":
+      return "bg-rose-500/10 border-rose-500/20 text-rose-700 dark:text-rose-400";
+    case "US":
+    case "Ujian Sekolah (US)":
+      return "bg-indigo-500/10 border-indigo-500/20 text-indigo-700 dark:text-indigo-400";
+    case "Tryout":
+      return "bg-purple-500/10 border-purple-500/20 text-purple-700 dark:text-purple-400";
+    case "Tugas Terstruktur":
+      return "bg-sky-500/10 border-sky-500/20 text-sky-700 dark:text-sky-400";
+    case "Ujian Praktik":
+      return "bg-teal-500/10 border-teal-500/20 text-teal-700 dark:text-teal-400";
+    default:
+      return "bg-neutral-100 border-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300";
   }
 };
 
@@ -303,7 +351,7 @@ let examsCache: ExamsCacheData | null = null;
 
 const ExamsPage = () => {
   const navigate = useNavigate();
-  const { pb, terminology } = useTenant();
+  const { pb, terminology, school } = useTenant();
   const { user, role, teacherId } = useAuth();
   const { addToast } = useToast();
   const { subjects, teachers, teacherFullAccess, loading: dataLoading } = useExamData();
@@ -324,6 +372,12 @@ const ExamsPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
+
+  // Filter & Search states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [inspectedExamId, setInspectedExamId] = useState<string | null>(null);
 
   // Batch Export State
   const [batchExportProgress, setBatchExportProgress] = useState<{
@@ -352,6 +406,9 @@ const ExamsPage = () => {
   useEffect(() => {
     setSelectedIds([]);
     setLastSelectedIndex(null);
+    setSearchQuery("");
+    setSubjectFilter("all");
+    setTypeFilter("all");
   }, [activeTab]);
 
   const fetchQuestionCounts = useCallback(async () => {
@@ -399,13 +456,46 @@ const ExamsPage = () => {
     return examTeacherId === teacherId || examTeacherId === user?.id;
   }, [role, teacherId, user, teacherFullAccess]);
 
-  const filteredExams = useMemo(() => {
+  const tabExams = useMemo(() => {
     return exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
   }, [exams, activeTab]);
 
+  const displayExams = useMemo(() => {
+    return tabExams.filter(exam => {
+      if (subjectFilter !== "all" && exam.subjectId !== subjectFilter) {
+        return false;
+      }
+      if (typeFilter !== "all") {
+        const t = exam.examType || "Latihan";
+        if (t !== typeFilter) return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const subject = subjects.find((s: any) => s.id === exam.subjectId)?.name?.toLowerCase() || "";
+        const teacher = teachers.find((t: any) => t.id === exam.teacherId)?.name?.toLowerCase() || "";
+        const title = (exam.title || "").toLowerCase();
+        const examType = (exam.examType || "").toLowerCase();
+        if (!title.includes(q) && !subject.includes(q) && !teacher.includes(q) && !examType.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [tabExams, subjectFilter, typeFilter, searchQuery, subjects, teachers]);
+
+  const filteredExams = displayExams;
+
+  const inspectedExam = useMemo(() => {
+    if (inspectedExamId) {
+      const found = displayExams.find(e => e.id === inspectedExamId);
+      if (found) return found;
+    }
+    return displayExams[0] || null;
+  }, [displayExams, inspectedExamId]);
+
   const selectableExams = useMemo(() => {
-    return filteredExams.filter(e => isOwner(e));
-  }, [filteredExams, isOwner]);
+    return displayExams.filter(e => isOwner(e));
+  }, [displayExams, isOwner]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -421,7 +511,7 @@ const ExamsPage = () => {
     if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
       const start = Math.min(lastSelectedIndex, index);
       const end = Math.max(lastSelectedIndex, index);
-      const idsInRange = filteredExams.slice(start, end + 1).filter(e => isOwner(e)).map(e => e.id);
+      const idsInRange = displayExams.slice(start, end + 1).filter(e => isOwner(e)).map(e => e.id);
       newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
     } else {
       if (checked) {
@@ -436,85 +526,6 @@ const ExamsPage = () => {
     setSelectedIds(newSelectedIds);
     setLastSelectedIndex(index);
   };
-
-  const columns = useMemo(() => [
-    {
-      key: "selection",
-      label: (
-        <input
-          type="checkbox"
-          checked={selectableExams.length > 0 && selectableExams.every(e => selectedIds.includes(e.id))}
-          onChange={(e) => handleSelectAll(e.target.checked)}
-          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer align-middle"
-          title="Pilih Semua"
-        />
-      ),
-      render: (_: any, item: any, index?: number) => {
-        const canSelect = isOwner(item);
-        if (!canSelect) return <div className="w-4 h-4 mx-auto" />;
-        return (
-          <input
-            type="checkbox"
-            checked={selectedIds.includes(item.id)}
-            onChange={(e) => handleSelectOne(item.id, e.target.checked, index ?? 0, e)}
-            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer align-middle"
-          />
-        );
-      },
-      className: "w-[40px] text-center",
-    },
-    {
-      key: "index",
-      label: "No",
-      render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
-      className: "w-[60px]",
-    },
-    {
-      key: "title",
-      label: `Judul Bank Soal`,
-      sortable: true,
-      render: (v: string, item: any) => (
-        <div className="flex flex-col min-w-0">
-          <span className="font-bold text-slate-800 dark:text-slate-100 truncate leading-tight">{v}</span>
-          {item.examType && (
-            <div className="mt-1">
-              <span className={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border", getExamTypeColorClass(item.examType))}>
-                {item.examType}
-              </span>
-            </div>
-          )}
-        </div>
-      )
-    },
-    {
-      key: "subjectName",
-      label: terminology.subject,
-      sortable: true,
-      render: (name: string) => (
-        <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{name}</span>
-      )
-    },
-    {
-      key: "teacherName",
-      label: `${terminology.teacher} Pengampu`,
-      sortable: true,
-      render: (name: string, exam: any) => {
-        const teacher = teachers.find((t: any) => t.id === exam.teacherId);
-        return (
-          <div className="flex items-center gap-2">
-            <Avatar className="h-7 w-7 border border-slate-200 dark:border-slate-800">
-              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-xs font-bold">
-                {teacher?.code || (name || "U").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
-            </div>
-          </div>
-        );
-      }
-    }
-  ], [teachers, selectableExams, selectedIds, terminology, isOwner, lastSelectedIndex, filteredExams]);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -1481,400 +1492,735 @@ const ExamsPage = () => {
     }
   };
 
-  return (
-    <div className="space-y-5">
-      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
-            Bank Soal (Ujian)
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola master ujian dan rincian soal Bank Soal.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {isLoading ? (
-            <>
-              <Skeleton className="h-9 w-24 rounded-xl" />
-              <Skeleton className="h-9 w-32 rounded-xl" />
-            </>
-          ) : (
-            <>
-              <div className="flex w-full sm:w-auto bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
-                <button 
-                  onClick={() => setActiveTab("aktif")} 
-                  className={`flex-1 sm:flex-none min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${ activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
+  const neonColumns: NeonTableColumn<ExamData>[] = useMemo(() => [
+    {
+      key: "index",
+      header: "#",
+      width: "40px",
+      align: "center",
+      render: (_, index) => (
+        <span className="font-mono text-xs text-neutral-400">
+          {index + 1}
+        </span>
+      ),
+    },
+    {
+      key: "title",
+      header: "Judul Bank Soal & Tipe",
+      className: "min-w-[170px]",
+      render: (exam) => {
+        const qCount = questionCounts[exam.id] || 0;
+        const subject = subjects.find((s: any) => s.id === exam.subjectId)?.name || (exam as any).subjectName || "-";
+
+        return (
+          <div className="flex flex-col gap-1 py-0.5 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm leading-tight hover:underline cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sessionStorage.setItem("activeQuestionsExamId", exam.id);
+                  navigate("/admin/bank-soal/questions");
+                }}
+              >
+                {exam.title}
+              </span>
+              <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0", getExamTypeColorClass(exam.examType || "Latihan"))}>
+                {exam.examType || "Latihan"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">
+              <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                {qCount} soal
+              </span>
+              <span className="md:hidden text-neutral-600 dark:text-neutral-300 font-sans">
+                • {subject}
+              </span>
+              {exam.createdAt && (
+                <>
+                  <span>•</span>
+                  <span>{new Date(exam.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "subject",
+      header: terminology.subject,
+      className: "hidden md:table-cell w-32",
+      headerClassName: "hidden md:table-cell w-32",
+      render: (exam) => {
+        const subject = subjects.find((s: any) => s.id === exam.subjectId)?.name || (exam as any).subjectName || "-";
+        return (
+          <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+            {subject}
+          </span>
+        );
+      },
+    },
+    {
+      key: "teacher",
+      header: `${terminology.teacher} Pengampu`,
+      className: "hidden lg:table-cell w-40",
+      headerClassName: "hidden lg:table-cell w-40",
+      render: (exam) => {
+        const teacher = teachers.find((t: any) => t.id === exam.teacherId);
+        const name = teacher?.name || (exam as any).teacherName || "-";
+        const initials = teacher?.code || name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase();
+
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6 border border-neutral-200 dark:border-neutral-800 shrink-0">
+              <AvatarFallback className="bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-[10px] font-bold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate max-w-[130px]">
+              {name}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: "actions",
+      header: "Aksi",
+      width: "100px",
+      align: "right",
+      render: (exam) => {
+        const owner = isOwner(exam);
+        return (
+          <div className="flex justify-end items-center gap-1 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+            {/* Coba Simulasi CBT */}
+            <button
+              type="button"
+              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              onClick={() => navigate(`/admin/simulate/${exam.id}`)}
+              title="Coba Simulasi Tampilan Siswa"
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </button>
+
+            {/* Kelola Soal */}
+            <button
+              type="button"
+              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              onClick={() => {
+                sessionStorage.setItem("activeQuestionsExamId", exam.id);
+                navigate("/admin/bank-soal/questions");
+              }}
+              title="Kelola Butir Soal"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+            </button>
+
+            {/* Menu Aksi Tambahan */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  title="Menu Lainnya"
                 >
-                  Aktif
+                  <MoreHorizontal className="h-3.5 w-3.5" />
                 </button>
-                <button 
-                  onClick={() => setActiveTab("arsip")} 
-                  className={`flex-1 sm:flex-none min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${ activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                {owner && (
+                  <DropdownMenuItem
+                    onClick={() => handleEditClick(exam)}
+                    className="text-xs cursor-pointer gap-2 py-1.5"
+                  >
+                    <Edit className="h-3.5 w-3.5 text-neutral-500" />
+                    <span>Edit Data Bank Soal</span>
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuItem
+                  onClick={() => handleBatchExport([exam])}
+                  className="text-xs cursor-pointer gap-2 py-1.5"
                 >
-                  Arsip
-                </button>
-              </div>
-              {/* DESKTOP (>=sm): aksi masal + Export Batch + Tambah Ujian + Laporan */}
-              <div className="hidden sm:flex flex-wrap items-center gap-2">
-              {selectedIds.length > 0 && (
-                <div className="flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm transition-all h-9 px-3.5 text-xs flex items-center gap-1.5"
+                  <Download className="h-3.5 w-3.5 text-neutral-500" />
+                  <span>Export Word (.doc)</span>
+                </DropdownMenuItem>
+
+                {role === "admin" && (
+                  <DropdownMenuItem
+                    onClick={() => handleDuplicateExam(exam)}
+                    className="text-xs cursor-pointer gap-2 py-1.5"
+                  >
+                    <Copy className="h-3.5 w-3.5 text-neutral-500" />
+                    <span>Duplikat Bank Soal</span>
+                  </DropdownMenuItem>
+                )}
+
+                {owner && (
+                  <>
+                    <DropdownMenuSeparator className="my-1 border-neutral-150 dark:border-neutral-800" />
+                    {activeTab === "aktif" ? (
+                      <DropdownMenuItem
+                        onClick={() => handleArchiveExam(exam)}
+                        className="text-xs cursor-pointer gap-2 py-1.5 text-amber-600 dark:text-amber-400"
                       >
-                        <span>{selectedIds.length} - Aksi Masal</span>
-                        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                      <DropdownMenuLabel className="text-xs font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1">
-                        Aksi ({selectedIds.length} Bank Soal)
-                      </DropdownMenuLabel>
-                      
-                      {activeTab === "aktif" ? (
-                        <>
-                          {role === "admin" && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                const chosen = exams.filter(e => selectedIds.includes(e.id));
-                                handleBatchExport(chosen);
-                              }}
-                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40"
-                            >
-                              <Download className="h-4 w-4" />
-                              <span>Export Terpilih (Word ZIP)</span>
-                            </DropdownMenuItem>
-                          )}
+                        <Archive className="h-3.5 w-3.5" />
+                        <span>Arsipkan</span>
+                      </DropdownMenuItem>
+                    ) : (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => handleRestoreExam(exam)}
+                          className="text-xs cursor-pointer gap-2 py-1.5 text-emerald-600 dark:text-emerald-400"
+                        >
+                          <RotateCw className="h-3.5 w-3.5" />
+                          <span>Pulihkan Bank Soal</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteClick(exam)}
+                          className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400"
+                        >
+                          <Trash className="h-3.5 w-3.5" />
+                          <span>Hapus Permanen</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    },
+  ], [questionCounts, subjects, teachers, terminology, isOwner, navigate, handleBatchExport, role, handleDuplicateExam, handleEditClick, activeTab, handleArchiveExam, handleRestoreExam, handleDeleteClick]);
 
-                          <DropdownMenuItem
-                            onClick={handleBatchArchive}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-                          >
-                            <Archive className="h-4 w-4" />
-                            <span>Arsipkan Bank Soal</span>
-                          </DropdownMenuItem>
-                        </>
-                      ) : (
-                        <>
-                          <DropdownMenuItem
-                            onClick={handleBatchRestore}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-                          >
-                            <RotateCw className="h-4 w-4" />
-                            <span>Pulihkan Bank Soal</span>
-                          </DropdownMenuItem>
+  return (
+    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+      <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-6 items-start">
 
-                          {role === "admin" && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                const chosen = exams.filter(e => selectedIds.includes(e.id));
-                                handleBatchExport(chosen);
-                              }}
-                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40"
-                            >
-                              <Download className="h-4 w-4" />
-                              <span>Export Terpilih (Word ZIP)</span>
-                            </DropdownMenuItem>
-                          )}
+          {/* ═══════════════════════════════════════════════════════════════
+              CENTER / MAIN CONTENT
+             ═══════════════════════════════════════════════════════════════ */}
+          <div className="min-w-0 space-y-6">
 
-                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-
-                          <DropdownMenuItem
-                            onClick={handleBatchDelete}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                          >
-                            <Trash className="h-4 w-4" />
-                            <span>Hapus Permanen</span>
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {/* 1. Header Bar: Title, Breadcrumbs & Primary Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+                  Bank Soal &amp; Master Ujian
+                </h1>
+                {/* Breadcrumb line */}
+                <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                  <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
+                    Semua Modul
+                  </Link>
+                  <span>/</span>
+                  <span className="text-neutral-700 dark:text-neutral-300 font-medium">
+                    {school?.slug || "modalbangsa"}
+                  </span>
+                  <span>/</span>
+                  <div className="flex items-center gap-1 text-neutral-800 dark:text-neutral-200 font-medium">
+                    <BookOpen className="h-3.5 w-3.5 text-neutral-500" />
+                    <span>bank-soal</span>
+                  </div>
                 </div>
-              )}
-
-              {role === "admin" && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="rounded-xl font-bold shadow-sm transition-all h-9 px-3" aria-label="Aksi lainnya">
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="ml-1.5 hidden lg:inline">Lainnya</span>
-                      <ChevronDown className="ml-1 h-3 w-3 opacity-50" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Aksi Lainnya</DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onClick={() => handleBatchExport()}
-                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                    >
-                      <div className="h-10 w-10 shrink-0 rounded-lg bg-violet-50 dark:bg-violet-900/30 text-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Download className="h-5 w-5" />
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export Batch</span>
-                        <span className="text-[10px] text-slate-400 mt-1">Export semua ke ZIP (Word)</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setIsReportOpen(true)}
-                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                    >
-                      <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <ClipboardList className="h-5 w-5" />
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Laporan</span>
-                        <span className="text-[10px] text-slate-400 mt-1">Laporan progress Bank Soal guru</span>
-                      </div>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
-                <Plus className="mr-1.5 h-3.5 w-3.5" /> Tambah Ujian
-              </Button>
               </div>
-              {/* MOBILE (<sm): [+ Tambah Ujian] + menu ⋯ */}
-              <div className="flex sm:hidden items-center gap-2 w-full">
-                <Button onClick={handleCreateClick} size="sm" className="flex-1 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-700 text-white font-bold shadow-sm h-10 px-4">
-                  <Plus className="mr-1.5 h-4 w-4" /> Tambah Ujian
-                </Button>
+
+              {/* Action Buttons Top Right */}
+              <div className="flex items-center gap-2 shrink-0">
                 {role === "admin" && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="h-10 w-10 shrink-0 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-sm"
-                        aria-label="Menu lainnya"
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
                       >
-                        <MoreHorizontal className="h-5 w-5" />
-                      </Button>
+                        <MoreHorizontal className="h-3.5 w-3.5 text-neutral-500" />
+                        <span>Lainnya</span>
+                        <ChevronDown className="h-3 w-3 text-neutral-400" />
+                      </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                      <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Aksi Lainnya</DropdownMenuLabel>
+                    <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                      <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                        Aksi Tambahan
+                      </DropdownMenuLabel>
                       <DropdownMenuItem
                         onClick={() => handleBatchExport()}
-                        className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
                       >
-                        <div className="h-10 w-10 shrink-0 rounded-lg bg-violet-50 dark:bg-violet-900/30 text-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Download className="h-5 w-5" />
-                        </div>
-                        <div className="flex flex-col min-w-0 text-left">
-                          <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export Batch</span>
-                          <span className="text-xs text-slate-400 mt-1">Export semua ke ZIP (Word)</span>
-                        </div>
+                        <Download className="h-3.5 w-3.5 text-neutral-500" />
+                        <span>Export Semua ke Word ZIP</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setIsReportOpen(true)}
-                        className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
                       >
-                        <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <ClipboardList className="h-5 w-5" />
-                        </div>
-                        <div className="flex flex-col min-w-0 text-left">
-                          <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Laporan</span>
-                          <span className="text-xs text-slate-400 mt-1">Laporan progress Bank Soal guru</span>
-                        </div>
+                        <ClipboardList className="h-3.5 w-3.5 text-emerald-500" />
+                        <span>Laporan Progress Guru</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
+
+                <button
+                  type="button"
+                  onClick={handleCreateClick}
+                  className="inline-flex items-center gap-1.5 h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-md shadow-xs transition-colors cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Tambah Bank Soal</span>
+                </button>
               </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {isLoading ? (
-        <Card className="shadow-sm hover:shadow-sm">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Bank Soal</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
-                    <TableRow>
-                      <TableHead className="w-16 text-center">No</TableHead>
-                      <TableHead>Judul Ujian</TableHead>
-                      <TableHead>Mata Pelajaran</TableHead>
-                      <TableHead>{terminology.teacher} Pengampu</TableHead>
-                      <TableHead className="text-right">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
-                        <TableCell>
-                           <div className="space-y-2">
-                              <Skeleton className="h-4 w-48" />
-                              <Skeleton className="h-3 w-24 rounded-full" />
-                           </div>
-                        </TableCell>
-                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-36" /></TableCell>
-                        <TableCell className="text-right">
-                           <div className="flex justify-end gap-2">
-                              <Skeleton className="h-8 w-8 rounded-lg" />
-                              <Skeleton className="h-8 w-8 rounded-lg" />
-                              <Skeleton className="h-8 w-8 rounded-lg" />
-                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="shadow-sm hover:shadow-sm">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Bank Soal</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            <DataTable
-              data={filteredExams}
-              columns={columns}
-              searchPlaceholder="Cari ujian..."
-              emptyMessage={`Belum ada bank soal ${ activeTab }.`}
-              actions={(exam: any) => (
-                <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
-                  <button
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40 transition-all hover:shadow-sm"
-                    onClick={() => {
-                      navigate(`/admin/simulate/${exam.id}`);
-                    }}
-                    title="Coba Ujian (Simulasi seperti tampilan siswa)"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    <span className="text-xs font-black hidden xl:inline">Coba</span>
-                  </button>
-                  <button 
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg dark:bg-purple-900/20 dark:text-purple-400 border border-purple-100 dark:border-purple-800/40 transition-all hover:shadow-sm" 
-                    onClick={() => {
-                      sessionStorage.setItem("activeQuestionsExamId", exam.id);
-                      navigate("/admin/bank-soal/questions");
-                    }}
-                    title="Kelola Soal"
-                  >
-                    <span className="text-xs font-black">{questionCounts[exam.id] || 0}</span>
-                    <BookOpen className="h-3.5 w-3.5" />
-                  </button>
 
-                  {role === "admin" && (
-                    <button 
-                      className="p-1.5 bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-lg dark:bg-teal-900/10 dark:text-teal-400 border border-teal-100 dark:border-teal-800/40 transition-all hover:shadow-sm" 
-                      onClick={() => handleDuplicateExam(exam)}
-                      title="Duplikat Bank Soal (Khusus Admin)"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                  )}
-                  
-                  {isOwner(exam) && (
+            {/* 2. Clean Horizontal Tabs: Bank Soal Aktif vs Bank Soal Diarsipkan */}
+            <NeonTabs
+              activeTab={activeTab}
+              onChange={setActiveTab}
+              tabs={[
+                {
+                  id: "aktif",
+                  label: "Bank Soal Aktif",
+                  count: exams.filter(e => e.status !== "archive").length,
+                  indicator: true,
+                },
+                {
+                  id: "arsip",
+                  label: "Bank Soal Diarsipkan",
+                  count: exams.filter(e => e.status === "archive").length,
+                },
+              ]}
+            />
+
+            {/* 3. Stats Strip (4 Kartu Ringkas, Elegan, Sama Ukuran dengan Ruang Ujian) */}
+            <NeonStatGrid cols={4}>
+              <NeonStatCard
+                label="Total Bank Soal"
+                value={exams.length}
+                unit="paket"
+                isLoading={isLoading}
+              />
+
+              <NeonStatCard
+                label="Bank Soal Aktif"
+                indicator={true}
+                value={exams.filter(e => e.status !== "archive").length}
+                unit="paket"
+                isLoading={isLoading}
+              />
+
+              <NeonStatCard
+                label="Diarsipkan"
+                value={exams.filter(e => e.status === "archive").length}
+                unit="paket"
+                isLoading={isLoading}
+              />
+
+              <NeonStatCard
+                label="Total Butir Soal"
+                value={Object.values(questionCounts).reduce((a, b) => a + b, 0)}
+                unit="butir"
+                isLoading={isLoading}
+              />
+            </NeonStatGrid>
+
+            {/* 4. Main Neon Table */}
+            <NeonTable
+              data={displayExams}
+              columns={neonColumns}
+              keyExtractor={(e) => e.id}
+              compact
+              isLoading={isLoading}
+              title="Daftar Master Bank Soal"
+              subtitle="Klik baris bank soal untuk melihat inspeksi parameter & aksi cepat di panel sebelah kanan."
+              searchValue={searchQuery}
+              onSearchChange={setSearchQuery}
+              searchPlaceholder="Cari judul ujian, pengampu, mapel, tipe..."
+              filterSlot={
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Subject filter */}
+                  <select
+                    value={subjectFilter}
+                    onChange={(e) => setSubjectFilter(e.target.value)}
+                    className="h-8 text-xs rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 px-2.5 text-neutral-700 dark:text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                  >
+                    <option value="all">Semua {terminology.subject}</option>
+                    {subjects.map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+
+                  {/* Type filter */}
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    className="h-8 text-xs rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 px-2.5 text-neutral-700 dark:text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                  >
+                    <option value="all">Semua Jenis Ujian</option>
+                    <option value="Latihan">Latihan Biasa</option>
+                    <option value="Ulangan">Ulangan Harian</option>
+                    <option value="PTS">Ujian Tengah Semester (PTS)</option>
+                    <option value="PAS">Ujian Akhir Semester (PAS / PAT)</option>
+                    <option value="US">Ujian Sekolah (US)</option>
+                    <option value="Tryout">Tryout</option>
+                  </select>
+                </div>
+              }
+              selectable={true}
+              selectedKeys={selectedIds}
+              onSelectionChange={setSelectedIds}
+              isItemSelectable={isOwner}
+              batchActions={
+                <div className="flex items-center gap-1.5">
+                  {activeTab === "aktif" ? (
                     <>
-                      {activeTab === "aktif" ? (
-                        <button 
-                          className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40" 
-                          onClick={() => handleArchiveExam(exam)}
-                          title="Arsipkan"
+                      {role === "admin" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const chosen = exams.filter(e => selectedIds.includes(e.id));
+                            handleBatchExport(chosen);
+                          }}
+                          className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-750 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
                         >
-                          <Archive className="h-4 w-4" />
-                        </button>
-                      ) : (
-                        <button 
-                          className="p-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40" 
-                          onClick={() => handleRestoreExam(exam)}
-                          title="Buka Arsip"
-                        >
-                          <RotateCw className="h-4 w-4" />
+                          <Download className="h-3 w-3" />
+                          <span>Export Word ZIP</span>
                         </button>
                       )}
-
-                      <button 
-                        className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40" 
-                        onClick={() => handleEditClick(exam)}
-                        title="Edit Data"
+                      <button
+                        type="button"
+                        onClick={handleBatchArchive}
+                        className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-amber-600 dark:text-amber-400 font-medium hover:bg-amber-50 dark:hover:bg-amber-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
                       >
-                        <Edit className="h-4 w-4" />
+                        <Archive className="h-3 w-3" />
+                        <span>Arsipkan</span>
                       </button>
-                      {activeTab === "arsip" && (
-                        <button 
-                          className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40" 
-                          onClick={() => handleDeleteClick(exam)}
-                          title="Hapus Permanen"
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleBatchRestore}
+                        className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-emerald-600 dark:text-emerald-400 font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <RotateCw className="h-3 w-3" />
+                        <span>Pulihkan</span>
+                      </button>
+                      {role === "admin" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const chosen = exams.filter(e => selectedIds.includes(e.id));
+                            handleBatchExport(chosen);
+                          }}
+                          className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-750 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
                         >
-                          <Trash className="h-4 w-4" />
+                          <Download className="h-3 w-3" />
+                          <span>Export Word ZIP</span>
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={handleBatchDelete}
+                        className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-rose-600 dark:text-rose-400 font-medium hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <Trash className="h-3 w-3" />
+                        <span>Hapus Permanen</span>
+                      </button>
                     </>
                   )}
                 </div>
-              )}
+              }
+              activeKey={inspectedExam?.id}
+              onRowClick={(exam) => setInspectedExamId(exam.id)}
+              pagination={true}
+              pageSize={10}
+              pageSizeOptions={[10, 25, 50]}
+              emptyTitle={`Belum ada bank soal ${activeTab}`}
+              emptySubtitle="Mulai dengan membuat paket bank soal baru menggunakan tombol di atas."
             />
-          </CardContent>
-        </Card>
-      )}
+          </div>
 
-      {/* Dialog Create/Edit */}
+          {/* ═══════════════════════════════════════════════════════════════
+              RIGHT SIDEBAR / INSPECTOR PANEL (Neon Style Reusable Component)
+             ═══════════════════════════════════════════════════════════════ */}
+          <NeonInspector>
+
+            {/* 1. Detail Bank Soal Terpilih (Inspector) */}
+            <InspectorSection>
+              <InspectorHeader
+                title="Detail Bank Soal"
+                icon={BookOpen}
+                badge={inspectedExam ? "Terpilih" : "Ringkasan"}
+              />
+
+              {inspectedExam ? (
+                <div className="space-y-2.5 text-xs">
+                  <InspectorField label="Judul Paket Soal">
+                    <div className="font-semibold text-neutral-900 dark:text-neutral-100 leading-snug">
+                      {inspectedExam.title}
+                    </div>
+                    {inspectedExam.examType && (
+                      <div className="mt-1">
+                        <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold border", getExamTypeColorClass(inspectedExam.examType))}>
+                          {inspectedExam.examType}
+                        </span>
+                      </div>
+                    )}
+                  </InspectorField>
+
+                  <InspectorGrid>
+                    <InspectorField
+                      label={terminology.subject}
+                      value={subjects.find((s: any) => s.id === inspectedExam.subjectId)?.name || (inspectedExam as any).subjectName || "-"}
+                    />
+                    <InspectorField
+                      label={terminology.teacher}
+                      value={teachers.find((t: any) => t.id === inspectedExam.teacherId)?.name || (inspectedExam as any).teacherName || "-"}
+                    />
+                  </InspectorGrid>
+
+                  <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                    <InspectorField
+                      label="Total Butir Soal"
+                      value={
+                        <span className="text-base font-mono font-bold text-neutral-900 dark:text-neutral-100 mt-0.5 block">
+                          {questionCounts[inspectedExam.id] || 0} Soal
+                        </span>
+                      }
+                    />
+                  </div>
+
+                  <InspectorActions>
+                    <InspectorButton
+                      variant="primary"
+                      icon={BookOpen}
+                      onClick={() => {
+                        sessionStorage.setItem("activeQuestionsExamId", inspectedExam.id);
+                        navigate("/admin/bank-soal/questions");
+                      }}
+                    >
+                      Kelola Butir Soal
+                    </InspectorButton>
+
+                    <InspectorButton
+                      variant="secondary"
+                      icon={Eye}
+                      onClick={() => navigate(`/admin/simulate/${inspectedExam.id}`)}
+                    >
+                      Simulasi Tampilan Siswa
+                    </InspectorButton>
+
+                    <InspectorButton
+                      variant="secondary"
+                      icon={Download}
+                      onClick={() => handleBatchExport([inspectedExam])}
+                    >
+                      Export Format Word (.doc)
+                    </InspectorButton>
+
+                    {isOwner(inspectedExam) && (
+                      <InspectorButton
+                        variant="secondary"
+                        icon={Edit}
+                        onClick={() => handleEditClick(inspectedExam)}
+                      >
+                        Edit Data Bank Soal
+                      </InspectorButton>
+                    )}
+
+                    {role === "admin" && (
+                      <InspectorButton
+                        variant="secondary"
+                        icon={Copy}
+                        onClick={() => handleDuplicateExam(inspectedExam)}
+                      >
+                        Duplikat Bank Soal
+                      </InspectorButton>
+                    )}
+                  </InspectorActions>
+                </div>
+              ) : (
+                <InspectorEmpty message="Pilih salah satu bank soal untuk melihat inspeksi." />
+              )}
+            </InspectorSection>
+
+            {/* 2. Pedoman Bank Soal */}
+            <InspectorCard
+              title="Pedoman Bank Soal"
+              icon={FileText}
+              description="Bank Soal dapat dihubungkan ke banyak Ruang Ujian. Perubahan butir soal tersinkronisasi otomatis ke seluruh ruangan yang aktif."
+            >
+              <div className="pt-1 flex flex-wrap gap-1 text-[10px] text-neutral-400">
+                <span className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800">LaTeX Math</span>
+                <span className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800">Listening Audio</span>
+                <span className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800">PG Kompleks</span>
+                <span className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800">Menjodohkan</span>
+              </div>
+            </InspectorCard>
+
+          </NeonInspector>
+
+        </div>
+      </div>
+
+      {/* Dialog Create/Edit (Neon Console Style) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md bg-card">
-          <DialogHeader>
-            <DialogTitle>{dialogMode === "edit" ? "Edit Data" : "Tambah Data"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <FormField id="title" label="Judul" error={undefined}>
-              <Input value={formValues.title} onChange={(e) => setFormValues({ ...formValues, title: e.target.value })} required className="h-11 rounded-xl" />
-            </FormField>
+        <DialogContent className="max-w-lg w-[95vw] overflow-hidden p-0 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shadow-2xl flex flex-col gap-0">
+          {/* Header Dialog */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 shrink-0 pr-12">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-2xs shrink-0">
+                <BookOpen className="h-4.5 w-4.5" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
+                    {dialogMode === "edit" ? "Edit Data Bank Soal" : "Tambah Bank Soal Baru"}
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
+                    {dialogMode === "edit" ? "Mode Edit" : "Paket Baru"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  {dialogMode === "edit"
+                    ? "Perbarui metadata, tipe evaluasi, atau penugasan guru pengampu."
+                    : "Buat master ujian baru untuk menampung butir soal dan jadwal CBT."}
+                </p>
+              </div>
+            </div>
+          </div>
 
-            <FormField id="examType" label="Jenis Bank Soal" error={undefined}>
-              <select 
-                value={formValues.examType} 
-                onChange={(e) => setFormValues({ ...formValues, examType: e.target.value })} 
-                required
-                className="w-full h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-card text-sm px-3"
-              >
-                <option value="Latihan">Latihan Biasa</option>
-                <option value="Ulangan">Ulangan Harian</option>
-                <option value="PTS">Ujian Tengah Semester (PTS)</option>
-                <option value="PAS">Ujian Akhir Semester (PAS / PAT)</option>
-                <option value="US">Ujian Sekolah (US)</option>
-                <option value="Tryout">Tryout</option>
-              </select>
-            </FormField>
-
-            <FormField id="subjectId" label={terminology.subject} error={undefined}>
-              <select 
-                value={formValues.subjectId} 
-                onChange={(e) => setFormValues({ ...formValues, subjectId: e.target.value })} 
-                required
-                className="w-full h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-card text-sm px-3"
-              >
-                <option value="">-- Pilih Mapel --</option>
-                {subjects.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </FormField>
-
-            {role === "admin" && (
-              <FormField id="teacherId" label={`${ terminology.teacher } Pengampu`} error={undefined}>
-                <select 
-                  value={formValues.teacherId} 
-                  onChange={(e) => setFormValues({ ...formValues, teacherId: e.target.value })} 
+          {/* Form Body */}
+          <form onSubmit={handleSubmit} className="flex flex-col">
+            <div className="p-5 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Field 1: Judul Bank Soal */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="exam-title-input" className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                    Judul Bank Soal
+                    <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <span className="text-[10px] font-mono text-neutral-400">Contoh: TO 1 TKA FISIKA</span>
+                </div>
+                <Input
+                  id="exam-title-input"
+                  value={formValues.title}
+                  onChange={(e) => setFormValues({ ...formValues, title: e.target.value })}
                   required
-                  className="w-full h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-card text-sm px-3"
-                >
-                  <option value="">-- Pilih {terminology.teacher} --</option>
-                  {teachers.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </FormField>
-            )}
+                  placeholder="Masukkan judul bank soal..."
+                  className="h-10 px-3.5 rounded-lg border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs text-neutral-900 dark:text-neutral-100 focus-visible:ring-1 focus-visible:ring-emerald-500 placeholder:text-neutral-400 transition-all"
+                />
+              </div>
 
-            <Button type="submit" className="w-full h-11 rounded-xl font-bold shadow-md">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
+              {/* Grid 2 Kolom: Jenis Evaluasi & Mata Pelajaran */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Jenis Bank Soal */}
+                <div className="space-y-1.5">
+                  <label htmlFor="exam-type-select" className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                    Jenis Evaluasi
+                    <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <div className="relative">
+                    <select 
+                      id="exam-type-select"
+                      value={formValues.examType} 
+                      onChange={(e) => setFormValues({ ...formValues, examType: e.target.value })} 
+                      required
+                      className="w-full h-10 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs px-3.5 pr-8 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer transition-all"
+                    >
+                      <option value="Latihan">Latihan Biasa</option>
+                      <option value="Ulangan">Ulangan Harian</option>
+                      <option value="PTS">PTS (Tengah Semester)</option>
+                      <option value="PAS">PAS / PAT (Akhir Semester)</option>
+                      <option value="US">Ujian Sekolah (US)</option>
+                      <option value="Tryout">Tryout CBT</option>
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Mata Pelajaran */}
+                <div className="space-y-1.5">
+                  <label htmlFor="exam-subject-select" className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                    {terminology.subject}
+                    <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <div className="relative">
+                    <select 
+                      id="exam-subject-select"
+                      value={formValues.subjectId} 
+                      onChange={(e) => setFormValues({ ...formValues, subjectId: e.target.value })} 
+                      required
+                      className="w-full h-10 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs px-3.5 pr-8 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer transition-all"
+                    >
+                      <option value="">-- Pilih {terminology.subject} --</option>
+                      {subjects.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Guru Pengampu (Khusus Admin) */}
+              {role === "admin" && (
+                <div className="space-y-1.5">
+                  <label htmlFor="exam-teacher-select" className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                    {terminology.teacher} Pengampu
+                    <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <div className="relative">
+                    <select 
+                      id="exam-teacher-select"
+                      value={formValues.teacherId} 
+                      onChange={(e) => setFormValues({ ...formValues, teacherId: e.target.value })} 
+                      required
+                      className="w-full h-10 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs px-3.5 pr-8 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer transition-all"
+                    >
+                      <option value="">-- Pilih {terminology.teacher} Pengampu --</option>
+                      {teachers.map((t: any) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
+
+              {/* Tips Callout */}
+              <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 p-3.5 flex items-start gap-2.5 text-xs text-neutral-600 dark:text-neutral-400">
+                <span className="h-5 w-5 rounded-md bg-neutral-200/60 dark:bg-neutral-800 flex items-center justify-center shrink-0 text-neutral-500 mt-0.5">
+                  <FileText className="h-3 w-3" />
+                </span>
+                <div className="leading-relaxed text-[11px]">
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200">Tips:</span> Bank Soal berfungsi sebagai master induk soal CBT. Setelah disimpan, Anda dapat langsung mengimpor dari Word, mengetik manual butir soal, atau menghubungkannya ke Ruang Ujian.
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Bar */}
+            <div className="px-5 py-3.5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 flex items-center justify-between shrink-0">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsDialogOpen(false)}
+                className="h-8.5 px-3.5 text-xs font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 cursor-pointer"
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                className="h-8.5 px-4 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span>{dialogMode === "edit" ? "Perbarui Bank Soal" : "Simpan Bank Soal"}</span>
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
@@ -1905,51 +2251,62 @@ const ExamsPage = () => {
 
       {/* Dialog Laporan Progress Guru */}
       <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
-        <DialogContent className="max-w-lg bg-card max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <ClipboardList className="h-4 w-4 text-emerald-500" />
-              Laporan Progress Bank Soal
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+        <DialogContent className="max-w-lg w-[95vw] bg-white dark:bg-[#0c0d0e] border border-neutral-200 dark:border-neutral-800 rounded-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 shrink-0 pr-12">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-2xs shrink-0">
+                <ClipboardList className="h-4.5 w-4.5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
+                  Laporan Progress Bank Soal
+                </h3>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  Rekapitulasi kesiapan butir soal guru pengampu untuk format pesan WhatsApp.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-4 p-5 sm:p-6">
             {/* Ringkasan */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-800">
-                <p className="text-lg font-black text-slate-800 dark:text-white">{exams.filter(e => e.status !== "archive").length}</p>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Bank Soal</p>
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="bg-neutral-50/80 dark:bg-neutral-900/60 rounded-xl p-3 text-center border border-neutral-200/60 dark:border-neutral-800">
+                <p className="text-lg font-mono font-bold text-neutral-900 dark:text-white">{exams.filter(e => e.status !== "archive").length}</p>
+                <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Bank Soal</p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-800">
-                <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{Object.values(questionCounts).reduce((a, b) => a + b, 0)}</p>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Soal</p>
+              <div className="bg-neutral-50/80 dark:bg-neutral-900/60 rounded-xl p-3 text-center border border-neutral-200/60 dark:border-neutral-800">
+                <p className="text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400">{Object.values(questionCounts).reduce((a, b) => a + b, 0)}</p>
+                <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Total Soal</p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-800">
-                <p className="text-lg font-black text-blue-600 dark:text-blue-400">{reportData.length}</p>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Guru Aktif</p>
+              <div className="bg-neutral-50/80 dark:bg-neutral-900/60 rounded-xl p-3 text-center border border-neutral-200/60 dark:border-neutral-800">
+                <p className="text-lg font-mono font-bold text-blue-600 dark:text-blue-400">{reportData.length}</p>
+                <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Guru Aktif</p>
               </div>
             </div>
 
             {/* Detail per Guru */}
             <div className="space-y-2">
               {reportData.map((t, idx) => (
-                <div key={idx} className="bg-slate-50 dark:bg-slate-800/30 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
+                <div key={idx} className="bg-neutral-50/60 dark:bg-neutral-900/50 rounded-xl p-3.5 border border-neutral-200/70 dark:border-neutral-800">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
-                        <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">{idx + 1}</span>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-6 h-6 bg-neutral-200 dark:bg-neutral-800 rounded-lg flex items-center justify-center font-mono text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        {idx + 1}
                       </div>
-                      <span className="text-sm font-bold text-slate-800 dark:text-white">{t.name}</span>
+                      <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">{t.name}</span>
                     </div>
-                    <Badge variant="outline" className="py-1 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
                       {t.totalQuestions} soal
-                    </Badge>
+                    </span>
                   </div>
-                  <div className="space-y-1 ml-9">
+                  <div className="space-y-1.5 ml-8.5">
                     {t.exams.map((e, eIdx) => (
                       <div key={eIdx} className="flex items-center gap-2 text-xs">
                         <span className={`w-1.5 h-1.5 rounded-full ${ e.count > 0 ? "bg-emerald-500" : "bg-amber-400" }`}></span>
-                        <span className="text-slate-600 dark:text-slate-400 truncate flex-1">{e.title}</span>
-                        <span className="text-slate-400 dark:text-slate-500 text-xs font-semibold">{e.count}</span>
+                        <span className="text-neutral-600 dark:text-neutral-400 truncate flex-1">{e.title}</span>
+                        <span className="text-neutral-500 font-mono text-[11px]">{e.count}</span>
                       </div>
                     ))}
                   </div>
@@ -1962,11 +2319,11 @@ const ExamsPage = () => {
                 const teachersWithout = teachers.filter((t: any) => !teachersWithExams.has(t.id));
                 if (teachersWithout.length === 0) return null;
                 return (
-                  <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-3 border border-amber-100 dark:border-amber-800/40">
-                    <p className="text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2">Belum Membuat Bank Soal</p>
+                  <div className="bg-amber-500/10 rounded-xl p-3.5 border border-amber-500/20">
+                    <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-2">Belum Membuat Bank Soal</p>
                     <div className="space-y-1">
                       {teachersWithout.map((t: any) => (
-                        <div key={t.id} className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                        <div key={t.id} className="flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                           <span>{t.name}</span>
                         </div>
@@ -1979,19 +2336,28 @@ const ExamsPage = () => {
           </div>
 
           {/* Tombol Copy untuk WA */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="px-5 py-3.5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 flex items-center justify-between shrink-0">
             <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsReportOpen(false)}
+              className="h-8.5 px-3.5 text-xs font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 cursor-pointer"
+            >
+              Tutup
+            </Button>
+            <Button
+              type="button"
               onClick={handleCopyReport}
-              className={`w-full h-11 rounded-xl font-bold text-sm transition-all ${
-  reportCopied
-    ? "bg-emerald-600 hover:bg-emerald-600 text-white"
-    : "bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-50 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:active:bg-emerald-900/30 dark:border-emerald-800/40 text-emerald-700"
-}`}
+              className={`h-8.5 px-4 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${
+                reportCopied
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  : "bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs"
+              }`}
             >
               {reportCopied ? (
-                <><Copy className="mr-2 h-4 w-4" /> Tersalin! Tinggal Paste ke WA</>
+                <><Check className="h-3.5 w-3.5 text-white" /> <span>Tersalin ke Clipboard</span></>
               ) : (
-                <><Copy className="mr-2 h-4 w-4" /> Salin Laporan untuk WhatsApp</>
+                <><Copy className="h-3.5 w-3.5" /> <span>Salin Teks untuk WhatsApp</span></>
               )}
             </Button>
           </div>
@@ -2000,28 +2366,28 @@ const ExamsPage = () => {
 
       {/* Batch Export Progress Dialog */}
       <Dialog open={batchExportProgress.isOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-sm bg-card" hideClose>
+        <DialogContent className="max-w-sm bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6" hideClose>
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <Loader2 className="h-4 w-4 text-violet-500 animate-spin" />
-              Export Batch Arsip
+            <DialogTitle className="text-sm font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+              <Loader2 className="h-4 w-4 text-neutral-500 animate-spin" />
+              <span>Export Batch Arsip</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-1">
+          <div className="space-y-4 pt-2">
             <Progress
               value={batchExportProgress.total > 0 ? Math.round((batchExportProgress.current / batchExportProgress.total) * 100) : 0}
-              className="h-2"
+              className="h-1.5"
             />
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
               <span className="truncate max-w-[220px]">{batchExportProgress.message}</span>
-              <span className="font-bold ml-2 shrink-0">{batchExportProgress.current}/{batchExportProgress.total}</span>
+              <span className="font-mono font-bold ml-2 shrink-0">{batchExportProgress.current}/{batchExportProgress.total}</span>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Batch Operation Progress Dialog */}
-      <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
+      <BatchProgressDialog progress={batchProgress} colorClass="bg-neutral-900 dark:bg-neutral-100" />
     </div>
   );
 };

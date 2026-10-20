@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Timer } from "lucide-react";
+import { Clock } from "lucide-react";
 
 interface StudentTimerProps {
   attempt: any;
   room: any;
 }
 
-// 🕒 Real-time Student Timer Component
+// 🕒 Real-time Student Timer Component (Clean Neon Style)
 export const StudentTimer = ({ attempt, room }: StudentTimerProps) => {
-  const [timeLeft, setTimeLeft] = useState<string>("--:--");
+  const [timeLabel, setTimeLabel] = useState<string>("--:--");
 
   useEffect(() => {
     if (!attempt || attempt.status !== "ongoing") {
@@ -25,9 +25,12 @@ export const StudentTimer = ({ attempt, room }: StudentTimerProps) => {
           ? `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
           : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
-        setTimeLeft(`Selesai (${timeStr})`);
-      } else if (attempt?.status === "LOCKED") setTimeLeft("TERKUNCI");
-      else setTimeLeft("--:--");
+        setTimeLabel(timeStr);
+      } else if (attempt?.status === "LOCKED") {
+        setTimeLabel("Terkunci");
+      } else {
+        setTimeLabel("--:--");
+      }
       return;
     }
 
@@ -40,7 +43,7 @@ export const StudentTimer = ({ attempt, room }: StudentTimerProps) => {
       const diff = endByDuration - now;
 
       if (diff <= 0) {
-        setTimeLeft("HABIS");
+        setTimeLabel("Habis");
         return;
       }
 
@@ -49,9 +52,9 @@ export const StudentTimer = ({ attempt, room }: StudentTimerProps) => {
       const secs = Math.floor((diff % (1000 * 60)) / 1000);
 
       if (hours > 0) {
-        setTimeLeft(`${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+        setTimeLabel(`${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
       } else {
-        setTimeLeft(`${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+        setTimeLabel(`${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
       }
     };
 
@@ -60,19 +63,12 @@ export const StudentTimer = ({ attempt, room }: StudentTimerProps) => {
     return () => clearInterval(timer);
   }, [attempt, room]);
 
-  const iconColor = timeLeft === "HABIS" || timeLeft === "TERKUNCI" ? "text-rose-400" :
-    timeLeft.startsWith("Selesai") ? "text-emerald-400" :
-      "text-blue-400";
+  if (!attempt || attempt.status === "OFFLINE") return null;
 
   return (
-    <div className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 transition-all ${timeLeft === "HABIS" || timeLeft === "TERKUNCI" ? "text-rose-600 border-rose-100 bg-rose-50" :
-      timeLeft.startsWith("Selesai") ? "text-emerald-600 border-emerald-100 bg-emerald-50" :
-        "text-blue-600 border-blue-50 bg-blue-50/30"
-      }`}>
-      <Timer className={`h-3 w-3 ${iconColor} ${attempt?.status === "ongoing" ? "animate-pulse" : ""}`} />
-      <span className="font-mono font-bold text-[9px] tracking-tight whitespace-nowrap">
-        {timeLeft}
-      </span>
+    <div className="flex items-center gap-1 text-[10px] font-mono text-neutral-400 dark:text-neutral-500 whitespace-nowrap">
+      <Clock className="h-2.5 w-2.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+      <span>{timeLabel}</span>
     </div>
   );
 };

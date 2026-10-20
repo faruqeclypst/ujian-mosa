@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -16,7 +16,21 @@ import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
 import { exportActiveRoomsToZip } from "../../lib/roomExcelExport";
 
-import { DataTable } from "../../components/ui/data-table";
+import { NeonTable, type NeonTableColumn } from "../../components/ui/NeonTable";
+import {
+  NeonInspector,
+  InspectorSection,
+  InspectorHeader,
+  InspectorField,
+  InspectorGrid,
+  InspectorActions,
+  InspectorButton,
+  InspectorCard,
+  InspectorEmpty,
+} from "../../components/ui/NeonInspector";
+import { NeonTabs } from "../../components/ui/NeonTabs";
+import { NeonStatGrid, NeonStatCard } from "../../components/ui/NeonStats";
+import { NeonBadge } from "../../components/ui/NeonBadge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import {
   DropdownMenu,
@@ -62,7 +76,7 @@ export interface ExamRoomData {
 
 const ExamRoomsPage = () => {
   const navigate = useNavigate();
-  const { pb, terminology } = useTenant();
+  const { pb, terminology, school } = useTenant();
   const { user, role, teacherId } = useAuth();
   const { addToast } = useToast();
   const [rooms, setRooms] = useState<ExamRoomData[]>([]);
@@ -78,10 +92,14 @@ const ExamRoomsPage = () => {
 
   const [examSearch, setExamSearch] = useState("");
   const [lastSelectedClassIndex, setLastSelectedClassIndex] = useState<number | null>(null);
+  const [inspectedRoomId, setInspectedRoomId] = useState<string | null>(null);
 
   // Batch Selection State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+  const [tableSearch, setTableSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "ongoing" | "waiting" | "finished" | "disabled">("all");
+  const [copiedToken, setCopiedToken] = useState(false);
   const [batchProgress, setBatchProgress] = useState<BatchProgressState>({
     isOpen: false,
     current: 0,
@@ -93,6 +111,8 @@ const ExamRoomsPage = () => {
   useEffect(() => {
     setSelectedIds([]);
     setLastSelectedIndex(null);
+    setTableSearch("");
+    setStatusFilter("all");
   }, [activeTab]);
 
   const [formValues, setFormValues] = useState({
@@ -195,232 +215,17 @@ const ExamRoomsPage = () => {
     });
   }, [rooms, activeTab, role, teacherId]);
 
+  const inspectedRoom = useMemo(() => {
+    if (inspectedRoomId) {
+      const found = rooms.find(r => r.id === inspectedRoomId);
+      if (found) return found;
+    }
+    return filteredRooms[0] || null;
+  }, [inspectedRoomId, rooms, filteredRooms]);
+
   const selectableRooms = useMemo(() => {
     return filteredRooms.filter(r => isOwner(r));
   }, [filteredRooms, isOwner]);
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(selectableRooms.map(r => r.id));
-    } else {
-      setSelectedIds([]);
-    }
-  };
-
-  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
-    let newSelectedIds = [...selectedIds];
-
-    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
-      const start = Math.min(lastSelectedIndex, index);
-      const end = Math.max(lastSelectedIndex, index);
-      const idsInRange = filteredRooms.slice(start, end + 1).filter(r => isOwner(r)).map(r => r.id);
-      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
-    } else {
-      if (checked) {
-        if (!newSelectedIds.includes(id)) {
-          newSelectedIds.push(id);
-        }
-      } else {
-        newSelectedIds = newSelectedIds.filter((item) => item !== id);
-      }
-    }
-
-    setSelectedIds(newSelectedIds);
-    setLastSelectedIndex(index);
-  };
-
-  // Columns definition (matching ExamsPage style)
-  const columns = useMemo(() => [
-    {
-      key: "selection",
-      label: (
-        <input
-          type="checkbox"
-          checked={selectableRooms.length > 0 && selectableRooms.every(r => selectedIds.includes(r.id))}
-          onChange={(e) => handleSelectAll(e.target.checked)}
-          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer align-middle"
-          title="Pilih Semua"
-        />
-      ),
-      render: (_: any, room: ExamRoomData, index?: number) => {
-        const canSelect = isOwner(room);
-        if (!canSelect) return <div className="w-4 h-4 mx-auto" />;
-        return (
-          <input
-            type="checkbox"
-            checked={selectedIds.includes(room.id)}
-            onChange={(e) => handleSelectOne(room.id, e.target.checked, index ?? 0, e)}
-            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer align-middle"
-          />
-        );
-      },
-      className: "w-[40px] text-center",
-    },
-    {
-      key: "index",
-      label: "No",
-      render: (_: any, __: any, i?: number) => <div className="text-center font-medium">{(i || 0) + 1}</div>,
-      className: "w-12",
-    },
-    {
-      key: "room_name",
-      label: "Ruangan & Pengampu",
-      sortable: true,
-      render: (v: string, room: ExamRoomData) => (
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-800 dark:text-white text-sm tracking-tight">{v || "Tanpa Nama"}</span>
-            {room.is_exambro && <ShieldAlert className="h-3 w-3 text-orange-500" />}
-          </div>
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 leading-none">{room.teacherName}</span>
-              <span className="text-slate-300 dark:text-slate-700">|</span>
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
-                {room.subjectName || "N/A"}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQuestionsClick(room);
-              }}
-              className="text-xs font-bold text-slate-500 hover:text-blue-600 hover:underline dark:text-slate-400 dark:hover:text-blue-400 truncate text-left"
-              title="Buka bank soal"
-            >
-              Bank Soal: {room.examTitle || "Tanpa Nama"}
-            </button>
-          </div>
-        </div>
-      )
-    },
-    {
-      key: "schedule",
-      label: "Jadwal & Status",
-      render: (_: any, room: ExamRoomData) => {
-        const now = Date.now();
-        const start = new Date(room.start_time).getTime();
-        const end = new Date(room.end_time).getTime();
-
-        let statusLabel = "Berjalan";
-        let statusStyle = "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40 animate-pulse";
-
-        if (room.status === "archive") {
-          statusLabel = "Arsip";
-          statusStyle = "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-700";
-        } else if (room.isDisabled) {
-          statusLabel = "Nonaktif";
-          statusStyle = "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/40";
-        } else if (now < start) {
-          statusLabel = "Menunggu";
-          statusStyle = "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800/40";
-        } else if (now > end) {
-          statusLabel = "Selesai";
-          statusStyle = "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-700";
-        }
-
-        return (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap", statusStyle)}>
-                {statusLabel}
-              </span>
-              <span className={cn("px-2.5 py-1 rounded-full text-xs font-semibold border", getExamTypeColorClass(room.examType || "UMUM"))}>
-                {room.examType || "UMUM"}
-              </span>
-              {room.max_questions && room.max_questions > 0 ? (
-                <span className={cn(
-                  "px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap",
-                  room.randomize_questions !== false
-                    ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40"
-                    : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
-                )}>
-                  {room.max_questions} Soal {room.randomize_questions !== false ? "(Acak)" : "(Urut)"}
-                </span>
-              ) : (
-                <span className={cn(
-                  "px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap",
-                  room.randomize_questions !== false
-                    ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40"
-                    : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
-                )}>
-                  Semua Soal {room.randomize_questions !== false ? "(Acak)" : "(Urut)"}
-                </span>
-              )}
-            </div>
-            <div className="flex flex-col gap-0.5 text-slate-500 dark:text-slate-400 font-bold text-xs">
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <span>
-                  {(() => {
-                    const s = new Date(room.start_time);
-                    const e = new Date(room.end_time);
-                    if (isNaN(s.getTime()) || isNaN(e.getTime())) return "--:-- - --:--";
-                    const sDate = s.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
-                    const eDate = e.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
-                    const sTime = `${s.getHours().toString().padStart(2, '0')}:${s.getMinutes().toString().padStart(2, '0')}`;
-                    const eTime = `${e.getHours().toString().padStart(2, '0')}:${e.getMinutes().toString().padStart(2, '0')}`;
-                    return sDate === eDate ? `${sDate}, ${sTime} - ${eTime}` : `${sDate} ${sTime} - ${eDate} ${eTime}`;
-                  })()}
-                </span>
-                <span className="text-slate-300">|</span>
-                <span className="text-blue-600 dark:text-blue-400">{room.duration}m</span>
-              </div>
-              {liveBreakdown[room.id] > 0 && (
-                <div className="text-emerald-600 font-black animate-pulse opacity-80">
-                  {liveBreakdown[room.id]} {terminology.student.toUpperCase()} SEDANG MENGERJAKAN
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
-    },
-    {
-      key: "className",
-      label: terminology.class,
-      className: "w-40",
-      render: (v: string, room: ExamRoomData) => {
-        if (room.allClasses) {
-          return <Badge variant="outline" className="py-1 bg-blue-50/50 text-blue-600 border-blue-100">Semua {terminology.class}</Badge>;
-        }
-
-        const classList = (v || "").split(", ").filter(Boolean);
-        if (classList.length === 0) return <span className="text-slate-400 text-xs">N/A</span>;
-
-        if (classList.length <= 2) {
-          return (
-            <div className="flex flex-wrap gap-1">
-              {classList.map((cls, idx) => (
-                <Badge key={idx} variant="secondary" className="py-1 bg-slate-100 text-slate-600 border-transparent">{cls}</Badge>
-              ))}
-            </div>
-          );
-        }
-
-        return (
-          <div className="relative group">
-            <button
-              onClick={() => setShowClassesRoom(room)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-100/70 dark:bg-indigo-950/40 dark:border-indigo-800/40 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-              title="Klik untuk melihat daftar kelas"
-            >
-              <Users className="h-3.5 w-3.5 text-indigo-500" />
-              <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">{classList.length} {terminology.class}</span>
-            </button>
-            {/* Hover tooltip - desktop only with pointer-events-none */}
-            <div className="hidden sm:group-hover:block pointer-events-none absolute z-50 top-full left-0 mt-1 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm w-max max-w-xs">
-              <div className="grid grid-cols-3 gap-1">
-                {classList.map((cls, idx) => (
-                  <span key={idx} className="px-2 py-0.5 rounded-full text-xs font-bold text-center bg-indigo-50 text-indigo-700 border border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-800">{cls}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      }
-    }
-  ], [masterTeachers, liveBreakdown, rooms, selectableRooms, selectedIds, terminology, isOwner, lastSelectedIndex, filteredRooms]);
 
   // ── Realtime Active Students Engine (Parity with Dashboard) ──
   // Menghitung jumlah siswa aktif secara real-time via query & SSE subscription
@@ -509,7 +314,7 @@ const ExamRoomsPage = () => {
           setLiveBreakdown(bd);
           setTotalOngoing(total);
         }
-      } catch (err) {}
+      } catch (err) { }
     }
   }, [pb, activeRoomIdsStr]);
 
@@ -879,7 +684,7 @@ const ExamRoomsPage = () => {
     const confirmDesc = enable
       ? `Aktifkan ${selectedIds.length} ruang ujian terpilih agar ${terminology.student.toLowerCase()} bisa mulai mengerjakan?`
       : `Nonaktifkan ${selectedIds.length} ruang ujian terpilih? ${terminology.student} tidak akan bisa masuk atau lanjut mengerjakan.`;
-    
+
     setConfirmDialog({
       isOpen: true,
       title: confirmTitle,
@@ -1173,7 +978,7 @@ const ExamRoomsPage = () => {
       const dateStr = new Date().toISOString().split('T')[0];
       const customFilename = customRooms
         ? `Rekap_${customRooms.length}_Ruang_Terpilih_${dateStr}.zip`
-        : isArchive 
+        : isArchive
           ? `Rekap_Semua_Ruang_Arsip_${dateStr}.zip`
           : `Rekap_Semua_Ruang_Aktif_${dateStr}.zip`;
 
@@ -1194,601 +999,1319 @@ const ExamRoomsPage = () => {
     }
   };
 
-  return (
-    <div className="space-y-5">
-      {/* Header Bar */}
-      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
-            Ruang Ujian
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan dan kelola sesi ujian untuk {terminology.student.toLowerCase()}.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {isLoading ? (
-            <>
-              <Skeleton className="h-9 w-24 rounded-xl" />
-              <Skeleton className="h-9 w-32 rounded-xl" />
-            </>
-          ) : (
-            <>
-              <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
-                <button
-                  onClick={() => setActiveTab("aktif")}
-                  className={`min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
+  // ── Status Filter Counts & Dynamic Display Data ──
+  const statusCounts = useMemo(() => {
+    const counts = { all: filteredRooms.length, ongoing: 0, waiting: 0, finished: 0, disabled: 0 };
+    const now = Date.now();
+    filteredRooms.forEach(r => {
+      if (r.isDisabled) {
+        counts.disabled++;
+        return;
+      }
+      const start = new Date(r.start_time).getTime();
+      const end = new Date(r.end_time).getTime();
+      if (now >= start && now <= end) {
+        counts.ongoing++;
+      } else if (now < start) {
+        counts.waiting++;
+      } else {
+        counts.finished++;
+      }
+    });
+    return counts;
+  }, [filteredRooms]);
+
+  const displayRooms = useMemo(() => {
+    let list = filteredRooms;
+
+    if (statusFilter !== "all") {
+      const now = Date.now();
+      list = list.filter(r => {
+        if (statusFilter === "disabled") return r.isDisabled;
+        if (r.isDisabled) return false;
+        const start = new Date(r.start_time).getTime();
+        const end = new Date(r.end_time).getTime();
+        if (statusFilter === "ongoing") return now >= start && now <= end;
+        if (statusFilter === "waiting") return now < start;
+        if (statusFilter === "finished") return now > end;
+        return true;
+      });
+    }
+
+    const q = tableSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter(r => {
+        const roomName = String(r.room_name || r.examTitle || "").toLowerCase();
+        const teacherName = String(r.teacherName || "").toLowerCase();
+        const subjectName = String(r.subjectName || "").toLowerCase();
+        const className = String(r.className || "").toLowerCase();
+        const roomCode = String(r.room_code || "").toLowerCase();
+        const token = String(r.token || "").toLowerCase();
+        const examTitle = String(r.examTitle || "").toLowerCase();
+        return (
+          roomName.includes(q) ||
+          teacherName.includes(q) ||
+          subjectName.includes(q) ||
+          className.includes(q) ||
+          roomCode.includes(q) ||
+          token.includes(q) ||
+          examTitle.includes(q)
+        );
+      });
+    }
+
+    return list;
+  }, [filteredRooms, statusFilter, tableSearch]);
+
+  // ── Neon Table Columns Definition ──
+  const neonColumns: NeonTableColumn<ExamRoomData>[] = useMemo(() => [
+    {
+      key: "index",
+      header: "#",
+      width: "44px",
+      align: "center",
+      render: (_item, index) => (
+        <span className="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">
+          {index + 1}
+        </span>
+      ),
+    },
+    {
+      key: "room_name",
+      header: "Ruang Ujian & Pengampu",
+      className: "w-[280px] min-w-[220px] max-w-[320px]",
+      render: (room) => {
+        const isInspected = inspectedRoom?.id === room.id;
+        return (
+          <div className="flex flex-col gap-0.5 py-0.5 overflow-hidden">
+            <div className="flex items-center gap-1.5 flex-nowrap overflow-hidden">
+              <span
+                className={cn(
+                  "text-[13px] font-bold tracking-tight transition-colors truncate",
+                  isInspected
+                    ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
+                    : "text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400"
+                )}
+                title={room.room_name || room.examTitle || "Tanpa Nama"}
+              >
+                {room.room_name || room.examTitle || "Tanpa Nama"}
+              </span>
+
+              {room.is_exambro && (
+                <span
+                  className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0"
+                  title="Wajib Kiosk Exambro"
                 >
-                  Aktif
-                </button>
-                <button
-                  onClick={() => setActiveTab("arsip")}
-                  className={`min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
-                >
-                  Arsip
-                </button>
-              </div>
-              {selectedIds.length > 0 && (
-                <div className="flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm transition-all h-9 px-3.5 text-xs flex items-center gap-1.5"
-                      >
-                        <span>{selectedIds.length} - Aksi Masal</span>
-                        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                      <DropdownMenuLabel className="text-xs font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1">
-                        Aksi ({selectedIds.length} Ruang Ujian)
-                      </DropdownMenuLabel>
-                      
-                      {activeTab === "aktif" ? (
-                        <>
-                          <DropdownMenuItem
-                            onClick={() => handleBatchToggleStatus(true)}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                          >
-                            <Power className="h-4 w-4" />
-                            <span>Aktifkan Ruangan</span>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem
-                            onClick={() => handleBatchToggleStatus(false)}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                          >
-                            <PowerOff className="h-4 w-4" />
-                            <span>Nonaktifkan Ruangan</span>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-
-                          <DropdownMenuItem
-                            onClick={() => {
-                              const chosen = rooms.filter(r => selectedIds.includes(r.id));
-                              handleExportZip(chosen);
-                            }}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
-                          >
-                            <FileSpreadsheet className="h-4 w-4" />
-                            <span>Export Rekap Excel (ZIP)</span>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-
-                          <DropdownMenuItem
-                            onClick={handleBatchArchive}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-                          >
-                            <Archive className="h-4 w-4" />
-                            <span>Arsipkan Ruangan</span>
-                          </DropdownMenuItem>
-                        </>
-                      ) : (
-                        <>
-                          <DropdownMenuItem
-                            onClick={handleBatchRestore}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-                          >
-                            <RotateCw className="h-4 w-4" />
-                            <span>Pulihkan Ruangan</span>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem
-                            onClick={() => {
-                              const chosen = rooms.filter(r => selectedIds.includes(r.id));
-                              handleExportZip(chosen);
-                            }}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
-                          >
-                            <FileSpreadsheet className="h-4 w-4" />
-                            <span>Export Rekap Excel (ZIP)</span>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-
-                          <DropdownMenuItem
-                            onClick={handleBatchDelete}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                          >
-                            <Trash className="h-4 w-4" />
-                            <span>Hapus Permanen</span>
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                  <ShieldAlert className="h-2.5 w-2.5" />
+                  <span>Kiosk</span>
+                </span>
               )}
-
-              {canCreate && (
-                <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Buka Ruang
-                </Button>
-              )}
-              {filteredRooms.length > 0 && (
-                <Button
-                  onClick={() => handleExportZip()}
-                  disabled={isExporting}
-                  size="sm"
-                  variant="softSuccess"
-                  className="rounded-xl font-bold shadow-sm h-9 px-3.5 transition-all"
-                >
-                  <FileSpreadsheet className="mr-1.5 h-4 w-4" />
-                  {isExporting ? "Mengekspor..." : activeTab === "aktif" ? "Export Semua Aktif (ZIP)" : "Export Semua Arsip (ZIP)"}
-                </Button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-        <div className="bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center justify-between backdrop-blur-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400">
-              <Lock className="h-5 w-5" />
             </div>
-            <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Token Universal</p>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                {isLoading ? <Skeleton className="h-6 w-24" /> : (
-                  <>
-                    <code className="text-lg font-mono font-bold text-slate-800 dark:text-slate-100">{universalToken || "---"}</code>
-                    <span className="text-xs text-amber-500 dark:text-amber-400 font-medium tracking-wide">({timeLeft})</span>
-                  </>
+
+            {/* Nama Guru & Mapel tanpa wrap text */}
+            <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 whitespace-nowrap overflow-hidden">
+              <span
+                className="font-medium text-neutral-700 dark:text-neutral-300 truncate max-w-[140px]"
+                title={room.teacherName}
+              >
+                {room.teacherName || "Pengampu N/A"}
+              </span>
+              <span className="text-neutral-300 dark:text-neutral-700 shrink-0">•</span>
+              <span
+                className="truncate max-w-[120px] text-neutral-500 dark:text-neutral-400"
+                title={room.subjectName}
+              >
+                {room.subjectName || "Mapel N/A"}
+              </span>
+            </div>
+
+            {room.examTitle && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleQuestionsClick(room);
+                }}
+                className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors truncate text-left cursor-pointer flex items-center gap-1 whitespace-nowrap overflow-hidden mt-0.5"
+                title={`Buka Bank Soal: ${room.examTitle}`}
+              >
+                <BookOpen className="h-3 w-3 shrink-0 opacity-70" />
+                <span className="truncate max-w-[240px]">Bank: {room.examTitle}</span>
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "schedule",
+      header: "Jadwal, Status & Kelas",
+      className: "w-56 min-w-[200px] max-w-[250px]",
+      render: (room) => {
+        const s = new Date(room.start_time);
+        const e = new Date(room.end_time);
+        const valid = !isNaN(s.getTime()) && !isNaN(e.getTime());
+        const sDate = valid ? s.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "--";
+        const eDate = valid ? e.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "--";
+        const sTime = valid ? `${s.getHours().toString().padStart(2, "0")}:${s.getMinutes().toString().padStart(2, "0")}` : "--:--";
+        const eTime = valid ? `${e.getHours().toString().padStart(2, "0")}:${e.getMinutes().toString().padStart(2, "0")}` : "--:--";
+
+        // Format waktu compact: 20 Okt, 09:15–13:00
+        const dateText = sDate === eDate ? `${sDate}, ${sTime}–${eTime}` : `${sDate} ${sTime}–${eDate} ${eTime}`;
+
+        const activeStudents = liveBreakdown[room.id] || 0;
+
+        // Status calculation
+        const now = Date.now();
+        const start = s.getTime();
+        const end = e.getTime();
+
+        let label = "Berjalan";
+        let badgeStyle = "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
+        let dot: React.ReactNode = <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse mr-1" />;
+
+        if (room.status === "archive") {
+          label = "Arsip";
+          badgeStyle = "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700";
+          dot = null;
+        } else if (room.isDisabled) {
+          label = "Nonaktif";
+          badgeStyle = "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20";
+          dot = null;
+        } else if (now < start) {
+          label = "Menunggu";
+          badgeStyle = "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20";
+          dot = null;
+        } else if (now > end) {
+          label = "Selesai";
+          badgeStyle = "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700";
+          dot = null;
+        }
+
+        // Kelas preview & hover list
+        const classList = (room.className || "").split(", ").filter(Boolean);
+        const classLabel = room.allClasses
+          ? `Semua ${terminology.class}`
+          : classList.length > 0
+            ? `${classList.length} ${terminology.class}`
+            : `Tanpa ${terminology.class}`;
+
+        return (
+          <div className="flex flex-col gap-1 py-0.5">
+            {/* Baris 1: Status Pill + Kelas Pill + Live Status */}
+            <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap overflow-hidden">
+              <span
+                className={cn(
+                  "inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold border shrink-0",
+                  badgeStyle
+                )}
+              >
+                {dot}
+                {label}
+              </span>
+
+              {/* Kelas dengan Hover Popover / Tooltip */}
+              <div
+                className="relative group/cls inline-flex items-center shrink-0"
+                onClick={(e) => {
+                  if (!room.allClasses && classList.length > 2) {
+                    e.stopPropagation();
+                    setShowClassesRoom(room);
+                  }
+                }}
+              >
+                <span className={cn(
+                  "inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium border transition-colors cursor-pointer",
+                  room.allClasses
+                    ? "bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-900/40"
+                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600"
+                )}>
+                  <Users className="h-2.5 w-2.5 opacity-70" />
+                  <span>{classLabel}</span>
+                </span>
+
+                {/* Floating Hover Tooltip: Tampil otomatis saat di-hover */}
+                <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/cls:flex flex-col z-50 w-max max-w-xs p-2 rounded-lg bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-[11px] shadow-xl border border-neutral-700 dark:border-neutral-300 pointer-events-none transition-all">
+                  <div className="font-semibold pb-1 border-b border-neutral-700/60 dark:border-neutral-300/60 text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
+                    Daftar {terminology.class} Terdaftar ({room.allClasses ? "Semua" : classList.length}):
+                  </div>
+                  <div className="pt-1 flex flex-wrap gap-1 leading-snug max-h-36 overflow-y-auto">
+                    {room.allClasses ? (
+                      <span className="text-[10px]">Semua {examClasses.length} kelas aktif</span>
+                    ) : classList.length > 0 ? (
+                      classList.map((c, idx) => (
+                        <span key={idx} className="px-1.5 py-0.5 rounded bg-white/10 dark:bg-black/10 text-[10px] font-medium">
+                          {c}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[10px] opacity-70">Belum ada kelas dipilih</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {activeStudents > 0 && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 animate-pulse shrink-0">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  {activeStudents} live
+                </span>
+              )}
+            </div>
+
+            {/* Baris 2: Waktu Compact & Durasi */}
+            <div className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-600 dark:text-neutral-400 whitespace-nowrap overflow-hidden">
+              <Clock className="h-3 w-3 text-neutral-400 shrink-0" />
+              <span className="truncate">{dateText}</span>
+              <span className="px-1 py-0.2 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200/60 dark:border-neutral-750 shrink-0">
+                {room.duration}m
+              </span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "rules",
+      header: "Aturan & Butir Soal",
+      className: "w-44 min-w-[150px]",
+      render: (room) => {
+        return (
+          <div className="flex flex-col gap-1 py-0.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className={cn(
+                  "px-1.5 py-0.5 rounded text-[10px] font-semibold border",
+                  getExamTypeColorClass(room.examType || "UMUM")
+                )}
+              >
+                {room.examType || "UMUM"}
+              </span>
+
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
+                {room.max_questions && room.max_questions > 0
+                  ? `${room.max_questions} Soal`
+                  : "Semua Soal"}
+              </span>
+            </div>
+
+            <div className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500">
+              {room.randomize_questions !== false ? "Acak Soal & Opsi" : "Nomor Urut Standar"}
+              {room.cheat_limit > 0 && `, Batas Cheat ${room.cheat_limit}x`}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "actions",
+      header: "Aksi",
+      width: "160px",
+      align: "right",
+      render: (room) => {
+        const owner = isOwner(room);
+        return (
+          <div
+            className="flex justify-end items-center gap-1 whitespace-nowrap"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Monitor Live */}
+            <button
+              type="button"
+              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              onClick={() => handleMonitorClick(room)}
+              title="Monitor Realtime CBT"
+            >
+              <Search className="h-3.5 w-3.5" />
+            </button>
+
+            {/* Analisis Butir Soal */}
+            <button
+              type="button"
+              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${room.id}&examId=${room.examId || ""}`)}
+              title="Analisis Butir Soal"
+            >
+              <BarChart2 className="h-3.5 w-3.5" />
+            </button>
+
+            {/* Penilaian & Koreksi */}
+            <button
+              type="button"
+              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              onClick={() => navigate(`/admin/penilaian?roomId=${room.id}`)}
+              title="Penilaian & Rekap Nilai"
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+            </button>
+
+            {owner && (
+              <button
+                type="button"
+                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                onClick={() => handleEditClick(room)}
+                title="Edit Parameter Ruangan"
+              >
+                <Edit className="h-3.5 w-3.5" />
+              </button>
+            )}
+
+            {owner && (
+              <button
+                type="button"
+                className={cn(
+                  "h-7 w-7 rounded-md flex items-center justify-center border transition-colors shadow-2xs cursor-pointer",
+                  room.isDisabled
+                    ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border-emerald-500/30 dark:text-emerald-400"
+                    : "bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 border-rose-500/30 dark:text-rose-400"
+                )}
+                onClick={() => handleToggleDisabled(room)}
+                title={room.isDisabled ? "Aktifkan Ruangan" : "Nonaktifkan Ruangan"}
+              >
+                {room.isDisabled ? <Power className="h-3.5 w-3.5" /> : <PowerOff className="h-3.5 w-3.5" />}
+              </button>
+            )}
+
+            {owner && (
+              activeTab === "aktif" ? (
+                <button
+                  type="button"
+                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-amber-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  onClick={() => handleArchiveRoom(room)}
+                  title="Arsipkan Ruangan"
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 hover:text-emerald-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                    onClick={() => handleRestoreRoom(room)}
+                    title="Pulihkan Ruangan"
+                  >
+                    <RotateCw className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shadow-2xs cursor-pointer"
+                    onClick={() => handleDeleteClick(room)}
+                    title="Hapus Permanen"
+                  >
+                    <Trash className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )
+            )}
+          </div>
+        );
+      },
+    },
+  ], [inspectedRoom, liveBreakdown, terminology, isOwner, handleQuestionsClick, handleMonitorClick, navigate, handleEditClick, handleToggleDisabled, handleArchiveRoom, handleRestoreRoom, handleDeleteClick, activeTab]);
+
+  return (
+    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+      <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-6 items-start">
+
+          {/* ═══════════════════════════════════════════════════════════════
+              CENTER / MAIN CONTENT
+             ═══════════════════════════════════════════════════════════════ */}
+          <div className="min-w-0 space-y-6">
+
+            {/* 1. Header Bar: Title & Primary Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+                  Ruang Ujian &amp; Sesi CBT
+                </h1>
+                {/* Breadcrumb line */}
+                <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                  <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
+                    Semua Modul
+                  </Link>
+                  <span>/</span>
+                  <span className="text-neutral-700 dark:text-neutral-300 font-medium">
+                    {school?.slug || "modalbangsa"}
+                  </span>
+                  <span>/</span>
+                  <div className="flex items-center gap-1 text-neutral-800 dark:text-neutral-200 font-medium">
+                    <GitBranch className="h-3.5 w-3.5 text-neutral-500" />
+                    <span>ruang-ujian</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons Top Right: Bersih & Tidak Semak */}
+              <div className="flex items-center gap-2 shrink-0">
+                {filteredRooms.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleExportZip()}
+                    disabled={isExporting}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                    title="Export seluruh rekap hasil ujian ke ZIP"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>{isExporting ? "Mengekspor..." : "Export ZIP"}</span>
+                  </button>
+                )}
+
+                {canCreate && (
+                  <button
+                    type="button"
+                    onClick={handleCreateClick}
+                    className="inline-flex items-center gap-1.5 h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-md shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Buka Ruang</span>
+                  </button>
                 )}
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="group relative z-10 hover:z-50 bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3 backdrop-blur-sm cursor-help hover:border-blue-300 dark:hover:border-blue-800 transition-all">
-          <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
-            <Users className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs text-slate-500 dark:text-slate-400">{terminology.student} Aktif</p>
-              <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-900/40 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live
-              </span>
-            </div>
-            <div className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-none">
-              {isLoading ? <Skeleton className="h-5 w-8" /> : totalOngoing}
-            </div>
-          </div>
-          {/* Hover Breakdown Card */}
-          <div className="absolute top-full left-0 right-0 mt-2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 scale-95 group-hover:scale-100 pointer-events-none group-hover:pointer-events-auto">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-3.5 min-w-[220px] max-h-60 overflow-y-auto ring-1 ring-black/5 dark:ring-white/10">
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-800 pb-1.5 flex justify-between items-center">
-                <span>Detail Ruangan Live</span>
-                <span className="text-blue-600 dark:text-blue-400 font-bold">{totalOngoing} Total</span>
-              </div>
-              {Object.keys(liveBreakdown).length === 0 ? (
-                <p className="text-center py-2 text-xs text-slate-400 font-medium">Tidak ada aktifitas</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {Object.keys(liveBreakdown).map(rid => {
-                    const room = rooms.find(r => r.id === rid);
-                    return (
-                      <div key={rid} className="flex justify-between items-center text-xs py-0.5">
-                        <span className="text-slate-600 dark:text-slate-300 font-medium truncate pr-2">
-                          {room ? (room.room_name || room.examTitle) : "ID: " + rid}
-                        </span>
-                        <span className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold text-xs min-w-[22px] text-center border border-blue-100 dark:border-blue-900/40">
-                          {liveBreakdown[rid]}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+            {/* 2. Clean Horizontal Tabs: Ruang Aktif vs Ruang Diarsipkan */}
+            <NeonTabs
+              activeTab={activeTab}
+              onChange={setActiveTab}
+              tabs={[
+                {
+                  id: "aktif",
+                  label: "Ruang Aktif",
+                  count: rooms.filter(r => r.status !== "archive").length,
+                  indicator: true,
+                },
+                {
+                  id: "arsip",
+                  label: "Ruang Diarsipkan",
+                  count: rooms.filter(r => r.status === "archive").length,
+                },
+              ]}
+            />
 
-        <div className="bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3 backdrop-blur-sm">
-          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400">
-            <ClipboardList className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {activeTab === "aktif" ? "Total Ruang Aktif" : "Total Ruang Arsip"}
-            </p>
-            <div className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5">
-              {isLoading ? <Skeleton className="h-7 w-8" /> : filteredRooms.length}
-            </div>
-          </div>
-        </div>
-      </div>
+            {/* 3. Stats Strip (4 Kartu Ringkas, Elegan, Sama Ukuran dengan Bank Soal) */}
+            <NeonStatGrid cols={4}>
+              <NeonStatCard
+                label="Total Ruang Ujian"
+                value={rooms.length}
+                unit="ruang"
+                isLoading={isLoading}
+              />
 
-      {/* Main Table Section (Matching ExamsPage structure) */}
-      {isLoading ? (
-        <Card className="shadow-sm hover:shadow-sm">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Ruang Ujian</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
-              <Table>
-                <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
-                  <TableRow>
-                    <TableHead className="w-16 text-center">No</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Ruangan / Bank Soal</TableHead>
-                    <TableHead>{terminology.class}</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
-                      <TableCell>
-                        <div className="space-y-1.5">
-                          <Skeleton className="h-4 w-48" />
-                          <Skeleton className="h-3 w-32" />
-                        </div>
-                      </TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1.5">
-                          <Skeleton className="h-8 w-8 rounded-lg" />
-                          <Skeleton className="h-8 w-8 rounded-lg" />
-                          <Skeleton className="h-8 w-8 rounded-lg" />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="shadow-sm hover:shadow-sm">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Ruang Ujian</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            <DataTable
-              data={filteredRooms}
-              columns={columns}
-              searchPlaceholder="Cari ruang ujian..."
-              emptyMessage={`Belum ada ruang ujian ${activeTab}.`}
-              actions={(room: ExamRoomData) => (
-                <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
-                  <button
-                    className="p-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40 transition-colors"
-                    onClick={() => handleMonitorClick(room)}
-                    title="Monitor Ujian"
-                  >
-                    <Search className="h-4 w-4" />
-                  </button>
+              <NeonStatCard
+                label="Ruang Ujian Aktif"
+                indicator={true}
+                value={rooms.filter(r => r.status !== "archive").length}
+                unit="ruang"
+                isLoading={isLoading}
+              />
 
-                  <button
-                    className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg dark:bg-blue-900/10 dark:text-blue-400 border border-blue-100 dark:border-blue-800/40 transition-colors"
-                    onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${room.id}&examId=${room.examId || ""}`)}
-                    title="Analisis Butir Soal & Daya Pembeda"
-                  >
-                    <BarChart2 className="h-4 w-4" />
-                  </button>
+              <NeonStatCard
+                label={`${terminology.student} Aktif`}
+                indicator={true}
+                value={totalOngoing}
+                unit="siswa"
+                isLoading={isLoading}
+              />
 
-                  {isOwner(room) && (
+              <NeonStatCard
+                label="Token Universal"
+                indicator={
+                  timeLeft ? (
+                    <span className="font-mono text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                      ({timeLeft})
+                    </span>
+                  ) : undefined
+                }
+                value={
+                  <code className="tracking-wider">
+                    {universalToken || "------"}
+                  </code>
+                }
+                actionSlot={
+                  universalToken ? (
                     <button
-                      className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40 transition-colors"
-                      onClick={() => handleEditClick(room)}
-                      title="Edit Ruangan"
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(universalToken);
+                        setCopiedToken(true);
+                        addToast({
+                          type: "success",
+                          title: "Token Disalin",
+                          description: `Token Universal ${universalToken} disalin ke clipboard.`
+                        });
+                        setTimeout(() => setCopiedToken(false), 2000);
+                      }}
+                      className="h-7 w-7 rounded flex items-center justify-center text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                      title="Salin Token Universal"
                     >
-                      <Edit className="h-4 w-4" />
+                      {copiedToken ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
                     </button>
-                  )}
+                  ) : null
+                }
+              />
+            </NeonStatGrid>
 
-                  {isOwner(room) && (
+            {/* 3. Main Neon Table Section */}
+            <NeonTable
+              data={displayRooms}
+              columns={neonColumns}
+              keyExtractor={(r) => r.id}
+              isLoading={isLoading}
+              title="Daftar Ruang Ujian & Sesi CBT"
+              subtitle="Klik baris ruangan untuk melihat inspeksi parameter & status live di panel sebelah kanan."
+              searchValue={tableSearch}
+              onSearchChange={setTableSearch}
+              searchPlaceholder="Cari ruang ujian, pengampu, mapel, kelas, token..."
+              filterSlot={
+                activeTab === "aktif" ? (
+                  <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-850 p-0.5 rounded-md text-[11px] font-medium border border-neutral-200/60 dark:border-neutral-800">
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter("all")}
+                      className={cn(
+                        "px-2 py-1 rounded transition-colors cursor-pointer",
+                        statusFilter === "all"
+                          ? "bg-white dark:bg-neutral-750 text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                          : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
+                      )}
+                    >
+                      Semua ({statusCounts.all})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter("ongoing")}
+                      className={cn(
+                        "px-2 py-1 rounded transition-colors cursor-pointer flex items-center gap-1",
+                        statusFilter === "ongoing"
+                          ? "bg-white dark:bg-neutral-750 text-emerald-700 dark:text-emerald-400 font-semibold shadow-2xs"
+                          : "text-neutral-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+                      )}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Berjalan ({statusCounts.ongoing})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter("waiting")}
+                      className={cn(
+                        "px-2 py-1 rounded transition-colors cursor-pointer",
+                        statusFilter === "waiting"
+                          ? "bg-white dark:bg-neutral-750 text-sky-700 dark:text-sky-400 font-semibold shadow-2xs"
+                          : "text-neutral-500 hover:text-sky-600 dark:hover:text-sky-400"
+                      )}
+                    >
+                      Menunggu ({statusCounts.waiting})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter("finished")}
+                      className={cn(
+                        "px-2 py-1 rounded transition-colors cursor-pointer",
+                        statusFilter === "finished"
+                          ? "bg-white dark:bg-neutral-750 text-neutral-800 dark:text-white font-semibold shadow-2xs"
+                          : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
+                      )}
+                    >
+                      Selesai ({statusCounts.finished})
+                    </button>
+                    {statusCounts.disabled > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setStatusFilter("disabled")}
+                        className={cn(
+                          "px-2 py-1 rounded transition-colors cursor-pointer",
+                          statusFilter === "disabled"
+                            ? "bg-white dark:bg-neutral-750 text-rose-700 dark:text-rose-400 font-semibold shadow-2xs"
+                            : "text-neutral-500 hover:text-rose-600 dark:hover:text-rose-400"
+                        )}
+                      >
+                        Nonaktif ({statusCounts.disabled})
+                      </button>
+                    )}
+                  </div>
+                ) : null
+              }
+              selectable={true}
+              selectedKeys={selectedIds}
+              onSelectionChange={setSelectedIds}
+              isItemSelectable={isOwner}
+              batchActions={
+                <div className="flex items-center gap-1.5">
+                  {activeTab === "aktif" ? (
                     <>
                       <button
-                        className={cn(
-                          "p-1.5 rounded-lg border transition-colors",
-                          room.isDisabled
-                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 dark:bg-emerald-900/10 dark:text-emerald-400 dark:border-emerald-800/40"
-                            : "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:border-rose-800/40"
-                        )}
-                        onClick={() => handleToggleDisabled(room)}
-                        title={room.isDisabled ? "Aktifkan" : "Nonaktifkan"}
+                        type="button"
+                        onClick={() => handleBatchToggleStatus(true)}
+                        className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-emerald-600 dark:text-emerald-400 font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-[11px] transition-colors cursor-pointer"
                       >
-                        {room.isDisabled ? <Power className="h-4 w-4" /> : <PowerOff className="h-4 w-4" />}
+                        Aktifkan
                       </button>
-
-                      {activeTab === "aktif" ? (
-                        <button
-                          className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40 transition-colors"
-                          onClick={() => handleArchiveRoom(room)}
-                          title="Arsipkan"
-                        >
-                          <Archive className="h-4 w-4" />
-                        </button>
-                      ) : (
-                        <>
-                          <button
-                            className="p-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40 transition-colors"
-                            onClick={() => handleRestoreRoom(room)}
-                            title="Pulihkan"
-                          >
-                            <RotateCw className="h-4 w-4" />
-                          </button>
-                          <button
-                            className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40 transition-colors"
-                            onClick={() => handleDeleteClick(room)}
-                            title="Hapus Permanen"
-                          >
-                            <Trash className="h-4 w-4" />
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleBatchToggleStatus(false)}
+                        className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-rose-600 dark:text-rose-400 font-medium hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[11px] transition-colors cursor-pointer"
+                      >
+                        Nonaktifkan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const chosen = rooms.filter(r => selectedIds.includes(r.id));
+                          handleExportZip(chosen);
+                        }}
+                        className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-950/40 text-[11px] transition-colors cursor-pointer"
+                      >
+                        Export Rekap
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleBatchArchive}
+                        className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-amber-600 dark:text-amber-400 font-medium hover:bg-amber-50 dark:hover:bg-amber-950/40 text-[11px] transition-colors cursor-pointer"
+                      >
+                        Arsipkan
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleBatchRestore}
+                        className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-indigo-600 dark:text-indigo-400 font-medium hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-[11px] transition-colors cursor-pointer"
+                      >
+                        Pulihkan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleBatchDelete}
+                        className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-rose-600 dark:text-rose-400 font-medium hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[11px] transition-colors cursor-pointer"
+                      >
+                        Hapus Permanen
+                      </button>
                     </>
                   )}
                 </div>
-              )}
+              }
+              activeKey={inspectedRoom?.id}
+              onRowClick={(room) => setInspectedRoomId(room.id)}
+              emptyTitle={activeTab === "aktif" ? "Belum Ada Ruang Ujian Aktif" : "Belum Ada Ruang Ujian Arsip"}
+              emptySubtitle={
+                tableSearch
+                  ? "Tidak ada ruang ujian yang sesuai dengan kriteria filter atau pencarian Anda."
+                  : "Jadwalkan ruang ujian CBT baru untuk memulai sesi pengerjaan ujian."
+              }
+              emptyAction={
+                canCreate && activeTab === "aktif" ? (
+                  <button
+                    type="button"
+                    onClick={handleCreateClick}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-md shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Buka Ruang Ujian Baru</span>
+                  </button>
+                ) : null
+              }
             />
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Dialog Create/Edit */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto bg-card p-0 rounded-2xl border-slate-200/70 dark:border-slate-800 shadow-2xl">
-
-          {/* Header dengan tombol simpan di kanan */}
-          <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-card z-10">
-            <div>
-              <h2 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">
-                {dialogMode === "edit" ? "Edit Ruang Ujian" : "Buka Ruang Ujian"}
-              </h2>
-              <p className="text-xs text-slate-400">Bank soal · jadwal · kelas · aturan & parameter</p>
-            </div>
-            <Button type="submit" form="room-form" className="h-10 px-6 rounded-xl font-bold text-xs shadow-md">
-              {dialogMode === "edit" ? "Perbarui Ruangan" : "Buka Ruangan"}
-            </Button>
           </div>
 
-          {isEditRestricted && (
-            <div className="mx-6 mt-3.5 flex items-start gap-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-amber-700 dark:text-amber-400 px-3.5 py-2.5 rounded-xl text-xs">
-              <Lock className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
-              <span>Ujian berlangsung. Hanya <b>Nama Ruang, Kelas, Waktu, Durasi, Kumpul Dibuka</b>, dan <b>Batas Cheat</b> yang bisa diubah.</span>
-            </div>
-          )}
+          {/* ═══════════════════════════════════════════════════════════════
+              RIGHT SIDEBAR / INSPECTOR PANEL (Neon Style Reusable Component)
+             ═══════════════════════════════════════════════════════════════ */}
+          <NeonInspector>
 
-          <form id="room-form" onSubmit={handleSubmit} className="px-6 pb-6 pt-4 space-y-4">
+            {/* 1. Detail Ruang Terpilih (Inspector) */}
+            <InspectorSection>
+              <InspectorHeader
+                title="Detail Ruang Ujian"
+                icon={GitBranch}
+                badge={inspectedRoom ? "Terpilih" : "Ringkasan"}
+              />
 
-            {/* Row 1: Search + Nama Ruang */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-              <div className="md:col-span-5">
-                <p className="text-sm font-semibold text-slate-400 mb-1.5">Cari Bank Soal</p>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <Input placeholder="Nama soal / mapel / guru" value={examSearch} onChange={(e) => setExamSearch(e.target.value)} disabled={isEditRestricted} className="pl-8 h-11 text-xs rounded-xl" />
+              {inspectedRoom ? (
+                <div className="space-y-2.5 text-xs">
+                  <InspectorField
+                    label="Nama Ruangan"
+                    value={inspectedRoom.room_name || inspectedRoom.examTitle || "Tanpa Nama"}
+                  />
+
+                  <InspectorField
+                    label="Pengampu & Mata Pelajaran"
+                    value={`${inspectedRoom.teacherName} • ${inspectedRoom.subjectName}`}
+                  />
+
+                  <InspectorField
+                    label="Paket Bank Soal"
+                    value={inspectedRoom.examTitle}
+                  />
+
+                  <InspectorGrid>
+                    <InspectorField
+                      label="Alokasi Siswa"
+                      value={inspectedRoom.className || "Semua Kelas"}
+                    />
+                    <InspectorField
+                      label="Durasi Pengerjaan"
+                      value={`${inspectedRoom.duration} Menit`}
+                    />
+                  </InspectorGrid>
+
+                  <InspectorGrid>
+                    <InspectorField label="Siswa Sedang Aktif">
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>{liveBreakdown[inspectedRoom.id] || 0} Siswa</span>
+                      </div>
+                    </InspectorField>
+                    <InspectorField
+                      label="Status Ruangan"
+                      value={inspectedRoom.isDisabled ? "Nonaktif" : "Aktif / Siap"}
+                    />
+                  </InspectorGrid>
+
+                  <InspectorActions>
+                    <InspectorButton
+                      variant="primary"
+                      icon={Search}
+                      onClick={() => handleMonitorClick(inspectedRoom)}
+                    >
+                      Buka Live Monitoring Ruang
+                    </InspectorButton>
+                    <InspectorButton
+                      variant="secondary"
+                      icon={CheckSquare}
+                      onClick={() => navigate(`/admin/penilaian?roomId=${inspectedRoom.id}`)}
+                    >
+                      Buka Lembar Penilaian
+                    </InspectorButton>
+                  </InspectorActions>
+                </div>
+              ) : (
+                <InspectorEmpty message="Pilih atau arahkan kursor ke salah satu ruang ujian." />
+              )}
+            </InspectorSection>
+
+            {/* 2. Token Sesi & Parameter Global */}
+            <InspectorSection divided>
+              <InspectorHeader
+                title="Token & Akses Peserta"
+                icon={Lock}
+              />
+
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 dark:text-neutral-400">Token Universal</span>
+                  <span className="font-mono font-bold text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-200 dark:border-neutral-700">
+                    {universalToken || "------"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 dark:text-neutral-400">Sisa Waktu Token</span>
+                  <span className="font-mono text-neutral-700 dark:text-neutral-300 font-medium">
+                    {timeLeft || "Tidak Terbatas"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 dark:text-neutral-400">Mode Proteksi</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    Kiosk Exambro Wajib
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 dark:text-neutral-400">Batas Pelanggaran</span>
+                  <span className="text-neutral-700 dark:text-neutral-300">
+                    Otomatis Kunci
+                  </span>
                 </div>
               </div>
-              <div className="md:col-span-7">
-                <p className="text-sm font-semibold text-slate-400 mb-1.5">Nama Ruang Ujian</p>
-                <Input placeholder="Contoh: Gelombang 1 / Kelas X" value={formValues.room_name} onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })} required className="h-11 text-xs rounded-xl" />
+            </InspectorSection>
+
+            {/* 3. Link Cepat Portal Siswa */}
+            <InspectorCard
+              title="Portal Akses Peserta"
+              icon={ExternalLink}
+              description="Siswa dapat langsung membuka portal login ujian menggunakan domain sekolah atau Exambro."
+            >
+              <InspectorButton
+                variant="secondary"
+                icon={Copy}
+                onClick={() => {
+                  const url = `${window.location.origin}/student/login`;
+                  navigator.clipboard.writeText(url);
+                  addToast({ title: "Tautan Disalin", description: "URL portal siswa disalin ke clipboard.", type: "success" });
+                }}
+              >
+                Salin Link Ujian Siswa
+              </InspectorButton>
+            </InspectorCard>
+
+          </NeonInspector>
+        </div>
+      </div>
+
+      {/* Dialog Create/Edit (Neon Console Split Pane) */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-5xl w-[95vw] h-[88vh] max-h-[820px] overflow-hidden p-0 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shadow-2xl flex flex-col">
+
+          {/* 1. Header Dialog */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shrink-0">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <BookOpen className="h-4 w-4" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    {dialogMode === "edit" ? "Edit Ruang Ujian" : "Buka Ruang Ujian Baru"}
+                  </h2>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200/60 dark:border-neutral-700/60">
+                    {dialogMode === "edit" ? "Edit Mode" : "Sesi Ujian"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Konfigurasikan bank soal, jadwal pelaksanaan, aturan anti-cheat, dan distribusi peserta.
+                </p>
               </div>
             </div>
+          </div>
 
-            {/* Row 2: Bank Soal (col-5) | Jadwal & Aturan (col-7) */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+          {/* 2. Main Content: 2-Pane Split (Kiri: Bank Soal, Kanan: Form Konfigurasi) */}
+          <div className="grid grid-cols-1 md:grid-cols-12 flex-1 min-h-0 overflow-hidden">
 
-              {/* Kiri: Bank Soal */}
-              <div className="md:col-span-5">
-                <p className="text-sm font-semibold text-slate-400 mb-1.5">Bank Soal <span className="font-normal normal-case text-slate-400">({filteredExams.length} tersedia)</span></p>
-                <div className={`space-y-1.5 max-h-[360px] overflow-y-auto pr-1 ${isEditRestricted ? "opacity-60 pointer-events-none" : ""}`}>
-                  {filteredExams.length === 0 ? (
-                    <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 py-12 text-center">
-                      <Search className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
-                      <p className="text-xs text-slate-400 font-medium">Tidak ditemukan</p>
-                    </div>
-                  ) : visibleExamOptions.map((e) => {
+            {/* Pane Kiri: Pemilihan Bank Soal (col-span-5) */}
+            <div className="md:col-span-5 border-r border-neutral-200 dark:border-neutral-800 flex flex-col bg-neutral-50/40 dark:bg-neutral-900/20 min-h-0">
+
+              {/* Header List Bank Soal */}
+              <div className="p-3 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between shrink-0">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                  1. Pilih Bank Soal
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-200/60 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                  {filteredExams.length} bank
+                </span>
+              </div>
+
+              {/* Search Box Terintegrasi */}
+              <div className="p-2.5 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+                  <Input
+                    placeholder="Cari judul / mapel / guru..."
+                    value={examSearch}
+                    onChange={(e) => setExamSearch(e.target.value)}
+                    disabled={isEditRestricted}
+                    className="pl-8 pr-2.5 h-8 text-xs rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* List Bank Soal yang Sleek */}
+              <div className={`flex-1 overflow-y-auto p-2 space-y-1.5 ${isEditRestricted ? "opacity-60 pointer-events-none" : ""}`}>
+                {filteredExams.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-neutral-400">
+                    <Search className="h-6 w-6 mx-auto mb-2 text-neutral-300 dark:text-neutral-600" />
+                    Tidak ada bank soal yang cocok
+                  </div>
+                ) : (
+                  visibleExamOptions.map((e) => {
                     const subjectName = subjects.find((m: any) => m.id === (e.subjectId || e.subjectid))?.name || "-";
                     const teacherName = masterTeachers.find((t: any) => t.id === (e.teacherId || e.teacherid))?.name || "-";
                     const qCount = examQuestionCounts[e.id];
                     const selected = formValues.examId === e.id;
+
                     return (
-                      <button key={e.id} type="button" onClick={() => setFormValues({ ...formValues, examId: e.id })}
-                        className={cn("w-full text-left rounded-xl border px-3 py-2.5 transition-all shadow-xs",
-                          selected ? "border-blue-500 bg-blue-50/80 dark:border-blue-700 dark:bg-blue-950/50 ring-1 ring-blue-400/40"
-                            : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-300 hover:bg-blue-50/30"
+                      <button
+                        key={e.id}
+                        type="button"
+                        onClick={() => setFormValues({ ...formValues, examId: e.id })}
+                        className={cn(
+                          "w-full text-left p-2.5 rounded-lg border transition-all cursor-pointer select-none relative group",
+                          selected
+                            ? "bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12] border-emerald-500/50 text-neutral-900 dark:text-neutral-100 shadow-2xs"
+                            : "bg-white dark:bg-neutral-900/60 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-100/50 dark:hover:bg-neutral-850/50 text-neutral-700 dark:text-neutral-300"
                         )}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={cn("text-xs font-bold truncate", selected ? "text-blue-700 dark:text-blue-300" : "text-slate-800 dark:text-slate-200")}>{e.title}</span>
-                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">{e.examType || "PAS"}</span>
+                        <div className="flex items-start justify-between gap-2">
+                          <span className={cn("text-xs font-semibold leading-snug line-clamp-2", selected ? "text-emerald-700 dark:text-emerald-400" : "text-neutral-800 dark:text-neutral-200")}>
+                            {e.title}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-medium uppercase tracking-wider bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200/60 dark:border-neutral-700/60 shrink-0">
+                            {e.examType || "PAS"}
+                          </span>
                         </div>
-                        <p className="text-xs text-slate-400 truncate mt-0.5">
-                          {subjectName} · {teacherName} {qCount !== undefined ? `· ${qCount} Soal` : ""}
-                        </p>
+
+                        <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 truncate">
+                          <span className="font-medium text-neutral-700 dark:text-neutral-300">{subjectName}</span>
+                          <span>•</span>
+                          <span className="truncate">{teacherName}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400 dark:text-neutral-500 mt-1.5 pt-1.5 border-t border-neutral-100 dark:border-neutral-850">
+                          <span>{qCount !== undefined ? `${qCount} Butir Soal` : "Soal termuat"}</span>
+                          {selected && (
+                            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-sans font-semibold">
+                              <Check className="h-3 w-3" />
+                              Terpilih
+                            </span>
+                          )}
+                        </div>
                       </button>
                     );
-                  })}
-                </div>
+                  })
+                )}
               </div>
 
-              {/* Kanan: Jadwal + Aturan */}
-              <div className="md:col-span-7 space-y-3">
-
-                {/* Jadwal */}
-                <div>
-                  <p className="text-sm font-semibold text-slate-400 mb-1">Jadwal</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-400 mb-1">Waktu Mulai</p>
-                      <Input type="datetime-local" value={formValues.start_time} onChange={(e) => handleStartTimeChange(e.target.value)} required className="h-11 text-xs rounded-xl" />
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {[
-                          { label: "Skrg", handler: handleSetNow },
-                          { label: "07:45", h: 7, m: 45 },
-                          { label: "09:40", h: 9, m: 40 },
-                          { label: "10:10", h: 10, m: 10 },
-                          { label: "11:40", h: 11, m: 40 },
-                        ].map((p) => (
-                          <button key={p.label} type="button"
-                            onClick={p.handler ?? (() => {
-                              const s = new Date(); s.setHours(p.h!, p.m!, 0, 0);
-                              setFormValues(prev => ({ ...prev, start_time: formatLocalDateTime(s), end_time: formatLocalDateTime(new Date(s.getTime() + prev.duration * 60000)) }));
-                            })}
-                            className="px-1.5 py-0.5 rounded text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-blue-100 hover:text-blue-700 border border-slate-200 dark:border-slate-700 transition-colors"
-                          >{p.label}</button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-400 mb-1">Waktu Berakhir</p>
-                      <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required className="h-11 text-xs rounded-xl" />
-                      <p className="text-xs text-amber-500 mt-1">Batas akhir akses</p>
-                    </div>
+              {/* Status Pemilihan di Bottom Pane Kiri */}
+              <div className="p-2.5 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shrink-0 text-xs">
+                {formValues.examId ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-neutral-500 truncate max-w-[200px]">
+                      Terpilih: <b className="text-neutral-800 dark:text-neutral-200">{exams.find((x: any) => x.id === formValues.examId)?.title || "Soal"}</b>
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                      Siap
+                    </span>
                   </div>
-                </div>
-
-                {/* Aturan */}
-                <div>
-                  <p className="text-sm font-semibold text-slate-400 mb-1">Aturan</p>
-                  
-                  {/* Baris 1: Durasi, Cheat, Kumpul */}
-                  <div className="grid grid-cols-3 gap-2.5 mb-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-400 mb-1">Durasi (mnt)</p>
-                      <Input type="number" value={formValues.duration || ""} onChange={(e) => handleDurationChange(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} required className="h-11 text-xs rounded-xl font-medium" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-400 mb-1">Batas Cheat</p>
-                      <Input type="number" value={formValues.cheat_limit || ""} onChange={(e) => setFormValues({ ...formValues, cheat_limit: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })} required className="h-11 text-xs rounded-xl font-medium" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-400 mb-1">Kumpul Dibuka</p>
-                      <Input type="number" placeholder="Kapan saja" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })} className="h-11 text-xs rounded-xl font-medium" />
-                      <p className="text-xs text-slate-400 mt-0.5">Kosongkan = kapan saja</p>
-                    </div>
-                  </div>
-
-                  {/* Baris 2: Jumlah Soal, Acak Soal & Opsi, Tampilkan Hasil */}
-                  <div className="grid grid-cols-3 gap-2.5">
-                    {/* Kolom 1: Jumlah Soal Ditampilkan */}
-                    <div>
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <p className="text-sm font-semibold text-slate-400">Jumlah Soal</p>
-                        {formValues.examId && examQuestionCounts[formValues.examId] !== undefined && (
-                          <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                            Bank: {examQuestionCounts[formValues.examId]}
-                          </span>
-                        )}
-                      </div>
-                      <Input
-                        type="number"
-                        placeholder="0 = Semua"
-                        value={formValues.max_questions || ""}
-                        onChange={(e) => setFormValues({ ...formValues, max_questions: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })}
-                        className="h-11 text-xs rounded-xl font-medium"
-                      />
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {formValues.max_questions && formValues.max_questions > 0
-                          ? `Tampilkan ${formValues.max_questions} soal.`
-                          : "0 = Semua soal."}
-                      </p>
-                    </div>
-
-                    {/* Kolom 2: Acak Soal & Pilihan Jawaban */}
-                    <div>
-                      <p className="text-sm font-semibold text-slate-400 mb-1">Pengacakan</p>
-                      <label className="flex items-center justify-between h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors select-none">
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate pr-1">Acak Soal</span>
-                        <div className="relative inline-flex items-center shrink-0">
-                          <input type="checkbox" className="sr-only peer" checked={formValues.randomize_questions !== false} onChange={(e) => setFormValues({ ...formValues, randomize_questions: e.target.checked })} />
-                          <div className="w-9 h-5 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-xs" />
-                        </div>
-                      </label>
-                      <p className="text-xs text-slate-400 mt-0.5">Acak butir & opsi A–E</p>
-                    </div>
-
-                    {/* Kolom 3: Tampilkan Hasil Ujian */}
-                    <div>
-                      <p className="text-sm font-semibold text-slate-400 mb-1">Hasil Ujian</p>
-                      <label className="flex items-center justify-between h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors select-none">
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate pr-1">Tampilkan</span>
-                        <div className="relative inline-flex items-center shrink-0">
-                          <input type="checkbox" className="sr-only peer" checked={formValues.show_result !== false} onChange={(e) => setFormValues({ ...formValues, show_result: e.target.checked })} />
-                          <div className="w-9 h-5 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-xs" />
-                        </div>
-                      </label>
-                      <p className="text-xs text-slate-400 mt-0.5">Siswa melihat nilai</p>
-                    </div>
-                  </div>
-                </div>
-
+                ) : (
+                  <span className="text-[11px] text-rose-500 font-medium">
+                    ⚠️ Silakan klik salah satu bank soal di atas.
+                  </span>
+                )}
               </div>
+
             </div>
 
-            {/* Row 3: Target Kelas — full width */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-sm font-semibold text-slate-400">Target Kelas</p>
-                <div className="flex rounded-md overflow-hidden border border-slate-200 dark:border-slate-700 text-xs font-semibold">
-                  <button type="button" onClick={() => setFormValues({ ...formValues, allClasses: true, classId: "" })}
-                    className={`px-3 py-1 transition-colors ${formValues.allClasses ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
-                    Semua Kelas
-                  </button>
-                  <button type="button" onClick={() => setFormValues({ ...formValues, allClasses: false })}
-                    className={`px-3 py-1 border-l border-slate-200 dark:border-slate-700 transition-colors ${!formValues.allClasses ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
-                    Pilih Parsial
-                  </button>
-                </div>
+            {/* Pane Kanan: Konfigurasi Ruang & Jadwal (col-span-7) */}
+            <div className="md:col-span-7 flex flex-col min-h-0 bg-white dark:bg-[#0c0d0e]">
+
+              {/* Header Pane Kanan */}
+              <div className="p-3 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between shrink-0">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                  2. Konfigurasi Ruangan & Aturan
+                </span>
+                <span className="text-[10px] text-neutral-400">
+                  Sesuaikan parameter ujian
+                </span>
               </div>
-              {formValues.allClasses ? (
-                <p className="text-xs text-slate-400">Semua {examClasses.length} kelas aktif mengikuti ujian ini.</p>
-              ) : (
-                <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 bg-white dark:bg-slate-900">
-                  <div className="flex flex-wrap gap-1.5">
-                    {[...examClasses].sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true })).map((c: any) => {
-                      const isChecked = formValues.classId ? formValues.classId.split(",").includes(c.id) : false;
-                      return (
-                        <button key={c.id} type="button" onClick={(e) => handleClassToggle(c.id, !isChecked, e.shiftKey)}
-                          className={cn("px-2.5 py-1 rounded-full text-xs font-semibold border transition-all active:scale-95 select-none",
-                            isChecked ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400"
-                          )}
-                        >{c.name}</button>
-                      );
-                    })}
+
+              {/* Scrollable Form Body */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                {isEditRestricted && (
+                  <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 p-2.5 rounded-md text-xs">
+                    <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    <span>Ujian berlangsung. Beberapa konfigurasi bank soal dikunci agar tidak merusak data siswa.</span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2">Shift+klik untuk rentang</p>
-                </div>
+                )}
+
+                <form id="room-form" onSubmit={handleSubmit} className="space-y-5">
+
+                  {/* 1. Nama Ruangan */}
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                      Nama Ruang Ujian <span className="text-rose-500">*</span>
+                    </label>
+                    <Input
+                      placeholder="Contoh: Gelombang 1 / Kelas X MIPA"
+                      value={formValues.room_name}
+                      onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })}
+                      required
+                      className="h-8.5 text-xs rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                    />
+                    <p className="text-[11px] text-neutral-400 mt-1">Nama ini akan muncul pada kartu tes dan portal login siswa.</p>
+                  </div>
+
+                  {/* 2. Jadwal Pelaksanaan */}
+                  <div className="pt-2 border-t border-neutral-100 dark:border-neutral-850">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 mb-2.5">
+                      <Calendar className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>Jadwal Pelaksanaan</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-1">
+                          Waktu Mulai
+                        </label>
+                        <Input
+                          type="datetime-local"
+                          value={formValues.start_time}
+                          onChange={(e) => handleStartTimeChange(e.target.value)}
+                          required
+                          className="h-8 text-xs font-mono rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                        />
+                        {/* Quick Presets */}
+                        <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                          <span className="text-[10px] text-neutral-400 mr-0.5">Preset:</span>
+                          {[
+                            { label: "Skrg", handler: handleSetNow },
+                            { label: "07:45", h: 7, m: 45 },
+                            { label: "09:40", h: 9, m: 40 },
+                            { label: "10:10", h: 10, m: 10 },
+                            { label: "11:40", h: 11, m: 40 },
+                          ].map((p) => (
+                            <button
+                              key={p.label}
+                              type="button"
+                              onClick={p.handler ?? (() => {
+                                const s = new Date(); s.setHours(p.h!, p.m!, 0, 0);
+                                setFormValues(prev => ({ ...prev, start_time: formatLocalDateTime(s), end_time: formatLocalDateTime(new Date(s.getTime() + prev.duration * 60000)) }));
+                              })}
+                              className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 transition-colors cursor-pointer"
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-1">
+                          Waktu Berakhir
+                        </label>
+                        <Input
+                          type="datetime-local"
+                          value={formValues.end_time}
+                          onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })}
+                          required
+                          className="h-8 text-xs font-mono rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                        />
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Batas akhir akses token sesi pengerjaan.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Durasi, Integritas & Parameter */}
+                  <div className="pt-2 border-t border-neutral-100 dark:border-neutral-850">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 mb-2.5">
+                      <Clock className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>Durasi & Integritas Ujian</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-1">
+                          Durasi (Menit)
+                        </label>
+                        <Input
+                          type="number"
+                          value={formValues.duration || ""}
+                          onChange={(e) => handleDurationChange(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
+                          required
+                          className="h-8 text-xs font-mono rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-1">
+                          Toleransi Cheat
+                        </label>
+                        <Input
+                          type="number"
+                          value={formValues.cheat_limit || ""}
+                          onChange={(e) => setFormValues({ ...formValues, cheat_limit: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })}
+                          required
+                          className="h-8 text-xs font-mono rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-0.5">x keluar aplikasi</p>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-1">
+                          Kumpul Dibuka
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="0 = Kapan saja"
+                          value={formValues.submit_window || ""}
+                          onChange={(e) => setFormValues({ ...formValues, submit_window: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })}
+                          className="h-8 text-xs font-mono rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-0.5">Menit ke-</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4. Distribusi Soal & Pengacakan */}
+                  <div className="pt-2 border-t border-neutral-100 dark:border-neutral-850">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                            Jumlah Butir Soal
+                          </label>
+                          {formValues.examId && examQuestionCounts[formValues.examId] !== undefined && (
+                            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                              Max {examQuestionCounts[formValues.examId]}
+                            </span>
+                          )}
+                        </div>
+                        <Input
+                          type="number"
+                          placeholder="0 = Semua"
+                          value={formValues.max_questions || ""}
+                          onChange={(e) => setFormValues({ ...formValues, max_questions: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })}
+                          className="h-8 text-xs font-mono rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-0.5">
+                          {formValues.max_questions && formValues.max_questions > 0
+                            ? `Ambil acak ${formValues.max_questions} soal`
+                            : "Semua soal diujikan"}
+                        </p>
+                      </div>
+
+                      {/* Acak Soal Toggle */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-1">
+                          Pengacakan Soal
+                        </label>
+                        <label className="flex items-center justify-between h-8 px-2.5 rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-850 cursor-pointer transition-colors select-none">
+                          <span className="text-xs text-neutral-700 dark:text-neutral-300">Acak Butir & Opsi</span>
+                          <div className="relative inline-flex items-center shrink-0">
+                            <input
+                              type="checkbox"
+                              className="sr-only peer"
+                              checked={formValues.randomize_questions !== false}
+                              onChange={(e) => setFormValues({ ...formValues, randomize_questions: e.target.checked })}
+                            />
+                            <div className="w-7 h-4 bg-neutral-300 dark:bg-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:bg-emerald-500 peer-checked:after:translate-x-3 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all shadow-2xs" />
+                          </div>
+                        </label>
+                        <p className="text-[10px] text-neutral-400 mt-0.5">Acak urutan A–E & butir</p>
+                      </div>
+
+                      {/* Hasil Ujian Toggle */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-1">
+                          Hasil ke Peserta
+                        </label>
+                        <label className="flex items-center justify-between h-8 px-2.5 rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-850 cursor-pointer transition-colors select-none">
+                          <span className="text-xs text-neutral-700 dark:text-neutral-300">Tampilkan Nilai</span>
+                          <div className="relative inline-flex items-center shrink-0">
+                            <input
+                              type="checkbox"
+                              className="sr-only peer"
+                              checked={formValues.show_result !== false}
+                              onChange={(e) => setFormValues({ ...formValues, show_result: e.target.checked })}
+                            />
+                            <div className="w-7 h-4 bg-neutral-300 dark:bg-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:bg-emerald-500 peer-checked:after:translate-x-3 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all shadow-2xs" />
+                          </div>
+                        </label>
+                        <p className="text-[10px] text-neutral-400 mt-0.5">Siswa dapat melihat skor</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5. Target Kelas */}
+                  <div className="pt-2 border-t border-neutral-100 dark:border-neutral-850">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                          Target {terminology.class}
+                        </span>
+                        <p className="text-[11px] text-neutral-400">
+                          {formValues.allClasses
+                            ? `Seluruh ${examClasses.length} kelas aktif diikutsertakan ke ruangan ini.`
+                            : "Pilih kelas spesifik yang dapat mengakses ruangan."}
+                        </p>
+                      </div>
+
+                      <div className="inline-flex p-0.5 rounded-md bg-neutral-100 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setFormValues({ ...formValues, allClasses: true, classId: "" })}
+                          className={cn(
+                            "px-2.5 py-1 rounded text-xs transition-colors cursor-pointer",
+                            formValues.allClasses
+                              ? "bg-white dark:bg-neutral-900 font-semibold text-neutral-900 dark:text-neutral-100 shadow-2xs"
+                              : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                          )}
+                        >
+                          Semua Kelas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormValues({ ...formValues, allClasses: false })}
+                          className={cn(
+                            "px-2.5 py-1 rounded text-xs transition-colors cursor-pointer",
+                            !formValues.allClasses
+                              ? "bg-white dark:bg-neutral-900 font-semibold text-neutral-900 dark:text-neutral-100 shadow-2xs"
+                              : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                          )}
+                        >
+                          Pilih Parsial
+                        </button>
+                      </div>
+                    </div>
+
+                    {!formValues.allClasses && (
+                      <div className="border border-neutral-200 dark:border-neutral-800 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-neutral-900/40">
+                        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                          {[...examClasses]
+                            .sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true }))
+                            .map((c: any) => {
+                              const isChecked = formValues.classId ? formValues.classId.split(",").includes(c.id) : false;
+                              return (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={(e) => handleClassToggle(c.id, !isChecked, e.shiftKey)}
+                                  className={cn(
+                                    "px-2 py-0.5 rounded text-xs font-medium border transition-colors select-none cursor-pointer",
+                                    isChecked
+                                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/40 font-semibold"
+                                      : "bg-white dark:bg-neutral-850 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700"
+                                  )}
+                                >
+                                  {c.name}
+                                </button>
+                              );
+                            })}
+                        </div>
+                        <p className="text-[10px] text-neutral-400 mt-2">
+                          💡 Tahan <kbd className="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 font-mono text-[9px]">Shift</kbd> + klik untuk rentang kelas.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                </form>
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* 3. Footer Sticky */}
+          <div className="px-5 py-3 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/90 dark:bg-neutral-900/60 backdrop-blur-xs flex items-center justify-between shrink-0">
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-md hidden sm:block">
+              {formValues.examId ? (
+                <span>Siap meluncurkan ujian dengan bank soal terpilih.</span>
+              ) : (
+                <span className="text-rose-500">Pilih bank soal di kolom kiri untuk melanjutkan.</span>
               )}
             </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                type="button"
+                onClick={() => setIsDialogOpen(false)}
+                className="h-8 px-3.5 rounded-md text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                form="room-form"
+                disabled={!formValues.examId}
+                className="h-8 px-4 rounded-md font-semibold text-xs bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white transition-colors shadow-xs disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+              >
+                {dialogMode === "edit" ? "Perbarui Ruangan" : "Buka Ruangan"}
+              </button>
+            </div>
+          </div>
 
-          </form>
         </DialogContent>
       </Dialog>
 
@@ -1818,24 +2341,30 @@ const ExamRoomsPage = () => {
 
       {/* Modal Daftar Kelas (Jika banyak) */}
       <Dialog open={!!showClassesRoom} onOpenChange={(open) => !open && setShowClassesRoom(null)}>
-        <DialogContent className="max-w-sm bg-card rounded-2xl overflow-hidden p-0 border-none shadow-2xl">
-          <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 text-white relative">
-            <Users className="h-12 w-12 opacity-10 absolute right-4 top-4" />
-            <h3 className="text-lg font-bold mb-1">Daftar {terminology.class}</h3>
-            <p className="text-indigo-100 text-xs opacity-80">Ruangan: {showClassesRoom?.room_name || showClassesRoom?.examTitle}</p>
+        <DialogContent className="max-w-md bg-white dark:bg-[#0c0d0e] rounded-xl overflow-hidden p-0 border border-neutral-200 dark:border-neutral-800 shadow-2xl">
+          <div className="px-5 py-3.5 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50">
+            <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+              <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              Daftar {terminology.class} Terdaftar
+            </h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+              Ruang: {showClassesRoom?.room_name || showClassesRoom?.examTitle}
+            </p>
           </div>
-          <div className="p-6 max-h-[60vh] overflow-y-auto bg-white dark:bg-slate-950">
-            <div className="flex flex-wrap gap-2">
+          <div className="p-4 max-h-[55vh] overflow-y-auto">
+            <div className="flex flex-wrap gap-1.5">
               {(showClassesRoom?.className || "").split(", ").map((cls, idx) => (
-                <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
-                  <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{cls}</span>
+                <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  <span>{cls}</span>
                 </div>
               ))}
             </div>
           </div>
-          <DialogFooter className="p-4 bg-slate-50 dark:bg-slate-900/50">
-            <Button onClick={() => setShowClassesRoom(null)} variant="outline" className="w-full rounded-xl font-bold h-11">Tutup</Button>
+          <DialogFooter className="p-3 bg-neutral-50/70 dark:bg-neutral-900/50 border-t border-neutral-200 dark:border-neutral-800">
+            <Button onClick={() => setShowClassesRoom(null)} variant="outline" className="w-full h-8 text-xs font-semibold rounded-md border-neutral-200 dark:border-neutral-800">
+              Tutup
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,5 +1,5 @@
 import { getOnlineFlag } from "../../lib/network";
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   RefreshCw,
   Users,
@@ -22,11 +22,22 @@ import {
   Settings,
   Timer,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  Download,
+  SlidersHorizontal,
+  CheckSquare,
+  FileText
 } from "lucide-react";
-import { Sparkles, RotateCcw, Copy, Check, Pencil, ClipboardPaste, Zap, BarChart2 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Sparkles, RotateCcw, Copy, Check, Pencil, ClipboardPaste, Zap, BarChart2, ExternalLink } from "lucide-react";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator
+} from "../../components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Skeleton } from "../../components/ui/skeleton";
@@ -46,6 +57,21 @@ import { EditAnswerDialog, EditAnswerDialogState } from "./monitoring/components
 import { StudentTable } from "./monitoring/components/StudentTable";
 import { QuickGradeDialog } from "./monitoring/components/QuickGradeDialog";
 import { countUniqueOngoingStudents } from "../../lib/attemptStats";
+import {
+  NeonInspector,
+  InspectorSection,
+  InspectorHeader,
+  InspectorField,
+  InspectorGrid,
+  InspectorActions,
+  InspectorButton,
+  InspectorCard,
+  InspectorEmpty,
+} from "../../components/ui/NeonInspector";
+import { NeonPageHeader } from "../../components/ui/NeonPageHeader";
+import { NeonBadge } from "../../components/ui/NeonBadge";
+import { NeonTabs } from "../../components/ui/NeonTabs";
+import { NeonStatGrid, NeonStatCard } from "../../components/ui/NeonStats";
 
 
 const MonitoringPage = () => {
@@ -61,7 +87,7 @@ const MonitoringPage = () => {
 
   const { user, role } = useAuth();
   const { pb, terminology } = useTenant();
-  const { classes: examClasses, students, subjects, teachers: masterTeachers, teacherFullAccess, loading: dataLoading } = useExamData();
+  const { classes: examClasses, students, subjects, teachers: masterTeachers, teacherFullAccess, universalToken, timeLeft, loading: dataLoading } = useExamData();
 
   const [loading, setLoading] = useState(true);
   const isLoading = loading || dataLoading;
@@ -84,6 +110,11 @@ const MonitoringPage = () => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [expandedstudent, setExpandedstudent] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  // Tabs, and Inspector State (Neon Console parity with ExamRoomsPage)
+  const [statusTab, setStatusTab] = useState<"all" | "ongoing" | "finished" | "absent" | "locked">("all");
+  const [inspectedStudentId, setInspectedStudentId] = useState<string | null>(null);
+  const [copiedUniversalToken, setCopiedUniversalToken] = useState(false);
 
   const [monitorPage, setMonitorPage] = useState(1);
   const [monitorPageSize, setMonitorPageSize] = useState(25);
@@ -1201,596 +1232,641 @@ const MonitoringPage = () => {
     );
   }
 
+  // Filter and compute statistics
+  const eligibleStudents = useMemo(() => {
+    return students.filter((s: any) => {
+      if (monitorRoom?.allClasses) {
+        if (monitorClassFilter !== "all" && examClasses.find((c: any) => c.id === s.classId)?.name !== monitorClassFilter) return false;
+        return true;
+      }
+      const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
+      if (!allowedIds.includes(s.classId)) return false;
+      if (monitorClassFilter !== "all" && examClasses.find((c: any) => c.id === s.classId)?.name !== monitorClassFilter) return false;
+      return true;
+    });
+  }, [students, monitorRoom, monitorClassFilter, examClasses]);
+
+  const eligibleIds = useMemo(() => new Set(eligibleStudents.map((s: any) => s.id)), [eligibleStudents]);
+
+  const filteredAttempts = useMemo(() => attempts.filter((a: any) => eligibleIds.has(a.studentId || a.student_id)), [attempts, eligibleIds]);
+  const ongoingCount = useMemo(() => countUniqueOngoingStudents(filteredAttempts), [filteredAttempts]);
+  const finishedCount = useMemo(() => filteredAttempts.filter((a: any) => a.status === 'finished' || a.status === 'submitted' || a.status === 'graded').length, [filteredAttempts]);
+  const lockedCount = useMemo(() => filteredAttempts.filter((a: any) => a.status === 'LOCKED').length, [filteredAttempts]);
+
+  const useBackendStats = detailStats !== null && monitorClassFilter === "all";
+  const dispOngoing = useBackendStats ? detailStats.ongoing : ongoingCount;
+  const dispFinished = useBackendStats ? detailStats.finished : finishedCount;
+
+  const absentList = useMemo(() => eligibleStudents
+    .filter((s: any) => !filteredAttempts.find((a: any) => (a.studentId || a.student_id) === s.id))
+    .sort((a: any, b: any) => {
+      const ca = examClasses.find((c: any) => c.id === a.classId)?.name || "";
+      const cb = examClasses.find((c: any) => c.id === b.classId)?.name || "";
+      return ca.localeCompare(cb) || a.name.localeCompare(b.name);
+    }), [eligibleStudents, filteredAttempts, examClasses]);
+  const absentCount = absentList.length;
+
+  const inspectedStudent = useMemo(() => {
+    if (inspectedStudentId) {
+      const found = students.find(s => s.id === inspectedStudentId);
+      if (found) {
+        return {
+          ...found,
+          className: examClasses.find(c => c.id === found.classId)?.name || found.className || "-"
+        };
+      }
+    }
+    const first = eligibleStudents[0];
+    if (first) {
+      return {
+        ...first,
+        className: examClasses.find(c => c.id === first.classId)?.name || first.className || "-"
+      };
+    }
+    return null;
+  }, [inspectedStudentId, students, eligibleStudents, examClasses]);
+
+  const inspectedAttempt = useMemo(() => {
+    if (!inspectedStudent) return null;
+    return attempts.find(a => (a.studentId || a.student_id) === inspectedStudent.id) || null;
+  }, [inspectedStudent, attempts]);
+
+  // Auto-select first student when data loads
+  useEffect(() => {
+    if (!inspectedStudentId && eligibleStudents.length > 0) {
+      setInspectedStudentId(eligibleStudents[0].id);
+    }
+  }, [eligibleStudents, inspectedStudentId]);
+
   return (
-    <div className="space-y-5 animate-in fade-in duration-500">
-      {/* HEADER SECTION - Clean & Professional */}
-      <div className="bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm transition-all duration-300">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/admin/ruang-ujian")}
-              className="h-10 w-10 rounded-xl border border-slate-200/60 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0"
-            >
-              <ArrowLeft className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-            </Button>
-            <div className="space-y-0.5 min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white tracking-tight">
-                  {isLoading ? <Skeleton className="h-7 w-48" /> : `Monitoring: ${monitorRoom?.room_name || "Tanpa Nama"}`}
-                </h1>
-                {!isLoading && (
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-md border border-emerald-100 dark:border-emerald-800/40">
-                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Live</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <BookOpen className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                  <span className="font-medium truncate max-w-[140px] md:max-w-xs">{isLoading ? <Skeleton className="h-3 w-32" /> : monitorRoom?.subjectName}</span>
-                </div>
-                <span className="text-slate-300 dark:text-slate-700">|</span>
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                  <span className="font-bold truncate max-w-[180px] md:max-w-md">{isLoading ? <Skeleton className="h-3 w-36" /> : `Bank Soal: ${monitorRoom?.examTitle || "Tanpa Nama"}`}</span>
-                </div>
-                <span className="text-slate-300 dark:text-slate-700">|</span>
-                <div className="flex flex-wrap gap-1">
-                  {(function () {
-                    if (isLoading || !monitorRoom) return <Skeleton className="h-4 w-20 rounded-md" />;
+    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+      <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
 
-                    const ids = Array.isArray(monitorRoom.classId) ? monitorRoom.classId : String(monitorRoom.classId || "").split(",");
-                    if (monitorRoom.allClasses) return <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">Semua Kelas</span>;
-
-                    const names = ids.map(id => examClasses.find(c => c.id === id)?.name).filter(Boolean);
-                    return names.length > 0 ? (
-                      <span className="font-medium truncate max-w-[150px]">{names.join(", ")}</span>
-                    ) : <span className="italic">Tidak ada kelas</span>;
-                  })()}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5 self-stretch sm:self-end md:self-center">
-            <div className="flex items-center justify-between sm:justify-start gap-3 bg-slate-50 dark:bg-slate-900/60 pl-3.5 pr-1.5 py-1.5 rounded-2xl border border-slate-200/60 dark:border-slate-800/60 w-full sm:w-auto">
-              <div className="flex flex-col text-left">
-                <div className="flex items-center gap-1.5 leading-none">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    Auto-Sync
-                  </span>
-                  <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
-                    {isLoading ? "--" : `${monitorTimeLeft}s`}
-                  </span>
-                </div>
-                <span className="text-xs text-slate-400 dark:text-slate-500 font-medium leading-none mt-1">
-                  {lastSyncTime ? `Diperbarui ${lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : "Menghubungkan..."}
-                </span>
-              </div>
-
-              <Button
-                onClick={() => handleTriggerManualRefresh()}
-                disabled={isMonitorRefreshing}
-                size="sm"
-                variant="ghost"
-                title="Segarkan data pengerjaan, skor, dan status siswa sekarang"
-                aria-label="Segarkan data monitoring"
-                className={`h-8 px-2.5 rounded-xl font-medium text-xs transition-all flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 shadow-xs ${
-                  isMonitorRefreshing
-                    ? "text-blue-600 dark:text-blue-400 cursor-not-allowed"
-                    : "text-slate-700 dark:text-slate-200 hover:text-blue-600 hover:border-blue-300 dark:hover:border-blue-700"
-                }`}
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${isMonitorRefreshing ? "animate-spin text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"}`} />
-                <span>{isMonitorRefreshing ? "Memuat..." : "Segarkan"}</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 📊 Session Summary Cards - Now at the Top */}
-      {(() => {
-        // Helper: siswa eligible berdasarkan room + filter kelas aktif
-        const eligibleStudents = students.filter(s => {
-          if (monitorRoom?.allClasses) {
-            if (monitorClassFilter !== "all" && examClasses.find(c => c.id === s.classId)?.name !== monitorClassFilter) return false;
-            return true;
+        {/* ═══════════════════════════════════════════════════════════════
+            1. TOP HEADER BAR (Simplified, Clean & Responsive)
+           ═══════════════════════════════════════════════════════════════ */}
+        <NeonPageHeader
+          bordered
+          onBack={() => navigate("/admin/ruang-ujian")}
+          backTitle="Kembali ke Ruang Ujian"
+          title={isLoading ? <Skeleton className="h-6 w-44 inline-block" /> : (monitorRoom?.room_name || "Monitoring Ujian")}
+          badge={
+            !isLoading ? (
+              <NeonBadge variant="emerald" pulse>
+                LIVE
+              </NeonBadge>
+            ) : null
           }
-          const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
-          if (!allowedIds.includes(s.classId)) return false;
-          if (monitorClassFilter !== "all" && examClasses.find(c => c.id === s.classId)?.name !== monitorClassFilter) return false;
-          return true;
-        });
-        const eligibleIds = new Set(eligibleStudents.map(s => s.id));
+          breadcrumbs={
+            <>
+              <Link to="/admin/ruang-ujian" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors shrink-0">
+                Ruang Ujian
+              </Link>
+              <span>/</span>
+              <span className="font-medium text-neutral-700 dark:text-neutral-300 shrink-0">
+                {isLoading ? "..." : (monitorRoom?.subjectName || "Mapel")}
+              </span>
+              <span>•</span>
+              <span className="truncate max-w-[280px] sm:max-w-[400px]">{roomClassLabel}</span>
+            </>
+          }
+          actions={
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+            {/* 1. Penilaian Button (Direct Access) */}
+            <button
+              type="button"
+              onClick={() => navigate(`/admin/penilaian?roomId=${roomId || ""}`)}
+              className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+              title="Buka Lembar Penilaian & Koreksi Nilai Ruangan"
+            >
+              <CheckSquare className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>Penilaian</span>
+            </button>
 
-        // Filter attempts hanya untuk siswa eligible
-        const filteredAttempts = attempts.filter(a => eligibleIds.has(a.studentId || a.student_id));
+            {/* 2. Analisis Butir Button (Direct Access) */}
+            <button
+              type="button"
+              onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${roomId || ""}&examId=${monitorRoom?.examId || ""}`)}
+              className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+              title="Buka Analisis Butir Soal & Rekap Nilai Ruangan"
+            >
+              <BarChart2 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+              <span>Analisis Butir</span>
+            </button>
 
-        // "Sedang Ujian" = SISWA UNIK dengan attempt ongoing (definisi kanonis,
-        // sama seperti yang dipakai ExamRoomsPage via lib/attemptStats).
-        // Dedupe: satu siswa dengan 2 attempt ongoing tetap dihitung 1.
-        const ongoingCount = countUniqueOngoingStudents(filteredAttempts);
-        const finishedCount = filteredAttempts.filter(a => a.status === 'finished' || a.status === 'submitted' || a.status === 'graded').length;
-        const lockedCount = filteredAttempts.filter(a => a.status === 'LOCKED').length;
-
-        // Preferensi: angka agregasi backend (/api/room-detail-stats) bila tidak
-        // ada filter kelas — definisinya identik (siswa unik + eligible), tapi
-        // dihitung di SQL tanpa menunggu fetch attempts selesai.
-        const useBackendStats = detailStats !== null && monitorClassFilter === "all";
-        const dispOngoing = useBackendStats ? detailStats.ongoing : ongoingCount;
-        const dispFinished = useBackendStats ? detailStats.finished : finishedCount;
-
-        const absentList = eligibleStudents
-          .filter(s => !filteredAttempts.find(a => (a.studentId || a.student_id) === s.id))
-          .sort((a, b) => {
-            const ca = examClasses.find(c => c.id === a.classId)?.name || "";
-            const cb = examClasses.find(c => c.id === b.classId)?.name || "";
-            return ca.localeCompare(cb) || a.name.localeCompare(b.name);
-          });
-
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-            {/* Total Peserta */}
-            <div className="group bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-blue-500/30 transition-all flex items-center justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
-                  <Users className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Total Peserta</p>
-                  <h4 className="text-xl font-black text-slate-800 dark:text-white leading-none">
-                    {isLoading ? <Skeleton className="h-6 w-12" /> : eligibleStudents.length}
-                  </h4>
-                </div>
-              </div>
-            </div>
-
-            {/* Sedang Ujian */}
-            <div className="group bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-emerald-500/30 transition-all flex items-center justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                  <Monitor className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Sedang Ujian</p>
-                  <h4 className="text-xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
-                    {isLoading ? <Skeleton className="h-6 w-8" /> : dispOngoing}
-                  </h4>
-                </div>
-              </div>
-            </div>
-
-            {/* Selesai */}
-            <div className="group relative bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-blue-500/30 transition-all flex items-center justify-between cursor-default">
-              <div className="flex items-center gap-3.5">
-                <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Selesai</p>
-                  {isLoading ? <Skeleton className="h-6 w-16" /> : (
-                    <h4 className="text-xl font-black text-blue-600 dark:text-blue-400 leading-none">
-                      {dispFinished}<span className="text-sm font-bold text-slate-400">/{eligibleStudents.length}</span>
-                    </h4>
-                  )}
-                </div>
-              </div>
-
-              {/* Hover popup — siswa belum ujian */}
-              {!isLoading && absentList.length > 0 && (
-                <div className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm p-3 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 translate-y-1 group-hover:translate-y-0">
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 px-1">
-                    Belum Ujian ({absentList.length} siswa)
-                  </p>
-                  <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
-                    {absentList.map(s => {
-                      const cls = examClasses.find(c => c.id === s.classId)?.name || "-";
-                      return (
-                        <div key={s.id} className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800">
-                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[160px]">{s.name}</span>
-                          <span className="text-xs font-bold text-slate-400 shrink-0 ml-2">{cls}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Terkunci */}
-            <div className="group bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-rose-500/30 transition-all flex items-center justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform">
-                  <Lock className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Terkunci</p>
-                  <h4 className="text-xl font-black text-rose-600 dark:text-rose-400 leading-none">
-                    {isLoading ? <Skeleton className="h-6 w-6" /> : lockedCount}
-                  </h4>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* SIDEBAR - Enhanced & Integrated */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-6 h-fit sticky top-6">
-            <div>
-              <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 flex items-center gap-2 mb-4 uppercase tracking-widest pl-1 border-l-2 border-blue-500 ml-1">
-                Panel Filter & Aksi
-              </h3>
-            </div>
-
-            <div className="pt-6 border-t border-slate-100 dark:border-slate-800/60 space-y-5">
-              <div className="space-y-4">
-                <div className="relative group">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                  <input
-                    type="text"
-                    placeholder={`Cari ${terminology.student.toLowerCase()}...`}
-                    value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setMonitorPage(1); }}
-                    className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 pl-1">Filter {terminology.class}</label>
-                  <select
-                    value={monitorClassFilter}
-                    onChange={(e) => { setMonitorClassFilter(e.target.value); setMonitorPage(1); }}
-                    className="w-full text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/10 appearance-none cursor-pointer text-slate-700 dark:text-slate-200"
-                  >
-                    <option value="all">Semua {terminology.class}</option>
-                    {examClasses
-                      .filter(c => {
-                        if (monitorRoom?.allClasses) return true;
-                        const ids = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
-                        return ids.includes(c.id);
-                      })
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map(c => <option key={c.id} value={c.name}>{c.name}</option>)
-                    }
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 pl-1">Urutan</label>
-                  <select
-                    value={monitorSortBy}
-                    onChange={(e) => { setMonitorSortBy(e.target.value as any); setMonitorPage(1); }}
-                    className="w-full text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/10 appearance-none cursor-pointer text-slate-700 dark:text-slate-200"
-                  >
-                    <option value="status">Status Ujian</option>
-                    <option value="nama">Nama</option>
-                    <option value="nilai">Nilai</option>
-                    <option value="login">Login</option>
-                    <option value="monitoring">Monitoring</option>
-                    <option value="default">Default</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 space-y-4">
-                {/* 📊 Kelompok: Navigasi & Live */}
-                <div className="space-y-1.5">
-                  <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Link & Analisis</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => { sessionStorage.setItem("activeGradingRoomId", roomId || ""); navigate("/admin/penilaian"); }}
-                      className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-bold text-xs py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
-                    >
-                      <BookOpen className="h-3.5 w-3.5 shrink-0 text-indigo-500" /> Penilaian
-                    </button>
-                    <button
-                      onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${roomId || ""}&examId=${monitorRoom?.examId || ""}`)}
-                      className="w-full col-span-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:border-blue-800/40 text-blue-700 font-bold text-xs py-2 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight"
-                    >
-                      <BarChart2 className="h-3.5 w-3.5 text-blue-600 shrink-0" /> Analisis Butir Soal (Item Analysis)
-                    </button>
-                  </div>
-                </div>
-
-                {/* 📥 Kelompok: Export Laporan */}
-                <div className="space-y-1.5">
-                  <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Unduh Laporan</span>
-                  {monitorQuestions.some((q: any) => q.type === "uraian") ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={handleExportExcel}
-                        className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold text-xs py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
-                      >
-                        <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> Excel
-                      </button>
-                      <button
-                        onClick={handleExportEssayExcel}
-                        className="w-full rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-100 dark:bg-teal-900/20 dark:text-teal-400 dark:hover:bg-teal-900/40 dark:border-teal-800/40 text-teal-700 font-bold text-xs py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
-                      >
-                        <FileSpreadsheet className="h-3.5 w-3.5 text-teal-600 shrink-0" /> Essay
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleExportExcel}
-                      className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold text-xs py-2 px-1.5 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
-                    >
-                      <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> Export Excel
-                    </button>
-                  )}
-                </div>
-
-                {/* 📝 Kelompok: Grading & Data */}
-                <div className="space-y-1.5">
-                  <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Penilaian & Siswa</span>
-                  {(role === "admin" || (role === "teacher" && teacherFullAccess)) && monitorQuestions.some((q: any) => q.type === "uraian") ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => { setQuickGradeOpen(true); }}
-                        className="w-full rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/40 dark:border-violet-800/40 text-violet-700 font-bold text-xs py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
-                      >
-                        <Zap className="h-3.5 w-3.5 text-violet-500 shrink-0" /> Quick Grade
-                      </button>
-                      <button
-                        onClick={handleCopyBelumUjian}
-                        className={`w-full rounded-xl border font-bold text-xs py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight ${waCopied
-                          ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
-                          : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"
-                          }`}
-                      >
-                        {waCopied ? <><Check className="h-3.5 w-3.5 shrink-0" /> Tersalin</> : <><Copy className="h-3.5 w-3.5 shrink-0" /> Belum Ujian</>}
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleCopyBelumUjian}
-                      className={`w-full rounded-xl border font-bold text-xs py-2 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight ${waCopied
-                        ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
-                        : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"
-                        }`}
-                    >
-                      {waCopied ? <><Check className="h-3.5 w-3.5 shrink-0" /> Tersalin!</> : <><Copy className="h-3.5 w-3.5 shrink-0" /> Salin Siswa Belum Ujian</>}
-                    </button>
-                  )}
-                </div>
-
-                {/* ⚠ Kelompok: Tindakan Massal (Admin/Full Teacher Only) */}
-                {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
-                  <div className="space-y-1.5">
-                    <span className="text-xs font-black text-rose-500/80 dark:text-rose-400/80 uppercase tracking-widest pl-1">Zona Bahaya (Aksi Massal)</span>
-                    <button
-                      onClick={handleOpenReopenAllFinishedDialog}
-                      disabled={attempts.filter(a => a.status === "finished").length === 0}
-                      className="w-full rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40 font-bold text-xs py-2.5 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight disabled:opacity-40 disabled:cursor-not-allowed mb-2"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                      Buka Semua yang Selesai ({attempts.filter(a => a.status === "finished").length})
-                    </button>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={handleForceSubmitAll}
-                        className="w-full rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/30 font-bold text-xs py-2.5 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
-                      >
-                        <Users className="h-3.5 w-3.5 text-rose-500 shrink-0" /> Selesai Semua
-                      </button>
-                      <button
-                        onClick={handleResetAllSessions}
-                        className="w-full rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-850/30 font-bold text-xs py-2.5 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 text-orange-500 shrink-0" /> Reset Sesi
-                      </button>
-                    </div>
-                  </div>
+            {/* 2. Laporan Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Laporan</span>
+                  <ChevronDown className="h-3 w-3 text-neutral-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer">
+                  <Download className="h-3.5 w-3.5 mr-2 text-emerald-600" /> Rekap Nilai Excel (.xlsx)
+                </DropdownMenuItem>
+                {monitorQuestions.some((q: any) => q.type === "uraian") && (
+                  <DropdownMenuItem onClick={handleExportEssayExcel} className="cursor-pointer">
+                    <BookOpen className="h-3.5 w-3.5 mr-2 text-blue-600" /> Jawaban Essay Excel (.xlsx)
+                  </DropdownMenuItem>
                 )}
-              </div>
-            </div>
+                <DropdownMenuItem onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${roomId || ""}&examId=${monitorRoom?.examId || ""}`)} className="cursor-pointer">
+                  <BarChart2 className="h-3.5 w-3.5 mr-2 text-purple-600" /> Analisis Butir Soal
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(`/admin/penilaian?roomId=${roomId || ""}`)} className="cursor-pointer">
+                  <CheckSquare className="h-3.5 w-3.5 mr-2 text-indigo-600" /> Lembar Penilaian & Rekap
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleCopyBelumUjian} className="cursor-pointer">
+                  <Copy className="h-3.5 w-3.5 mr-2 text-neutral-500" /> Salin Siswa Belum Ujian
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* 2. Aksi Massal Dropdown */}
+            {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-md shadow-xs transition-colors cursor-pointer"
+                  >
+                    <span>Aksi Massal</span>
+                    <ChevronDown className="h-3 w-3 text-neutral-400" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={handleOpenReopenAllFinishedDialog} className="cursor-pointer">
+                    <RotateCcw className="h-3.5 w-3.5 mr-2 text-emerald-600" /> Buka Semua Selesai
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleForceSubmitAll} className="cursor-pointer text-rose-600 focus:text-rose-600">
+                    <div className="h-1.5 w-1.5 rounded-full bg-rose-500 mr-2" /> Force Submit Semua
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleResetAllSessions} className="cursor-pointer text-rose-600 focus:text-rose-600">
+                    <div className="h-1.5 w-1.5 rounded-full bg-rose-500 mr-2" /> Reset Sesi Semua
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* 3. Interactive Sync Pill (Click to Refresh) */}
+            <button
+              type="button"
+              onClick={() => handleTriggerManualRefresh()}
+              disabled={isMonitorRefreshing}
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs font-mono rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+              title="Klik untuk segarkan data sekarang"
+            >
+              <RefreshCw className={cn("h-3 w-3", isMonitorRefreshing ? "animate-spin text-emerald-500" : "text-emerald-500")} />
+              <span className="font-sans font-medium text-neutral-500">Sync</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                {isLoading ? "--" : `${monitorTimeLeft}s`}
+              </span>
+            </button>
           </div>
-        </div>
+        }
+      />
 
-        <div className="lg:col-span-3">
-          {/* Formula Info (jika ada soal essay) */}
-          {monitorQuestions.some((q: any) => q.type === "uraian") && (
-            <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/40 rounded-2xl p-4 flex items-center gap-4 text-xs">
-              <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0">
-                <BookOpen className="w-4 h-4 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="font-black text-indigo-700 dark:text-indigo-300 text-xs uppercase tracking-widest mb-1">Rumus Penilaian (Bobot 60:40)</p>
-                <p className="text-indigo-600/80 dark:text-indigo-400/80 font-medium leading-relaxed">
-                  <span className="font-bold">Nilai Final</span> = (Skor Objektif × <span className="font-black">60%</span>) + (Skor Subjektif × <span className="font-black">40%</span>)
-                  <span className="mx-2 text-indigo-300">•</span>
-                  <span className="text-blue-600 dark:text-blue-400">O:{monitorQuestions.filter((q: any) => q.type !== "uraian").length} soal</span>
-                  <span className="mx-1 text-indigo-300">|</span>
-                  <span className="text-purple-600 dark:text-purple-400">S:{monitorQuestions.filter((q: any) => q.type === "uraian").length} soal</span>
-                </p>
-              </div>
-            </div>
-          )}
+        {/* ═══════════════════════════════════════════════════════════════
+            2. TWO-COLUMN GRID (Content + Inspector)
+           ═══════════════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-6 xl:gap-8 items-start">
 
-          <div className="bg-card rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden min-h-[500px]">
-            <div className="overflow-x-auto">
-              <StudentTable
-                students={students}
-                attempts={attempts}
-                monitorQuestions={monitorQuestions}
-                monitorRoom={monitorRoom}
-                terminology={terminology}
-                selectedStudentIds={selectedStudentIds}
-                setSelectedStudentIds={setSelectedStudentIds}
-                monitorSortBy={monitorSortBy}
-                monitorSortOrder={monitorSortOrder}
-                toggleSort={toggleSort}
-                monitorPage={monitorPage}
-                monitorPageSize={monitorPageSize}
-                monitorClassFilter={monitorClassFilter}
-                openMenuId={openMenuId}
-                setOpenMenuId={setOpenMenuId}
-                expandedstudent={expandedstudent}
-                setExpandedstudent={setExpandedstudent}
-                setPreviewImage={setPreviewImage}
-                getAttemptScore={getAttemptScore}
-                getLiveScore={getLiveScore}
-                handleForceSubmitStudent={handleForceSubmitStudent}
-                handleOpenReopenDialog={handleOpenReopenDialog}
-                handleUnlockStudent={handleUnlockStudent}
-                handleResetSession={handleResetSession}
-                handleResetCheatCount={handleResetCheatCount}
-                handleManualGrade={handleManualGrade}
-                handleClearOverride={handleClearOverride}
-                handleAIGrade={handleAIGrade}
-                setEditAnswerDialog={setEditAnswerDialog}
-                detailAnswers={detailAnswers}
-                answersList={answersList}
-                isLoading={isLoading}
-                examClasses={examClasses}
-                searchQuery={searchQuery}
-                roomId={roomId}
-                isLargeRoom={isLargeRoom}
-                pb={pb}
-                setDetailAnswers={setDetailAnswers}
-                role={role}
-                teacherFullAccess={teacherFullAccess}
-                aiGradingId={aiGradingId}
+          {/* ── LEFT COLUMN: Horizontal Tabs, Metric Cards, Formula, NeonTable ── */}
+          <div className="min-w-0 space-y-6">
+
+            {/* 2. Signature Neon Horizontal Tabs: Status Peserta */}
+            <NeonTabs
+              activeTab={statusTab}
+              onChange={setStatusTab}
+              tabs={[
+                {
+                  id: "all",
+                  label: <span>Semua <span className="hidden 2xl:inline">Peserta</span></span>,
+                  count: eligibleStudents.length,
+                },
+                {
+                  id: "ongoing",
+                  label: <span><span className="hidden 2xl:inline">Sedang </span>Mengerjakan</span>,
+                  indicator: true,
+                  count: dispOngoing,
+                },
+                {
+                  id: "finished",
+                  label: <span>Selesai<span className="hidden 2xl:inline"> Ujian</span></span>,
+                  count: dispFinished,
+                },
+                {
+                  id: "absent",
+                  label: "Belum Mulai",
+                  count: absentCount,
+                },
+                {
+                  id: "locked",
+                  label: <span><span className="hidden 2xl:inline">Sesi </span>Terkunci</span>,
+                  count: lockedCount,
+                },
+              ]}
+            />
+
+            {/* 3. Stats Strip (4 Kartu Ringkas, Elegan, Neon Style) */}
+            <NeonStatGrid cols={4}>
+              <NeonStatCard
+                label="Total Peserta"
+                value={isLoading ? <Skeleton className="h-7 w-12 inline-block" /> : eligibleStudents.length}
+                unit="siswa"
               />
-            </div>
 
-            {/* PAGINATION */}
-            {(() => {
-              const { filtered } = (function () {
-                const filteredArr = students
-                  .map(s => ({
-                    ...s,
-                    className: examClasses.find(c => c.id === s.classId)?.name || "-"
-                  }))
-                  .filter((s) => {
-                    if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase()) && !s.nisn.includes(searchQuery)) return false;
-                    if (monitorRoom?.allClasses) {
-                      if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
-                      return true;
-                    }
-                    const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
-                    if (!allowedIds.includes(s.classId)) return false;
-                    if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
-                    return true;
-                  });
-                return { filtered: filteredArr };
-              })();
+              <NeonStatCard
+                label="Sedang Mengerjakan"
+                indicator={true}
+                value={
+                  <span className="text-emerald-600 dark:text-emerald-400">
+                    {isLoading ? <Skeleton className="h-7 w-8 inline-block" /> : dispOngoing}
+                  </span>
+                }
+                unit="siswa"
+              />
 
-              const total = filtered.length;
-              const startIndex = (monitorPage - 1) * monitorPageSize;
-              const totalPages = Math.ceil(total / monitorPageSize);
+              <NeonStatCard
+                label="Selesai Ujian"
+                actionSlot={
+                  absentList.length > 0 ? (
+                    <span className="text-[10px] font-mono text-neutral-400">
+                      {absentList.length} belum
+                    </span>
+                  ) : null
+                }
+                value={
+                  isLoading ? <Skeleton className="h-7 w-16 inline-block" /> : (
+                    <>
+                      {dispFinished}{" "}
+                      <span className="text-xs font-normal font-sans text-neutral-400">
+                        / {eligibleStudents.length}
+                      </span>
+                    </>
+                  )
+                }
+              />
 
-              if (total === 0) return null;
+              <NeonStatCard
+                label="Sesi Terkunci"
+                value={
+                  <span className={lockedCount > 0 ? "text-rose-600 dark:text-rose-400" : ""}>
+                    {isLoading ? <Skeleton className="h-7 w-8 inline-block" /> : lockedCount}
+                  </span>
+                }
+                unit="siswa"
+              />
+            </NeonStatGrid>
 
-              return (
-                <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-50/50 dark:bg-slate-900/40 p-3 sm:p-4 rounded-b-3xl border-t border-slate-200 dark:border-slate-800 shadow-sm">
-                  <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 text-center sm:text-left font-medium">
-                    Menampilkan {total > 0 ? startIndex + 1 : 0}-{Math.min(startIndex + monitorPageSize, total)} dari {total} data
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 shrink-0">Baris per halaman:</span>
-                      <select
-                        value={monitorPageSize}
-                        onChange={(e) => { setMonitorPageSize(Number(e.target.value)); setMonitorPage(1); }}
-                        className="h-8 sm:h-9 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        {[10, 25, 50, 100].map((size) => (
-                          <option key={size} value={size}>
-                            {size}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setMonitorPage(1)}
-                        disabled={monitorPage === 1}
-                        className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
-                      >
-                        <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="sr-only">First page</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setMonitorPage(prev => Math.max(1, prev - 1))}
-                        disabled={monitorPage === 1}
-                        className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
-                      >
-                        <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="sr-only">Previous page</span>
-                      </Button>
-
-                      <div className="flex items-center gap-1">
-                        {(() => {
-                          const pages = [];
-                          const maxVisible = 5;
-                          let start = Math.max(1, monitorPage - 2);
-                          let end = Math.min(totalPages, start + maxVisible - 1);
-                          if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
-
-                          for (let i = start; i <= end; i++) {
-                            pages.push(
-                              <Button
-                                key={i}
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setMonitorPage(i)}
-                                className={`h-8 w-8 sm:h-9 sm:w-9 p-0 text-xs sm:text-sm rounded-lg transition-colors border ${monitorPage === i
-                                  ? "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40 font-bold"
-                                  : "border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800"
-                                  }`}
-                              >
-                                {i}
-                              </Button>
-                            );
-                          }
-                          return pages;
-                        })()}
-                      </div>
-
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setMonitorPage(prev => prev + 1)}
-                        disabled={monitorPage === totalPages}
-                        className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
-                      >
-                        <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="sr-only">Next page</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setMonitorPage(totalPages)}
-                        disabled={monitorPage === totalPages}
-                        className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
-                      >
-                        <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="sr-only">Last page</span>
-                      </Button>
-                    </div>
-                  </div>
+            {/* 4. Formula Info (jika ada soal essay) */}
+            {monitorQuestions.some((q: any) => q.type === "uraian") && (
+              <div className="p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                  <span className="font-medium text-neutral-700 dark:text-neutral-300">
+                    Rumus Penilaian: <code className="font-mono font-bold text-neutral-900 dark:text-neutral-100">(Objektif × 60%) + (Subjektif × 40%)</code>
+                  </span>
                 </div>
-              );
-            })()}
+                <div className="flex items-center gap-2 text-[11px] text-neutral-500 font-mono">
+                  <span>Objektif: {monitorQuestions.filter((q: any) => q.type !== "uraian").length} soal</span>
+                  <span>•</span>
+                  <span>Uraian: {monitorQuestions.filter((q: any) => q.type === "uraian").length} soal</span>
+                </div>
+              </div>
+            )}
+
+            {/* 5. Main Neon Table Section */}
+            <StudentTable
+              students={students}
+              attempts={attempts}
+              monitorQuestions={monitorQuestions}
+              monitorRoom={monitorRoom}
+              terminology={terminology}
+              selectedStudentIds={selectedStudentIds}
+              setSelectedStudentIds={setSelectedStudentIds}
+              monitorSortBy={monitorSortBy}
+              setMonitorSortBy={setMonitorSortBy}
+              monitorSortOrder={monitorSortOrder}
+              setMonitorSortOrder={setMonitorSortOrder}
+              toggleSort={toggleSort}
+              monitorPage={monitorPage}
+              setMonitorPage={setMonitorPage}
+              monitorPageSize={monitorPageSize}
+              setMonitorPageSize={setMonitorPageSize}
+              monitorClassFilter={monitorClassFilter}
+              setMonitorClassFilter={setMonitorClassFilter}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              openMenuId={openMenuId}
+              setOpenMenuId={setOpenMenuId}
+              expandedstudent={expandedstudent}
+              setExpandedstudent={setExpandedstudent}
+              setPreviewImage={setPreviewImage}
+              getAttemptScore={getAttemptScore}
+              getLiveScore={getLiveScore}
+              handleForceSubmitStudent={handleForceSubmitStudent}
+              handleOpenReopenDialog={handleOpenReopenDialog}
+              handleUnlockStudent={handleUnlockStudent}
+              handleResetSession={handleResetSession}
+              handleResetCheatCount={handleResetCheatCount}
+              handleManualGrade={handleManualGrade}
+              handleClearOverride={handleClearOverride}
+              handleAIGrade={handleAIGrade}
+              setEditAnswerDialog={setEditAnswerDialog}
+              detailAnswers={detailAnswers}
+              answersList={answersList}
+              isLoading={isLoading}
+              examClasses={examClasses}
+              roomId={roomId}
+              isLargeRoom={isLargeRoom}
+              pb={pb}
+              setDetailAnswers={setDetailAnswers}
+              role={role}
+              teacherFullAccess={teacherFullAccess}
+              aiGradingId={aiGradingId}
+              handleExportExcel={handleExportExcel}
+              handleExportEssayExcel={handleExportEssayExcel}
+              handleCopyBelumUjian={handleCopyBelumUjian}
+              waCopied={waCopied}
+              setQuickGradeOpen={setQuickGradeOpen}
+              handleOpenReopenAllFinishedDialog={handleOpenReopenAllFinishedDialog}
+              handleForceSubmitAll={handleForceSubmitAll}
+              handleResetAllSessions={handleResetAllSessions}
+              handleOpenReopenSelectedDialog={handleOpenReopenSelectedDialog}
+              inspectedStudentId={inspectedStudent?.id}
+              setInspectedStudentId={setInspectedStudentId}
+              statusTab={statusTab}
+            />
+
           </div>
+
+          {/* ═══════════════════════════════════════════════════════════════
+              RIGHT SIDEBAR / INSPECTOR PANEL (Neon Style Parity with ExamRoomsPage)
+             ═══════════════════════════════════════════════════════════════ */}
+          <NeonInspector>
+
+            {/* 1. Detail Peserta Terpilih (Inspector) */}
+            <InspectorSection>
+              <InspectorHeader
+                title="Detail Peserta Ujian"
+                icon={Users}
+                badge={inspectedStudent ? "Terpilih" : "Ringkasan"}
+              />
+
+              {inspectedStudent ? (
+                <div className="space-y-2.5 text-xs">
+                  <div>
+                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Nama Siswa</div>
+                    <div className="font-semibold text-neutral-900 dark:text-neutral-100 mt-0.5 truncate" title={inspectedStudent.name}>
+                      {inspectedStudent.name}
+                    </div>
+                    <div className="text-[11px] font-mono text-neutral-400 mt-0.2">
+                      NISN: {inspectedStudent.nisn || "-"} • {inspectedStudent.className}
+                    </div>
+                  </div>
+
+                  {/* Status & Timer */}
+                  <InspectorGrid cols={2}>
+                    <div>
+                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Status Pengerjaan</div>
+                      <div className="mt-0.5">
+                        {inspectedAttempt?.status === "ongoing" ? (
+                          <NeonBadge variant="emerald" pulse>Mengerjakan</NeonBadge>
+                        ) : (inspectedAttempt?.status === "finished" || inspectedAttempt?.status === "submitted" || inspectedAttempt?.status === "graded") ? (
+                          <NeonBadge variant="neutral">Selesai</NeonBadge>
+                        ) : inspectedAttempt?.status === "LOCKED" ? (
+                          <NeonBadge variant="danger">Terkunci</NeonBadge>
+                        ) : (
+                          <NeonBadge variant="neutral">Belum Mulai</NeonBadge>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Sisa Waktu</div>
+                      <div className="mt-0.5">
+                        {inspectedAttempt?.status === "ongoing" ? (
+                          <StudentTimer attempt={inspectedAttempt} room={monitorRoom} />
+                        ) : (
+                          <span className="text-neutral-400 font-mono text-[11px]">--:--</span>
+                        )}
+                      </div>
+                    </div>
+                  </InspectorGrid>
+
+                  {/* Progress Soal */}
+                  {(() => {
+                    const sisAns = (inspectedAttempt && detailAnswers[inspectedAttempt.id]) || inspectedAttempt?.answers || {};
+                    const ansCount = Object.keys(sisAns).length > 0
+                      ? Object.keys(sisAns).filter(k => k !== "__overrides__" && monitorQuestions.some((q: any) => q.id === k)).length
+                      : (inspectedAttempt?.answeredCount ?? 0);
+                    const totalQ = (monitorRoom?.max_questions && monitorRoom.max_questions > 0)
+                      ? monitorRoom.max_questions
+                      : (monitorQuestions.length || 1);
+                    const pct = Math.min(100, Math.round((ansCount / totalQ) * 100));
+
+                    return (
+                      <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800 space-y-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-neutral-500 dark:text-neutral-400">Progres Soal Dijawab</span>
+                          <span className="font-mono font-bold text-neutral-900 dark:text-neutral-100">
+                            {ansCount}/{totalQ} ({pct}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Nilai & Pelanggaran */}
+                  <InspectorGrid cols={2}>
+                    <div>
+                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Total Nilai</div>
+                      <div className="text-base font-mono font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
+                        {inspectedAttempt ? getAttemptScore(inspectedAttempt) : "-"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Pelanggaran</div>
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        {(inspectedAttempt?.cheatCount || 0) > 0 ? (
+                          <>
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                              <ShieldAlert className="h-3 w-3" />
+                              <span>{inspectedAttempt.cheatCount}x</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleResetCheatCount(inspectedAttempt.id)}
+                              className="text-[10px] text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                            >
+                              Reset
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-neutral-400 font-mono text-[11px]">0x (Aman)</span>
+                        )}
+                      </div>
+                    </div>
+                  </InspectorGrid>
+
+                  {/* Quick Actions */}
+                  <InspectorActions>
+                    {inspectedAttempt ? (
+                      <>
+                        <InspectorButton
+                          variant="primary"
+                          icon={expandedstudent === inspectedStudent.id ? EyeOff : Eye}
+                          onClick={() => {
+                            const next = expandedstudent === inspectedStudent.id ? null : inspectedStudent.id;
+                            setExpandedstudent(next);
+                            if (next && inspectedAttempt && pb) {
+                              pb.collection('attempts').getOne(inspectedAttempt.id).then((rec: any) => {
+                                if (rec?.answers) setDetailAnswers((prev: any) => ({ ...prev, [inspectedAttempt.id]: rec.answers }));
+                              }).catch(() => {});
+                            }
+                          }}
+                        >
+                          {expandedstudent === inspectedStudent.id ? "Tutup Lembar Jawaban" : "Buka Lembar Jawaban"}
+                        </InspectorButton>
+
+                        <InspectorButton
+                          variant="secondary"
+                          icon={FileText}
+                          onClick={() => navigate(`/admin/penilaian/${inspectedStudent.id}?roomId=${roomId || ""}`)}
+                        >
+                          Buka Detail Penilaian Siswa
+                        </InspectorButton>
+
+                        {inspectedAttempt?.status === "LOCKED" && (
+                          <InspectorButton
+                            variant="success"
+                            onClick={() => handleUnlockStudent(inspectedAttempt.id)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                          >
+                            Buka Kunci Sesi Siswa
+                          </InspectorButton>
+                        )}
+
+                        {inspectedAttempt?.status === "ongoing" && (
+                          <InspectorButton
+                            variant="danger"
+                            onClick={() => handleForceSubmitStudent(inspectedAttempt.id)}
+                          >
+                            Paksa Selesaikan (Force Submit)
+                          </InspectorButton>
+                        )}
+
+                        {(inspectedAttempt?.status === "finished" || inspectedAttempt?.status === "submitted" || inspectedAttempt?.status === "graded") && (
+                          <InspectorButton
+                            variant="success"
+                            icon={RotateCcw}
+                            onClick={() => handleOpenReopenDialog(inspectedAttempt, inspectedStudent.name)}
+                          >
+                            Buka Kembali (Jadikan Ongoing)
+                          </InspectorButton>
+                        )}
+
+                        <InspectorButton
+                          variant="ghost"
+                          onClick={() => handleResetSession(inspectedAttempt.id, inspectedStudent.id)}
+                          className="py-1 text-[11px] font-medium text-neutral-500 hover:text-rose-600"
+                        >
+                          Reset Sesi Pengerjaan
+                        </InspectorButton>
+                      </>
+                    ) : (
+                      <div className="p-2.5 rounded-md bg-neutral-100/60 dark:bg-neutral-850/60 border border-neutral-200/60 dark:border-neutral-800 text-center text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
+                        Peserta belum login / memulai ujian
+                      </div>
+                    )}
+                  </InspectorActions>
+                </div>
+              ) : (
+                <InspectorEmpty message="Pilih salah satu siswa pada tabel untuk melihat inspeksi live." />
+              )}
+            </InspectorSection>
+
+            {/* 2. Parameter Ruang Ujian */}
+            <InspectorSection divided>
+              <InspectorHeader
+                title="Parameter Ruang Ujian"
+                icon={Lock}
+              />
+
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 dark:text-neutral-400">Token Ruang</span>
+                  <span className="font-mono font-bold text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-200 dark:border-neutral-700">
+                    {monitorRoom?.token || universalToken || "------"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 dark:text-neutral-400">Durasi Pengerjaan</span>
+                  <span className="font-mono text-neutral-700 dark:text-neutral-300 font-medium">
+                    {monitorRoom?.duration || 90} Menit
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 dark:text-neutral-400">Mode Proteksi</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    {(monitorRoom as any)?.is_exambro ? "Kiosk Exambro Wajib" : "Browser Bebas"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 dark:text-neutral-400">Batas Pelanggaran</span>
+                  <span className="text-neutral-700 dark:text-neutral-300">
+                    {monitorRoom?.cheat_limit ? `${monitorRoom.cheat_limit}x (Auto Lock)` : "Tidak Terbatas"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500 dark:text-neutral-400">Total Butir Soal</span>
+                  <span className="font-mono text-neutral-700 dark:text-neutral-300">
+                    {monitorQuestions.length} Soal
+                  </span>
+                </div>
+              </div>
+            </InspectorSection>
+
+            {/* 3. Link Cepat Portal Siswa */}
+            <InspectorCard
+              title="Portal Akses Siswa"
+              icon={ExternalLink}
+              description="Bagikan link portal ini kepada peserta ujian yang terkendala login:"
+            >
+              <div className="flex items-center justify-between gap-2 p-1.5 bg-white dark:bg-neutral-850 rounded border border-neutral-200 dark:border-neutral-750 overflow-hidden">
+                <code className="text-[11px] font-mono text-neutral-600 dark:text-neutral-300 truncate select-all">
+                  {window.location.origin}/login
+                </code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/login`);
+                    setCopiedUniversalToken(true);
+                    setTimeout(() => setCopiedUniversalToken(false), 2000);
+                  }}
+                  className="h-6 w-6 rounded flex items-center justify-center text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer shrink-0"
+                  title="Salin Link Portal"
+                >
+                  {copiedUniversalToken ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            </InspectorCard>
+
+          </NeonInspector>
+
         </div>
       </div>
 
@@ -1807,28 +1883,6 @@ const MonitoringPage = () => {
         confirmLabel={confirmDialog.confirmLabel}
         requireWord={confirmDialog.requireWord}
       />
-
-      {/* 📋 Floating Batch Action Bar */}
-      {selectedStudentIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white dark:bg-slate-800 px-5 py-3 rounded-2xl shadow-sm border border-slate-700 flex items-center gap-3.5 animate-in fade-in slide-in-from-bottom-5 duration-200">
-          <span className="text-xs font-black tracking-wide text-slate-200 whitespace-nowrap">
-            <span className="text-indigo-400 font-black mr-1">{selectedStudentIds.length}</span> Siswa Dipilih
-          </span>
-          <div className="h-4 w-px bg-slate-700" />
-          <button
-            onClick={handleOpenReopenSelectedDialog}
-            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-md shadow-indigo-900/50 whitespace-nowrap"
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Buka Kembali (Ongoing)
-          </button>
-          <button
-            onClick={() => setSelectedStudentIds([])}
-            className="text-xs font-semibold text-slate-400 hover:text-white px-2 py-1 transition-colors whitespace-nowrap"
-          >
-            Batal
-          </button>
-        </div>
-      )}
 
       {/* 🔄 Dialog Buka Kembali Ujian (Jadikan Ongoing) */}
       <ReopenDialog

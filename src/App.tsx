@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { IconContext } from "@phosphor-icons/react";
 
-import InventoryLayout from "./components/layout/InventoryLayout";
+import AdminLayout from "./components/layout/AdminLayout";
 import LoadingScreen from "./components/layout/LoadingScreen";
 import { useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -203,7 +203,7 @@ const SchoolAppContent = () => {
                   <LoadingScreen />
                 ) : (user && user.hasChangedPassword) ? (
                   <ExamDataProvider>
-                    <InventoryLayout />
+                    <AdminLayout />
                   </ExamDataProvider>
                 ) : (
                   <LoginPage />
@@ -217,6 +217,7 @@ const SchoolAppContent = () => {
               <Route path="alumni" element={<AdminOnlyRoute><AlumniPage /></AdminOnlyRoute>} />
               <Route path="classes" element={<AdminOnlyRoute><ClassesPage /></AdminOnlyRoute>} />
               <Route path="kelola-akun" element={<AdminOnlyRoute><UsersPage /></AdminOnlyRoute>} />
+              <Route path="users" element={<Navigate to="/admin/kelola-akun" replace />} />
               <Route path="bank-soal" element={<ExamsPage />} />
               <Route path="bank-soal/questions" element={<QuestionsPage />} />
               <Route path="bank-soal/questions/new" element={<QuestionFormPage />} />

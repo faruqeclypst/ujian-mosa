@@ -11,8 +11,23 @@ import {
   Download, 
   ChevronDown,
   FileText,
-  Upload
+  Upload,
+  Edit,
+  KeyRound,
+  Info,
+  GraduationCap,
+  Users
 } from "lucide-react";
+import { 
+  NeonInspector,
+  InspectorSection,
+  InspectorHeader,
+  InspectorField,
+  InspectorGrid,
+  InspectorActions,
+  InspectorButton,
+  InspectorEmpty,
+} from "../components/ui/NeonInspector";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -21,6 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel
 } from "../components/ui/dropdown-menu";
+import { Link } from "react-router-dom";
 import { useExamData } from "../context/ExamDataContext";
 import { useTenant } from "../context/TenantContext";
 import { Button } from "../components/ui/button";
@@ -33,14 +49,20 @@ import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
 import { downloadClassImportTemplate, exportClassToExcel, parseClassImportExcel } from "../lib/classExcel";
 import type { ClassData } from "../types/exam";
 import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
+import { NeonStatGrid, NeonStatCard } from "../components/ui/NeonStats";
 
 const ClassesPage = () => {
   const { classes, students, loading, createClass, updateClass, deleteClass, resetStudentPasswordBatch } = useExamData();
-  const { terminology } = useTenant();
+  const { terminology, school } = useTenant();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
+  const [inspectedClassId, setInspectedClassId] = useState<string | null>(null);
+  
+  const inspectedClass = useMemo(() => {
+    return classes.find(c => c.id === inspectedClassId) || classes[0] || null;
+  }, [classes, inspectedClassId]);
   
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [classToDelete, setClassToDelete] = useState<ClassData | null>(null);
@@ -266,8 +288,21 @@ const ClassesPage = () => {
     selectedClass ? { name: selectedClass.name } : { name: "" }, 
   [selectedClass]);
 
+  const schoolSlug = school?.slug || school?.name?.toLowerCase().replace(/\s+/g, "-") || "modalbangsa";
+  const avgStudentsPerClass = classes.length > 0 ? Math.round(students.length / classes.length) : 0;
+
+  const studentCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const s of students) {
+      if (s.classId) {
+        map[s.classId] = (map[s.classId] || 0) + 1;
+      }
+    }
+    return map;
+  }, [students]);
+
   return (
-    <>
+    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
       <input
         id="class-import-input"
         type="file"
@@ -280,187 +315,288 @@ const ClassesPage = () => {
           e.target.value = "";
         }}
       />
-      <div className="space-y-5">
-        <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
-            Daftar {terminology.class}
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.class.toLowerCase()} untuk pengelompokan {terminology.student.toLowerCase()}.</p>
+      <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
+        {/* ── Page Header Bar (Title, Breadcrumb & Primary Actions) ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+              Daftar {terminology.class}
+            </h1>
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+              <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
+                Semua Modul
+              </Link>
+              <span>/</span>
+              <span className="text-neutral-700 dark:text-neutral-300 font-medium">{schoolSlug}</span>
+              <span>/</span>
+              <span className="text-neutral-500 dark:text-neutral-400">master-data</span>
+              <span>/</span>
+              <span className="text-neutral-900 dark:text-neutral-100 font-semibold">classes</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {loading ? (
+              <>
+                <Skeleton className="h-8 w-24 rounded-lg" />
+                <Skeleton className="h-8 w-28 rounded-lg" />
+              </>
+            ) : (
+              <>
+                {selectedIds.length > 0 && (
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    className="h-8 px-3 text-xs font-semibold bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 animate-in fade-in"
+                    onClick={handleBatchDelete}
+                  >
+                    <Trash className="h-3.5 w-3.5" />
+                    <span>Hapus ({selectedIds.length})</span>
+                  </Button>
+                )}
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-3 text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <FileSpreadsheet className="h-3.5 w-3.5" />
+                      <span>Opsi Data</span>
+                      <ChevronDown className="h-3 w-3 opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl shadow-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0f1115] z-[100]">
+                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2.5 py-1">
+                      Kelola {terminology.class}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem 
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                      onClick={() => {
+                        const input = document.getElementById("class-import-input") as HTMLInputElement;
+                        if (input) input.click();
+                      }}
+                    >
+                      <Upload className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                          {isImporting ? "Mengimport..." : "Import dari Excel"}
+                        </span>
+                        <span className="text-[10px] text-neutral-400">Unggah file data {terminology.class.toLowerCase()}</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={handleExportClasses} 
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <Download className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Export ke Excel</span>
+                        <span className="text-[10px] text-neutral-400">Unduh daftar {terminology.class.toLowerCase()}</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                    <DropdownMenuItem 
+                      onClick={() => downloadClassImportTemplate()} 
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <FileText className="h-4 w-4 text-neutral-500" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Unduh Template</span>
+                        <span className="text-[10px] text-neutral-400">Format file import Excel</span>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      onClick={handleCreateClick}
+                      size="sm"
+                      className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Tambah {terminology.class}</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md bg-white dark:bg-[#0c0d0e] border border-neutral-200 dark:border-neutral-800">
+                    <DialogHeader>
+                      <DialogTitle className="text-sm font-bold text-neutral-900 dark:text-white">
+                        {dialogMode === "edit" ? `Edit Data ${terminology.class}` : `Tambah Data ${terminology.class}`}
+                      </DialogTitle>
+                    </DialogHeader>
+                    <ClassForm
+                      defaultValues={defaultValues}
+                      onSubmit={handleSubmitClass}
+                      submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
+                      onCancel={() => setIsDialogOpen(false)}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {loading ? (
-             <>
-               <Skeleton className="h-9 w-28 rounded-xl" />
-               <Skeleton className="h-9 w-28 rounded-xl" />
-             </>
-          ) : (
-            <>
-              {selectedIds.length > 0 && (
-            <Button 
-              variant="default" 
-              size="sm" 
-              className="bg-rose-600 hover:bg-rose-700 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/40 text-white rounded-xl font-bold shadow-lg shadow-rose-500/20 animate-in fade-in zoom-in duration-200 transition-all active:scale-95"
-              onClick={handleBatchDelete}
-            >
-              <Trash className="mr-1 h-3.5 w-3.5" />
-              Hapus ({selectedIds.length})
-            </Button>
-          )}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="softSuccess" size="sm" className="rounded-xl font-bold shadow-sm transition-all h-9 px-3.5">
-                <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-                Opsi Data
-                <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola {terminology.class}</DropdownMenuLabel>
-              <DropdownMenuItem 
-                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                onClick={() => {
-                  const input = document.getElementById("class-import-input") as HTMLInputElement;
-                  if (input) input.click();
-                }}
-              >
-                <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Upload className="h-5 w-5" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
-                    {isImporting ? "Mengimport..." : "Import dari Excel"}
-                  </span>
-                  <span className="text-[10px] text-slate-400 mt-1">Unggah file data {terminology.class.toLowerCase()}</span>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={handleExportClasses} 
-                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-              >
-                <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Download className="h-5 w-5" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export ke Excel</span>
-                  <span className="text-[10px] text-slate-400 mt-1">Unduh daftar {terminology.class.toLowerCase()}</span>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-              <DropdownMenuItem 
-                onClick={() => downloadClassImportTemplate()} 
-                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-              >
-                <div className="h-10 w-10 shrink-0 rounded-lg bg-sky-50 dark:bg-sky-900/30 text-sky-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Unduh Template</span>
-                  <span className="text-[10px] text-slate-400 mt-1">Format file import Excel {terminology.class.toLowerCase()}</span>
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {/* ── Top Stats Strip (3 Kartu Ringkas) ── */}
+        <NeonStatGrid cols={3}>
+          <NeonStatCard
+            label={`Total ${terminology.class}`}
+            value={String(classes.length)}
+            unit="kelas"
+            subText={`Kelompok aktif ${terminology.class.toLowerCase()}`}
+            isLoading={loading}
+          />
+          <NeonStatCard
+            label={`Total ${terminology.student} Terdaftar`}
+            value={String(students.length)}
+            unit="siswa"
+            indicator={true}
+            subText="Siswa aktif di seluruh kelas"
+            isLoading={loading}
+          />
+          <NeonStatCard
+            label="Rata-rata per Kelas"
+            value={String(avgStudentsPerClass)}
+            unit="siswa / kelas"
+            subText="Kepadatan rombel rata-rata"
+            isLoading={loading}
+          />
+        </NeonStatGrid>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => { setSelectedClass(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Tambah {terminology.class}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md bg-card">
-              <DialogHeader>
-                <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? `Edit Data ${terminology.class}` : `Tambah Data ${terminology.class}`}</DialogTitle>
-              </DialogHeader>
-              <ClassForm
-                defaultValues={defaultValues}
-                onSubmit={handleSubmitClass}
-                submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
-                onCancel={() => setIsDialogOpen(false)}
+        {/* ── Main Content Grid: Table + Right Inspector ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-6 items-start">
+          <div className="min-w-0 space-y-6">
+            <ClassTable 
+              classes={classes} 
+              studentCounts={studentCountMap}
+              selectedIds={selectedIds}
+              onSelectChange={setSelectedIds}
+              onEdit={handleEditClick} 
+              onDelete={handleDeleteClick} 
+              onResetPassword={handleResetClassPassword}
+              isLoading={loading}
+              activeKey={inspectedClass?.id}
+              onRowClick={(cls) => setInspectedClassId(cls.id)}
+            />
+          </div>
+
+          {/* ── Right Sidebar / Inspector Panel ── */}
+          <NeonInspector>
+            <InspectorSection>
+              <InspectorHeader
+                title={`Detail ${terminology.class}`}
+                icon={GraduationCap}
+                badge={inspectedClass ? "Terpilih" : "Ringkasan"}
               />
-            </DialogContent>
-          </Dialog>
-            </>
-          )}
+
+              {inspectedClass ? (
+                <div className="space-y-3 text-xs">
+                  <InspectorField label={`Nama ${terminology.class}`}>
+                    <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
+                      {inspectedClass.name}
+                    </div>
+                    <div className="text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5">
+                      ID Rombel: {inspectedClass.id?.slice(0, 10)}
+                    </div>
+                  </InspectorField>
+
+                  <InspectorGrid>
+                    <InspectorField
+                      label="Total Siswa"
+                      value={
+                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                          {studentCountMap[inspectedClass.id] || 0} Siswa
+                        </span>
+                      }
+                    />
+                    <InspectorField
+                      label="Status Rombel"
+                      value={
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                          Aktif
+                        </span>
+                      }
+                    />
+                  </InspectorGrid>
+
+                  <InspectorActions>
+                    <InspectorButton
+                      variant="primary"
+                      icon={Edit}
+                      onClick={() => handleEditClick(inspectedClass)}
+                    >
+                      Edit {terminology.class}
+                    </InspectorButton>
+                    <InspectorButton
+                      variant="secondary"
+                      icon={KeyRound}
+                      onClick={() => handleResetClassPassword(inspectedClass)}
+                    >
+                      Reset Password (12345678)
+                    </InspectorButton>
+                    <InspectorButton
+                      variant="danger"
+                      icon={Trash}
+                      onClick={() => handleDeleteClick(inspectedClass)}
+                    >
+                      Hapus {terminology.class}
+                    </InspectorButton>
+                  </InspectorActions>
+                </div>
+              ) : (
+                <InspectorEmpty
+                  title={`Belum ada ${terminology.class.toLowerCase()}`}
+                  description={`Klik salah satu baris ${terminology.class.toLowerCase()} pada tabel untuk menginspeksi rincian.`}
+                />
+              )}
+            </InspectorSection>
+
+            <InspectorSection divided>
+              <InspectorHeader title="Panduan Rombel" icon={Info} />
+              <div className="space-y-2 text-xs text-neutral-500 dark:text-neutral-400">
+                <p>
+                  Rombongan belajar digunakan untuk alokasi ruang ujian, pembagian sesi, dan pengelompokan peserta didik secara teratur.
+                </p>
+                <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/80 dark:border-neutral-800 text-[11px]">
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200 block mb-0.5">💡 Tips CBT:</span>
+                  Anda dapat mereset serentak password seluruh siswa di rombel ini ke default 12345678 dengan 1 kali klik.
+                </div>
+              </div>
+            </InspectorSection>
+          </NeonInspector>
         </div>
-      </div>
 
-
-
-      {loading ? (
-        <Card>
-          <CardHeader className="p-4">
-            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar {terminology.class}</CardTitle>
-          </CardHeader>
-          <CardContent>
-             <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
-                    <TableRow>
-                      <TableHead className="w-16 text-center">No</TableHead>
-                      <TableHead>Nama {terminology.class}</TableHead>
-                      <TableHead className="text-right">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                        <TableCell className="text-right">
-                           <div className="flex justify-end gap-2">
-                              <Skeleton className="h-8 w-8 rounded-lg" />
-                              <Skeleton className="h-8 w-8 rounded-lg" />
-                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <ClassTable 
-          classes={classes} 
-          selectedIds={selectedIds}
-          onSelectChange={setSelectedIds}
-          onEdit={handleEditClick} 
-          onDelete={handleDeleteClick} 
-          onResetPassword={handleResetClassPassword}
+        <ConfirmationDialog
+          isOpen={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          onConfirm={handleConfirmDelete}
+          type="danger"
+          title={`Hapus ${terminology.class}`}
+          description={`Apakah Anda yakin ingin menghapus data ${terminology.class.toLowerCase()} "${classToDelete?.name || ""}"?`}
+          confirmLabel="Hapus"
+          isLoading={isDeleting}
         />
-      )}
 
-      <ConfirmationDialog
-        isOpen={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        onConfirm={handleConfirmDelete}
-        type="danger"
-        title={`Hapus ${terminology.class}`}
-        description={`Apakah Anda yakin ingin menghapus data ${terminology.class.toLowerCase()} "${classToDelete?.name || ""}"?`}
-        confirmLabel="Hapus"
-        isLoading={isDeleting}
-      />
+        <ConfirmationDialog
+          isOpen={alertDialog.isOpen}
+          onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+          onConfirm={() => {
+            if (alertDialog.onConfirm) alertDialog.onConfirm();
+            setAlertDialog({ ...alertDialog, isOpen: false });
+          }}
+          title={alertDialog.title}
+          description={alertDialog.description}
+          type={alertDialog.type}
+          confirmLabel={alertDialog.confirmLabel || "OK"}
+          showCancel={alertDialog.showCancel}
+        />
 
-      <ConfirmationDialog
-        isOpen={alertDialog.isOpen}
-        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
-        onConfirm={() => {
-          if (alertDialog.onConfirm) alertDialog.onConfirm();
-          setAlertDialog({ ...alertDialog, isOpen: false });
-        }}
-        title={alertDialog.title}
-        description={alertDialog.description}
-        type={alertDialog.type}
-        confirmLabel={alertDialog.confirmLabel || "OK"}
-        showCancel={alertDialog.showCancel}
-      />
-
-      <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
+        <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
+      </div>
     </div>
-    </>
   );
 };
 
