@@ -928,7 +928,10 @@ const StudentsPage = () => {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
               Daftar {terminology.student}
             </h1>
-            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
+              Kelola data dan status akun login {terminology.student.toLowerCase()}.
+            </p>
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
               <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
                 Semua Modul
               </Link>
@@ -1191,7 +1194,7 @@ const StudentsPage = () => {
             label={`Total ${terminology.student} Aktif`}
             value={studentCount.toLocaleString("id-ID")}
             unit="siswa"
-            subText={isOffline ? "Server mandiri offline" : `Kuota: ${quota.toLocaleString("id-ID")} siswa`}
+            subText={isOffline ? "Server mandiri offline" : "Terdaftar di sistem"}
             isLoading={loading}
           />
           <NeonStatCard
@@ -1370,36 +1373,34 @@ const StudentsPage = () => {
               ? "border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/15"
               : "border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-[#0f1115]"
         )}>
-          <div className="flex flex-col gap-3">
+          <div className="space-y-3">
             {/* Header row: Status, Metrics & Action */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                  Kapasitas Kuota {terminology.student}:
-                </span>
-                <span className="font-mono font-bold text-xs text-neutral-900 dark:text-neutral-100">
-                  {studentCount.toLocaleString("id-ID")}
-                </span>
-                <span className="text-neutral-400 dark:text-neutral-500 text-xs font-mono">/</span>
-                <span className="font-mono font-bold text-xs text-neutral-600 dark:text-neutral-400">
-                  {quota.toLocaleString("id-ID")}
-                </span>
-                <span className="text-neutral-500 dark:text-neutral-400 text-xs font-medium">Terdaftar</span>
-
-                <NeonBadge
-                  variant={isQuotaFull ? "rose" : isQuotaWarning ? "amber" : "emerald"}
-                  pulse={isQuotaFull || isQuotaWarning}
-                  mono
-                  size="xs"
-                >
-                  {quotaUsedPercent}% Terpakai
-                </NeonBadge>
-
-                {school?.plan === "free" && (
-                  <NeonBadge variant="neutral" size="xs">
-                    Free Trial (Maks. 50)
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                    Kapasitas Kuota {terminology.student}
+                  </span>
+                  <NeonBadge
+                    variant={isQuotaFull ? "rose" : isQuotaWarning ? "amber" : "emerald"}
+                    pulse={isQuotaFull || isQuotaWarning}
+                    mono
+                    size="xs"
+                  >
+                    {quotaUsedPercent}% Terpakai
                   </NeonBadge>
-                )}
+                  {school?.plan === "free" && (
+                    <NeonBadge variant="neutral" size="xs">
+                      Free Trial
+                    </NeonBadge>
+                  )}
+                </div>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+                  <strong className="font-mono text-neutral-800 dark:text-neutral-200">{studentCount.toLocaleString("id-ID")}</strong>
+                  {" dari "}
+                  <strong className="font-mono text-neutral-700 dark:text-neutral-300">{quota.toLocaleString("id-ID")}</strong>
+                  {" slot terdaftar"}
+                </p>
               </div>
 
               {role === "admin" && (
@@ -1407,16 +1408,17 @@ const StudentsPage = () => {
                   type="button"
                   onClick={() => navigate("/admin/invoice")}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-2xs self-start sm:self-auto flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95 focus:outline-hidden focus:ring-2 focus:ring-offset-1",
+                    "px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-2xs flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95 focus:outline-hidden",
                     isQuotaFull
-                      ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20 focus:ring-rose-500"
+                      ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20"
                       : isQuotaWarning
-                        ? "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20 focus:ring-amber-500"
-                        : "border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700/80 focus:ring-neutral-400"
+                        ? "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20"
+                        : "border border-neutral-300 dark:border-neutral-750 bg-white dark:bg-neutral-850 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   )}
                 >
-                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                  <span>{isQuotaFull ? "Upgrade Kuota Sekarang" : "Tingkatkan Kuota"}</span>
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <span className="hidden sm:inline">{isQuotaFull ? "Upgrade Kuota Sekarang" : "Tingkatkan Kuota"}</span>
+                  <span className="sm:hidden font-medium">Tingkatkan</span>
                 </button>
               )}
             </div>
@@ -1428,8 +1430,8 @@ const StudentsPage = () => {
                 variant={isQuotaFull ? "rose" : isQuotaWarning ? "amber" : "emerald"}
                 size="md"
               />
-              <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
-                <span>
+              <div className="flex items-center justify-between gap-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+                <span className="truncate">
                   {isQuotaFull ? (
                     <span className="text-rose-600 dark:text-rose-400 font-semibold">
                       Kuota siswa telah habis. Tambah kuota untuk mendaftarkan siswa baru.
@@ -1444,8 +1446,8 @@ const StudentsPage = () => {
                     </>
                   )}
                 </span>
-                <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 shrink-0">
-                  {studentCount.toLocaleString("id-ID")} / {quota.toLocaleString("id-ID")}
+                <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 shrink-0 tabular-nums">
+                  {Math.max(0, 100 - quotaUsedPercent)}% tersedia
                 </span>
               </div>
             </div>

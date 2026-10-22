@@ -113,19 +113,19 @@ export const StudentTable = ({
               >
                 {student.name}
               </span>
-              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5">
-                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5 min-w-0">
+                <span className="font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
                   @{student.nisn || "---"}
                 </span>
                 {/* Info Kelas di mobile saat kolom kelas disembunyikan */}
-                <span className="sm:hidden text-neutral-700 dark:text-neutral-300 font-sans font-medium">
+                <span className="sm:hidden text-neutral-700 dark:text-neutral-300 font-sans font-medium truncate max-w-[120px]">
                   • {classes.find(c => c.id === student.classId)?.name || (student.classId === "ALUMNI" ? "Alumni" : "-")}
                 </span>
                 {student.examNumber && student.examNumber !== student.nisn && (
-                  <>
-                    <span>•</span>
+                  <span className="hidden sm:inline">
+                    <span>• </span>
                     <span>No: {student.examNumber}</span>
-                  </>
+                  </span>
                 )}
                 {(student.birthPlace || student.birthDate) && (
                   <span className="hidden sm:inline">
@@ -233,15 +233,9 @@ export const StudentTable = ({
             {role === "admin" && onResetPassword && (
               <button 
                 type="button"
-                className={cn(
-                  "h-7 w-7 rounded-md items-center justify-center border transition-colors shadow-2xs cursor-pointer",
-                  student.resetRequested ? "flex" : "hidden sm:flex",
-                  student.resetRequested
-                    ? "bg-rose-50 border-rose-300 text-rose-600 animate-pulse dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-400"
-                    : "bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                )}
+                className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center border transition-colors shadow-2xs cursor-pointer bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                 onClick={() => onResetPassword(student)}
-                title={student.resetRequested ? "Siswa meminta reset! Klik untuk reset password" : `Reset Password ${terminology.student} (12345678)`}
+                title={`Reset Password ${terminology.student}`}
               >
                 <KeyRound className="h-3.5 w-3.5" />
               </button>
@@ -251,10 +245,13 @@ export const StudentTable = ({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  className="relative h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
                   title="Menu Lainnya"
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
+                  {student.resetRequested && (
+                    <span className="sm:hidden absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 animate-pulse border border-white dark:border-neutral-900" />
+                  )}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
@@ -264,7 +261,10 @@ export const StudentTable = ({
                     className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
                   >
                     <KeyRound className="h-3.5 w-3.5 text-amber-500" />
-                    <span>Reset Password (12345678)</span>
+                    <span>Reset Password</span>
+                    {student.resetRequested && (
+                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                    )}
                   </DropdownMenuItem>
                 )}
                 {onPrintExamCard && (

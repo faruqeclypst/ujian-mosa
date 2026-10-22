@@ -539,7 +539,10 @@ const TeachersPage = () => {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
               Data {terminology.teacher}
             </h1>
-            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
+              Kelola data tenaga pengajar dan akun login {terminology.teacher.toLowerCase()}.
+            </p>
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
               <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
                 Semua Modul
               </Link>
@@ -583,7 +586,7 @@ const TeachersPage = () => {
                           className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
                         >
                           <KeyRound className="h-4 w-4" />
-                          <span>Reset Password (12345678)</span>
+                          <span>Reset Password</span>
                         </DropdownMenuItem>
 
                         <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
@@ -834,7 +837,7 @@ const TeachersPage = () => {
                       icon={KeyRound}
                       onClick={() => handleResetPassword(inspectedTeacher.id)}
                     >
-                      Reset Password (12345678)
+                      Reset Password
                     </InspectorButton>
                     <InspectorButton
                       variant="danger"

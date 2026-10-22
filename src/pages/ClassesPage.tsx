@@ -322,7 +322,10 @@ const ClassesPage = () => {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
               Daftar {terminology.class}
             </h1>
-            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
+              Kelola data rombongan belajar dan kelompok {terminology.class.toLowerCase()} aktif.
+            </p>
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
               <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
                 Semua Modul
               </Link>
@@ -535,7 +538,7 @@ const ClassesPage = () => {
                       icon={KeyRound}
                       onClick={() => handleResetClassPassword(inspectedClass)}
                     >
-                      Reset Password (12345678)
+                      Reset Password
                     </InspectorButton>
                     <InspectorButton
                       variant="danger"

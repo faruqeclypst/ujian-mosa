@@ -423,9 +423,14 @@ const UsersPage = () => {
               {u.name?.charAt(0)?.toUpperCase() || "U"}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 truncate">
-                {u.name}
-              </span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 truncate">
+                  {u.name}
+                </span>
+                <span className="sm:hidden shrink-0">
+                  {getRoleBadge(u.role)}
+                </span>
+              </div>
               <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
                 <span className="font-mono">@{u.username || "pengguna"}</span>
                 {u.email && (
@@ -444,6 +449,8 @@ const UsersPage = () => {
       key: "role",
       header: "Hak Akses",
       width: "120px",
+      className: "hidden sm:table-cell w-28",
+      headerClassName: "hidden sm:table-cell w-28",
       render: (u) => getRoleBadge(u.role)
     },
     {
@@ -500,7 +507,7 @@ const UsersPage = () => {
               type="button"
               className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/40 dark:hover:text-amber-400 transition-colors shadow-2xs cursor-pointer"
               onClick={() => handleOpenResetDialog(u)}
-              title="Reset Sandi ke 12345678"
+              title="Reset Kata Sandi"
             >
               <Key className="h-3.5 w-3.5" />
             </button>
@@ -527,7 +534,7 @@ const UsersPage = () => {
                   className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
                 >
                   <Key className="h-3.5 w-3.5 text-amber-500" />
-                  <span>Reset Password (12345678)</span>
+                  <span>Reset Kata Sandi</span>
                 </DropdownMenuItem>
                 {!isSelf && (
                   <>
@@ -606,7 +613,7 @@ const UsersPage = () => {
                 Kelola Akun Pengguna
               </h1>
               {/* Breadcrumb line matching Neon Console */}
-              <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+              <div className="hidden sm:flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
                 <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
                   Overview
                 </Link>
@@ -621,6 +628,9 @@ const UsersPage = () => {
                   kelola-akun
                 </span>
               </div>
+              <p className="sm:hidden text-xs text-neutral-500 dark:text-neutral-400">
+                Manajemen akun dan hak akses pengguna
+              </p>
             </div>
 
             {/* Top Right Action: Admin Baru */}

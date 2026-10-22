@@ -71,12 +71,12 @@ export const TeacherTable = ({
               >
                 {teacher.name}
               </span>
-              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5">
-                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5 min-w-0">
+                <span className="font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
                   @{teacher.username || teacher.code || "guru"}
                 </span>
-                <span>•</span>
-                <span>Kode: {teacher.code || "-"}</span>
+                <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
+                <span className="hidden sm:inline">Kode: {teacher.code || "-"}</span>
                 {teacher.subjects && teacher.subjects.length > 0 && (
                   <span className="sm:hidden font-sans text-neutral-600 dark:text-neutral-300 truncate max-w-[120px]">
                     • {teacher.subjects.join(", ")}
@@ -157,7 +157,7 @@ export const TeacherTable = ({
             type="button"
             className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
             onClick={() => onResetPassword(teacher.id)}
-            title={`Reset Password ${terminology.teacher} (12345678)`}
+            title={`Reset Password ${terminology.teacher}`}
           >
             <KeyRound className="h-3.5 w-3.5" />
           </button>
@@ -185,7 +185,7 @@ export const TeacherTable = ({
                 className="text-xs cursor-pointer gap-2 py-1.5"
               >
                 <KeyRound className="h-3.5 w-3.5 text-amber-500" />
-                <span>Reset Password (12345678)</span>
+                <span>Reset Password</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
               <DropdownMenuItem

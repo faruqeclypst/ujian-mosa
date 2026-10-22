@@ -46,7 +46,12 @@ export const ClassTable = ({
   const columns: NeonTableColumn<ClassData>[] = useMemo(() => [
     { 
       key: "name", 
-      header: "Nama Rombongan Belajar (Kelas)",
+      header: (
+        <span>
+          <span className="hidden sm:inline">Nama Rombongan Belajar (Kelas)</span>
+          <span className="sm:hidden">Nama Kelas</span>
+        </span>
+      ),
       className: "min-w-0",
       render: (cls) => {
         const count = studentCounts[cls.id] || 0;
@@ -63,12 +68,12 @@ export const ClassTable = ({
               >
                 {cls.name}
               </span>
-              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5">
-                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5 min-w-0">
+                <span className="font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
                   {count} siswa
                 </span>
                 <span>•</span>
-                <span>Rombel aktif</span>
+                <span className="truncate">Rombel aktif</span>
               </div>
             </div>
           </div>

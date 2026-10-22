@@ -44,7 +44,12 @@ export const SubjectTable = ({
   const columns: NeonTableColumn<SubjectData>[] = useMemo(() => [
     { 
       key: "name", 
-      header: `Nama ${terminology.subject} & Kurikulum`,
+      header: (
+        <span>
+          <span className="hidden sm:inline">Nama {terminology.subject} &amp; Kurikulum</span>
+          <span className="sm:hidden">{terminology.subject}</span>
+        </span>
+      ),
       className: "min-w-0",
       render: (subject) => (
         <div className="flex items-center gap-2.5 py-0.5">
@@ -59,12 +64,12 @@ export const SubjectTable = ({
             >
               {subject.name}
             </span>
-            <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5">
-              <span className="font-medium text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5 min-w-0">
+              <span className="font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
                 Kurikulum Aktif
               </span>
-              <span>•</span>
-              <span>Mata Pelajaran Ujian</span>
+              <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
+              <span className="hidden sm:inline">Mata Pelajaran Ujian</span>
             </div>
           </div>
         </div>

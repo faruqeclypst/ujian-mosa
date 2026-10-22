@@ -86,13 +86,26 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
         const subj = subjects.find((s) => s.id === subjId) || r.expand?.examId?.expand?.subjectId;
         const teach = teachers.find((t) => t.id === teachId) || r.expand?.examId?.expand?.teacherId;
 
+        const rawCls = r.classIds || (r as any).class_ids || (r.classId ? (Array.isArray(r.classId) ? r.classId : [r.classId]) : []);
+        const clsIds: string[] = (Array.isArray(rawCls) ? rawCls : [rawCls])
+          .flatMap((item: any) => (typeof item === "string" ? item.split(",") : [item]))
+          .map((x: any) => String(x || "").trim())
+          .filter((id: string) => id && id.toLowerCase() !== "all");
+
+        const isAll = Boolean(
+          r.allClasses ||
+          r.all_classes ||
+          clsIds.length === 0 ||
+          (masterClasses.length > 0 && clsIds.length >= masterClasses.length)
+        );
+
         let className = `Semua ${terminology.class}`;
-        if (!r.allClasses) {
-          const clsIds = r.classIds || (r.classId ? [r.classId] : []);
-          if (Array.isArray(clsIds) && clsIds.length > 0) {
-            className = clsIds
-              .map((cid: string) => masterClasses.find((c) => c.id === cid)?.name || cid)
-              .join(", ");
+        if (!isAll) {
+          const mappedNames = clsIds
+            .map((cid: string) => masterClasses.find((c) => c.id === cid)?.name || cid)
+            .filter(Boolean);
+          if (mappedNames.length > 0) {
+            className = mappedNames.join(", ");
           }
         }
 
@@ -104,7 +117,7 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
           subjectName: subj?.name || "-",
           teacherName: teach?.name || "-",
           className,
-          allClasses: r.allClasses,
+          allClasses: isAll,
           start_time: r.start_time,
           end_time: r.end_time,
           duration: r.duration,
@@ -150,6 +163,30 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
     return { label: "Aktif", color: "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-800" };
   };
 
+  // Status counts for badge tabs
+  const statusCounts = useMemo(() => {
+    let all = 0;
+    let active = 0;
+    let finished = 0;
+    let archive = 0;
+
+    for (const r of rooms) {
+      if (r.status === "archive") {
+        archive++;
+        continue;
+      }
+      all++;
+      const timing = getRoomTimingStatus(r);
+      if (timing.label === "Sedang Berlangsung" || timing.label === "Aktif" || timing.label === "Terjadwal") {
+        active++;
+      } else if (timing.label === "Selesai") {
+        finished++;
+      }
+    }
+
+    return { all, active, finished, archive };
+  }, [rooms]);
+
   // Filtered rooms
   const filteredRooms = useMemo(() => {
     return rooms.filter((r) => {
@@ -169,10 +206,10 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
 
       // 2. Search query
       if (search.trim()) {
-        const q = search.toLowerCase();
-        const matchesName = r.name.toLowerCase().includes(q);
-        const matchesExam = r.examTitle.toLowerCase().includes(q);
-        const matchesSubj = r.subjectName.toLowerCase().includes(q);
+        const q = search.trim().toLowerCase();
+        const matchesName = (r.name || "").toLowerCase().includes(q);
+        const matchesExam = (r.examTitle || "").toLowerCase().includes(q);
+        const matchesSubj = (r.subjectName || "").toLowerCase().includes(q);
         const matchesTeach = (r.teacherName || "").toLowerCase().includes(q);
         const matchesClass = (r.className || "").toLowerCase().includes(q);
         return matchesName || matchesExam || matchesSubj || matchesTeach || matchesClass;
@@ -209,76 +246,117 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
       />
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-[#111214] p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white dark:bg-[#111214] p-2.5 sm:p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-2xs">
         {/* Status Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-xs -mx-0.5 px-0.5">
           <button
             type="button"
             onClick={() => setStatusFilter("all")}
             className={cn(
-              "px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer shrink-0",
+              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
               statusFilter === "all"
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold"
-                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
             )}
           >
-            Semua Ruang ({rooms.filter((r) => r.status !== "archive").length})
+            <span>Semua</span>
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                statusFilter === "all"
+                  ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+              )}
+            >
+              {statusCounts.all}
+            </span>
           </button>
           <button
             type="button"
             onClick={() => setStatusFilter("active")}
             className={cn(
-              "px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer shrink-0",
+              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
               statusFilter === "active"
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold"
-                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
             )}
           >
-            Aktif / Berlangsung
+            <span>Aktif</span>
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                statusFilter === "active"
+                  ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+              )}
+            >
+              {statusCounts.active}
+            </span>
           </button>
           <button
             type="button"
             onClick={() => setStatusFilter("finished")}
             className={cn(
-              "px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer shrink-0",
+              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
               statusFilter === "finished"
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold"
-                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
             )}
           >
-            Selesai
+            <span>Selesai</span>
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                statusFilter === "finished"
+                  ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+              )}
+            >
+              {statusCounts.finished}
+            </span>
           </button>
           <button
             type="button"
             onClick={() => setStatusFilter("archive")}
             className={cn(
-              "px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer shrink-0",
+              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
               statusFilter === "archive"
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold"
-                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
             )}
           >
-            Arsip ({rooms.filter((r) => r.status === "archive").length})
+            <span>Arsip</span>
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                statusFilter === "archive"
+                  ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+              )}
+            >
+              {statusCounts.archive}
+            </span>
           </button>
         </div>
 
         {/* Search Input */}
         <div className="relative w-full sm:w-72 shrink-0">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari ruang, mapel, paket soal..."
-            className="w-full h-8.5 pl-8 pr-7 text-xs bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-md text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-600 transition-colors"
+            className="w-full h-9 pl-8 pr-8 text-xs bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-md text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-colors"
           />
           {search && (
             <button
               type="button"
               onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-0.5 rounded cursor-pointer"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+              title="Hapus pencarian"
             >
-              <X className="h-3 w-3" />
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>

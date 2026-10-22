@@ -315,7 +315,7 @@ export function NeonTable<T>({
 
       {/* ── Main Table Grid ── */}
       <div className="relative w-full overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+        <table className="w-full table-fixed sm:table-auto text-left text-xs border-collapse">
           {/* Table Header */}
           <thead>
             <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/80 dark:bg-[#111214] text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider select-none">
@@ -325,7 +325,7 @@ export function NeonTable<T>({
                   className={cn(
                     compact
                       ? "w-10 px-2.5 sm:px-3 py-2.5 sm:py-3 text-center"
-                      : "w-12 px-4 sm:px-5 py-3 sm:py-3.5 text-center"
+                      : "w-9 sm:w-12 px-2 sm:px-5 py-3 sm:py-3.5 text-center"
                   )}
                 >
                   <input
@@ -350,7 +350,7 @@ export function NeonTable<T>({
                   className={cn(
                     compact
                       ? "px-3 sm:px-3.5 py-2.5 sm:py-3"
-                      : "px-4 sm:px-5 py-3 sm:py-3.5",
+                      : "px-2.5 sm:px-5 py-3 sm:py-3.5",
                     col.align === "center"
                       ? "text-center"
                       : col.align === "right"
@@ -443,7 +443,7 @@ export function NeonTable<T>({
                           className={cn(
                             compact
                               ? "w-10 px-2.5 sm:px-3 py-2.5 sm:py-3 text-center align-middle relative"
-                              : "w-12 px-4 sm:px-5 py-3.5 sm:py-4 text-center align-middle relative",
+                              : "w-9 sm:w-12 px-2 sm:px-5 py-3.5 sm:py-4 text-center align-middle relative",
                             isActive ? "border-l-[4px] border-l-emerald-500 bg-emerald-500/[0.04]" : ""
                           )}
                           onClick={(e) => e.stopPropagation()}
@@ -470,7 +470,7 @@ export function NeonTable<T>({
                           className={cn(
                             compact
                               ? "px-3 sm:px-3.5 py-2.5 sm:py-3 align-middle text-neutral-700 dark:text-neutral-300"
-                              : "px-4 sm:px-5 py-3.5 sm:py-4 align-middle text-neutral-700 dark:text-neutral-300",
+                              : "px-2.5 sm:px-5 py-3.5 sm:py-4 align-middle text-neutral-700 dark:text-neutral-300",
                             !selectable && cIdx === 0 && isActive
                               ? "border-l-[4px] border-l-emerald-500 bg-emerald-500/[0.04]"
                               : "",

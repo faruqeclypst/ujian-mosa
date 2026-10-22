@@ -74,6 +74,26 @@ export interface ExamRoomData {
   is_exambro?: boolean;
 }
 
+// Sub-komponen terisolasi untuk countdown sisa waktu token agar tidak memicu re-render seluruh halaman tiap detik
+const TokenTimeLeftBadge = () => {
+  const { timeLeft } = useExamData();
+  if (!timeLeft) return null;
+  return (
+    <span className="font-mono text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+      ({timeLeft})
+    </span>
+  );
+};
+
+const TokenTimeLeftText = () => {
+  const { timeLeft } = useExamData();
+  return (
+    <span className="font-mono text-neutral-700 dark:text-neutral-300 font-medium">
+      {timeLeft || "Tidak Terbatas"}
+    </span>
+  );
+};
+
 const ExamRoomsPage = () => {
   const navigate = useNavigate();
   const { pb, terminology, school } = useTenant();
@@ -156,7 +176,7 @@ const ExamRoomsPage = () => {
 
   const {
     classes: examClasses, subjects, teachers: masterTeachers,
-    universalToken, timeLeft, teacherFullAccess, loading: dataLoading,
+    universalToken, teacherFullAccess, loading: dataLoading,
     students
   } = useExamData();
 
@@ -188,8 +208,6 @@ const ExamRoomsPage = () => {
     const my_teacher_id = teacherId || user?.id;
 
     const owner_match = room_teacher_id === my_teacher_id;
-
-    console.log(`DEBUG: Access check -> role: ${role}, fullAccess: ${teacherFullAccess}, isOwner: ${owner_match}, myID: ${my_teacher_id}, roomOwnerID: ${room_teacher_id}`);
 
     if (is_admin) return true;
     if (is_teacher_full) {
@@ -446,20 +464,28 @@ const ExamRoomsPage = () => {
         const subjectObj = examObj?.expand?.subjectId || subjects.find(s => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
         const teacherObj = examObj?.expand?.teacherId || masterTeachers.find(t => t.id === eTeacherId);
 
+        const isAll = Boolean(room.allClasses || (room as any).all_classes);
         let className = `Semua ${terminology.class}`;
-        if (!room.allClasses) {
+        if (!isAll) {
           const clsData = room.classId || (room as any).classid || (room as any).classIds || (room as any).classids || "";
           let classList: string[] = [];
-          if (Array.isArray(clsData)) classList = clsData;
-          else if (typeof clsData === 'string' && clsData.length > 0) classList = clsData.split(",").map(id => id.trim()).filter(id => id && id !== "all");
+          if (Array.isArray(clsData)) {
+            classList = clsData.map(id => String(id).trim()).filter(id => id && id.toLowerCase() !== "all");
+          } else if (typeof clsData === 'string' && clsData.length > 0) {
+            classList = clsData.split(",").map(id => id.trim()).filter(id => id && id.toLowerCase() !== "all");
+          }
 
-          const foundNames = classList.map(id => {
-            const c = (examClasses || []).find(cl => cl.id === id);
-            return c ? c.name : null;
-          }).filter(Boolean);
+          if (classList.length === 0 || (examClasses.length > 0 && classList.length >= examClasses.length)) {
+            className = `Semua ${terminology.class}`;
+          } else {
+            const foundNames = classList.map(id => {
+              const c = (examClasses || []).find(cl => cl.id === id);
+              return c ? c.name : null;
+            }).filter(Boolean);
 
-          if (foundNames.length > 0) className = foundNames.join(", ");
-          else className = classList.length > 0 ? `ID: ${classList[0].substring(0, 5)}...` : "N/A";
+            if (foundNames.length > 0) className = foundNames.join(", ");
+            else className = classList.length > 0 ? `ID: ${classList[0].substring(0, 5)}...` : `Semua ${terminology.class}`;
+          }
         }
 
         const { id, ...rest } = room;
@@ -1063,16 +1089,76 @@ const ExamRoomsPage = () => {
     return list;
   }, [filteredRooms, statusFilter, tableSearch]);
 
+  // ── Helper: Hitung status, jadwal & kelas ruang ujian ──
+  const getRoomScheduleMeta = (room: ExamRoomData) => {
+    const s = new Date(room.start_time);
+    const e = new Date(room.end_time);
+    const valid = !isNaN(s.getTime()) && !isNaN(e.getTime());
+    const sDate = valid ? s.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "--";
+    const eDate = valid ? e.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "--";
+    const sTime = valid ? `${s.getHours().toString().padStart(2, "0")}:${s.getMinutes().toString().padStart(2, "0")}` : "--:--";
+    const eTime = valid ? `${e.getHours().toString().padStart(2, "0")}:${e.getMinutes().toString().padStart(2, "0")}` : "--:--";
+
+    const dateText = sDate === eDate ? `${sDate}, ${sTime}–${eTime}` : `${sDate} ${sTime}–${eDate} ${eTime}`;
+    const activeStudents = liveBreakdown[room.id] || 0;
+
+    const now = Date.now();
+    const start = s.getTime();
+    const end = e.getTime();
+
+    let label = "Berjalan";
+    let badgeStyle = "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
+    let dot: React.ReactNode = <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse mr-1" />;
+
+    if (room.status === "archive") {
+      label = "Arsip";
+      badgeStyle = "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700";
+      dot = null;
+    } else if (room.isDisabled) {
+      label = "Nonaktif";
+      badgeStyle = "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20";
+      dot = null;
+    } else if (now < start) {
+      label = "Menunggu";
+      badgeStyle = "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20";
+      dot = null;
+    } else if (now > end) {
+      label = "Selesai";
+      badgeStyle = "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700";
+      dot = null;
+    }
+
+    const classList = (room.className || "").split(", ").filter(Boolean);
+    const classLabel = room.allClasses
+      ? `Semua ${terminology.class}`
+      : classList.length > 0
+        ? `${classList.length} ${terminology.class}`
+        : `Tanpa ${terminology.class}`;
+
+    return {
+      dateText,
+      activeStudents,
+      label,
+      badgeStyle,
+      dot,
+      classList,
+      classLabel,
+    };
+  };
+
   // ── Neon Table Columns Definition ──
   const neonColumns: NeonTableColumn<ExamRoomData>[] = useMemo(() => [
     {
       key: "room_name",
       header: "Ruang Ujian & Pengampu",
-      className: "min-w-0 max-w-[320px]",
+      className: "min-w-0 max-w-[340px]",
       render: (room) => {
         const isInspected = inspectedRoom?.id === room.id;
+        const meta = getRoomScheduleMeta(room);
+
         return (
-          <div className="flex flex-col gap-0.5 py-0.5 min-w-0">
+          <div className="flex flex-col gap-1 py-0.5 min-w-0">
+            {/* Header: Nama Ruang + Status (Mobile) + Kiosk + Live */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <span
                 className={cn(
@@ -1086,6 +1172,17 @@ const ExamRoomsPage = () => {
                 {room.room_name || room.examTitle || "Tanpa Nama"}
               </span>
 
+              {/* Status Pill on Mobile */}
+              <span
+                className={cn(
+                  "md:hidden inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold border shrink-0",
+                  meta.badgeStyle
+                )}
+              >
+                {meta.dot}
+                {meta.label}
+              </span>
+
               {room.is_exambro && (
                 <span
                   className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0"
@@ -1095,9 +1192,17 @@ const ExamRoomsPage = () => {
                   <span>Kiosk</span>
                 </span>
               )}
+
+              {/* Live Badge on Mobile */}
+              {meta.activeStudents > 0 && (
+                <span className="md:hidden inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 animate-pulse shrink-0">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  {meta.activeStudents} live
+                </span>
+              )}
             </div>
 
-            {/* Nama Guru & Mapel */}
+            {/* Nama Guru, Mapel & Kelas (Mobile) */}
             <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 flex-wrap">
               <span
                 className="font-medium text-neutral-700 dark:text-neutral-300"
@@ -1112,31 +1217,56 @@ const ExamRoomsPage = () => {
               >
                 {room.subjectName || "Mapel N/A"}
               </span>
+
+              {/* Kelas on Mobile */}
+              <span
+                className={cn(
+                  "md:hidden inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium border shrink-0",
+                  room.allClasses
+                    ? "bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-900/40"
+                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700"
+                )}
+              >
+                <Users className="h-2.5 w-2.5 opacity-70" />
+                <span>{meta.classLabel}</span>
+              </span>
             </div>
 
-            {room.examTitle && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleQuestionsClick(room);
-                }}
-                className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer flex items-center gap-1 flex-wrap mt-0.5"
-                title={`Buka Bank Soal: ${room.examTitle}`}
-              >
-                <BookOpen className="h-3 w-3 shrink-0 opacity-70" />
-                <span>Bank: {room.examTitle}</span>
-              </button>
-            )}
+            {/* Jadwal & Durasi on Mobile */}
+            <div className="md:hidden flex items-center gap-1.5 text-[11px] font-mono text-neutral-600 dark:text-neutral-400 flex-wrap">
+              <Clock className="h-3 w-3 text-neutral-400 shrink-0" />
+              <span>{meta.dateText}</span>
+              <span className="px-1 py-0.2 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200/60 dark:border-neutral-750 shrink-0">
+                {room.duration}m
+              </span>
+            </div>
 
-            {/* Tipe Ujian & Info Soal di Layar Mobile (kolom Aturan disembunyikan di mobile) */}
-            <div className="md:hidden flex items-center gap-1.5 flex-wrap mt-0.5">
-              <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-semibold border", getExamTypeColorClass(room.examType || "UMUM"))}>
-                {room.examType || "UMUM"}
-              </span>
-              <span className="text-[9px] font-mono text-neutral-500">
-                {room.max_questions && room.max_questions > 0 ? `${room.max_questions} Soal` : "Semua Soal"}
-              </span>
+            {/* Bank Soal, Tipe Ujian & Info Soal */}
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+              {room.examTitle && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleQuestionsClick(room);
+                  }}
+                  className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer flex items-center gap-1"
+                  title={`Buka Bank Soal: ${room.examTitle}`}
+                >
+                  <BookOpen className="h-3 w-3 shrink-0 opacity-70" />
+                  <span className="truncate max-w-[170px] sm:max-w-none">Bank: {room.examTitle}</span>
+                </button>
+              )}
+
+              {/* Tipe Ujian & Info Soal di Layar Mobile */}
+              <div className="md:hidden flex items-center gap-1.5">
+                <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-semibold border", getExamTypeColorClass(room.examType || "UMUM"))}>
+                  {room.examType || "UMUM"}
+                </span>
+                <span className="text-[9px] font-mono text-neutral-500">
+                  {room.max_questions && room.max_questions > 0 ? `${room.max_questions} Soal` : "Semua Soal"}
+                </span>
+              </div>
             </div>
           </div>
         );
@@ -1145,55 +1275,11 @@ const ExamRoomsPage = () => {
     {
       key: "schedule",
       header: "Jadwal, Status & Kelas",
-      className: "min-w-0 max-w-[260px]",
+      className: "hidden md:table-cell min-w-0 max-w-[260px]",
+      headerClassName: "hidden md:table-cell",
       render: (room) => {
-        const s = new Date(room.start_time);
-        const e = new Date(room.end_time);
-        const valid = !isNaN(s.getTime()) && !isNaN(e.getTime());
-        const sDate = valid ? s.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "--";
-        const eDate = valid ? e.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "--";
-        const sTime = valid ? `${s.getHours().toString().padStart(2, "0")}:${s.getMinutes().toString().padStart(2, "0")}` : "--:--";
-        const eTime = valid ? `${e.getHours().toString().padStart(2, "0")}:${e.getMinutes().toString().padStart(2, "0")}` : "--:--";
-
-        // Format waktu compact: 20 Okt, 09:15–13:00
-        const dateText = sDate === eDate ? `${sDate}, ${sTime}–${eTime}` : `${sDate} ${sTime}–${eDate} ${eTime}`;
-
-        const activeStudents = liveBreakdown[room.id] || 0;
-
-        // Status calculation
-        const now = Date.now();
-        const start = s.getTime();
-        const end = e.getTime();
-
-        let label = "Berjalan";
-        let badgeStyle = "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
-        let dot: React.ReactNode = <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse mr-1" />;
-
-        if (room.status === "archive") {
-          label = "Arsip";
-          badgeStyle = "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700";
-          dot = null;
-        } else if (room.isDisabled) {
-          label = "Nonaktif";
-          badgeStyle = "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20";
-          dot = null;
-        } else if (now < start) {
-          label = "Menunggu";
-          badgeStyle = "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20";
-          dot = null;
-        } else if (now > end) {
-          label = "Selesai";
-          badgeStyle = "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700";
-          dot = null;
-        }
-
-        // Kelas preview & hover list
-        const classList = (room.className || "").split(", ").filter(Boolean);
-        const classLabel = room.allClasses
-          ? `Semua ${terminology.class}`
-          : classList.length > 0
-            ? `${classList.length} ${terminology.class}`
-            : `Tanpa ${terminology.class}`;
+        const meta = getRoomScheduleMeta(room);
+        const classList = meta.classList;
 
         return (
           <div className="flex flex-col gap-1 py-0.5 min-w-0">
@@ -1202,11 +1288,11 @@ const ExamRoomsPage = () => {
               <span
                 className={cn(
                   "inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold border shrink-0",
-                  badgeStyle
+                  meta.badgeStyle
                 )}
               >
-                {dot}
-                {label}
+                {meta.dot}
+                {meta.label}
               </span>
 
               {/* Kelas dengan Hover Popover / Tooltip */}
@@ -1226,7 +1312,7 @@ const ExamRoomsPage = () => {
                     : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600"
                 )}>
                   <Users className="h-2.5 w-2.5 opacity-70" />
-                  <span>{classLabel}</span>
+                  <span>{meta.classLabel}</span>
                 </span>
 
                 {/* Floating Hover Tooltip: Tampil otomatis saat di-hover */}
@@ -1250,10 +1336,10 @@ const ExamRoomsPage = () => {
                 </div>
               </div>
 
-              {activeStudents > 0 && (
+              {meta.activeStudents > 0 && (
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 animate-pulse shrink-0">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  {activeStudents} live
+                  {meta.activeStudents} live
                 </span>
               )}
             </div>
@@ -1261,7 +1347,7 @@ const ExamRoomsPage = () => {
             {/* Baris 2: Waktu Compact & Durasi */}
             <div className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-600 dark:text-neutral-400 flex-wrap">
               <Clock className="h-3 w-3 text-neutral-400 shrink-0" />
-              <span className="truncate">{dateText}</span>
+              <span className="truncate">{meta.dateText}</span>
               <span className="px-1 py-0.2 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200/60 dark:border-neutral-750 shrink-0">
                 {room.duration}m
               </span>
@@ -1542,13 +1628,7 @@ const ExamRoomsPage = () => {
 
               <NeonStatCard
                 label="Token Universal"
-                indicator={
-                  timeLeft ? (
-                    <span className="font-mono text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                      ({timeLeft})
-                    </span>
-                  ) : undefined
-                }
+                indicator={<TokenTimeLeftBadge />}
                 value={
                   <code className="tracking-wider">
                     {universalToken || "------"}
@@ -1838,9 +1918,7 @@ const ExamRoomsPage = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500 dark:text-neutral-400">Sisa Waktu Token</span>
-                  <span className="font-mono text-neutral-700 dark:text-neutral-300 font-medium">
-                    {timeLeft || "Tidak Terbatas"}
-                  </span>
+                  <TokenTimeLeftText />
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500 dark:text-neutral-400">Mode Proteksi</span>
