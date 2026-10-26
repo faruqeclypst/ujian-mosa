@@ -147,18 +147,18 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col lg:flex-row bg-[#FBF9F5] dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-blue-500/20">
+    <div className="min-h-[100dvh] flex flex-col lg:flex-row bg-[#FBF9F5] dark:bg-[#0A0A0C] text-neutral-900 dark:text-neutral-100 selection:bg-emerald-500/20">
       {/* ========================================================
           LEFT PANEL: BRAND & CBT HIGHLIGHTS (DESKTOP ONLY)
           ======================================================== */}
-      <aside className="hidden lg:flex lg:w-[420px] xl:w-[480px] 2xl:w-[540px] shrink-0 bg-slate-900 text-white p-8 sm:p-10 xl:p-14 2xl:p-16 flex-col justify-between border-r border-slate-800/80 relative overflow-hidden">
+      <aside className="hidden lg:flex lg:w-[420px] xl:w-[480px] 2xl:w-[540px] shrink-0 bg-[#0E1013] text-white p-8 sm:p-10 xl:p-14 2xl:p-16 flex-col justify-between border-r border-neutral-800/80 relative overflow-hidden">
         {/* Subtle Ambient Glow */}
-        <div className="absolute -top-24 -left-24 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-24 -left-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
 
         {/* Educational Doodle Pattern (Brand Aside) */}
         <div
-          className="absolute inset-0 bg-repeat invert opacity-[0.08] pointer-events-none select-none z-0"
+          className="absolute inset-0 bg-repeat invert opacity-[0.06] pointer-events-none select-none z-0"
           style={{
             backgroundImage: "url('/login-pattern.png')",
             backgroundSize: "320px 320px",
@@ -169,9 +169,9 @@ const LoginPage = () => {
         <div className="relative z-10 space-y-7">
           {/* Logo Brand Line */}
           <div className="flex items-center gap-3.5">
-            <div className="h-11 w-11 rounded-2xl bg-white/10 border border-white/15 p-2 flex items-center justify-center shrink-0 shadow-sm">
+            <div className="h-11 w-11 rounded-xl bg-white/5 border border-white/10 p-2 flex items-center justify-center shrink-0 shadow-xs">
               {logoLoading ? (
-                <div className="h-4 w-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                <div className="h-4 w-4 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
               ) : schoolLogo && !logoError ? (
                 <img
                   src={schoolLogo}
@@ -195,9 +195,9 @@ const LoginPage = () => {
                 <span className="text-2xl font-black tracking-tight text-white">
                   Examku
                 </span>
-                <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)] shrink-0" />
               </div>
-              <span className="text-xs font-semibold text-slate-400 block -mt-0.5">
+              <span className="text-xs font-semibold text-neutral-400 block -mt-0.5">
                 by alfaprojects
               </span>
             </div>
@@ -208,39 +208,39 @@ const LoginPage = () => {
             <h2 className="text-xl sm:text-2xl xl:text-3xl font-extrabold text-white tracking-tight leading-snug">
               {schoolName || school?.name || "Sistem Asesmen Berbasis Komputer"}
             </h2>
-            <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed font-normal">
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed font-normal">
               Platform evaluasi modern terintegrasi untuk proktor, guru pengampu, dan tim kurikulum sekolah.
             </p>
           </div>
         </div>
 
-        {/* Middle: Feature Highlights (Kenari Card List Style) */}
+        {/* Middle: Feature Highlights (Neon Card List Style) */}
         <div className="relative z-10 my-8 space-y-6 xl:space-y-7">
           {/* Feature 1: Keamanan & Kiosk */}
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-blue-400 shrink-0 mt-0.5 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5 shadow-2xs">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-white tracking-wide">
                 Keamanan Kiosk &amp; Anti-Kecurangan
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-neutral-400 leading-relaxed">
                 Proteksi penuh terhadap pergantian tab, pembagian layar, dan peretasan sesi ujian siswa.
               </p>
             </div>
           </div>
 
-          {/* Feature 2: Server Lokal & Hybrid */}
+          {/* Feature 2: Server Mandiri & Hybrid */}
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 shrink-0 mt-0.5 shadow-2xs">
               <HardDrive className="h-5 w-5" />
             </div>
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-white tracking-wide">
                 Server Mandiri &amp; Mode Offline
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-neutral-400 leading-relaxed">
                 Kinerja lancar untuk ratusan siswa serentak, baik di jaringan lokal (LAN) maupun VPS Cloud.
               </p>
             </div>
@@ -248,14 +248,14 @@ const LoginPage = () => {
 
           {/* Feature 3: Analisis Butir & Psikometri */}
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-amber-400 shrink-0 mt-0.5 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0 mt-0.5 shadow-2xs">
               <BarChart2 className="h-5 w-5" />
             </div>
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-white tracking-wide">
                 Analisis Psikometri &amp; AI CTT
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-neutral-400 leading-relaxed">
                 Otomatisasi kalkulasi daya pembeda (D), tingkat kesukaran (P), dan efektivitas pengecoh.
               </p>
             </div>
@@ -263,19 +263,21 @@ const LoginPage = () => {
         </div>
 
         {/* Bottom: Left Footer */}
-        <div className="relative z-10 pt-5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-medium">
+        <div className="relative z-10 pt-5 border-t border-neutral-800/80 flex items-center justify-between text-xs text-neutral-400 font-medium">
           <span>examku.my.id &copy; {new Date().getFullYear()}</span>
-          <span className="font-semibold text-slate-300">{APP_DISPLAY_VERSION}</span>
+          <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-neutral-300">
+            {APP_DISPLAY_VERSION}
+          </span>
         </div>
       </aside>
 
       {/* ========================================================
-          RIGHT PANEL: AUTHENTICATION CANVAS (KENARI-INSPIRED)
+          RIGHT PANEL: AUTHENTICATION CANVAS (NEON THEME)
           ======================================================== */}
       <section className="flex-1 min-h-[100dvh] flex flex-col justify-between p-6 sm:p-12 xl:p-16 relative overflow-y-auto">
         {/* Educational Doodle Pattern (Adaptive Watermark) */}
         <div
-          className="absolute inset-0 bg-repeat opacity-[0.07] dark:invert dark:opacity-[0.08] pointer-events-none select-none z-0"
+          className="absolute inset-0 bg-repeat opacity-[0.04] dark:invert dark:opacity-[0.05] pointer-events-none select-none z-0"
           style={{
             backgroundImage: "url('/login-pattern.png')",
             backgroundSize: "360px 360px",
@@ -288,9 +290,9 @@ const LoginPage = () => {
             <button
               type="button"
               onClick={() => setManualSchool(null)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 shadow-2xs backdrop-blur-sm transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/90 dark:bg-[#111214]/90 border border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/30 shadow-2xs backdrop-blur-sm transition-colors cursor-pointer"
             >
-              <School className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              <School className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Ganti Sekolah</span>
             </button>
           )}
@@ -298,7 +300,7 @@ const LoginPage = () => {
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 shadow-2xs backdrop-blur-sm hover:scale-105 active:scale-95 transition-all cursor-pointer"
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/90 dark:bg-[#111214]/90 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/30 shadow-2xs backdrop-blur-sm hover:scale-105 active:scale-95 transition-all cursor-pointer"
             title={actualTheme === "dark" ? "Mode Terang" : "Mode Gelap"}
             aria-label="Toggle Theme"
           >
@@ -308,10 +310,10 @@ const LoginPage = () => {
 
         {/* Center: Sign In Form Box */}
         <div className="w-full max-w-[460px] xl:max-w-[490px] mx-auto my-auto space-y-6 xl:space-y-7 relative z-10">
-          {/* Mobile Branding (Matching Kenari Screenshot: Logo centered above Sign In) */}
+          {/* Mobile Branding */}
           <div className="flex flex-col items-center justify-center text-center pt-4 lg:hidden">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-10 w-10 rounded-xl bg-slate-900 dark:bg-slate-800 p-1.5 flex items-center justify-center shadow-xs">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="h-10 w-10 rounded-xl bg-neutral-900 dark:bg-[#111214] border border-neutral-800 p-1.5 flex items-center justify-center shadow-xs">
                 {schoolLogo && !logoError ? (
                   <img
                     src={schoolLogo}
@@ -331,37 +333,41 @@ const LoginPage = () => {
                 )}
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                <span className="text-2xl font-black tracking-tight text-neutral-900 dark:text-white">
                   examku
                 </span>
-                <span className="h-2 w-2 rounded-full bg-blue-600 shrink-0" />
+                <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)] shrink-0" />
               </div>
             </div>
             {schoolName && (
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
                 {schoolName}
               </span>
             )}
           </div>
 
-          {/* Sign In Header */}
-          <div className="space-y-2">
-            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+          {/* Sign In Header with NEON Pill */}
+          <div className="space-y-2.5">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
+              <span>Portal CBT Proktor &amp; Guru</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-neutral-900 dark:text-white tracking-tight">
               Masuk ke Akun
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-              Gunakan akun administrator / guru untuk masuk.
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">
+              Gunakan akun administrator atau guru untuk masuk ke sistem.
             </p>
           </div>
 
-          {/* Form Card Container */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-7 sm:p-9 xl:p-10 shadow-[0_4px_25px_rgba(0,0,0,0.035)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.35)]">
+          {/* Form Card Container (NEON Theme) */}
+          <div className="bg-white dark:bg-[#111214] rounded-2xl border border-neutral-200/90 dark:border-neutral-800 p-7 sm:p-9 xl:p-10 shadow-[0_4px_25px_rgba(0,0,0,0.035)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {/* Field: Username / Email */}
               <div className="space-y-1.5">
                 <label
                   htmlFor="username"
-                  className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400"
+                  className="block text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400"
                 >
                   Email atau Username
                 </label>
@@ -370,7 +376,7 @@ const LoginPage = () => {
                     id="username"
                     placeholder="Isi username / email"
                     autoComplete="username"
-                    className="h-12 sm:h-12.5 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 text-sm font-medium px-4 focus:border-blue-600 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    className="h-12 sm:h-12.5 rounded-xl border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/80 text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 text-sm font-medium px-4 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
                     {...register("username")}
                   />
                 </div>
@@ -386,7 +392,7 @@ const LoginPage = () => {
               <div className="space-y-1.5">
                 <label
                   htmlFor="password"
-                  className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400"
+                  className="block text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400"
                 >
                   Password
                 </label>
@@ -396,13 +402,13 @@ const LoginPage = () => {
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     placeholder="Minimal 6 karakter"
-                    className="h-12 sm:h-12.5 pr-11 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 text-sm font-medium px-4 focus:border-blue-600 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    className="h-12 sm:h-12.5 pr-11 rounded-xl border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/80 text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 text-sm font-medium px-4 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
                     {...register("password")}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 cursor-pointer transition-colors"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1.5 cursor-pointer transition-colors"
                     tabIndex={-1}
                     aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
                   >
@@ -437,10 +443,10 @@ const LoginPage = () => {
                 </div>
               )}
 
-              {/* Primary Action Button (Examku Blue) */}
+              {/* Primary Action Button (NEON Emerald) */}
               <Button
                 type="submit"
-                className="group w-full h-12 sm:h-12.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm sm:text-base shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-50 mt-2"
+                className="group w-full h-12 sm:h-12.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm sm:text-base shadow-md shadow-emerald-600/25 hover:shadow-lg hover:shadow-emerald-600/35 transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-50 mt-2"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
@@ -458,7 +464,7 @@ const LoginPage = () => {
             </form>
 
             {/* Security Footnote */}
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center gap-2 text-xs text-slate-400 dark:text-slate-500 font-medium">
+            <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 font-medium">
               <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               <span>Sesi terenkripsi &amp; aman</span>
             </div>
@@ -466,27 +472,27 @@ const LoginPage = () => {
         </div>
 
         {/* Bottom Right Footer */}
-        <div className="w-full max-w-[460px] xl:max-w-[490px] mx-auto text-center pt-6 text-xs text-slate-400 dark:text-slate-500 relative z-10">
+        <div className="w-full max-w-[460px] xl:max-w-[490px] mx-auto text-center pt-6 text-xs text-neutral-400 dark:text-neutral-500 relative z-10">
           <p>Butuh bantuan login? Hubungi Proktor Utama atau Tim IT Sekolah.</p>
         </div>
       </section>
 
       {/* ========================================================
-          MANDATORY CHANGE PASSWORD DIALOG
+          MANDATORY CHANGE PASSWORD DIALOG (NEON THEME)
           ======================================================== */}
       <Dialog open={!!(user && !user.hasChangedPassword)} onOpenChange={() => { }}>
         <DialogContent
-          className="w-[94vw] max-w-md bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 shadow-2xl"
+          className="w-[94vw] max-w-md bg-white dark:bg-[#111214] rounded-2xl p-6 sm:p-7 border border-neutral-200 dark:border-neutral-800 shadow-2xl"
           onPointerDownOutside={(e) => e.preventDefault()}
         >
           <DialogHeader className="text-center space-y-2 mb-4">
-            <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/60 rounded-xl border border-blue-100 dark:border-blue-900/50 flex items-center justify-center mx-auto text-blue-600 dark:text-blue-400">
+            <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-950/60 rounded-xl border border-emerald-100 dark:border-emerald-900/50 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
               <Lock className="h-5 w-5" />
             </div>
-            <DialogTitle className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
+            <DialogTitle className="text-lg sm:text-xl font-black text-neutral-900 dark:text-white">
               Ganti Password Wajib
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <DialogDescription className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
               Demi keamanan sistem CBT sekolah, silakan perbarui password default akun Anda sebelum mengakses dashboard.
             </DialogDescription>
           </DialogHeader>
@@ -522,7 +528,7 @@ const LoginPage = () => {
             )}
 
             <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                 Password Saat Ini
               </label>
               <div className="relative">
@@ -531,12 +537,12 @@ const LoginPage = () => {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Password saat ini (default: 12345678)"
-                  className="rounded-lg h-10 bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 pr-10 text-xs font-medium focus:ring-1 focus:ring-blue-500/30"
+                  className="rounded-lg h-10 bg-neutral-50 dark:bg-neutral-900/70 border-neutral-200 dark:border-neutral-700 pr-10 text-xs font-medium focus:ring-1 focus:ring-emerald-500/30"
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-1"
                 >
                   {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -544,7 +550,7 @@ const LoginPage = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                 Password Baru
               </label>
               <div className="relative">
@@ -553,12 +559,12 @@ const LoginPage = () => {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Minimal 6 karakter"
-                  className="rounded-lg h-10 bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 pr-10 text-xs font-medium focus:ring-1 focus:ring-blue-500/30"
+                  className="rounded-lg h-10 bg-neutral-50 dark:bg-neutral-900/70 border-neutral-200 dark:border-neutral-700 pr-10 text-xs font-medium focus:ring-1 focus:ring-emerald-500/30"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-1"
                 >
                   {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -566,7 +572,7 @@ const LoginPage = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                 Konfirmasi Password Baru
               </label>
               <Input
@@ -574,7 +580,7 @@ const LoginPage = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Ulangi password baru"
-                className="rounded-lg h-10 bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-xs font-medium focus:ring-1 focus:ring-blue-500/30"
+                className="rounded-lg h-10 bg-neutral-50 dark:bg-neutral-900/70 border-neutral-200 dark:border-neutral-700 text-xs font-medium focus:ring-1 focus:ring-emerald-500/30"
               />
             </div>
 
@@ -583,14 +589,14 @@ const LoginPage = () => {
                 type="button"
                 variant="outline"
                 onClick={() => signOut()}
-                className="w-full sm:w-1/3 rounded-lg h-10 text-xs text-slate-600 dark:text-slate-300 font-semibold border-slate-200 dark:border-slate-700 cursor-pointer"
+                className="w-full sm:w-1/3 rounded-lg h-10 text-xs text-neutral-600 dark:text-neutral-300 font-semibold border-neutral-200 dark:border-neutral-700 cursor-pointer"
                 disabled={isChangingPass}
               >
                 Batal / Keluar
               </Button>
               <Button
                 type="submit"
-                className="w-full sm:w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 rounded-lg text-xs shadow-md shadow-blue-500/20 cursor-pointer"
+                className="w-full sm:w-2/3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-10 rounded-lg text-xs shadow-md shadow-emerald-500/20 cursor-pointer"
                 disabled={isChangingPass}
               >
                 {isChangingPass ? (

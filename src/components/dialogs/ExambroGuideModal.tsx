@@ -27,6 +27,7 @@ import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
 import { useToast } from "../ui/toast";
 import { APP_DISPLAY_VERSION } from "../../utils/version";
+import { getSchoolDomain, getSchoolUrl } from "../../utils/domainHelper";
 
 const AppleIcon = ({ className = "", size = 16 }: { className?: string; size?: number }) => (
   <svg
@@ -57,8 +58,8 @@ export const ExambroGuideModal = ({
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const { addToast } = useToast();
 
-  const schoolDomain = `${schoolSlug}.examku.my.id`;
-  const schoolUrl = `https://${schoolDomain}`;
+  const schoolDomain = getSchoolDomain(schoolSlug);
+  const schoolUrl = getSchoolUrl(schoolSlug);
   const sebDirectLink = `sebs://${schoolDomain}`;
   const apkStandardUrl = "https://examku.my.id/exam-aa-latest.apk";
   const apkBrowserUrl = "https://examku.my.id/exam-aa-browser-latest.apk";

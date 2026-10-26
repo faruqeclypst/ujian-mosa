@@ -95,11 +95,11 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
               <Landmark size={18} />
             </div>
             <div>
-              <h2 className="font-bold text-slate-800 text-sm">Kelola Rekening Bank</h2>
-              <p className="text-[10px] text-slate-500">Opsi transfer manual untuk tagihan tenant</p>
+              <h2 className="font-bold text-slate-800 dark:text-neutral-100 text-sm">Kelola Rekening Bank</h2>
+              <p className="text-[10px] text-slate-500 dark:text-neutral-400">Opsi transfer manual untuk tagihan tenant</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition"><X size={16} /></button>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded-lg transition-colors cursor-pointer"><X size={16} /></button>
         </div>
 
         <div className="p-4 overflow-y-auto flex-1 bg-slate-50">

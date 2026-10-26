@@ -709,6 +709,7 @@ export default function SuperAdminOfflineLicensesPage() {
           <div className="flex flex-wrap items-center gap-2">
             <a
               href="https://examku.my.id/downloads/offline-update.zip"
+              download="offline-update.zip"
               target="_blank"
               rel="noopener noreferrer"
               className="min-h-[42px] px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-2 transition-all shadow-2xs"
@@ -1662,6 +1663,7 @@ export default function SuperAdminOfflineLicensesPage() {
                 </div>
                 <a
                   href="https://examku.my.id/downloads/offline-update.zip"
+                  download="offline-update.zip"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-2.5 py-1.5 rounded-lg bg-white border border-purple-200 text-purple-700 hover:bg-purple-100 text-xs font-bold flex items-center gap-1 shadow-2xs shrink-0 transition-colors"

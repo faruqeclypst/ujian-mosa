@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare, MoreVertical, MoreHorizontal } from "lucide-react";
+import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare, MoreVertical, MoreHorizontal, Folder, Layers } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
@@ -15,6 +15,7 @@ import { BatchProgressDialog, type BatchProgressState } from "../../components/d
 import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
 import { exportActiveRoomsToZip } from "../../lib/roomExcelExport";
+import { getStudentExamUrl } from "../../utils/domainHelper";
 
 import { NeonTable, type NeonTableColumn } from "../../components/ui/NeonTable";
 import {
@@ -72,6 +73,7 @@ export interface ExamRoomData {
   show_result?: boolean;
   isActive?: boolean;
   is_exambro?: boolean;
+  group_name?: string;
 }
 
 // Sub-komponen terisolasi untuk countdown sisa waktu token agar tidak memicu re-render seluruh halaman tiap detik
@@ -119,6 +121,9 @@ const ExamRoomsPage = () => {
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [tableSearch, setTableSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "ongoing" | "waiting" | "finished" | "disabled">("all");
+  const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [batchGroupDialogOpen, setBatchGroupDialogOpen] = useState(false);
+  const [batchGroupInput, setBatchGroupInput] = useState("");
   const [copiedToken, setCopiedToken] = useState(false);
   const [batchProgress, setBatchProgress] = useState<BatchProgressState>({
     isOpen: false,
@@ -133,10 +138,12 @@ const ExamRoomsPage = () => {
     setLastSelectedIndex(null);
     setTableSearch("");
     setStatusFilter("all");
+    setGroupFilter("all");
   }, [activeTab]);
 
   const [formValues, setFormValues] = useState({
     room_name: "",
+    group_name: "",
     examId: "",
     classId: "all",
     allClasses: true,
@@ -244,6 +251,16 @@ const ExamRoomsPage = () => {
   const selectableRooms = useMemo(() => {
     return filteredRooms.filter(r => isOwner(r));
   }, [filteredRooms, isOwner]);
+
+  const availableGroups = useMemo(() => {
+    const set = new Set<string>();
+    rooms.forEach(r => {
+      if (r.group_name && r.group_name.trim()) {
+        set.add(r.group_name.trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [rooms]);
 
   // ── Realtime Active Students Engine (Parity with Dashboard) ──
   // Menghitung jumlah siswa aktif secara real-time via query & SSE subscription
@@ -506,7 +523,8 @@ const ExamRoomsPage = () => {
           className: className,
           max_questions: Number(room.max_questions) || 0,
           randomize_questions: room.randomize_questions !== false,
-          is_exambro: room.is_exambro || (room as any).isExambro || false
+          is_exambro: room.is_exambro || (room as any).isExambro || false,
+          group_name: (room as any).group_name || ""
         } as any as ExamRoomData;
       });
 
@@ -573,6 +591,7 @@ const ExamRoomsPage = () => {
     setSelectedRoom(null);
     setFormValues({
       room_name: "",
+      group_name: "",
       examId: "",
       classId: "all",
       allClasses: true,
@@ -598,6 +617,7 @@ const ExamRoomsPage = () => {
     setSelectedRoom(room);
     setFormValues({
       room_name: room.room_name || "",
+      group_name: room.group_name || "",
       examId: room.examId,
       classId: room.allClasses ? "" : (Array.isArray(room.classId) ? room.classId.join(",") : (room.classId || "")),
       allClasses: room.allClasses || false,
@@ -872,6 +892,48 @@ const ExamRoomsPage = () => {
     });
   };
 
+  const handleApplyBatchGroup = async (targetGroupName: string) => {
+    if (selectedIds.length === 0 || !pb) return;
+    setBatchGroupDialogOpen(false);
+    const cleanedGroup = targetGroupName.trim();
+
+    setBatchProgress({
+      isOpen: true,
+      total: selectedIds.length,
+      current: 0,
+      message: `Mengatur group ${cleanedGroup ? `"${cleanedGroup}"` : "kosong"}...`,
+      title: "Atur Group Ruang Ujian"
+    });
+
+    try {
+      for (let i = 0; i < selectedIds.length; i++) {
+        await pb.collection('exam_rooms').update(selectedIds[i], {
+          group_name: cleanedGroup
+        });
+        setBatchProgress(prev => ({
+          ...prev,
+          current: i + 1,
+          message: `Memperbarui ruang ujian (${i + 1}/${selectedIds.length})`
+        }));
+      }
+
+      setRooms(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, group_name: cleanedGroup } : r));
+      showAlert(
+        "Berhasil",
+        cleanedGroup
+          ? `${selectedIds.length} ruang ujian berhasil dimasukkan ke group "${cleanedGroup}".`
+          : `${selectedIds.length} ruang ujian berhasil dikeluarkan dari group.`,
+        "success"
+      );
+      setSelectedIds([]);
+      setBatchGroupInput("");
+    } catch (e: any) {
+      showAlert("Gagal", e.message || "Gagal mengatur group massal.", "danger");
+    } finally {
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -887,6 +949,7 @@ const ExamRoomsPage = () => {
       const data = {
         title: formValues.room_name,
         room_name: formValues.room_name,
+        group_name: (formValues.group_name || "").trim(),
         examId: formValues.examId,
         startTime: new Date(formValues.start_time).toISOString(),
         start_time: new Date(formValues.start_time).toISOString(),
@@ -1064,6 +1127,15 @@ const ExamRoomsPage = () => {
       });
     }
 
+    if (groupFilter !== "all") {
+      if (groupFilter === "__none__") {
+        list = list.filter(r => !r.group_name || !r.group_name.trim());
+      } else {
+        const target = groupFilter.trim().toLowerCase();
+        list = list.filter(r => (r.group_name || "").trim().toLowerCase() === target);
+      }
+    }
+
     const q = tableSearch.trim().toLowerCase();
     if (q) {
       list = list.filter(r => {
@@ -1074,6 +1146,7 @@ const ExamRoomsPage = () => {
         const roomCode = String(r.room_code || "").toLowerCase();
         const token = String(r.token || "").toLowerCase();
         const examTitle = String(r.examTitle || "").toLowerCase();
+        const groupName = String(r.group_name || "").toLowerCase();
         return (
           roomName.includes(q) ||
           teacherName.includes(q) ||
@@ -1081,13 +1154,14 @@ const ExamRoomsPage = () => {
           className.includes(q) ||
           roomCode.includes(q) ||
           token.includes(q) ||
-          examTitle.includes(q)
+          examTitle.includes(q) ||
+          groupName.includes(q)
         );
       });
     }
 
     return list;
-  }, [filteredRooms, statusFilter, tableSearch]);
+  }, [filteredRooms, statusFilter, groupFilter, tableSearch]);
 
   // ── Helper: Hitung status, jadwal & kelas ruang ujian ──
   const getRoomScheduleMeta = (room: ExamRoomData) => {
@@ -1153,24 +1227,28 @@ const ExamRoomsPage = () => {
       header: "Ruang Ujian & Pengampu",
       className: "min-w-0 max-w-[340px]",
       render: (room) => {
-        const isInspected = inspectedRoom?.id === room.id;
         const meta = getRoomScheduleMeta(room);
 
         return (
-          <div className="flex flex-col gap-1 py-0.5 min-w-0">
+          <div className="flex flex-col gap-1 min-w-0">
             {/* Header: Nama Ruang + Status (Mobile) + Kiosk + Live */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <span
-                className={cn(
-                  "text-[13px] font-bold tracking-tight transition-colors",
-                  isInspected
-                    ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
-                    : "text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400"
-                )}
+                className="text-[13px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors"
                 title={room.room_name || room.examTitle || "Tanpa Nama"}
               >
                 {room.room_name || room.examTitle || "Tanpa Nama"}
               </span>
+
+              {room.group_name && (
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 shrink-0 max-w-[150px] truncate"
+                  title={`Group: ${room.group_name}`}
+                >
+                  <Folder className="h-2.5 w-2.5 shrink-0 text-purple-500" />
+                  <span className="truncate">{room.group_name}</span>
+                </span>
+              )}
 
               {/* Status Pill on Mobile */}
               <span
@@ -1202,17 +1280,17 @@ const ExamRoomsPage = () => {
               )}
             </div>
 
-            {/* Nama Guru, Mapel & Kelas (Mobile) */}
-            <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 flex-wrap">
+            {/* Nama Guru & Mapel */}
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 min-w-0">
               <span
-                className="font-medium text-neutral-700 dark:text-neutral-300"
+                className="font-medium text-neutral-700 dark:text-neutral-300 truncate"
                 title={room.teacherName}
               >
                 {room.teacherName || "Pengampu N/A"}
               </span>
               <span className="text-neutral-300 dark:text-neutral-700 shrink-0">•</span>
               <span
-                className="text-neutral-500 dark:text-neutral-400"
+                className="truncate"
                 title={room.subjectName}
               >
                 {room.subjectName || "Mapel N/A"}
@@ -1232,8 +1310,8 @@ const ExamRoomsPage = () => {
               </span>
             </div>
 
-            {/* Jadwal & Durasi on Mobile */}
-            <div className="md:hidden flex items-center gap-1.5 text-[11px] font-mono text-neutral-600 dark:text-neutral-400 flex-wrap">
+            {/* Jadwal on Mobile */}
+            <div className="md:hidden flex items-center gap-1.5 text-[11px] font-mono text-neutral-500 dark:text-neutral-400 flex-wrap">
               <Clock className="h-3 w-3 text-neutral-400 shrink-0" />
               <span>{meta.dateText}</span>
               <span className="px-1 py-0.2 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200/60 dark:border-neutral-750 shrink-0">
@@ -1241,53 +1319,43 @@ const ExamRoomsPage = () => {
               </span>
             </div>
 
-            {/* Bank Soal, Tipe Ujian & Info Soal */}
-            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-              {room.examTitle && (
+            {/* Bank Soal */}
+            {room.examTitle && (
+              <div className="flex items-center gap-1 text-[11px] text-neutral-400 dark:text-neutral-500 min-w-0">
+                <BookOpen className="h-3 w-3 shrink-0 opacity-70" />
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleQuestionsClick(room);
                   }}
-                  className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer flex items-center gap-1"
+                  className="truncate hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer"
                   title={`Buka Bank Soal: ${room.examTitle}`}
                 >
-                  <BookOpen className="h-3 w-3 shrink-0 opacity-70" />
-                  <span className="truncate max-w-[170px] sm:max-w-none">Bank: {room.examTitle}</span>
+                  Bank: {room.examTitle}
                 </button>
-              )}
-
-              {/* Tipe Ujian & Info Soal di Layar Mobile */}
-              <div className="md:hidden flex items-center gap-1.5">
-                <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-semibold border", getExamTypeColorClass(room.examType || "UMUM"))}>
-                  {room.examType || "UMUM"}
-                </span>
-                <span className="text-[9px] font-mono text-neutral-500">
-                  {room.max_questions && room.max_questions > 0 ? `${room.max_questions} Soal` : "Semua Soal"}
-                </span>
               </div>
-            </div>
+            )}
           </div>
         );
       },
     },
     {
       key: "schedule",
-      header: "Jadwal, Status & Kelas",
-      className: "hidden md:table-cell min-w-0 max-w-[260px]",
-      headerClassName: "hidden md:table-cell",
+      header: "Jadwal & Kelas",
+      className: "hidden md:table-cell min-w-0 w-[240px] xl:w-[260px]",
+      headerClassName: "hidden md:table-cell w-[240px] xl:w-[260px]",
       render: (room) => {
         const meta = getRoomScheduleMeta(room);
         const classList = meta.classList;
 
         return (
-          <div className="flex flex-col gap-1 py-0.5 min-w-0">
+          <div className="flex flex-col gap-1 min-w-0">
             {/* Baris 1: Status Pill + Kelas Pill + Live Status */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-nowrap overflow-hidden">
               <span
                 className={cn(
-                  "inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold border shrink-0",
+                  "inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0",
                   meta.badgeStyle
                 )}
               >
@@ -1306,7 +1374,7 @@ const ExamRoomsPage = () => {
                 }}
               >
                 <span className={cn(
-                  "inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium border transition-colors cursor-pointer",
+                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer",
                   room.allClasses
                     ? "bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-900/40"
                     : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600"
@@ -1337,7 +1405,7 @@ const ExamRoomsPage = () => {
               </div>
 
               {meta.activeStudents > 0 && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 animate-pulse shrink-0">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 animate-pulse shrink-0">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   {meta.activeStudents} live
                 </span>
@@ -1345,9 +1413,9 @@ const ExamRoomsPage = () => {
             </div>
 
             {/* Baris 2: Waktu Compact & Durasi */}
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-600 dark:text-neutral-400 flex-wrap">
+            <div className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
               <Clock className="h-3 w-3 text-neutral-400 shrink-0" />
-              <span className="truncate">{meta.dateText}</span>
+              <span>{meta.dateText}</span>
               <span className="px-1 py-0.2 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200/60 dark:border-neutral-750 shrink-0">
                 {room.duration}m
               </span>
@@ -1358,32 +1426,32 @@ const ExamRoomsPage = () => {
     },
     {
       key: "rules",
-      header: "Aturan & Butir Soal",
-      className: "hidden md:table-cell min-w-0 max-w-[180px]",
-      headerClassName: "hidden md:table-cell",
+      header: "Aturan & Soal",
+      className: "hidden lg:table-cell min-w-0 w-[190px] xl:w-[210px]",
+      headerClassName: "hidden lg:table-cell w-[190px] xl:w-[210px]",
       render: (room) => {
         return (
-          <div className="flex flex-col gap-1 py-0.5">
-            <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex flex-col gap-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-nowrap">
               <span
                 className={cn(
-                  "px-1.5 py-0.5 rounded text-[10px] font-semibold border",
+                  "px-1.5 py-0.5 rounded text-[10px] font-semibold border shrink-0",
                   getExamTypeColorClass(room.examType || "UMUM")
                 )}
               >
                 {room.examType || "UMUM"}
               </span>
 
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700 shrink-0">
                 {room.max_questions && room.max_questions > 0
                   ? `${room.max_questions} Soal`
                   : "Semua Soal"}
               </span>
             </div>
 
-            <div className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500">
-              {room.randomize_questions !== false ? "Acak Soal & Opsi" : "Nomor Urut Standar"}
-              {room.cheat_limit > 0 && `, Batas Cheat ${room.cheat_limit}x`}
+            <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+              {room.randomize_questions !== false ? "Acak Soal" : "Urut Standar"}
+              {room.cheat_limit > 0 && ` • Cheat ${room.cheat_limit}x`}
             </div>
           </div>
         );
@@ -1392,8 +1460,8 @@ const ExamRoomsPage = () => {
     {
       key: "actions",
       header: "Aksi",
-      className: "w-20 sm:w-28 text-right shrink-0",
-      headerClassName: "w-20 sm:w-28 text-right shrink-0",
+      className: "w-24 sm:w-28 text-right shrink-0",
+      headerClassName: "w-24 sm:w-28 text-right shrink-0",
       align: "right",
       render: (room) => {
         const owner = isOwner(room);
@@ -1427,7 +1495,7 @@ const ExamRoomsPage = () => {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
                   title="Menu Aksi Lainnya"
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
@@ -1627,7 +1695,7 @@ const ExamRoomsPage = () => {
               />
 
               <NeonStatCard
-                label="Token Universal"
+                label={<span className="whitespace-nowrap">Token Universal</span>}
                 indicator={<TokenTimeLeftBadge />}
                 value={
                   <code className="tracking-wider">
@@ -1674,73 +1742,132 @@ const ExamRoomsPage = () => {
               onSearchChange={setTableSearch}
               searchPlaceholder="Cari ruang ujian, pengampu, mapel, kelas, token..."
               filterSlot={
-                activeTab === "aktif" ? (
-                  <div className="flex flex-wrap items-center gap-1 bg-neutral-100 dark:bg-neutral-850 p-0.5 rounded-md text-[11px] font-medium border border-neutral-200/60 dark:border-neutral-800 max-w-full">
-                    <button
-                      type="button"
-                      onClick={() => setStatusFilter("all")}
-                      className={cn(
-                        "px-2 py-1 rounded transition-colors cursor-pointer",
-                        statusFilter === "all"
-                          ? "bg-white dark:bg-neutral-750 text-neutral-900 dark:text-white font-semibold shadow-2xs"
-                          : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
-                      )}
-                    >
-                      Semua ({statusCounts.all})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStatusFilter("ongoing")}
-                      className={cn(
-                        "px-2 py-1 rounded transition-colors cursor-pointer flex items-center gap-1",
-                        statusFilter === "ongoing"
-                          ? "bg-white dark:bg-neutral-750 text-emerald-700 dark:text-emerald-400 font-semibold shadow-2xs"
-                          : "text-neutral-500 hover:text-emerald-600 dark:hover:text-emerald-400"
-                      )}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Berjalan ({statusCounts.ongoing})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStatusFilter("waiting")}
-                      className={cn(
-                        "px-2 py-1 rounded transition-colors cursor-pointer",
-                        statusFilter === "waiting"
-                          ? "bg-white dark:bg-neutral-750 text-sky-700 dark:text-sky-400 font-semibold shadow-2xs"
-                          : "text-neutral-500 hover:text-sky-600 dark:hover:text-sky-400"
-                      )}
-                    >
-                      Menunggu ({statusCounts.waiting})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStatusFilter("finished")}
-                      className={cn(
-                        "px-2 py-1 rounded transition-colors cursor-pointer",
-                        statusFilter === "finished"
-                          ? "bg-white dark:bg-neutral-750 text-neutral-800 dark:text-white font-semibold shadow-2xs"
-                          : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
-                      )}
-                    >
-                      Selesai ({statusCounts.finished})
-                    </button>
-                    {statusCounts.disabled > 0 && (
+                <div className="flex flex-wrap items-center gap-2 max-w-full">
+                  {/* Status Pills */}
+                  {activeTab === "aktif" && (
+                    <div className="flex flex-wrap items-center gap-1 bg-neutral-100 dark:bg-neutral-850 p-0.5 rounded-md text-[11px] font-medium border border-neutral-200/60 dark:border-neutral-800 max-w-full">
                       <button
                         type="button"
-                        onClick={() => setStatusFilter("disabled")}
+                        onClick={() => setStatusFilter("all")}
                         className={cn(
                           "px-2 py-1 rounded transition-colors cursor-pointer",
-                          statusFilter === "disabled"
-                            ? "bg-white dark:bg-neutral-750 text-rose-700 dark:text-rose-400 font-semibold shadow-2xs"
-                            : "text-neutral-500 hover:text-rose-600 dark:hover:text-rose-400"
+                          statusFilter === "all"
+                            ? "bg-white dark:bg-neutral-750 text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                            : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
                         )}
                       >
-                        Nonaktif ({statusCounts.disabled})
+                        Semua ({statusCounts.all})
                       </button>
-                    )}
-                  </div>
-                ) : null
+                      <button
+                        type="button"
+                        onClick={() => setStatusFilter("ongoing")}
+                        className={cn(
+                          "px-2 py-1 rounded transition-colors cursor-pointer flex items-center gap-1",
+                          statusFilter === "ongoing"
+                            ? "bg-white dark:bg-neutral-750 text-emerald-700 dark:text-emerald-400 font-semibold shadow-2xs"
+                            : "text-neutral-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+                        )}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Berjalan ({statusCounts.ongoing})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStatusFilter("waiting")}
+                        className={cn(
+                          "px-2 py-1 rounded transition-colors cursor-pointer",
+                          statusFilter === "waiting"
+                            ? "bg-white dark:bg-neutral-750 text-sky-700 dark:text-sky-400 font-semibold shadow-2xs"
+                            : "text-neutral-500 hover:text-sky-600 dark:hover:text-sky-400"
+                        )}
+                      >
+                        Menunggu ({statusCounts.waiting})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStatusFilter("finished")}
+                        className={cn(
+                          "px-2 py-1 rounded transition-colors cursor-pointer",
+                          statusFilter === "finished"
+                            ? "bg-white dark:bg-neutral-750 text-neutral-800 dark:text-white font-semibold shadow-2xs"
+                            : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
+                        )}
+                      >
+                        Selesai ({statusCounts.finished})
+                      </button>
+                      {statusCounts.disabled > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setStatusFilter("disabled")}
+                          className={cn(
+                            "px-2 py-1 rounded transition-colors cursor-pointer",
+                            statusFilter === "disabled"
+                              ? "bg-white dark:bg-neutral-750 text-rose-700 dark:text-rose-400 font-semibold shadow-2xs"
+                              : "text-neutral-500 hover:text-rose-600 dark:hover:text-rose-400"
+                          )}
+                        >
+                          Nonaktif ({statusCounts.disabled})
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Group Filter Dropdown */}
+                  {availableGroups.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            "h-7 px-2.5 rounded-md text-[11px] font-medium border flex items-center gap-1.5 transition-colors cursor-pointer",
+                            groupFilter !== "all"
+                              ? "bg-purple-50 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-semibold"
+                              : "bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                          )}
+                        >
+                          <Folder className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                          <span className="max-w-[130px] truncate">
+                            {groupFilter === "all"
+                              ? "Semua Group"
+                              : groupFilter === "__none__"
+                              ? "Tanpa Group"
+                              : groupFilter}
+                          </span>
+                          <ChevronDown className="h-3 w-3 opacity-60" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56 text-xs">
+                        <DropdownMenuLabel className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+                          Filter Group Ruangan
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => setGroupFilter("all")} className="cursor-pointer">
+                          Semua Group ({filteredRooms.length})
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {availableGroups.map((grp) => {
+                          const count = filteredRooms.filter(r => (r.group_name || "").trim().toLowerCase() === grp.toLowerCase()).length;
+                          return (
+                            <DropdownMenuItem
+                              key={grp}
+                              onClick={() => setGroupFilter(grp)}
+                              className="cursor-pointer flex items-center justify-between"
+                            >
+                              <span className="truncate">{grp}</span>
+                              <span className="text-[10px] font-mono text-neutral-400">{count}</span>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setGroupFilter("__none__")} className="cursor-pointer flex items-center justify-between text-neutral-500">
+                          <span>Tanpa Group</span>
+                          <span className="text-[10px] font-mono text-neutral-400">
+                            {filteredRooms.filter(r => !r.group_name || !r.group_name.trim()).length}
+                          </span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               }
               selectable={true}
               selectedKeys={selectedIds}
@@ -1748,6 +1875,17 @@ const ExamRoomsPage = () => {
               isItemSelectable={isOwner}
               batchActions={
                 <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBatchGroupInput("");
+                      setBatchGroupDialogOpen(true);
+                    }}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-purple-600 dark:text-purple-400 font-medium hover:bg-purple-50 dark:hover:bg-purple-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Folder className="h-3 w-3" />
+                    <span>Set Group</span>
+                  </button>
                   {activeTab === "aktif" ? (
                     <>
                       <button
@@ -1858,14 +1996,19 @@ const ExamRoomsPage = () => {
 
                   <InspectorGrid>
                     <InspectorField
+                      label="Group Sesi"
+                      value={inspectedRoom.group_name || "Tanpa Group"}
+                    />
+                    <InspectorField
                       label="Alokasi Siswa"
                       value={inspectedRoom.className || "Semua Kelas"}
                     />
-                    <InspectorField
-                      label="Durasi Pengerjaan"
-                      value={`${inspectedRoom.duration} Menit`}
-                    />
                   </InspectorGrid>
+
+                  <InspectorField
+                    label="Durasi Pengerjaan"
+                    value={`${inspectedRoom.duration} Menit`}
+                  />
 
                   <InspectorGrid>
                     <InspectorField label="Siswa Sedang Aktif">
@@ -1945,9 +2088,9 @@ const ExamRoomsPage = () => {
                 variant="secondary"
                 icon={Copy}
                 onClick={() => {
-                  const url = `${window.location.origin}/student/login`;
+                  const url = getStudentExamUrl(school?.slug);
                   navigator.clipboard.writeText(url);
-                  addToast({ title: "Tautan Disalin", description: "URL portal siswa disalin ke clipboard.", type: "success" });
+                  addToast({ title: "Tautan Disalin", description: `${url} disalin ke clipboard.`, type: "success" });
                 }}
               >
                 Salin Link Ujian Siswa
@@ -2114,19 +2257,56 @@ const ExamRoomsPage = () => {
 
                 <form id="room-form" onSubmit={handleSubmit} className="space-y-5">
 
-                  {/* 1. Nama Ruangan */}
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                      Nama Ruang Ujian <span className="text-rose-500">*</span>
-                    </label>
-                    <Input
-                      placeholder="Contoh: Gelombang 1 / Kelas X MIPA"
-                      value={formValues.room_name}
-                      onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })}
-                      required
-                      className="h-8.5 text-xs rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
-                    />
-                    <p className="text-[11px] text-neutral-400 mt-1">Nama ini akan muncul pada kartu tes dan portal login siswa.</p>
+                  {/* 1. Nama Ruangan & Group */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                        Nama Ruang Ujian <span className="text-rose-500">*</span>
+                      </label>
+                      <Input
+                        placeholder="Contoh: Ruang 01 / Gelombang 1"
+                        value={formValues.room_name}
+                        onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })}
+                        required
+                        className="h-8.5 text-xs rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                      />
+                      <p className="text-[10px] text-neutral-400 mt-1">Muncul pada kartu tes &amp; login siswa.</p>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                          Group Ujian
+                        </label>
+                        <span className="text-[10px] text-neutral-400">Opsional</span>
+                      </div>
+                      <Input
+                        list="room-group-form-suggestions"
+                        placeholder="Contoh: Ujian Semester 2 2026"
+                        value={formValues.group_name}
+                        onChange={(e) => setFormValues({ ...formValues, group_name: e.target.value })}
+                        className="h-8.5 text-xs rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                      />
+                      <datalist id="room-group-form-suggestions">
+                        {availableGroups.map((grp) => (
+                          <option key={grp} value={grp} />
+                        ))}
+                      </datalist>
+                      {availableGroups.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          {availableGroups.slice(0, 3).map((grp) => (
+                            <button
+                              key={grp}
+                              type="button"
+                              onClick={() => setFormValues({ ...formValues, group_name: grp })}
+                              className="px-1.5 py-0.2 rounded text-[9px] bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 transition-colors cursor-pointer"
+                            >
+                              +{grp}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* 2. Jadwal Pelaksanaan */}
@@ -2445,36 +2625,143 @@ const ExamRoomsPage = () => {
 
       {/* Modal Daftar Kelas (Jika banyak) */}
       <Dialog open={!!showClassesRoom} onOpenChange={(open) => !open && setShowClassesRoom(null)}>
-        <DialogContent className="max-w-md bg-white dark:bg-[#0c0d0e] rounded-xl overflow-hidden p-0 border border-neutral-200 dark:border-neutral-800 shadow-2xl">
-          <div className="px-5 py-3.5 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50">
-            <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-              <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              Daftar {terminology.class} Terdaftar
-            </h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
-              Ruang: {showClassesRoom?.room_name || showClassesRoom?.examTitle}
-            </p>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] bg-white dark:bg-[#0c0d0e] rounded-2xl overflow-hidden p-0 border border-neutral-200/90 dark:border-neutral-800 shadow-2xl dark:shadow-[0_0_50px_rgba(16,185,129,0.08)]">
+          <div className="px-5 py-4 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-[#111214] flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+              <Users className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)] shrink-0" />
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight truncate">
+                  Daftar {terminology.class} Terdaftar
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+                Ruang: {showClassesRoom?.room_name || showClassesRoom?.examTitle}
+              </p>
+            </div>
           </div>
-          <div className="p-4 max-h-[55vh] overflow-y-auto">
+          <div className="p-5 max-h-[55vh] overflow-y-auto bg-white dark:bg-[#0c0d0e]">
             <div className="flex flex-wrap gap-1.5">
               {(showClassesRoom?.className || "").split(", ").map((cls, idx) => (
-                <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                <div key={idx} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-850 border border-neutral-200/80 dark:border-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]"></span>
                   <span>{cls}</span>
                 </div>
               ))}
             </div>
           </div>
-          <DialogFooter className="p-3 bg-neutral-50/70 dark:bg-neutral-900/50 border-t border-neutral-200 dark:border-neutral-800">
-            <Button onClick={() => setShowClassesRoom(null)} variant="outline" className="w-full h-8 text-xs font-semibold rounded-md border-neutral-200 dark:border-neutral-800">
+          <DialogFooter className="p-3.5 bg-neutral-50/70 dark:bg-neutral-900/50 border-t border-neutral-100 dark:border-neutral-800">
+            <Button onClick={() => setShowClassesRoom(null)} variant="outline" className="w-full h-8.5 text-xs font-semibold rounded-xl border-neutral-200 dark:border-neutral-800">
               Tutup
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Modal Atur Group Massal */}
+      <Dialog open={batchGroupDialogOpen} onOpenChange={setBatchGroupDialogOpen}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] bg-white dark:bg-[#0c0d0e] rounded-2xl overflow-hidden p-0 border border-neutral-200/90 dark:border-neutral-800 shadow-2xl dark:shadow-[0_0_50px_rgba(16,185,129,0.08)]">
+          <div className="px-5 py-4 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-[#111214] flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+              <Folder className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)] shrink-0" />
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight truncate">
+                  Atur Group Ruang Ujian
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+                Terapkan group untuk <span className="font-semibold text-neutral-800 dark:text-neutral-200">{selectedIds.length} ruang ujian</span> terpilih.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-5 space-y-4 bg-white dark:bg-[#0c0d0e]">
+            <div>
+              <label className="block text-xs font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+                Nama Group Ujian
+              </label>
+              <Input
+                list="batch-group-suggestions-er"
+                placeholder="Contoh: Ujian Semester 2 2026 / Try Out 1"
+                value={batchGroupInput}
+                onChange={(e) => setBatchGroupInput(e.target.value)}
+                className="h-10 text-xs rounded-xl bg-neutral-50/70 dark:bg-neutral-900/80 border-neutral-200 dark:border-neutral-800 focus-visible:ring-2 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
+                autoFocus
+              />
+              <datalist id="batch-group-suggestions-er">
+                {availableGroups.map((grp) => (
+                  <option key={grp} value={grp} />
+                ))}
+              </datalist>
+            </div>
+
+            {availableGroups.length > 0 && (
+              <div>
+                <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 block mb-1.5">
+                  Atau klik group yang sudah ada:
+                </span>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800">
+                  {availableGroups.map((grp) => (
+                    <button
+                      key={grp}
+                      type="button"
+                      onClick={() => setBatchGroupInput(grp)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer border select-none",
+                        batchGroupInput.trim() === grp
+                          ? "bg-emerald-600 text-white border-emerald-600 font-semibold shadow-xs"
+                          : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-emerald-500"
+                      )}
+                    >
+                      {grp}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="p-3.5 bg-neutral-50/70 dark:bg-neutral-900/50 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between sm:justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleApplyBatchGroup("")}
+              className="h-8.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/40 rounded-xl"
+            >
+              Kosongkan Group
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setBatchGroupDialogOpen(false)}
+                className="h-8.5 text-xs rounded-xl"
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => handleApplyBatchGroup(batchGroupInput)}
+                disabled={!batchGroupInput.trim()}
+                className="h-8.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/25 disabled:opacity-40"
+              >
+                Terapkan Group
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Batch Operation Progress Dialog */}
-      <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
+      <BatchProgressDialog progress={batchProgress} />
     </div>
   );
 };

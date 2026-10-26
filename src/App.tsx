@@ -231,10 +231,13 @@ const SchoolAppContent = () => {
               <Route path="pengaturan" element={<AdminOnlyRoute><SettingsPage /></AdminOnlyRoute>} />
               <Route path="status-server" element={<AdminOnlyRoute><ServerStatusPage /></AdminOnlyRoute>} />
               <Route path="invoice" element={<AdminOnlyRoute><SchoolInvoicePage /></AdminOnlyRoute>} />
+              <Route path="unduh-aplikasi" element={<DownloadAppsPage />} />
+              <Route path="unduh" element={<DownloadAppsPage />} />
             </Route>
 
             {/* Root redirect */}
             <Route path="/" element={<Navigate to="/exam" replace />} />
+            <Route path="/login" element={<Navigate to="/admin" replace />} />
             <Route path="/token-view" element={<TokenViewPage />} />
             <Route path="/unduh" element={<DownloadAppsPage />} />
             <Route path="/download" element={<Navigate to="/unduh" replace />} />

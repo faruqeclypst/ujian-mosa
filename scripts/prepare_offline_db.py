@@ -7,8 +7,18 @@ TEMPLATE_DB = 'vps/template_school/pb_data/data.db'
 OFFLINE_DB = 'offline_package/pb_data/data.db'
 OFFLINE_DB_BAK = 'offline_package/pb_data/data.db.bak'
 
+def remove_wal(db_path):
+    for ext in ['-wal', '-shm']:
+        f = db_path + ext
+        if os.path.exists(f):
+            try:
+                os.remove(f)
+            except Exception:
+                pass
+
 def clean_template_db():
     print(f"Cleaning template DB: {TEMPLATE_DB}...")
+    remove_wal(TEMPLATE_DB)
     conn = sqlite3.connect(TEMPLATE_DB)
     cur = conn.cursor()
     # Clean old leftover test data from template
@@ -18,12 +28,15 @@ def clean_template_db():
     cur.execute("DELETE FROM _mfas")
     cur.execute("DELETE FROM _otps")
     conn.commit()
+    cur.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     cur.execute("VACUUM")
     conn.close()
+    remove_wal(TEMPLATE_DB)
     print("Template DB cleaned successfully.")
 
 def build_offline_db():
     print(f"Building offline DB from {TEMPLATE_DB}...")
+    remove_wal(OFFLINE_DB)
     # Copy fresh template to offline DB
     shutil.copyfile(TEMPLATE_DB, OFFLINE_DB)
     
@@ -207,12 +220,20 @@ def build_offline_db():
     print("Cleared all operational tables.")
 
     conn.commit()
+    cur.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     cur.execute("VACUUM")
     conn.close()
+    remove_wal(OFFLINE_DB)
 
-    # Copy to backup
+    # Copy to backup and template
     shutil.copyfile(OFFLINE_DB, OFFLINE_DB_BAK)
     print(f"Created backup at {OFFLINE_DB_BAK}")
+    template_folder = 'offline_package/pb_data_template'
+    os.makedirs(template_folder, exist_ok=True)
+    template_db = os.path.join(template_folder, 'data.db')
+    remove_wal(template_db)
+    shutil.copyfile(OFFLINE_DB, template_db)
+    print(f"Created template at {template_folder}/data.db")
 
 if __name__ == '__main__':
     clean_template_db()

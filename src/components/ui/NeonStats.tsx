@@ -70,17 +70,17 @@ export const NeonStatCard: React.FC<NeonStatCardProps> = ({
       {...props}
     >
       {/* Top row: Label + Indicator / Action / Icon */}
-      <div className={cn("flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 min-h-[28px]", labelClassName)}>
-        <div className="flex items-center gap-1.5 font-medium truncate">
+      <div className={cn("flex items-center justify-between gap-1 text-xs text-neutral-500 dark:text-neutral-400 min-h-[28px]", labelClassName)}>
+        <div className="flex items-center gap-1.5 font-medium min-w-0 flex-1">
           {Icon && <Icon className="h-3.5 w-3.5 shrink-0 text-neutral-500" />}
           <span className="truncate">{label}</span>
           {indicator === true && (
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
           )}
-          {typeof indicator === "object" && indicator}
+          {typeof indicator === "object" && <span className="shrink-0">{indicator}</span>}
         </div>
 
-        {actionSlot && <div className="shrink-0">{actionSlot}</div>}
+        {actionSlot && <div className="shrink-0 ml-1">{actionSlot}</div>}
       </div>
 
       {/* Main Value Row */}

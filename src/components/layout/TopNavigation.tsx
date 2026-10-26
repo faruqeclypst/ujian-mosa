@@ -109,7 +109,7 @@ const TopNavigation = () => {
           filter: 'status = "LOCKED"',
           expand: 'studentId'
         });
-        
+
         if (!isMounted) return;
         setLockedAttempts(locked.map((a: any) => ({
           id: a.id,
@@ -119,7 +119,7 @@ const TopNavigation = () => {
           status: a.status,
           expand: a.expand
         })));
-      } catch (e) {}
+      } catch (e) { }
     };
 
     fetchInitialData();
@@ -142,18 +142,18 @@ const TopNavigation = () => {
     // Subscribe to Attempts - ONLY update if status is LOCKED or changing from LOCKED
     const unsubAttempts = pb.collection('attempts').subscribe("*", (e) => {
       if (!isMounted) return;
-      
+
       const record = e.record as any;
       const isLocked = record.status === "LOCKED";
-      
+
       setLockedAttempts(prev => {
         const exists = prev.find(a => a.id === record.id);
-        
+
         if (e.action === "delete" || !isLocked) {
           if (exists) return prev.filter(a => a.id !== record.id);
           return prev;
         }
-        
+
         // It's LOCKED and (create or update)
         const mapped = {
           id: record.id,
@@ -516,7 +516,7 @@ const TopNavigation = () => {
                           try {
                             const d = new Date(st.resetRequested);
                             timeStr = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-                          } catch (_) {}
+                          } catch (_) { }
                         }
 
                         const isThisResetting = resettingId === st.id;
@@ -790,9 +790,9 @@ const TopNavigation = () => {
         </div>
       </div>
       {/* Profile & Password Change Modal */}
-      <ChangePasswordModal 
-        isOpen={isCPModalOpen} 
-        onClose={() => setIsCPModalOpen(false)} 
+      <ChangePasswordModal
+        isOpen={isCPModalOpen}
+        onClose={() => setIsCPModalOpen(false)}
         defaultTab={modalTab}
       />
 
@@ -806,5 +806,7 @@ const TopNavigation = () => {
 };
 
 export default TopNavigation;
+
+
 
 

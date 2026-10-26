@@ -20,10 +20,12 @@ import {
   Users,
   CheckSquare,
   GitBranch,
+  Folder,
+  Layers,
 } from "lucide-react";
 import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Progress } from "../../components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
@@ -34,6 +36,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useExamData } from "../../context/ExamDataContext";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import { BatchProgressDialog, type BatchProgressState } from "../../components/dialogs/BatchProgressDialog";
+import { NeonProgressModal } from "../../components/ui/NeonProgressModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,6 +76,7 @@ export interface ExamData {
   createdAt: string; // PocketBase uses ISO strings
   examType?: string;
   status?: "archive" | null;
+  group_name?: string;
 }
 
 export const getExamTypeColorClass = (type: string) => {
@@ -364,7 +368,7 @@ const ExamsPage = () => {
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedExam, setSelectedExam] = useState<ExamData | null>(null);
   const [activeExamIds, setActiveExamIds] = useState<string[]>(() => examsCache?.activeExamIds || []);
-  const [formValues, setFormValues] = useState({ title: "", subjectId: "", teacherId: "", examType: "Latihan" });
+  const [formValues, setFormValues] = useState({ title: "", subjectId: "", teacherId: "", examType: "Latihan", group_name: "" });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
@@ -377,6 +381,9 @@ const ExamsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [groupFilter, setGroupFilter] = useState("all");
+  const [batchGroupDialogOpen, setBatchGroupDialogOpen] = useState(false);
+  const [batchGroupInput, setBatchGroupInput] = useState("");
   const [inspectedExamId, setInspectedExamId] = useState<string | null>(null);
 
   // Batch Export State
@@ -409,6 +416,7 @@ const ExamsPage = () => {
     setSearchQuery("");
     setSubjectFilter("all");
     setTypeFilter("all");
+    setGroupFilter("all");
   }, [activeTab]);
 
   const fetchQuestionCounts = useCallback(async () => {
@@ -460,6 +468,16 @@ const ExamsPage = () => {
     return exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
   }, [exams, activeTab]);
 
+  const availableGroups = useMemo(() => {
+    const set = new Set<string>();
+    exams.forEach(e => {
+      if (e.group_name && e.group_name.trim()) {
+        set.add(e.group_name.trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [exams]);
+
   const displayExams = useMemo(() => {
     return tabExams.filter(exam => {
       if (subjectFilter !== "all" && exam.subjectId !== subjectFilter) {
@@ -469,19 +487,27 @@ const ExamsPage = () => {
         const t = exam.examType || "Latihan";
         if (t !== typeFilter) return false;
       }
+      if (groupFilter !== "all") {
+        if (groupFilter === "__none__") {
+          if (exam.group_name && exam.group_name.trim()) return false;
+        } else {
+          if ((exam.group_name || "").trim().toLowerCase() !== groupFilter.trim().toLowerCase()) return false;
+        }
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const subject = subjects.find((s: any) => s.id === exam.subjectId)?.name?.toLowerCase() || "";
         const teacher = teachers.find((t: any) => t.id === exam.teacherId)?.name?.toLowerCase() || "";
         const title = (exam.title || "").toLowerCase();
         const examType = (exam.examType || "").toLowerCase();
-        if (!title.includes(q) && !subject.includes(q) && !teacher.includes(q) && !examType.includes(q)) {
+        const groupName = (exam.group_name || "").toLowerCase();
+        if (!title.includes(q) && !subject.includes(q) && !teacher.includes(q) && !examType.includes(q) && !groupName.includes(q)) {
           return false;
         }
       }
       return true;
     });
-  }, [tabExams, subjectFilter, typeFilter, searchQuery, subjects, teachers]);
+  }, [tabExams, subjectFilter, typeFilter, groupFilter, searchQuery, subjects, teachers]);
 
   const filteredExams = displayExams;
 
@@ -853,7 +879,8 @@ const ExamsPage = () => {
       title: "",
       subjectId: "",
       teacherId: role === "admin" ? "" : (teacherId || ""),
-      examType: "Latihan"
+      examType: "Latihan",
+      group_name: "",
     });
     setIsDialogOpen(true);
   };
@@ -873,6 +900,7 @@ const ExamsPage = () => {
             subjectId: exam.subjectId,
             teacherId: exam.teacherId,
             examType: exam.examType || "Latihan",
+            group_name: exam.group_name || "",
           });
 
           const questions = await pb.collection('questions').getFullList({
@@ -902,9 +930,52 @@ const ExamsPage = () => {
       title: exam.title,
       subjectId: exam.subjectId,
       teacherId: exam.teacherId || "",
-      examType: exam.examType || "Latihan"
+      examType: exam.examType || "Latihan",
+      group_name: exam.group_name || "",
     });
     setIsDialogOpen(true);
+  };
+
+  const handleApplyBatchGroup = async (targetGroupName: string) => {
+    if (selectedIds.length === 0 || !pb) return;
+    setBatchGroupDialogOpen(false);
+    const cleanedGroup = targetGroupName.trim();
+
+    setBatchProgress({
+      isOpen: true,
+      total: selectedIds.length,
+      current: 0,
+      message: `Mengatur group ${cleanedGroup ? `"${cleanedGroup}"` : "kosong"}...`,
+      title: "Atur Group Bank Soal"
+    });
+
+    try {
+      for (let i = 0; i < selectedIds.length; i++) {
+        await pb.collection('exams').update(selectedIds[i], {
+          group_name: cleanedGroup
+        });
+        setBatchProgress(prev => ({
+          ...prev,
+          current: i + 1,
+          message: `Memperbarui bank soal (${i + 1}/${selectedIds.length})`
+        }));
+      }
+
+      setExams(prev => prev.map(e => selectedIds.includes(e.id) ? { ...e, group_name: cleanedGroup } : e));
+      showAlert(
+        "Berhasil",
+        cleanedGroup
+          ? `${selectedIds.length} bank soal berhasil dimasukkan ke group "${cleanedGroup}".`
+          : `${selectedIds.length} bank soal berhasil dikeluarkan dari group.`,
+        "success"
+      );
+      setSelectedIds([]);
+      setBatchGroupInput("");
+    } catch (e: any) {
+      showAlert("Gagal", e.message || "Gagal mengatur group massal.", "danger");
+    } finally {
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
+    }
   };
 
   const handleDeleteClick = async (exam: ExamData) => {
@@ -933,12 +1004,14 @@ const ExamsPage = () => {
     e.preventDefault();
     if (!pb) return;
     try {
+      const payload = {
+        ...formValues,
+        group_name: (formValues.group_name || "").trim(),
+      };
       if (dialogMode === "edit" && selectedExam) {
-        await pb.collection('exams').update(selectedExam.id, { ...formValues });
+        await pb.collection('exams').update(selectedExam.id, payload);
       } else {
-        await pb.collection('exams').create({
-          ...formValues,
-        });
+        await pb.collection('exams').create(payload);
       }
       setIsDialogOpen(false);
     } catch (error) {
@@ -1517,6 +1590,12 @@ const ExamsPage = () => {
               <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0", getExamTypeColorClass(exam.examType || "Latihan"))}>
                 {exam.examType || "Latihan"}
               </span>
+              {exam.group_name && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 shrink-0 max-w-[150px] truncate" title={`Group: ${exam.group_name}`}>
+                  <Folder className="h-2.5 w-2.5 shrink-0 text-purple-500" />
+                  <span className="truncate">{exam.group_name}</span>
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">
               <span className="font-medium text-emerald-600 dark:text-emerald-400">
@@ -1612,7 +1691,7 @@ const ExamsPage = () => {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
                   title="Menu Lainnya"
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
@@ -1874,6 +1953,21 @@ const ExamsPage = () => {
                     <option value="US">Ujian Sekolah (US)</option>
                     <option value="Tryout">Tryout</option>
                   </select>
+
+                  {/* Group filter */}
+                  {availableGroups.length > 0 && (
+                    <select
+                      value={groupFilter}
+                      onChange={(e) => setGroupFilter(e.target.value)}
+                      className="h-8 text-xs rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 px-2.5 text-purple-700 dark:text-purple-300 font-medium focus:outline-none focus:ring-1 focus:ring-purple-400"
+                    >
+                      <option value="all">Semua Group</option>
+                      {availableGroups.map((grp) => (
+                        <option key={grp} value={grp}>{grp}</option>
+                      ))}
+                      <option value="__none__">Tanpa Group</option>
+                    </select>
+                  )}
                 </div>
               }
               selectable={true}
@@ -1882,6 +1976,17 @@ const ExamsPage = () => {
               isItemSelectable={isOwner}
               batchActions={
                 <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBatchGroupInput("");
+                      setBatchGroupDialogOpen(true);
+                    }}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-purple-600 dark:text-purple-400 font-medium hover:bg-purple-50 dark:hover:bg-purple-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Folder className="h-3 w-3" />
+                    <span>Set Group</span>
+                  </button>
                   {activeTab === "aktif" ? (
                     <>
                       {role === "admin" && (
@@ -1989,6 +2094,11 @@ const ExamsPage = () => {
                       value={teachers.find((t: any) => t.id === inspectedExam.teacherId)?.name || (inspectedExam as any).teacherName || "-"}
                     />
                   </InspectorGrid>
+
+                  <InspectorField
+                    label="Group Bank Soal"
+                    value={inspectedExam.group_name || "Tanpa Group"}
+                  />
 
                   <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
                     <InspectorField
@@ -2104,7 +2214,7 @@ const ExamsPage = () => {
           {/* Form Body */}
           <form onSubmit={handleSubmit} className="flex flex-col">
             <div className="p-5 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              {/* Field 1: Judul Bank Soal */}
+              {/* Field 1: Judul Bank Soal & Group */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label htmlFor="exam-title-input" className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
@@ -2121,6 +2231,44 @@ const ExamsPage = () => {
                   placeholder="Masukkan judul bank soal..."
                   className="h-10 px-3.5 rounded-lg border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs text-neutral-900 dark:text-neutral-100 focus-visible:ring-1 focus-visible:ring-emerald-500 placeholder:text-neutral-400 transition-all"
                 />
+              </div>
+
+              {/* Field 1b: Group Bank Soal */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="exam-group-input" className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                    Group Bank Soal
+                  </label>
+                  <span className="text-[10px] text-neutral-400">Opsional</span>
+                </div>
+                <Input
+                  id="exam-group-input"
+                  list="exam-group-form-suggestions"
+                  value={formValues.group_name}
+                  onChange={(e) => setFormValues({ ...formValues, group_name: e.target.value })}
+                  placeholder="Contoh: Ujian Semester 2 2026 / Latihan Mandiri"
+                  className="h-10 px-3.5 rounded-lg border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs text-neutral-900 dark:text-neutral-100 focus-visible:ring-1 focus-visible:ring-emerald-500 placeholder:text-neutral-400 transition-all"
+                />
+                <datalist id="exam-group-form-suggestions">
+                  {availableGroups.map((grp) => (
+                    <option key={grp} value={grp} />
+                  ))}
+                </datalist>
+                {availableGroups.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1 mt-1">
+                    <span className="text-[10px] text-neutral-400">Saran:</span>
+                    {availableGroups.slice(0, 3).map((grp) => (
+                      <button
+                        key={grp}
+                        type="button"
+                        onClick={() => setFormValues({ ...formValues, group_name: grp })}
+                        className="px-1.5 py-0.5 rounded text-[10px] bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 transition-colors cursor-pointer"
+                      >
+                        +{grp}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Grid 2 Kolom: Jenis Evaluasi & Mata Pelajaran */}
@@ -2372,29 +2520,115 @@ const ExamsPage = () => {
       </Dialog>
 
       {/* Batch Export Progress Dialog */}
-      <Dialog open={batchExportProgress.isOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-sm bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6" hideClose>
-          <DialogHeader>
-            <DialogTitle className="text-sm font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-              <Loader2 className="h-4 w-4 text-neutral-500 animate-spin" />
-              <span>Export Batch Arsip</span>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <Progress
-              value={batchExportProgress.total > 0 ? Math.round((batchExportProgress.current / batchExportProgress.total) * 100) : 0}
-              className="h-1.5"
-            />
-            <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
-              <span className="truncate max-w-[220px]">{batchExportProgress.message}</span>
-              <span className="font-mono font-bold ml-2 shrink-0">{batchExportProgress.current}/{batchExportProgress.total}</span>
+      <NeonProgressModal
+        progress={{
+          ...batchExportProgress,
+          title: "Export Batch Arsip",
+        }}
+      />
+
+      {/* Modal Atur Group Massal */}
+      <Dialog open={batchGroupDialogOpen} onOpenChange={setBatchGroupDialogOpen}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] bg-white dark:bg-[#0c0d0e] rounded-2xl overflow-hidden p-0 border border-neutral-200/90 dark:border-neutral-800 shadow-2xl dark:shadow-[0_0_50px_rgba(16,185,129,0.08)]">
+          <div className="px-5 py-4 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-[#111214] flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+              <Folder className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)] shrink-0" />
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight truncate">
+                  Atur Group Bank Soal
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+                Terapkan group untuk <span className="font-semibold text-neutral-800 dark:text-neutral-200">{selectedIds.length} bank soal</span> terpilih.
+              </p>
             </div>
           </div>
+
+          <div className="p-5 space-y-4 bg-white dark:bg-[#0c0d0e]">
+            <div>
+              <label className="block text-xs font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+                Nama Group Bank Soal
+              </label>
+              <Input
+                list="batch-group-suggestions-ex"
+                placeholder="Contoh: Ujian Semester 2 2026 / Latihan Mandiri"
+                value={batchGroupInput}
+                onChange={(e) => setBatchGroupInput(e.target.value)}
+                className="h-10 text-xs rounded-xl bg-neutral-50/70 dark:bg-neutral-900/80 border-neutral-200 dark:border-neutral-800 focus-visible:ring-2 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
+                autoFocus
+              />
+              <datalist id="batch-group-suggestions-ex">
+                {availableGroups.map((grp) => (
+                  <option key={grp} value={grp} />
+                ))}
+              </datalist>
+            </div>
+
+            {availableGroups.length > 0 && (
+              <div>
+                <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 block mb-1.5">
+                  Atau klik group yang sudah ada:
+                </span>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800">
+                  {availableGroups.map((grp) => (
+                    <button
+                      key={grp}
+                      type="button"
+                      onClick={() => setBatchGroupInput(grp)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer border select-none",
+                        batchGroupInput.trim() === grp
+                          ? "bg-emerald-600 text-white border-emerald-600 font-semibold shadow-xs"
+                          : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-emerald-500"
+                      )}
+                    >
+                      {grp}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="p-3.5 bg-neutral-50/70 dark:bg-neutral-900/50 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between sm:justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleApplyBatchGroup("")}
+              className="h-8.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/40 rounded-xl"
+            >
+              Kosongkan Group
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setBatchGroupDialogOpen(false)}
+                className="h-8.5 text-xs rounded-xl"
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => handleApplyBatchGroup(batchGroupInput)}
+                disabled={!batchGroupInput.trim()}
+                className="h-8.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/25 disabled:opacity-40"
+              >
+                Terapkan Group
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Batch Operation Progress Dialog */}
-      <BatchProgressDialog progress={batchProgress} colorClass="bg-neutral-900 dark:bg-neutral-100" />
+      <BatchProgressDialog progress={batchProgress} />
     </div>
   );
 };

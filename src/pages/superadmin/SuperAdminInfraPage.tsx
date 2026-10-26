@@ -219,7 +219,7 @@ const SuperAdminInfraPage = () => {
             type="button"
             onClick={fetchInfrastructure}
             disabled={loading}
-            className="flex items-center gap-2 min-h-[42px] px-4 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 shadow-sm transition-all disabled:opacity-50 w-fit"
+            className="flex items-center gap-2 min-h-[42px] px-4 bg-white dark:bg-neutral-850 border border-slate-200 dark:border-neutral-750 text-slate-700 dark:text-neutral-200 text-xs font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-neutral-800 shadow-2xs transition-all disabled:opacity-50 w-fit cursor-pointer"
           >
             <RefreshCw size={14} className={cn(loading && "animate-spin")} />
             <span>Segarkan</span>

@@ -47,6 +47,36 @@ onBootstrap((e) => {
             // Notice only
         }
 
+        // Auto-ensure group_name in exam_rooms & exams
+        try {
+            try { db.newQuery("ALTER TABLE exam_rooms ADD COLUMN group_name TEXT DEFAULT ''").execute(); } catch (_) {}
+            try { db.newQuery("ALTER TABLE exams ADD COLUMN group_name TEXT DEFAULT ''").execute(); } catch (_) {}
+
+            const erCol = $app.findCollectionByNameOrId("exam_rooms");
+            if (erCol && !erCol.fields.getByName("group_name")) {
+                const tf = new TextField();
+                tf.name = "group_name";
+                tf.required = false;
+                tf.max = 150;
+                erCol.fields.add(tf);
+                $app.save(erCol);
+                console.log("[SCHEMA_SYNC] Ensured group_name field in exam_rooms collection");
+            }
+
+            const exCol = $app.findCollectionByNameOrId("exams");
+            if (exCol && !exCol.fields.getByName("group_name")) {
+                const tf = new TextField();
+                tf.name = "group_name";
+                tf.required = false;
+                tf.max = 150;
+                exCol.fields.add(tf);
+                $app.save(exCol);
+                console.log("[SCHEMA_SYNC] Ensured group_name field in exams collection");
+            }
+        } catch (errGroup) {
+            // Notice only
+        }
+
         try {
             const attemptsCols = [
                 { name: "objectiveScore", sql: "ALTER TABLE attempts ADD COLUMN objectiveScore REAL DEFAULT 0" },

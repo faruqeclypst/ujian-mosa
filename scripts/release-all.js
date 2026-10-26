@@ -189,31 +189,18 @@ try {
   // pb_hooks tanpa _removed_go_native (arsip hook yang diganti Go native)
   execSync(`powershell -Command "Copy-Item pb_hooks ${stagingDir}/pb_hooks_tmp -Recurse -Force; Remove-Item ${stagingDir}/pb_hooks_tmp/_removed_go_native -Recurse -Force -ErrorAction SilentlyContinue; Move-Item ${stagingDir}/pb_hooks_tmp ${stagingDir}/pb_hooks -Force"`, { stdio: 'inherit' });
   execSync(`powershell -Command "Copy-Item version.json ${stagingDir}/version.json -Force"`, { stdio: 'inherit' });
-  // Binary PocketBase Go-native (Windows) untuk server offline sekolah
-  // Diambil dari Master VPS saat release (tidak disimpan di git — 45MB)
-  // NOTE: scp langsung ke staging lokal (bukan via ssh, karena path Windows tidak ada di VPS)
-  // Cache: jika sudah ada di .cache/ dan ukurannya sama dengan VPS, skip download
-  const pbExeCache = path.join(process.cwd(), '.cache', 'pocketbase.exe');
-  let needDownload = true;
-  if (fs.existsSync(pbExeCache)) {
-    try {
-      const localSize = fs.statSync(pbExeCache).size;
-      const remoteSize = parseInt(execSync(`ssh -o StrictHostKeyChecking=no ${VPS_HOST} "stat -c%s /opt/pocketbase/schools/template/pocketbase.exe"`, { encoding: 'utf-8' }).trim());
-      if (localSize === remoteSize && localSize > 40000000) {
-        console.log('  ♻️ pocketbase.exe sudah di-cache lokal, skip download 43MB');
-        needDownload = false;
-      }
-    } catch { }
-  }
-  if (needDownload) {
-    execSync(`scp -o StrictHostKeyChecking=no ${VPS_HOST}:/opt/pocketbase/schools/template/pocketbase.exe ${stagingDir}/pocketbase.exe`, { stdio: 'inherit' });
-    // Simpan ke cache
-    try {
-      fs.mkdirSync(path.dirname(pbExeCache), { recursive: true });
-      fs.copyFileSync(path.join(stagingDir, 'pocketbase.exe'), pbExeCache);
-    } catch { }
+  // Binary PocketBase Windows untuk server offline sekolah (33.9MB, support --publicDir & JSVM)
+  // Prioritaskan binary teruji dari offline_package lokal (identik dengan copy-paste offline_package)
+  if (fs.existsSync('offline_package/pocketbase.exe')) {
+    console.log('  📦 Menggunakan pocketbase.exe resmi dari offline_package (33.9MB)...');
+    fs.copyFileSync('offline_package/pocketbase.exe', path.join(stagingDir, 'pocketbase.exe'));
   } else {
-    fs.copyFileSync(pbExeCache, path.join(stagingDir, 'pocketbase.exe'));
+    const pbExeCache = path.join(process.cwd(), '.cache', 'pocketbase.exe');
+    if (fs.existsSync(pbExeCache)) {
+      fs.copyFileSync(pbExeCache, path.join(stagingDir, 'pocketbase.exe'));
+    } else {
+      execSync(`scp -o StrictHostKeyChecking=no ${VPS_HOST}:/opt/pocketbase/schools/template/pocketbase.exe ${stagingDir}/pocketbase.exe`, { stdio: 'inherit' });
+    }
   }
   if (fs.existsSync('offline_package/perbarui-server.bat')) {
     execSync(`powershell -Command "Copy-Item offline_package/perbarui-server.bat ${stagingDir}/perbarui-server.bat -Force"`, { stdio: 'inherit' });
@@ -221,13 +208,24 @@ try {
   if (fs.existsSync('offline_package/jalankan-server.bat')) {
     execSync(`powershell -Command "Copy-Item offline_package/jalankan-server.bat ${stagingDir}/jalankan-server.bat -Force"`, { stdio: 'inherit' });
   }
+  // Sertakan starter database template agar proktor/sekolah yang baru pertama kali memasang langsung siap pakai
+  if (fs.existsSync('offline_package/pb_data/data.db')) {
+    const templateDir = path.join(stagingDir, 'pb_data_template');
+    if (!fs.existsSync(templateDir)) fs.mkdirSync(templateDir, { recursive: true });
+    fs.copyFileSync('offline_package/pb_data/data.db', path.join(templateDir, 'data.db'));
+  }
 
-  // Kompres ke offline-update.zip (Gunakan tar.exe bawaan Windows — 20x lebih cepat dari Compress-Archive)
+  // Kompres ke offline-update.zip (Gunakan tar.exe bawaan Windows — cepat & kompatibel dengan seluruh extractor)
+  // CATATAN: JANGAN gunakan '.' sebagai target tar, karena bsdtar akan menambahkan prefix './' ke setiap file/folder
+  // di dalam zip yang menyebabkan Windows Explorer / WinRAR menganggap zip corrupted / invalid (0 file).
+  // Berikan daftar item teratas di stagingDir secara langsung agar struktur zip standar (tanpa prefix ./).
   const updateZipName = 'offline-update.zip';
   if (fs.existsSync(updateZipName)) fs.unlinkSync(updateZipName);
+  const stagingItems = fs.readdirSync(stagingDir);
   try {
-    execSync(`tar.exe -a -c -f "${updateZipName}" -C "${stagingDir}" .`, { stdio: 'inherit' });
+    execSync(`tar.exe -a -c -f "${updateZipName}" -C "${stagingDir}" ${stagingItems.map(f => `"${f}"`).join(' ')}`, { stdio: 'inherit' });
   } catch (tarErr) {
+    console.warn('  ⚠️ tar.exe gagal, mencoba fallback PowerShell Compress-Archive...', tarErr.message);
     execSync(`powershell -Command "Compress-Archive -Path '${stagingDir}/*' -DestinationPath '${updateZipName}' -Force"`, { stdio: 'inherit' });
   }
   fs.rmSync(stagingDir, { recursive: true, force: true });

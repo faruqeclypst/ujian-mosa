@@ -65,7 +65,7 @@ export const SubjectForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
             type="button" 
             variant="outline" 
             onClick={onCancel}
-            className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300"
+            className="border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg text-xs font-semibold text-neutral-700 dark:text-neutral-300 shadow-2xs transition-colors cursor-pointer"
           >
             Batal
           </Button>

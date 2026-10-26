@@ -373,7 +373,7 @@ export const OneClickMigrationModal = ({
                     type="button"
                     onClick={handleTestConnection}
                     disabled={testing || !workerHost.trim()}
-                    className="h-10 px-3.5 rounded-xl bg-white border border-purple-300 text-purple-700 text-xs font-bold hover:bg-purple-50 transition-all flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0 cursor-pointer"
+                    className="h-10 px-3.5 rounded-xl bg-white dark:bg-neutral-850 border border-purple-300 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-bold hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-all flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0 cursor-pointer"
                   >
                     <RefreshCw size={13} className={cn(testing && "animate-spin")} />
                     <span>{testing ? "Menguji..." : "Tes Koneksi"}</span>
@@ -559,12 +559,12 @@ export const OneClickMigrationModal = ({
 
         {/* Footer Actions */}
         {!migrating && !successMessage && (
-          <div className="bg-slate-50 px-5 py-3.5 border-t border-slate-200 flex items-center justify-between gap-3">
+          <div className="bg-slate-50 dark:bg-neutral-900 px-5 py-3.5 border-t border-slate-200 dark:border-neutral-800 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={onClose}
               disabled={restoring}
-              className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-white transition-all cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 border border-slate-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 text-slate-700 dark:text-neutral-200 rounded-xl text-xs font-semibold hover:bg-slate-50 dark:hover:bg-neutral-800 transition-all cursor-pointer disabled:opacity-50"
             >
               Batal
             </button>

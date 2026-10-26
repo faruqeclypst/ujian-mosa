@@ -13,6 +13,7 @@ import {
   AlertCircle,
   CheckCircle2,
   FileText,
+  Folder,
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import { useAuth } from "../../context/AuthContext";
@@ -36,6 +37,7 @@ export interface ExamRoomPickerItem {
   isDisabled?: boolean;
   token?: string;
   created?: string;
+  group_name?: string;
 }
 
 interface ExamRoomPickerProps {
@@ -63,6 +65,7 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "finished" | "archive">("all");
+  const [groupFilter, setGroupFilter] = useState<string>("all");
 
   const fetchRooms = useCallback(async () => {
     if (!pb) return;
@@ -125,6 +128,7 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
           isDisabled: r.isDisabled !== undefined ? r.isDisabled : r.isActive === false,
           token: r.token,
           created: r.created,
+          group_name: r.group_name || "",
         };
       });
 
@@ -187,9 +191,23 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
     return { all, active, finished, archive };
   }, [rooms]);
 
+  // Groups available
+  const availableGroups = useMemo(() => {
+    const set = new Set<string>();
+    rooms.forEach((r) => {
+      if (r.group_name && r.group_name.trim()) {
+        set.add(r.group_name.trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "id"));
+  }, [rooms]);
+
   // Filtered rooms
   const filteredRooms = useMemo(() => {
     return rooms.filter((r) => {
+      // 0. Group Filter
+      if (groupFilter !== "all" && (r.group_name || "") !== groupFilter) return false;
+
       // 1. Status Filter
       if (statusFilter === "archive" && r.status !== "archive") return false;
       if (statusFilter !== "archive" && r.status === "archive") return false;
@@ -212,12 +230,13 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
         const matchesSubj = (r.subjectName || "").toLowerCase().includes(q);
         const matchesTeach = (r.teacherName || "").toLowerCase().includes(q);
         const matchesClass = (r.className || "").toLowerCase().includes(q);
-        return matchesName || matchesExam || matchesSubj || matchesTeach || matchesClass;
+        const matchesGroup = (r.group_name || "").toLowerCase().includes(q);
+        return matchesName || matchesExam || matchesSubj || matchesTeach || matchesClass || matchesGroup;
       }
 
       return true;
     });
-  }, [rooms, statusFilter, search]);
+  }, [rooms, statusFilter, groupFilter, search]);
 
   return (
     <div className="space-y-6">
@@ -247,96 +266,122 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
 
       {/* Filter & Search Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white dark:bg-[#111214] p-2.5 sm:p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-2xs">
-        {/* Status Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-xs -mx-0.5 px-0.5">
-          <button
-            type="button"
-            onClick={() => setStatusFilter("all")}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
-              statusFilter === "all"
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
-                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
-            )}
-          >
-            <span>Semua</span>
-            <span
+        {/* Status Tabs & Group Selector */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-xs -mx-0.5 px-0.5">
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
               className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
                 statusFilter === "all"
-                  ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
-                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
               )}
             >
-              {statusCounts.all}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusFilter("active")}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
-              statusFilter === "active"
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
-                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
-            )}
-          >
-            <span>Aktif</span>
-            <span
+              <span>Semua</span>
+              <span
+                className={cn(
+                  "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                  statusFilter === "all"
+                    ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+                )}
+              >
+                {statusCounts.all}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("active")}
               className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
                 statusFilter === "active"
-                  ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
-                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
               )}
             >
-              {statusCounts.active}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusFilter("finished")}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
-              statusFilter === "finished"
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
-                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
-            )}
-          >
-            <span>Selesai</span>
-            <span
+              <span>Aktif</span>
+              <span
+                className={cn(
+                  "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                  statusFilter === "active"
+                    ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+                )}
+              >
+                {statusCounts.active}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("finished")}
               className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
                 statusFilter === "finished"
-                  ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
-                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
               )}
             >
-              {statusCounts.finished}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusFilter("archive")}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
-              statusFilter === "archive"
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
-                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
-            )}
-          >
-            <span>Arsip</span>
-            <span
+              <span>Selesai</span>
+              <span
+                className={cn(
+                  "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                  statusFilter === "finished"
+                    ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+                )}
+              >
+                {statusCounts.finished}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("archive")}
               className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
                 statusFilter === "archive"
-                  ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
-                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
               )}
             >
-              {statusCounts.archive}
-            </span>
-          </button>
+              <span>Arsip</span>
+              <span
+                className={cn(
+                  "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
+                  statusFilter === "archive"
+                    ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+                )}
+              >
+                {statusCounts.archive}
+              </span>
+            </button>
+          </div>
+
+          {availableGroups.length > 0 && (
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-neutral-300 dark:text-neutral-700 hidden sm:inline">|</span>
+              <div className="relative">
+                <select
+                  value={groupFilter}
+                  onChange={(e) => setGroupFilter(e.target.value)}
+                  className="h-8 pl-2 pr-7 text-xs font-medium rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111214] text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer transition-colors"
+                  title="Filter berdasarkan group ujian"
+                >
+                  <option value="all">Semua Group ({rooms.length})</option>
+                  {availableGroups.map((grp) => {
+                    const count = rooms.filter((r) => r.group_name === grp).length;
+                    return (
+                      <option key={grp} value={grp}>
+                        {grp} ({count})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Search Input */}
@@ -421,9 +466,20 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
                 <div className="space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
-                        {room.name}
-                      </h3>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                          {room.name}
+                        </h3>
+                        {room.group_name && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 shrink-0 max-w-[140px] truncate"
+                            title={`Group: ${room.group_name}`}
+                          >
+                            <Folder className="h-2.5 w-2.5 shrink-0" />
+                            <span className="truncate">{room.group_name}</span>
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
                         {room.subjectName} {room.teacherName && room.teacherName !== "-" ? `• ${room.teacherName}` : ""}
                       </p>

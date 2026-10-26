@@ -1973,7 +1973,7 @@ const ConfirmDialog = ({
           <button
             disabled={loading}
             onClick={onClose}
-            className="flex-1 h-11 bg-slate-100 text-slate-700 rounded-2xl text-sm font-bold hover:bg-slate-200 transition-all disabled:opacity-50"
+            className="flex-1 h-11 bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-200 rounded-2xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-neutral-750 transition-all disabled:opacity-50 cursor-pointer"
           >
             Batal
           </button>
@@ -2340,7 +2340,7 @@ const AddEditSchoolModal = ({
               {isEdit ? "Perbarui konfigurasi tenant" : "Daftarkan institusi ke sistem"}
             </p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-all">
+          <button onClick={onClose} className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800 hover:bg-slate-100 dark:hover:bg-neutral-750 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all cursor-pointer">
             <X size={18} strokeWidth={2.5} />
           </button>
         </div>
@@ -2732,12 +2732,12 @@ const AddEditSchoolModal = ({
         </form>
 
         {/* Footer */}
-        <div className="shrink-0 px-6 py-5 border-t border-slate-100 bg-white flex gap-3">
+        <div className="shrink-0 px-6 py-5 border-t border-slate-100 dark:border-neutral-800 bg-white dark:bg-neutral-900 flex gap-3">
           <button
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="flex-[1] h-12 border border-slate-200 text-slate-600 rounded-xl text-[13px] font-bold hover:bg-slate-50 transition-all disabled:opacity-50"
+            className="flex-[1] h-12 border border-slate-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 text-slate-600 dark:text-neutral-300 rounded-xl text-[13px] font-bold hover:bg-slate-50 dark:hover:bg-neutral-800 transition-all disabled:opacity-50 cursor-pointer"
           >
             Batal
           </button>

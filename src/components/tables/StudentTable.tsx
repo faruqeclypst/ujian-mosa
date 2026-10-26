@@ -100,7 +100,7 @@ export const StudentTable = ({
               {student.photo && <AvatarImage src={student.photo} alt={student.name} className="object-cover" />}
               <AvatarFallback className={cn(
                 "text-white text-[10px] font-bold font-mono",
-                student.gender === "L" ? "bg-gradient-to-br from-blue-500 to-indigo-600" : "bg-gradient-to-br from-rose-400 to-pink-600"
+                student.gender === "L" ? "bg-sky-600 dark:bg-sky-700" : "bg-rose-500 dark:bg-rose-600"
               )}>
                 {initials}
               </AvatarFallback>
@@ -245,7 +245,7 @@ export const StudentTable = ({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="relative h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  className="relative h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
                   title="Menu Lainnya"
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />

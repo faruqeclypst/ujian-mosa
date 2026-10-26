@@ -24,7 +24,7 @@ export const getMainDomain = (): string => {
       if (parts.length === 2) return host;
     }
   }
-  return 'localhost:5173';
+  return 'examku.my.id';
 };
 
 /**
@@ -52,6 +52,41 @@ export const getSchoolUrl = (slug: string): string => {
 export const getSchoolDomain = (slug: string): string => {
   const domain = getMainDomain();
   return `${slug}.${domain}`;
+};
+
+/**
+ * Generate full student exam URL from slug
+ * Sesuai konfigurasi SaaS: https://${slug}.${domain}/exam
+ * @param slug - School slug (e.g., "modalbangsa")
+ * @returns Full URL (e.g., "https://modalbangsa.examku.my.id/exam")
+ */
+export const getStudentExamUrl = (slug?: string | null): string => {
+  const domain = getMainDomain();
+  const cleanSlug = (slug || '').trim();
+  if (!cleanSlug || cleanSlug === 'local') {
+    if (typeof window !== 'undefined' && window.location.origin) {
+      return `${window.location.origin}/exam`;
+    }
+    return `https://${domain}/exam`;
+  }
+  return `https://${cleanSlug}.${domain}/exam`;
+};
+
+/**
+ * Generate student exam domain/path without protocol (e.g., "modalbangsa.examku.my.id/exam")
+ * @param slug - School slug
+ * @returns Domain + path
+ */
+export const getStudentExamDomain = (slug?: string | null): string => {
+  const domain = getMainDomain();
+  const cleanSlug = (slug || '').trim();
+  if (!cleanSlug || cleanSlug === 'local') {
+    if (typeof window !== 'undefined' && window.location.host) {
+      return `${window.location.host}/exam`;
+    }
+    return `${domain}/exam`;
+  }
+  return `${cleanSlug}.${domain}/exam`;
 };
 
 /**

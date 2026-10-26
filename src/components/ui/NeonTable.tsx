@@ -349,8 +349,8 @@ export function NeonTable<T>({
                   style={{ width: col.width }}
                   className={cn(
                     compact
-                      ? "px-3 sm:px-3.5 py-2.5 sm:py-3"
-                      : "px-2.5 sm:px-5 py-3 sm:py-3.5",
+                      ? "px-2.5 sm:px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400"
+                      : "px-3 sm:px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400",
                     col.align === "center"
                       ? "text-center"
                       : col.align === "right"
@@ -425,15 +425,15 @@ export function NeonTable<T>({
                       className={cn(
                         "transition-colors group",
                         onRowClick ? "cursor-pointer" : "",
-                        // Active/Inspected row highlighting (Neon accent)
+                        // Active/Inspected row highlighting (Subtle accent)
                         isActive
-                          ? "bg-emerald-500/[0.08] dark:bg-emerald-500/[0.14] shadow-[inset_0_0_20px_rgba(16,185,129,0.06)] relative"
+                          ? "bg-emerald-500/[0.05] dark:bg-emerald-500/[0.09] relative"
                           : isExpanded
-                          ? "bg-emerald-500/[0.03] dark:bg-emerald-500/[0.06]"
+                          ? "bg-emerald-500/[0.02] dark:bg-emerald-500/[0.05]"
                           : "hover:bg-neutral-50/80 dark:hover:bg-[#131517]",
                         // Selected row style
                         isSelected && !isActive
-                          ? "bg-blue-50/30 dark:bg-blue-950/20"
+                          ? "bg-blue-50/40 dark:bg-blue-950/20"
                           : ""
                       )}
                     >
@@ -442,9 +442,9 @@ export function NeonTable<T>({
                         <td
                           className={cn(
                             compact
-                              ? "w-10 px-2.5 sm:px-3 py-2.5 sm:py-3 text-center align-middle relative"
-                              : "w-9 sm:w-12 px-2 sm:px-5 py-3.5 sm:py-4 text-center align-middle relative",
-                            isActive ? "border-l-[4px] border-l-emerald-500 bg-emerald-500/[0.04]" : ""
+                              ? "w-9 px-2 sm:px-2.5 py-2 text-center align-middle relative"
+                              : "w-9 sm:w-11 px-2.5 sm:px-3 py-2.5 sm:py-3 text-center align-middle relative",
+                            isActive ? "border-l-[3px] border-l-emerald-500" : ""
                           )}
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -469,10 +469,10 @@ export function NeonTable<T>({
                           style={{ width: col.width }}
                           className={cn(
                             compact
-                              ? "px-3 sm:px-3.5 py-2.5 sm:py-3 align-middle text-neutral-700 dark:text-neutral-300"
-                              : "px-2.5 sm:px-5 py-3.5 sm:py-4 align-middle text-neutral-700 dark:text-neutral-300",
+                              ? "px-2.5 sm:px-3 py-2 text-xs align-middle text-neutral-700 dark:text-neutral-300"
+                              : "px-3 sm:px-4 py-2.5 sm:py-3 text-xs align-middle text-neutral-700 dark:text-neutral-300",
                             !selectable && cIdx === 0 && isActive
-                              ? "border-l-[4px] border-l-emerald-500 bg-emerald-500/[0.04]"
+                              ? "border-l-[3px] border-l-emerald-500"
                               : "",
                             col.align === "center"
                               ? "text-center"

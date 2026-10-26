@@ -219,7 +219,7 @@ export const BackupOpsSection = () => {
             type="button"
             onClick={fetchStatus}
             disabled={loading}
-            className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 bg-white border border-slate-200 rounded-full px-3 py-1.5 shadow-sm"
+            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 bg-white dark:bg-neutral-850 border border-slate-200 dark:border-neutral-750 rounded-full px-3 py-1.5 shadow-2xs transition-colors"
           >
             <RefreshCw size={13} className={cn(loading && "animate-spin")} />
             <span>Muat Ulang</span>

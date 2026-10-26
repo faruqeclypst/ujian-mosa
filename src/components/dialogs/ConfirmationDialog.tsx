@@ -40,27 +40,27 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   const icons = {
     danger: <AlertOctagon className="h-4 w-4 text-rose-600 dark:text-rose-400" />,
     warning: <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
-    info: <HelpCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />,
+    info: <HelpCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />,
     success: <AlertCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />,
   };
 
   const iconContainers = {
     danger: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20",
     warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
-    info: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+    info: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
     success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
   };
 
   const confirmBtnClasses = {
     danger: "bg-rose-600 hover:bg-rose-700 text-white border border-rose-600/50 shadow-2xs",
     warning: "bg-amber-600 hover:bg-amber-700 text-white border border-amber-600/50 shadow-2xs",
-    info: "bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs",
+    info: "bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-600/25",
     success: "bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600/50 shadow-2xs",
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-white dark:bg-[#0c0d0e] border border-neutral-200 dark:border-neutral-800 p-5 rounded-xl shadow-2xl">
+      <DialogContent className="sm:max-w-md bg-white dark:bg-[#0c0d0e] border border-neutral-200/90 dark:border-neutral-800 p-5 rounded-2xl shadow-2xl">
         <DialogHeader className="space-y-3">
           <div className="flex items-center gap-3 text-left">
             <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${iconContainers[type]}`}>

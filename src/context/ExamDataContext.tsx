@@ -67,7 +67,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const [universalToken, setUniversalToken] = useState("");
   const [tokenUpdatedAt, setTokenUpdatedAt] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState("--:--");
-  const [serverOffset, setServerOffset] = useState(0); 
+  const [serverOffset, setServerOffset] = useState(0);
   const [teacherFullAccess, setTeacherFullAccess] = useState(false);
   const [teacherAIAccess, setTeacherAIAccess] = useState(false);
   const { role } = useAuth();
@@ -278,7 +278,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     const fetchSettings = async () => {
       try {
         pb.autoCancellation(false);
-        
+
         // 🕒 Sinkronisasi Waktu Server yang Akurat
         // Kita ambil jam asli server dari response header
         const healthResponse = await fetch(`${pb.baseUrl}/api/health`, { method: 'GET' });
@@ -306,7 +306,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     };
 
     fetchSettings();
-    
+
     // Subscribe ke perubahan dan langsung update state
     const unsubscribe = pb.collection('settings').subscribe("*", (e) => {
       console.log("🔔 Settings Subscription Event:", e.action, e.record.universal_token);
@@ -336,7 +336,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
       if (diff <= 0) {
         setTimeLeft(prev => prev === "00:00" ? prev : "00:00");
-        
+
         // 🔒 No longer rotating from the frontend admin to avoid conflicts.
         // Rotation is now handled by the server (pb_hooks/main.pb.js).
         // Only trigger a safety fetch if we are stuck at 0.
@@ -344,7 +344,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           isUpdating = true;
           try {
             // Trigger rotasi token server secara otomatis jika waktu telah habis
-            fetch(`${pb.baseUrl}/api/rotate-token`, { method: "POST" }).catch(() => {});
+            fetch(`${pb.baseUrl}/api/rotate-token`, { method: "POST" }).catch(() => { });
 
             const records = await pb.collection('settings').getFullList({ limit: 1, sort: 'created' });
             if (records.length > 0) {
@@ -367,7 +367,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   // --- Teacher Actions ---
   const createTeacher = async (payload: TeacherPayload) => {
     const defaultPass = "12345678";
-    
+
     let safeUsername = (payload.username || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
     if (safeUsername.length < 3) {
       const codePart = (payload.code || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -378,7 +378,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     // 1. Create Teacher Data Record (including username)
     const teacherRecord = await pb.collection("teachers").create(cleanPayload);
     setTeachers(prev => prev.find(i => i.id === teacherRecord.id) ? prev : [teacherRecord as any, ...prev]);
-    
+
     // 2. Create Auth User Record for the Teacher using the provided username
     try {
       await pb.collection("users").create({
@@ -394,7 +394,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       console.warn("User account creation warning:", err);
     }
   };
-  
+
   const updateTeacher = async (id: string, payload: Partial<TeacherPayload>) => {
     const record = await pb.collection("teachers").update(id, payload);
     setTeachers(prev => prev.map(item => item.id === id ? { ...item, ...record } as any : item));
@@ -405,20 +405,20 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         const updateData: any = {};
         if (payload.name) updateData.name = payload.name;
         if (payload.username) updateData.username = payload.username;
-        
+
         if (Object.keys(updateData).length > 0) {
           await pb.collection("users").update(userRec.id, updateData);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
   };
-  
+
   const deleteTeacher = async (id: string) => {
     // Delete user account first if exists
     try {
       const userRec = await pb.collection("users").getFirstListItem(`teacherId="${id}"`);
       if (userRec) await pb.collection("users").delete(userRec.id);
-    } catch (e) {}
+    } catch (e) { }
     await pb.collection("teachers").delete(id);
     setTeachers(prev => prev.filter(item => item.id !== id));
   };
@@ -571,7 +571,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         onProgress(Math.min(i + chunkSize, studentIds.length), studentIds.length);
       }
     }
-    setStudents(prev => prev.map(student => 
+    setStudents(prev => prev.map(student =>
       studentIds.includes(student.id) ? { ...student, hasChangedPassword: false, resetRequested: "" } : student
     ));
   };
@@ -584,7 +584,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         classid: newClassId
       })));
     }
-    setStudents(prev => prev.map(student => 
+    setStudents(prev => prev.map(student =>
       studentIds.includes(student.id) ? { ...student, classId: newClassId, classid: newClassId } : student
     ));
   };

@@ -64,6 +64,9 @@ const AlumniPage = () => {
       .map((s) => ({ ...s, className: "Alumni / Lulus" }));
   }, [students]);
 
+  const maleAlumniCount = useMemo(() => mappedStudents.filter((s) => s.gender === "L").length, [mappedStudents]);
+  const femaleAlumniCount = useMemo(() => mappedStudents.filter((s) => s.gender === "P").length, [mappedStudents]);
+
   // ── Inspector State & Memo ──
   const [inspectedAlumniId, setInspectedAlumniId] = useState<string | null>(null);
 
@@ -151,8 +154,6 @@ const AlumniPage = () => {
     );
   };
 
-  const schoolSlug = school?.slug || school?.name?.toLowerCase().replace(/\s+/g, "-") || "modalbangsa";
-
   return (
     <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
       <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
@@ -160,21 +161,16 @@ const AlumniPage = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-              Data Alumni / Lulusan
+              Data Alumni &amp; Lulusan
             </h1>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
-              Arsip data siswa yang telah menyelesaikan masa pendidikan.
-            </p>
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
               <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
-                Semua Modul
+                Dashboard
               </Link>
               <span>/</span>
-              <span className="text-neutral-700 dark:text-neutral-300 font-medium">{schoolSlug}</span>
+              <span className="text-neutral-600 dark:text-neutral-300 font-medium">Master Data</span>
               <span>/</span>
-              <span className="text-neutral-500 dark:text-neutral-400">master-data</span>
-              <span>/</span>
-              <span className="text-neutral-900 dark:text-neutral-100 font-semibold">alumni</span>
+              <span className="text-neutral-900 dark:text-neutral-100 font-semibold">Alumni</span>
             </div>
           </div>
 
@@ -189,28 +185,27 @@ const AlumniPage = () => {
           </div>
         </div>
 
-        {/* ── Top Stats Strip (3 Kartu Ringkas) ── */}
+        {/* ── Top Stats Strip (Data Riil & Fungsional) ── */}
         <NeonStatGrid cols={3}>
           <NeonStatCard
-            label="Total Alumni"
+            label="Total Arsip Alumni"
             value={String(mappedStudents.length)}
-            unit="alumni"
-            subText="Siswa yang telah menyelesaikan pendidikan"
+            unit="siswa"
+            subText="Bebas kuota aktif institusi"
             isLoading={loading}
           />
           <NeonStatCard
-            label="Status Data"
-            value="Arsip Lulus"
+            label="Komposisi Gender"
+            value={`${maleAlumniCount} L / ${femaleAlumniCount} P`}
             unit=""
-            indicator={true}
-            subText="Bisa dipulihkan kapan saja ke rombel aktif"
+            subText={`${mappedStudents.length > 0 ? Math.round((maleAlumniCount / mappedStudents.length) * 100) : 0}% Laki-laki`}
             isLoading={loading}
           />
           <NeonStatCard
-            label={`Rombel ${terminology.class} Tersedia`}
+            label={`Rombel ${terminology.class} Aktif`}
             value={String(sortedClasses.length)}
             unit="kelas"
-            subText="Pilihan tujuan pemulihan kelas"
+            subText="Tujuan pemulihan siswa"
             isLoading={loading}
           />
         </NeonStatGrid>
@@ -402,7 +397,7 @@ const AlumniPage = () => {
             <InspectorSection divided>
               <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850/40 border border-neutral-200/80 dark:border-neutral-800 space-y-2">
                 <div className="flex items-center gap-2 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                  <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <Info className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
                   <span>Informasi Data Alumni</span>
                 </div>
                 <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">

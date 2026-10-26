@@ -45,6 +45,7 @@ import { cn } from "../../lib/utils";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
+import { getStudentExamUrl } from "../../utils/domainHelper";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import { MathText } from "../../components/ui/MathText";
 import { gradeEssayWithAI } from "../../lib/ai";
@@ -86,7 +87,7 @@ const MonitoringPage = () => {
   }, [roomId, navigate]);
 
   const { user, role } = useAuth();
-  const { pb, terminology } = useTenant();
+  const { pb, terminology, school } = useTenant();
   const { classes: examClasses, students, subjects, teachers: masterTeachers, teacherFullAccess, universalToken, timeLeft, loading: dataLoading } = useExamData();
 
   const [loading, setLoading] = useState(true);
@@ -1848,12 +1849,13 @@ const MonitoringPage = () => {
             >
               <div className="flex items-center justify-between gap-2 p-1.5 bg-white dark:bg-neutral-850 rounded border border-neutral-200 dark:border-neutral-750 overflow-hidden">
                 <code className="text-[11px] font-mono text-neutral-600 dark:text-neutral-300 truncate select-all">
-                  {window.location.origin}/login
+                  {getStudentExamUrl(school?.slug)}
                 </code>
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/login`);
+                    const studentUrl = getStudentExamUrl(school?.slug);
+                    navigator.clipboard.writeText(studentUrl);
                     setCopiedUniversalToken(true);
                     setTimeout(() => setCopiedUniversalToken(false), 2000);
                   }}

@@ -95,11 +95,11 @@ const SuperAdminAnalyticsPage = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Statistik Server</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Analitik penggunaan sistem Examku CBT.</p>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-neutral-100 tracking-tight">Statistik Server</h2>
+          <p className="text-slate-500 dark:text-neutral-400 text-sm mt-0.5">Analitik penggunaan sistem Examku CBT.</p>
         </div>
-        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl w-fit">
-          <button className="px-4 py-2 text-sm font-semibold rounded-lg bg-white text-slate-800 shadow-sm">
+        <div className="flex items-center gap-2 bg-slate-100 dark:bg-neutral-850 p-1 rounded-xl w-fit border border-transparent dark:border-neutral-800">
+          <button className="px-4 py-2 text-sm font-semibold rounded-lg bg-white dark:bg-neutral-800 text-slate-800 dark:text-neutral-100 shadow-xs border border-transparent dark:border-neutral-700 cursor-pointer">
             Semua Waktu
           </button>
         </div>
@@ -108,12 +108,12 @@ const SuperAdminAnalyticsPage = () => {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {statCards.map((card, i) => (
-          <div key={i} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div key={i} className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl p-5 shadow-xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{card.label}</p>
-                <h3 className="text-2xl font-bold text-slate-900">
-                  {stats.loading ? <span className="text-slate-300">–</span> : card.value}
+                <p className="text-xs font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider mb-1">{card.label}</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-neutral-100">
+                  {stats.loading ? <span className="text-slate-300 dark:text-neutral-600">–</span> : card.value}
                 </h3>
               </div>
               <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0", card.bg)}>
@@ -129,23 +129,23 @@ const SuperAdminAnalyticsPage = () => {
       </div>
 
       {/* Chart */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <BarChart3 size={18} className="text-blue-600" />
+      <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl p-5 sm:p-6 shadow-xs">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-neutral-800">
+          <h3 className="text-base font-bold text-slate-900 dark:text-neutral-100 flex items-center gap-2">
+            <BarChart3 size={18} className="text-blue-600 dark:text-blue-400" />
             Tren Aktivitas Registrasi
           </h3>
-          <span className="text-xs font-medium text-slate-400 bg-slate-100 px-3 py-1 rounded-full">14 Hari Terakhir</span>
+          <span className="text-xs font-medium text-slate-500 dark:text-neutral-400 bg-slate-100 dark:bg-neutral-800 px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-750">14 Hari Terakhir</span>
         </div>
 
         {/* Bar chart */}
         <div className="h-48 sm:h-64 flex items-end justify-between gap-1 sm:gap-1.5 pb-2">
           {stats.loading ? (
-            <div className="w-full flex items-center justify-center text-slate-400 text-sm font-medium h-full">
+            <div className="w-full flex items-center justify-center text-slate-400 dark:text-neutral-500 text-sm font-medium h-full">
               Memuat data...
             </div>
           ) : isEmpty ? (
-            <div className="w-full flex flex-col items-center justify-center h-full gap-3 text-slate-400">
+            <div className="w-full flex flex-col items-center justify-center h-full gap-3 text-slate-400 dark:text-neutral-500">
               <BarChart3 size={40} className="opacity-30" />
               <p className="text-sm font-medium">Belum ada aktivitas dalam 14 hari terakhir</p>
             </div>
@@ -157,7 +157,7 @@ const SuperAdminAnalyticsPage = () => {
                 <div key={i} className="h-full w-full flex flex-col justify-end items-center group relative">
                   {/* Tooltip */}
                   {data.count > 0 && (
-                    <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-lg transition-opacity whitespace-nowrap z-10 pointer-events-none shadow-lg">
+                    <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 dark:bg-neutral-800 text-white text-[10px] font-bold px-2 py-1 rounded-lg transition-opacity whitespace-nowrap z-10 pointer-events-none shadow-lg border border-transparent dark:border-neutral-700">
                       {data.count} registrasi
                     </div>
                   )}
@@ -165,8 +165,8 @@ const SuperAdminAnalyticsPage = () => {
                     className={cn(
                       "w-full max-w-[32px] rounded-t-md transition-all duration-500 relative overflow-hidden",
                       data.count > 0
-                        ? isToday ? "bg-blue-600" : "bg-blue-200 group-hover:bg-blue-300"
-                        : "bg-slate-100"
+                        ? isToday ? "bg-blue-600 dark:bg-blue-500" : "bg-blue-200 dark:bg-blue-900/60 group-hover:bg-blue-300 dark:group-hover:bg-blue-800"
+                        : "bg-slate-100 dark:bg-neutral-800"
                     )}
                     style={{ height: `${data.count > 0 ? heightPercent : 4}%` }}
                   />
@@ -178,10 +178,10 @@ const SuperAdminAnalyticsPage = () => {
 
         {/* X-axis labels */}
         {!stats.loading && stats.chartData.length > 0 && (
-          <div className="flex justify-between text-[10px] font-medium text-slate-400 pt-2 border-t border-slate-100 mt-2">
+          <div className="flex justify-between text-[10px] font-medium text-slate-400 dark:text-neutral-500 pt-2 border-t border-slate-100 dark:border-neutral-800 mt-2">
             <span>{stats.chartData[0]?.label}</span>
             <span>{stats.chartData[Math.floor(stats.chartData.length / 2)]?.label}</span>
-            <span className="text-blue-600 font-bold">Hari Ini</span>
+            <span className="text-blue-600 dark:text-blue-400 font-bold">Hari Ini</span>
           </div>
         )}
       </div>
