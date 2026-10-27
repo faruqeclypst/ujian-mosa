@@ -1,5 +1,6 @@
 {
   "version": "1.2.1",
+  "build_code": 23,
   "release_date": "21-10-2026",
   "timestamp": "2026-10-20T18:09:34.792Z",
   "notes": "Major Update 1.2.1: Standarisasi Konsol Desain Neon (NeonTable & NeonProgress), grid responsif bebas scroll horizontal pada semua modul admin, penyeragaman tombol aksi titik tiga, modul analisis butir soal terpadu, dan log pembaruan sistem CBT."

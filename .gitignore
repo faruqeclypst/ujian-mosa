@@ -38,6 +38,8 @@ public/*.apk
 offline_package/
 dist-shell/
 dist-browser/
+__pycache__/
+*.pyc
 assets-raw/
 keystore.properties
 .cache/

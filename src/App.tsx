@@ -20,6 +20,7 @@ import ExambroGuard from "./components/auth/ExambroGuard";
 import AppVersionGuard from "./components/auth/AppVersionGuard";
 import OfflineServerGuard from "./components/auth/OfflineServerGuard";
 import StudentLoginPage from "./pages/student/StudentLoginPage";
+import GoogleAuthCallbackPage from "./pages/GoogleAuthCallbackPage";
 
 const StudentDashboardPage = lazy(() => import("./pages/student/StudentDashboardPage"));
 const CBTPage = lazy(() => import("./pages/student/CBTPage"));
@@ -243,6 +244,8 @@ const SchoolAppContent = () => {
             <Route path="/download" element={<Navigate to="/unduh" replace />} />
             {/* Simulasi ujian untuk guru — full-screen seperti CBT siswa, guard di dalam komponen */}
             <Route path="/admin/simulate/:examId" element={<ExamSimulatePage />} />
+            <Route path="/auth/google/callback" element={<GoogleAuthCallbackPage />} />
+            <Route path="/admin/auth/google/callback" element={<GoogleAuthCallbackPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
@@ -295,6 +298,8 @@ const LandingContent = () => {
         <Route path="/pilih sekolah" element={<SelectSchoolPage />} />
         <Route path="/pilihsekolah" element={<SelectSchoolPage />} />
         <Route path="/browser" element={<CustomBrowserPage />} />
+        <Route path="/auth/google/callback" element={<GoogleAuthCallbackPage />} />
+        <Route path="/admin/auth/google/callback" element={<GoogleAuthCallbackPage />} />
         <Route path="*" element={<LandingPage />} />
       </Routes>
     </Suspense>

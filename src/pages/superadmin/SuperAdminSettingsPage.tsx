@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { UserCircle, KeyRound, Save, CheckCircle, AlertCircle, Shield, Smartphone, Cloud, RefreshCw, Database, Server, Check, Landmark } from "lucide-react";
+import { UserCircle, KeyRound, Save, CheckCircle, AlertCircle, Shield, Smartphone, Cloud, RefreshCw, Database, Server, Check, Landmark, Sparkles } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
 import { BankAccountsSettings } from "../../components/admin/BankAccountsSettings";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
+import { APP_VERSION, APP_DISPLAY_VERSION, APP_BUILD_CODE } from "../../utils/version";
 
 type Section = "profile" | "password" | "apk" | "media" | "bank";
 
@@ -65,7 +66,29 @@ const SuperAdminSettingsPage = () => {
       }
     };
     fetchApkSettings();
+
+    // Muat metadata rilis (tanggal & changelog) dari version.json
+    fetch("/version.json")
+      .then((r) => r.json())
+      .then((data) => setReleaseInfo(data))
+      .catch(() => {});
   }, [navigate]);
+
+  const [releaseInfo, setReleaseInfo] = useState<{
+    version?: string;
+    build_code?: number;
+    release_date?: string;
+    notes?: string;
+  } | null>(null);
+
+  const handleApplyLatestVersion = () => {
+    setApkData((prev) => ({
+      ...prev,
+      min_version_name: APP_VERSION,
+      min_version_code: APP_BUILD_CODE,
+    }));
+    setSuccess(`Versi rilis terbaru (v${APP_VERSION} / Code: ${APP_BUILD_CODE}) berhasil diterapkan ke form.`);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -362,6 +385,108 @@ const SuperAdminSettingsPage = () => {
                   {apkData.is_force_update ? "Pembaruan Wajib Aktif" : "Pembaruan Opsional"}
                 </span>
               </div>
+              {/* Info Build & Code Terakhir dari Sistem / Codebase */}
+              <div className="m-5 mb-0 p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/70 via-indigo-50/30 to-slate-50/60 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100/70">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <Smartphone size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                          Build &amp; Rilis Codebase Terakhir
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                          Aktif di Sistem
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Versi kompilasi resmi APK Android dan Web saat ini pada sistem.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tombol Terapkan ke Form */}
+                  <button
+                    type="button"
+                    onClick={handleApplyLatestVersion}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer"
+                    title="Salin Versi &amp; Build Code terbaru ke kolom input di bawah"
+                  >
+                    <Sparkles size={13} className="text-blue-600" />
+                    <span>Terapkan ke Form</span>
+                  </button>
+                </div>
+
+                {/* Grid 3 Kolom Info Metrik Build */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
+                  {/* 1. VersionName */}
+                  <div className="bg-white/80 backdrop-blur-xs p-3 rounded-lg border border-slate-200/80">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Versi Rilis (VersionName)
+                    </span>
+                    <div className="flex items-baseline gap-1.5 mt-0.5">
+                      <span className="text-base font-black font-mono text-slate-900">
+                        {APP_VERSION}
+                      </span>
+                      <span className="text-xs font-semibold text-blue-600">
+                        ({APP_DISPLAY_VERSION})
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      Label versi yang tampil di aplikasi
+                    </span>
+                  </div>
+
+                  {/* 2. VersionCode */}
+                  <div className="bg-white/80 backdrop-blur-xs p-3 rounded-lg border border-slate-200/80">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Kode Versi (VersionCode)
+                    </span>
+                    <div className="flex items-baseline gap-1.5 mt-0.5">
+                      <span className="text-base font-black font-mono text-blue-700">
+                        {APP_BUILD_CODE}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        (Build Number)
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      Sumber: android/app/build.gradle
+                    </span>
+                  </div>
+
+                  {/* 3. Status Keselarasan Sinkronisasi */}
+                  <div className="bg-white/80 backdrop-blur-xs p-3 rounded-lg border border-slate-200/80 flex flex-col justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Status Konfigurasi
+                    </span>
+                    <div className="mt-1">
+                      {apkData.min_version_code === APP_BUILD_CODE && apkData.min_version_name === APP_VERSION ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          <CheckCircle size={12} />
+                          Selaras dengan build terakhir
+                        </span>
+                      ) : apkData.min_version_code < APP_BUILD_CODE ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          <AlertCircle size={12} />
+                          Di bawah build ({apkData.min_version_code} &lt; {APP_BUILD_CODE})
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                          <AlertCircle size={12} />
+                          Di atas build ({apkData.min_version_code} &gt; {APP_BUILD_CODE})
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-400 block mt-1">
+                      {releaseInfo?.release_date ? `Rilis: ${releaseInfo.release_date}` : "EXAMKU CBT Official Release"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <form onSubmit={handleSaveApk} className="p-5 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -375,14 +500,19 @@ const SuperAdminSettingsPage = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Versi Minimal Label (VersionName)
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Versi Minimal Label (VersionName)
+                      </label>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        Build sistem: <strong className="text-slate-700 font-bold">{APP_VERSION}</strong>
+                      </span>
+                    </div>
                     <input
                       type="text"
                       value={apkData.min_version_name}
                       onChange={(e) => setApkData(p => ({ ...p, min_version_name: e.target.value }))}
-                      placeholder="Contoh: 2.0.0"
+                      placeholder={`Contoh: ${APP_VERSION}`}
                       className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm"
                     />
                   </div>
@@ -390,20 +520,25 @@ const SuperAdminSettingsPage = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Kode Versi Minimal (VersionCode / Build Number)
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Kode Versi Minimal (VersionCode / Build Number)
+                      </label>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        Build sistem: <strong className="text-blue-700 font-bold">{APP_BUILD_CODE}</strong>
+                      </span>
+                    </div>
                     <input
                       type="number"
                       required
                       min={1}
                       value={apkData.min_version_code}
                       onChange={(e) => setApkData(p => ({ ...p, min_version_code: parseInt(e.target.value, 10) || 1 }))}
-                      placeholder="1"
+                      placeholder={String(APP_BUILD_CODE)}
                       className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm"
                     />
                     <p className="text-[11px] text-slate-400 mt-1">
-                      Angka integer di build.gradle Android. HP siswa dengan build lebih rendah akan dikunci.
+                      Angka integer di build.gradle Android. HP siswa dengan build lebih rendah akan dikunci. (Build terakhir sistem: {APP_BUILD_CODE}).
                     </p>
                   </div>
                   <div>

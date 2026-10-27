@@ -13,6 +13,7 @@ import ProfilePictureUpload from "../ui/ProfilePictureUpload";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
 import { useToast } from "../ui/toast";
+import { startGoogleRedirectAuth } from "../../utils/googleAuthHelper";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +58,68 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [isGoogleLinked, setIsGoogleLinked] = useState<boolean>(false);
+  const [linkedGoogleEmail, setLinkedGoogleEmail] = useState<string>("");
+  const [isCheckingGoogle, setIsCheckingGoogle] = useState(false);
+  const [isUnlinkingGoogle, setIsUnlinkingGoogle] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && pb && user) {
+      const gid = (user as any).google_id;
+      const gemail = (user as any).google_email;
+      if (gid) {
+        setIsGoogleLinked(true);
+        setLinkedGoogleEmail(gemail || "");
+      } else {
+        setIsCheckingGoogle(true);
+        pb.send("/api/auth/google", {
+          method: "POST",
+          body: { action: "status" },
+        })
+          .then((res: any) => {
+            if (res?.isLinked) {
+              setIsGoogleLinked(true);
+              setLinkedGoogleEmail(res.googleEmail || "");
+            } else {
+              setIsGoogleLinked(false);
+            }
+          })
+          .catch(() => {})
+          .finally(() => {
+            setIsCheckingGoogle(false);
+          });
+      }
+    }
+  }, [isOpen, pb, user]);
+
+  const handleUnlinkGoogle = async () => {
+    if (!pb) return;
+    try {
+      setIsUnlinkingGoogle(true);
+      const res = await pb.send("/api/auth/google", {
+        method: "POST",
+        body: { action: "unlink" },
+      });
+      if (res?.ok) {
+        setIsGoogleLinked(false);
+        setLinkedGoogleEmail("");
+        addToast({
+          title: "Tautan Akun Google Dilepas",
+          description: "Akun Google berhasil diputuskan dari profil Anda.",
+          type: "success",
+        });
+      }
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Melepas Tautan",
+        description: err.message || "Terjadi kesalahan saat memutus tautan Google.",
+        type: "error",
+      });
+    } finally {
+      setIsUnlinkingGoogle(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -166,26 +229,26 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
         onClose();
       }
     }}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 bg-white dark:bg-gray-900 shadow-2xl rounded-2xl">
-        <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-700 z-50" />
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111317] shadow-2xl rounded-2xl">
+        <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 z-50" />
         
         <DialogHeader className="pt-6 px-6 pb-2">
-            <DialogTitle className="text-xl font-black bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent dark:from-white dark:to-gray-300">
+            <DialogTitle className="text-xl font-black text-neutral-900 dark:text-white">
               Pengaturan Profil
             </DialogTitle>
-            <DialogDescription className="text-gray-500 dark:text-gray-400 font-medium">
+            <DialogDescription className="text-neutral-500 dark:text-neutral-400 font-medium text-xs">
               Kelola informasi profil dan keamanan akun Anda.
             </DialogDescription>
             
             {/* Custom Tabs */}
-            <div className="flex items-center gap-1 mt-4 p-1 bg-gray-100/80 dark:bg-gray-800/80 rounded-xl">
+            <div className="flex items-center gap-1 mt-4 p-1 bg-neutral-100 dark:bg-[#16181f] rounded-xl border border-neutral-200/80 dark:border-neutral-800/80">
               <button
                 type="button"
                 onClick={() => { setActiveTab("profile"); setFormError(null); }}
-                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   activeTab === "profile" 
-                    ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm" 
-                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                    ? "bg-white dark:bg-[#1f222b] text-emerald-600 dark:text-emerald-400 shadow-xs border border-neutral-200/60 dark:border-neutral-700/60" 
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
                 }`}
               >
                 Profil
@@ -193,10 +256,10 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
               <button
                 type="button"
                 onClick={() => { setActiveTab("password"); setFormError(null); }}
-                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   activeTab === "password" 
-                    ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm" 
-                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                    ? "bg-white dark:bg-[#1f222b] text-emerald-600 dark:text-emerald-400 shadow-xs border border-neutral-200/60 dark:border-neutral-700/60" 
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
                 }`}
               >
                 Keamanan
@@ -243,6 +306,77 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
                   <p className="text-[10px] text-gray-500 mt-1 pl-1">Email dikunci. Harap hubungi superadmin.</p>
                 </FormField>
 
+                {/* Tautan Akun Google (Neon Themed) */}
+                <div className="p-4 rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-neutral-50/80 dark:bg-[#0f1115] shadow-xs space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-white dark:bg-[#16181f] border border-neutral-200 dark:border-neutral-700/80 flex items-center justify-center shrink-0 shadow-xs">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
+                          <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
+                          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                          <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                        </svg>
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 truncate">
+                          Tautan Akun Google
+                        </h4>
+                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+                          Login 1-klik tanpa username & password
+                        </p>
+                      </div>
+                    </div>
+
+                    {isGoogleLinked ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 shadow-[0_0_8px_rgba(16,185,129,0.2)] shrink-0">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
+                        <span>Terhubung</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-200/80 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-300/60 dark:border-neutral-700/60 shrink-0">
+                        <span className="h-1.5 w-1.5 rounded-full bg-neutral-400 dark:bg-neutral-500" />
+                        <span>Belum Tertaut</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="pt-2.5 border-t border-neutral-200/80 dark:border-neutral-800/80 flex items-center justify-between gap-2 text-xs">
+                    {isGoogleLinked ? (
+                      <>
+                        <div className="truncate text-neutral-700 dark:text-neutral-300">
+                          <span className="text-[10px] text-neutral-400 mr-1.5 font-medium">Email:</span>
+                          <span className="font-semibold text-xs text-neutral-900 dark:text-white">{linkedGoogleEmail || user?.email}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isUnlinkingGoogle}
+                          onClick={handleUnlinkGoogle}
+                          className="text-xs font-bold text-rose-600 hover:text-rose-500 dark:text-rose-400 dark:hover:text-rose-300 bg-rose-50/50 hover:bg-rose-100/60 dark:bg-rose-950/30 dark:hover:bg-rose-950/60 border border-rose-200 dark:border-rose-900/50 h-7.5 px-3 rounded-lg cursor-pointer transition-all"
+                        >
+                          {isUnlinkingGoogle ? "Memproses..." : "Putus Tautan"}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
+                          Tautkan untuk akses cepat & aman
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => startGoogleRedirectAuth({ action: "link", returnUrl: "/admin" })}
+                          className="text-xs font-bold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-sm shadow-emerald-600/25 hover:shadow-md hover:shadow-emerald-600/35 border border-emerald-500/30 h-7.5 px-3 rounded-lg gap-1.5 cursor-pointer transition-all"
+                        >
+                          <span>Tautkan Akun</span>
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 <AnimatePresence>
                   {formError && (
                     <motion.div
@@ -260,13 +394,13 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
                 </AnimatePresence>
 
                 <div className="pt-2 flex gap-3">
-                  <Button type="button" variant="ghost" onClick={onClose} className="flex-1 rounded-xl h-11 font-bold">
+                  <Button type="button" variant="ghost" onClick={onClose} className="flex-1 rounded-xl h-11 font-bold text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer">
                     Batal
                   </Button>
                   <Button
                     type="submit"
                     disabled={isSubmittingProfile || !isProfileDirty}
-                    className="flex-1 rounded-xl h-11 font-bold bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-lg shadow-blue-500/20"
+                    className="flex-1 rounded-xl h-11 font-bold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 border border-emerald-500/30 cursor-pointer transition-all"
                   >
                     {isSubmittingProfile ? <RefreshCw className="h-4 w-4 animate-spin" /> : <>Simpan</>}
                   </Button>
@@ -278,18 +412,18 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
               <form onSubmit={handleSubmitPassword(onPasswordSubmit)} className="space-y-4 pt-2">
                 <FormField id="currentPassword" label="Password Saat Ini" error={passwordErrors.currentPassword}>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
                     <Input
                       id="currentPassword"
                       type={showCurrentPassword ? "text" : "password"}
                       placeholder="••••••••"
-                      className="pl-10 pr-10 rounded-xl border-gray-200/60 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/50"
+                      className="pl-10 pr-10 rounded-xl border-neutral-200/80 bg-neutral-50/50 dark:border-neutral-800 dark:bg-[#16181f] text-neutral-900 dark:text-neutral-100"
                       {...registerPassword("currentPassword")}
                     />
                     <button
                       type="button"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
                     >
                       {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -298,18 +432,18 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
 
                 <FormField id="newPassword" label="Password Baru" error={passwordErrors.newPassword}>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
                     <Input
                       id="newPassword"
                       type={showNewPassword ? "text" : "password"}
                       placeholder="Minimal 6 karakter"
-                      className="pl-10 pr-10 rounded-xl border-gray-200/60 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/50"
+                      className="pl-10 pr-10 rounded-xl border-neutral-200/80 bg-neutral-50/50 dark:border-neutral-800 dark:bg-[#16181f] text-neutral-900 dark:text-neutral-100"
                       {...registerPassword("newPassword")}
                     />
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
                     >
                       {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -318,18 +452,18 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
 
                 <FormField id="confirmPassword" label="Konfirmasi Password Baru" error={passwordErrors.confirmPassword}>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
                     <Input
                       id="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
                       placeholder="Ulangi password baru"
-                      className="pl-10 pr-10 rounded-xl border-gray-200/60 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/50"
+                      className="pl-10 pr-10 rounded-xl border-neutral-200/80 bg-neutral-50/50 dark:border-neutral-800 dark:bg-[#16181f] text-neutral-900 dark:text-neutral-100"
                       {...registerPassword("confirmPassword")}
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
                     >
                       {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -342,9 +476,9 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 overflow-hidden"
+                      className="rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 p-3 overflow-hidden"
                     >
-                      <p className="text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+                      <p className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-2">
                         <Shield className="h-3.5 w-3.5" />
                         {formError}
                       </p>
@@ -353,13 +487,13 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
                 </AnimatePresence>
 
                 <div className="pt-2 flex gap-3">
-                  <Button type="button" variant="ghost" onClick={onClose} className="flex-1 rounded-xl h-11 font-bold">
+                  <Button type="button" variant="ghost" onClick={onClose} className="flex-1 rounded-xl h-11 font-bold text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer">
                     Batal
                   </Button>
                   <Button
                     type="submit"
                     disabled={isSubmittingPassword}
-                    className="flex-1 rounded-xl h-11 font-bold bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-lg shadow-blue-500/20"
+                    className="flex-1 rounded-xl h-11 font-bold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 border border-emerald-500/30 cursor-pointer transition-all"
                   >
                     {isSubmittingPassword ? <RefreshCw className="h-4 w-4 animate-spin" /> : <>Perbarui</>}
                   </Button>

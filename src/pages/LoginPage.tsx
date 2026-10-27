@@ -33,6 +33,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTenant } from "../context/TenantContext";
 import { useTheme } from "../context/ThemeContext";
 import { APP_DISPLAY_VERSION } from "../utils/version";
+import { startGoogleRedirectAuth } from "../utils/googleAuthHelper";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username minimal 3 karakter"),
@@ -461,6 +462,32 @@ const LoginPage = () => {
                   </>
                 )}
               </Button>
+
+              {/* Pembatas "atau" */}
+              <div className="relative my-3.5 flex items-center justify-center">
+                <div className="w-full border-t border-neutral-200 dark:border-neutral-800" />
+                <span className="absolute bg-[#FBF9F5] dark:bg-[#0A0A0C] px-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
+                  atau
+                </span>
+              </div>
+
+              {/* Tombol Masuk dengan Akun Google (Full-Page Redirect - Neon Style) */}
+              <button
+                type="button"
+                onClick={() => startGoogleRedirectAuth({ action: "login" })}
+                className="w-full h-12 rounded-xl border border-neutral-200/90 dark:border-neutral-800 bg-neutral-50/60 dark:bg-[#15171e] hover:bg-white dark:hover:bg-[#1a1d26] hover:border-emerald-500/40 dark:hover:border-emerald-500/40 text-neutral-800 dark:text-neutral-100 font-bold text-xs sm:text-sm shadow-xs hover:shadow-[0_0_20px_rgba(16,185,129,0.12)] transition-all cursor-pointer flex items-center justify-center gap-3 active:scale-98 group"
+                title="Masuk menggunakan akun Google guru atau proktor yang terdaftar"
+              >
+                <div className="w-5 h-5 rounded-md bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-110 transition-transform">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                    <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                  </svg>
+                </div>
+                <span>Masuk dengan Akun Google</span>
+              </button>
             </form>
 
             {/* Security Footnote */}

@@ -63,19 +63,13 @@ pkg.version = targetVersion;
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
 console.log(`✅ [1/6] package.json diupdate ke ${targetVersion}`);
 
-// 2. Update src/utils/version.ts (Frontend Single Source of Truth)
-const versionTsPath = path.join(rootDir, 'src', 'utils', 'version.ts');
-const versionTsContent = `export const APP_VERSION = "${targetVersion}";\nexport const APP_DISPLAY_VERSION = "${displayVersion}";\n`;
-fs.writeFileSync(versionTsPath, versionTsContent, 'utf8');
-console.log(`✅ [2/6] src/utils/version.ts diupdate ke ${targetVersion} (${displayVersion})`);
-
 // 3. Update android/app/build.gradle (versionName & versionCode)
 const gradlePath = path.join(rootDir, 'android', 'app', 'build.gradle');
+let nextCode = 1;
 if (fs.existsSync(gradlePath)) {
   let gradle = fs.readFileSync(gradlePath, 'utf8');
   // Ambil versionCode saat ini dan naikkan +1
   const codeMatch = gradle.match(/versionCode\s+(\d+)/);
-  let nextCode = 1;
   if (codeMatch && codeMatch[1]) {
     nextCode = parseInt(codeMatch[1], 10) + 1;
   }
@@ -85,9 +79,16 @@ if (fs.existsSync(gradlePath)) {
   console.log(`✅ [3/6] android/app/build.gradle diupdate (versionName: ${targetVersion}, versionCode: ${nextCode})`);
 }
 
+// 2. Update src/utils/version.ts (Frontend Single Source of Truth)
+const versionTsPath = path.join(rootDir, 'src', 'utils', 'version.ts');
+const versionTsContent = `export const APP_VERSION = "${targetVersion}";\nexport const APP_DISPLAY_VERSION = "${displayVersion}";\nexport const APP_BUILD_CODE = ${nextCode};\n`;
+fs.writeFileSync(versionTsPath, versionTsContent, 'utf8');
+console.log(`✅ [2/6] src/utils/version.ts diupdate ke ${targetVersion} (${displayVersion}, build ${nextCode})`);
+
 // 4. Update public/version.json & offline_package/version.json
 const versionPayload = {
   version: targetVersion,
+  build_code: nextCode,
   release_date: dateStr,
   timestamp: now.toISOString(),
   notes: notes
@@ -101,7 +102,7 @@ const offlineVersionPath = path.join(rootDir, 'offline_package', 'version.json')
 if (fs.existsSync(path.dirname(offlineVersionPath))) {
   fs.writeFileSync(offlineVersionPath, versionJsonStr, 'utf8');
 }
-console.log(`✅ [4/6] public/version.json & offline_package/version.json diupdate`);
+console.log(`✅ [4/6] public/version.json & offline_package/version.json diupdate (build: ${nextCode})`);
 
 // 5. Update PocketBase offline_update.pb.js fallback versions
 const hookFiles = [
