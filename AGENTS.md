@@ -68,3 +68,48 @@ When deploying or syncing changes, always follow these rules and refer to [COMMA
 ### 4. Offline Server 1-Click Update
 - Schools running offline servers can update directly from their dashboard under Settings -> "Pembaruan 1-Click" or by running `perbarui-server.bat`.
 - The database `pb_data/data.db` is strictly preserved and never overwritten.
+
+## Penyelarasan kit template (keputusan pemilik, 2026-10-28)
+
+Examku menyelaraskan komponen, skill, dan motion ke repo template Neon
+(standar yang sama dengan SPMB). Aturan berikut mengikat pekerjaan UI
+baru di repo ini:
+
+- **Satu tombol kanonis untuk permukaan baru**: `NeonButton` di
+  `src/components/ui/NeonButton.tsx` (port dari template). Varian:
+  primary, secondary, soft, outline, dark, danger, dangerGhost, ghost,
+  link. Prop `color` menerima seluruh palet inti Tailwind (brand =
+  emerald). Ukuran mengikuti tangga padding Tailwind UI (xs sampai xl,
+  tanpa tinggi tetap); tombol khusus ikon memakai `iconOnly` dan wajib
+  `aria-label`. Tombol shadcn lama di `button.tsx` TIDAK diubah dan
+  tidak dihapus; halaman lama bermigrasi halaman per halaman, dan
+  tidak ada migrasi massal tanpa verifikasi per halaman.
+- **Panduan memilih tombol**: tepat satu primary per tampilan (aksi
+  utama); secondary untuk aksi berbingkai bawaan; soft untuk penekanan
+  rendah di permukaan berwarna; outline untuk penekanan berwarna tanpa
+  isian; ghost untuk ikon, toolbar, dan aksi tabel; link untuk aksi di
+  dalam teks; dark hanya untuk satu aksi kontras tinggi; danger dan
+  dangerGhost hanya untuk aksi destruktif. Warna bersifat semantik,
+  bukan dekorasi: brand bawaan, sky informasi, amber waspada, rose di
+  sisi makna destruktif. Ukuran bawaan md; sm untuk tabel dan toolbar
+  padat; xs di samping badge dan di kepala kartu; lg dan xl untuk CTA
+  setingkat halaman.
+- **Motion**: kosakata bersama di `src/lib/motion.ts` (uiTransition,
+  overlayTransition, springPop, chartTransition, fadeUp,
+  staggerContainer, scaleIn, backdropFade). Jangan menulis angka
+  durasi/easing lokal. Aplikasi dibungkus `MotionConfig
+  reducedMotion="user"` di `main.tsx`, jadi semua animasi menghormati
+  prefers-reduced-motion. Overlay beranimasi dua arah dan portal tetap
+  terpasang selama animasi keluar berjalan.
+- **Port komponen dari template**: sesuaikan tiga hal, yaitu Tailwind
+  v3 di repo ini (tanpa utilitas v4 seperti outline-solid dan tanpa
+  token @theme; petakan brand ke emerald dan surface ke white /
+  neutral-850), mode gelap WAJIB dipertahankan (Examku punya tema
+  gelap), dan ikon WAJIB dicek ke phosphor-bridge sebelum dipakai
+  (aturan ikon di atas berlaku penuh). Framer Motion di repo ini
+  adalah paket `framer-motion` v10, bukan `motion`.
+- **Skill**: antislop tetap berlaku (blok di atas), ditambah aturan
+  Hallmark untuk halaman atau bangunan BARU: semua warna dan font
+  lewat token, tanpa transition: all, tanpa animasi width/height,
+  focus-visible instan, dan tanpa metrik atau testimoni karangan.
+  Desain lama tidak diubah hanya karena aturan ini.
