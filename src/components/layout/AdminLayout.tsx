@@ -1,5 +1,7 @@
 import { ReactNode, Suspense } from "react";
-import { Outlet, Link } from "react-router-dom";
+import { Outlet, Link, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import { AlertTriangle } from "lucide-react";
 
 import Sidebar from "./Sidebar";
@@ -17,6 +19,7 @@ export interface AdminLayoutProps {
  */
 const AdminLayout = ({ children }: AdminLayoutProps) => {
   const { isCollapsed } = useSidebar();
+  const location = useLocation();
   const { subscriptionStatus } = useTenant();
   const isSuspended = !!subscriptionStatus?.isSuspended;
 
@@ -41,11 +44,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           className="flex-1 overflow-y-auto overflow-x-hidden relative bg-[#fbfbfb] dark:bg-[#0c0d0e]"
           style={{ zIndex: 1 }}
         >
-          <div className="w-full mx-auto transition-all duration-200 ease-in-out">
+          <motion.div key={location.pathname} variants={fadeUp} initial="hidden" animate="visible" className="w-full mx-auto">
             <Suspense fallback={null}>
               {children ?? <Outlet />}
             </Suspense>
-          </div>
+          </motion.div>
         </main>
       </div>
     </div>

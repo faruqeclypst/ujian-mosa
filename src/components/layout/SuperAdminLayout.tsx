@@ -16,6 +16,8 @@ import {
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
+import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 
 interface SuperAdminLayoutProps {
   children: React.ReactNode;
@@ -271,7 +273,9 @@ const SuperAdminLayout: React.FC<SuperAdminLayoutProps> = ({ children }) => {
 
         {/* Page Content with safe-area spacing for mobile bottom bar */}
         <main className="flex-1 p-3.5 sm:p-5 lg:p-6 pb-24 lg:pb-8 max-w-[1400px] w-full mx-auto min-w-0 overflow-x-hidden">
-          {children}
+          <motion.div key={location.pathname} variants={fadeUp} initial="hidden" animate="visible">
+            {children}
+          </motion.div>
         </main>
       </div>
 

@@ -9,6 +9,8 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { motion } from "framer-motion";
+import { uiTransition } from "../../lib/motion";
 import { Skeleton } from "./skeleton";
 
 export interface NeonTableColumn<T> {
@@ -212,7 +214,10 @@ export function NeonTable<T>({
   const endEntry = Math.min(safePage * pageSize, totalItems);
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={uiTransition}
       className={cn(
         "relative rounded-xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shadow-2xs overflow-hidden flex flex-col",
         className
@@ -600,6 +605,6 @@ export function NeonTable<T>({
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
