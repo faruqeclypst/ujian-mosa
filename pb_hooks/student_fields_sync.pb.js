@@ -24,6 +24,29 @@ onBootstrap((e) => {
             }
         }
 
+        // Auto-ensure database performance indexes for fast table queries & CBT stability
+        try {
+            const perfIndexes = [
+                "CREATE INDEX IF NOT EXISTS idx_students_classId ON students(classId)",
+                "CREATE INDEX IF NOT EXISTS idx_students_name ON students(name)",
+                "CREATE INDEX IF NOT EXISTS idx_students_created ON students(created)",
+                "CREATE INDEX IF NOT EXISTS idx_attempts_examRoomId ON attempts(examRoomId)",
+                "CREATE INDEX IF NOT EXISTS idx_attempts_status ON attempts(status)",
+                "CREATE INDEX IF NOT EXISTS idx_attempts_room_status ON attempts(examRoomId, status)",
+                "CREATE INDEX IF NOT EXISTS idx_exam_rooms_status ON exam_rooms(status)",
+                "CREATE INDEX IF NOT EXISTS idx_exam_rooms_examId ON exam_rooms(examId)",
+                "CREATE INDEX IF NOT EXISTS idx_exam_rooms_created ON exam_rooms(created)",
+                "CREATE INDEX IF NOT EXISTS idx_questions_examId ON questions(examId)",
+                "CREATE INDEX IF NOT EXISTS idx_exams_created ON exams(created)",
+                "CREATE INDEX IF NOT EXISTS idx_classes_created ON classes(created)"
+            ];
+            for (let i = 0; i < perfIndexes.length; i++) {
+                try {
+                    db.newQuery(perfIndexes[i]).execute();
+                } catch (_) {}
+            }
+        } catch (_) {}
+
         try {
             const collection = $app.findCollectionByNameOrId("students");
             if (collection) {

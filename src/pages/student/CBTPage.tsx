@@ -17,6 +17,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { Sun, Moon, Monitor } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
+import { StudentProfileDialog } from "../../components/dialogs/StudentProfileDialog";
 import {
   AlertCircle,
   Clock,
@@ -330,6 +331,7 @@ const CBTPage = () => {
   const { theme, setTheme } = useTheme();
 
   const [roomId, setRoomId] = useState<string | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const isOnline = useNetworkStatus();
 
   // ── MERGE JAWABAN PER-SOAL (anti-timpa) ────────────────────────────────
@@ -2449,8 +2451,12 @@ const CBTPage = () => {
             {/* Icon Profil (Dropdown) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <div className="w-7 h-7 sm:w-11 sm:h-11 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg sm:rounded-2xl flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm group cursor-pointer hover:bg-emerald-100 transition-all outline-none">
-                  <User className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                <div className="w-7 h-7 sm:w-11 sm:h-11 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg sm:rounded-2xl flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm group cursor-pointer hover:bg-emerald-100 transition-all outline-none overflow-hidden">
+                  {student?.photo ? (
+                    <img src={student.photo} alt={student.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                  )}
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl border-slate-100 dark:border-slate-800 shadow-2xl z-[100]">
@@ -2458,6 +2464,13 @@ const CBTPage = () => {
                   <span className="text-xs font-black text-slate-800 dark:text-white uppercase truncate">{student?.name}</span>
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{terminology.student.toUpperCase()} • {student?.className} • {terminology.id} {student?.nisn}</span>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
+                <DropdownMenuItem onClick={() => setIsProfileOpen(true)} className="px-3 py-2.5 rounded-xl text-slate-700 dark:text-slate-200 focus:bg-emerald-50 dark:focus:bg-emerald-950/40 focus:text-emerald-700 dark:focus:text-emerald-300 flex items-center gap-3 cursor-pointer transition-colors group">
+                  <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg group-focus:bg-emerald-100 dark:group-focus:bg-emerald-900/40 transition-colors">
+                    <User className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-widest">Profil Saya</span>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
                 <div className="px-3 py-2 flex flex-col gap-2">
                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">Personalisasi Tema</span>
@@ -3141,6 +3154,13 @@ const CBTPage = () => {
           }} className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black uppercase tracking-widest h-12 rounded-2xl mt-6 transition-colors shadow-lg shadow-emerald-600/20">SAYA MENGERTI</Button>
         </DialogContent>
       </Dialog>
+
+      {/* Student Profile Dialog (Read-Only saat ujian aktif di CBT) */}
+      <StudentProfileDialog
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        readOnly={true}
+      />
 
       {/* Modal Blokir Mode Game (Game Turbo / Game Booster) */}
       <Dialog open={isGameModeBlocked} onOpenChange={() => {}}>

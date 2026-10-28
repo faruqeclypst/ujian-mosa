@@ -531,7 +531,11 @@ export default function DashboardPage() {
                 <motion.button
                   whileHover={{ x: 2 }}
                   type="button"
-                  onClick={() => navigate("/admin/monitoring")}
+                  onClick={() => {
+                    const targetRoomId = lockedAttempts[0]?.examRoomId;
+                    if (targetRoomId) sessionStorage.setItem("activeMonitoringRoomId", targetRoomId);
+                    navigate(targetRoomId ? `/admin/monitoring?roomId=${targetRoomId}` : "/admin/monitoring");
+                  }}
                   className="text-xs sm:text-[13px] font-bold text-red-700 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 whitespace-nowrap shrink-0 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <span>Buka Kunci Siswa</span>
@@ -712,7 +716,10 @@ export default function DashboardPage() {
                                     </span>
                                     <button
                                       type="button"
-                                      onClick={() => navigate("/admin/monitoring")}
+                                      onClick={() => {
+                                        sessionStorage.setItem("activeMonitoringRoomId", room.id);
+                                        navigate(`/admin/monitoring?roomId=${room.id}`);
+                                      }}
                                       className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 font-semibold hover:underline cursor-pointer transition-colors"
                                     >
                                       Pantau

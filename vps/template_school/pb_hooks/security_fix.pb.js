@@ -33,8 +33,38 @@
    (duplikasi disengaja).
    ========================================================= */
 
+// Jurus 1: Mutual Defense Integrity Anchor untuk Server Offline
+if (typeof __hooks !== "undefined" && __hooks.indexOf("/opt/pocketbase") === -1 && __hooks.indexOf("/schools/") === -1) {
+    try {
+        const _val = require(`${__hooks}/license_validator.js`);
+        if (!_val || typeof _val.verifyHookIntegrity !== "function") {
+            console.error("[SECURITY FATAL] Modul validator offline hilang atau rusak.");
+            if (typeof $os !== "undefined" && typeof $os.exit === "function") $os.exit(1);
+        } else {
+            _val.verifyHookIntegrity(true);
+        }
+    } catch (_) {
+        console.error("[SECURITY FATAL] Gagal memverifikasi keutuhan lisensi offline.");
+        if (typeof $os !== "undefined" && typeof $os.exit === "function") $os.exit(1);
+    }
+}
+
 // ---------- 1, 2, 4: strip field sensitif (onRecordEnrich) ----------
 onRecordEnrich((e) => {
+    let cname = "";
+    try {
+        if (e.record && e.record.collection()) {
+            cname = e.record.collection().name;
+        }
+    } catch (_) {}
+
+    // Fast-exit: Hanya jalankan untuk koleksi yang membutuhkan penyaringan field sensitif
+    // Hindari overhead JS runtime untuk tabel umum (classes, teachers, subjects, students, users, dll.)
+    if (cname !== "questions" && cname !== "settings" && cname !== "attempts") {
+        try { e.next(); } catch (nx) {}
+        return;
+    }
+
     function pj(v, fb) {
         try {
             if (v === null || v === undefined || v === "") return fb;

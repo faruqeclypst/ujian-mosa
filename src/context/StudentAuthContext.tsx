@@ -7,12 +7,19 @@ import { useTenant } from "./TenantContext";
 
 const CheatAlert = registerPlugin<any>("CheatAlert");
 
-interface StudentUser {
+export interface StudentUser {
   id: string;
   nisn: string;
   name: string;
   classId: string;
   className: string;
+  gender?: "L" | "P" | string;
+  photo?: string;
+  birthPlace?: string;
+  birthDate?: string;
+  room?: string;
+  session?: string;
+  examNumber?: string;
   hasChangedPassword?: boolean;
 }
 
@@ -26,13 +33,19 @@ const isStudentPasswordDefault = (data: any): boolean => {
   );
 };
 
-interface StudentAuthContextValue {
+export interface StudentAuthContextValue {
   student: StudentUser | null;
   loading: boolean;
   isKicked: boolean;
   loginStudent: (nisn: string, password: string) => Promise<void>;
   logoutStudent: () => void;
   changePassword: (newPassword: string) => Promise<void>;
+  updateProfile: (data: {
+    photo?: string;
+    gender?: "L" | "P" | string;
+    birthPlace?: string;
+    birthDate?: string;
+  }) => Promise<void>;
 }
 
 const StudentAuthContext = createContext<StudentAuthContextValue | undefined>(undefined);
@@ -74,6 +87,13 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
           name: model.name || "-",
           classId: model.classId || model.classid || (model as any).class_id || (model as any).class || "",
           className: (model as any).className || (model as any).class_name || "-",
+          gender: model.gender || "L",
+          photo: model.photo || "",
+          birthPlace: model.birthPlace || "",
+          birthDate: model.birthDate || "",
+          room: model.room || "",
+          session: model.session || "",
+          examNumber: model.examNumber || "",
           hasChangedPassword: model.hasChangedPassword !== false && model.hasChangedPassword !== "false" && model.hasChangedPassword !== "0" && model.hasChangedPassword !== 0
         });
 
@@ -108,6 +128,13 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
             name: refreshed.name,
             classId: refreshed.classId || refreshed.classid || (refreshed as any).class_id || "",
             className: classObj?.name || classObj?.nama || (classObj as any)?.classname || "-",
+            gender: refreshed.gender || model.gender || "L",
+            photo: refreshed.photo || model.photo || "",
+            birthPlace: refreshed.birthPlace || model.birthPlace || "",
+            birthDate: refreshed.birthDate || model.birthDate || "",
+            room: refreshed.room || model.room || "",
+            session: refreshed.session || model.session || "",
+            examNumber: refreshed.examNumber || model.examNumber || "",
             hasChangedPassword: !isStudentPasswordDefault(refreshed),
           });
         } catch (err: any) {
@@ -220,6 +247,13 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         name: fullModel.name,
         classId: classId,
         className: classObj?.name || fullModel.className || fullModel.class_name || "-",
+        gender: fullModel.gender || "L",
+        photo: fullModel.photo || "",
+        birthPlace: fullModel.birthPlace || "",
+        birthDate: fullModel.birthDate || "",
+        room: fullModel.room || "",
+        session: fullModel.session || "",
+        examNumber: fullModel.examNumber || "",
         hasChangedPassword: !isDefault,
       });
     } catch (err: any) {
@@ -465,8 +499,37 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [isKicked, handleKickedExit]);
 
+  const updateProfile = useCallback(async (data: {
+    photo?: string;
+    gender?: "L" | "P" | string;
+    birthPlace?: string;
+    birthDate?: string;
+  }) => {
+    if (!pb) throw new Error("Koneksi server belum tersedia.");
+    if (!student?.id) throw new Error("Sesi peserta didik tidak ditemukan.");
+
+    const payload: Record<string, any> = {};
+    if (data.photo !== undefined) payload.photo = data.photo;
+    if (data.gender !== undefined) payload.gender = data.gender;
+    if (data.birthPlace !== undefined) payload.birthPlace = data.birthPlace;
+    if (data.birthDate !== undefined) payload.birthDate = data.birthDate;
+
+    const res = await pb.collection("students").update(student.id, payload, { $autoCancel: false });
+
+    setstudent((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        photo: res.photo !== undefined ? res.photo : (data.photo !== undefined ? data.photo : prev.photo),
+        gender: res.gender !== undefined ? res.gender : (data.gender !== undefined ? data.gender : prev.gender),
+        birthPlace: res.birthPlace !== undefined ? res.birthPlace : (data.birthPlace !== undefined ? data.birthPlace : prev.birthPlace),
+        birthDate: res.birthDate !== undefined ? res.birthDate : (data.birthDate !== undefined ? data.birthDate : prev.birthDate),
+      };
+    });
+  }, [pb, student?.id]);
+
   return (
-    <StudentAuthContext.Provider value={{ student, loading, isKicked, loginStudent, logoutStudent, changePassword }}>
+    <StudentAuthContext.Provider value={{ student, loading, isKicked, loginStudent, logoutStudent, changePassword, updateProfile }}>
       {children}
 
       {isKicked && typeof document !== "undefined" && createPortal(

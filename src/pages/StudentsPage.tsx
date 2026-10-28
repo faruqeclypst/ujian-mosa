@@ -1586,20 +1586,14 @@ const StudentsPage = () => {
                     </div>
                   </div>
 
-                  <InspectorGrid>
-                    <InspectorField
-                      label="No. Peserta"
-                      value={inspectedStudent.examNumber || inspectedStudent.nisn || "-"}
-                    />
-                    <InspectorField
-                      label="Tempat, Tgl Lahir"
-                      value={
-                        inspectedStudent.birthPlace || inspectedStudent.birthDate
-                          ? `${inspectedStudent.birthPlace || "-"}, ${inspectedStudent.birthDate || "-"}`
-                          : "-"
-                      }
-                    />
-                  </InspectorGrid>
+                  <InspectorField
+                    label="Tempat, Tgl Lahir"
+                    value={
+                      inspectedStudent.birthPlace || inspectedStudent.birthDate
+                        ? `${inspectedStudent.birthPlace || "-"}, ${inspectedStudent.birthDate || "-"}`
+                        : "-"
+                    }
+                  />
 
                   <InspectorField label="Status Sandi Akun">
                     {inspectedStudent.resetRequested ? (

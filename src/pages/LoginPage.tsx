@@ -466,19 +466,19 @@ const LoginPage = () => {
               {/* Pembatas "atau" */}
               <div className="relative my-3.5 flex items-center justify-center">
                 <div className="w-full border-t border-neutral-200 dark:border-neutral-800" />
-                <span className="absolute bg-[#FBF9F5] dark:bg-[#0A0A0C] px-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
+                <span className="absolute bg-white dark:bg-[#111214] px-3 text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
                   atau
                 </span>
               </div>
 
-              {/* Tombol Masuk dengan Akun Google (Full-Page Redirect - Neon Style) */}
+              {/* Tombol Masuk dengan Akun Google (Full-Page Redirect) */}
               <button
                 type="button"
                 onClick={() => startGoogleRedirectAuth({ action: "login" })}
-                className="w-full h-12 rounded-xl border border-neutral-200/90 dark:border-neutral-800 bg-neutral-50/60 dark:bg-[#15171e] hover:bg-white dark:hover:bg-[#1a1d26] hover:border-emerald-500/40 dark:hover:border-emerald-500/40 text-neutral-800 dark:text-neutral-100 font-bold text-xs sm:text-sm shadow-xs hover:shadow-[0_0_20px_rgba(16,185,129,0.12)] transition-all cursor-pointer flex items-center justify-center gap-3 active:scale-98 group"
+                className="group relative w-full h-11 sm:h-12 rounded-xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-[#12141a] hover:bg-emerald-500/[0.04] dark:hover:bg-emerald-500/[0.06] hover:border-emerald-500/40 dark:hover:border-emerald-500/40 text-neutral-800 dark:text-neutral-100 font-bold text-xs sm:text-sm shadow-2xs hover:shadow-[0_4px_20px_rgba(16,185,129,0.12)] transition-all cursor-pointer flex items-center justify-center gap-3 active:scale-[0.99]"
                 title="Masuk menggunakan akun Google guru atau proktor yang terdaftar"
               >
-                <div className="w-5 h-5 rounded-md bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-110 transition-transform">
+                <div className="w-6 h-6 rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/60 dark:border-neutral-800 flex items-center justify-center shrink-0">
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
                     <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>

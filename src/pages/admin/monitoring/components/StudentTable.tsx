@@ -198,14 +198,17 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
         }
 
         // Class Filter
-        if (!s.classId || monitorRoom?.allClasses) {
-          if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
-          return true;
+        const hasAttempt = attempts.some(at => (at.studentId || at.student_id) === s.id);
+        if (!hasAttempt) {
+          if (!s.classId || monitorRoom?.allClasses) {
+            if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
+            return true;
+          }
+          const allowedIds = Array.isArray(monitorRoom?.classId) && (monitorRoom.classId as string[]).length > 0
+            ? monitorRoom.classId as string[]
+            : null;
+          if (allowedIds && !allowedIds.includes(s.classId)) return false;
         }
-        const allowedIds = Array.isArray(monitorRoom?.classId) && (monitorRoom.classId as string[]).length > 0
-          ? monitorRoom.classId as string[]
-          : null;
-        if (allowedIds && !allowedIds.includes(s.classId)) return false;
         if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
         return true;
       })

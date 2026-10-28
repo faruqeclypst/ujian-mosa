@@ -328,7 +328,7 @@ export const StudentForm = ({
         </FormField>
       </div>
 
-      {/* Tempat & Tanggal Lahir (Khas Kartu Ujian ANBK/TKA) */}
+      {/* Tempat & Tanggal Lahir */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField id="birthPlace" label="Tempat Lahir (Opsional)" error={errors.birthPlace}>
           <Input id="birthPlace" placeholder="Contoh: Jakarta" {...register("birthPlace")} />
@@ -338,26 +338,6 @@ export const StudentForm = ({
           <Input id="birthDate" type="date" {...register("birthDate")} />
         </FormField>
       </div>
-
-      {/* Ruang & Sesi Ujian */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField id="room" label="Ruang Ujian (Opsional)" error={errors.room}>
-          <Input id="room" placeholder="Contoh: Ruang 01 / Lab Komputer" {...register("room")} />
-        </FormField>
-
-        <FormField id="session" label="Sesi Ujian (Opsional)" error={errors.session}>
-          <Input id="session" placeholder="Contoh: Sesi 1 / Sesi 2" {...register("session")} />
-        </FormField>
-      </div>
-
-      {/* Nomor Peserta Khusus (Opsional) */}
-      <FormField id="examNumber" label="Nomor Peserta Ujian (Opsional)" error={errors.examNumber}>
-        <Input 
-          id="examNumber" 
-          placeholder={`Jika kosong, otomatis menggunakan ${terminology.id}`} 
-          {...register("examNumber")} 
-        />
-      </FormField>
       
       <div className="flex justify-end gap-2 pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
         {onCancel && (

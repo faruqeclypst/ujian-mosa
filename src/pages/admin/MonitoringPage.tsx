@@ -26,10 +26,12 @@ import {
   Download,
   SlidersHorizontal,
   CheckSquare,
-  FileText
+  FileText,
+  GitBranch
 } from "lucide-react";
 import { Sparkles, RotateCcw, Copy, Check, Pencil, ClipboardPaste, Zap, BarChart2, ExternalLink } from "lucide-react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
+import { ExamRoomPicker, ExamRoomPickerItem } from "../../components/common/ExamRoomPicker";
 import { Button } from "../../components/ui/button";
 import {
   DropdownMenu,
@@ -77,14 +79,38 @@ import { NeonStatGrid, NeonStatCard } from "../../components/ui/NeonStats";
 
 const MonitoringPage = () => {
   const navigate = useNavigate();
-  const [roomId, setRoomId] = useState<string | null>(() => sessionStorage.getItem("activeMonitoringRoomId"));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryRoomId = searchParams.get("roomId");
 
+  const [roomId, setRoomId] = useState<string | null>(() => {
+    return queryRoomId || sessionStorage.getItem("activeMonitoringRoomId");
+  });
+
+  // Sinkronisasi query param & sessionStorage jika URL berubah
   useEffect(() => {
-    if (!roomId) {
-      // Jika nyasar kesini tanpa ID, balikin ke daftar ruangan
-      navigate("/admin/ruang-ujian", { replace: true });
+    if (queryRoomId && queryRoomId !== roomId) {
+      setRoomId(queryRoomId);
+      sessionStorage.setItem("activeMonitoringRoomId", queryRoomId);
     }
-  }, [roomId, navigate]);
+  }, [queryRoomId, roomId]);
+
+  // Handler memilih ruangan dari ExamRoomPicker
+  const handleSelectRoom = (r: ExamRoomPickerItem) => {
+    setRoomId(r.id);
+    sessionStorage.setItem("activeMonitoringRoomId", r.id);
+    setSearchParams({ roomId: r.id });
+  };
+
+  // Handler kembali ke daftar pemilihan ruangan
+  const handleSwitchRoom = () => {
+    setRoomId(null);
+    setMonitorRoom(null);
+    setAttempts([]);
+    setMonitorQuestions([]);
+    setDetailStats(null);
+    sessionStorage.removeItem("activeMonitoringRoomId");
+    setSearchParams({});
+  };
 
   const { user, role } = useAuth();
   const { pb, terminology, school } = useTenant();
@@ -338,8 +364,8 @@ const MonitoringPage = () => {
           }
         }
 
-        // classIds kosong di DB = room terbuka semua kelas
-        const effectiveAllClasses = isAllClasses || classList.length === 0;
+        // classIds kosong di DB atau mencakup seluruh kelas = room terbuka semua kelas
+        const effectiveAllClasses = isAllClasses || classList.length === 0 || (examClasses.length > 0 && classList.length >= examClasses.length);
 
         currentRoom = {
           ...roomRecord,
@@ -553,7 +579,7 @@ const MonitoringPage = () => {
       setLoading(false);
       setLastSyncTime(new Date());
     }
-  }, [roomId, monitorRoom, monitorQuestions.length, pb, subjects, masterTeachers]);
+  }, [roomId, monitorRoom, monitorQuestions.length, pb, subjects, masterTeachers, examClasses]);
 
   // Pemicu penyegaran manual oleh pengawas / guru
   const handleTriggerManualRefresh = useCallback(() => {
@@ -1213,28 +1239,9 @@ const MonitoringPage = () => {
     return names.length > 0 ? names.join(", ") : (ids.length > 0 ? `ID: ${String(ids[0]).substring(0, 5)}...` : "N/A");
   })();
 
-  // Monitoring dikunci untuk non-admin saat ujian besar (>200 peserta)
-  if (monitoringLocked) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-in fade-in duration-500">
-        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-2xl flex items-center justify-center">
-          <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-        </div>
-        <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight text-center">
-          Monitoring Dikunci
-        </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-md font-semibold">
-          Halaman monitoring dikunci selama ujian besar berlangsung (&gt;200 peserta) untuk menjaga performa server.
-          Hanya admin yang dapat mengakses. Anda tetap dapat mengelola bank soal dan fungsi lainnya.
-        </p>
-      </div>
-    );
-  }
-
   // Filter and compute statistics
   const eligibleStudents = useMemo(() => {
+    if (!monitorRoom) return students;
     return students.filter((s: any) => {
       if (monitorRoom?.allClasses) {
         if (monitorClassFilter !== "all" && examClasses.find((c: any) => c.id === s.classId)?.name !== monitorClassFilter) return false;
@@ -1299,6 +1306,44 @@ const MonitoringPage = () => {
     }
   }, [eligibleStudents, inspectedStudentId]);
 
+  // 1. Jika belum memilih ruang ujian, tampilkan ExamRoomPicker (daftar seluruh ruangan)
+  if (!roomId) {
+    return (
+      <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+        <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+          <ExamRoomPicker
+            title="Live Monitoring &amp; Pengawasan Ujian"
+            subtitle="Pilih sesi ruang ujian aktif untuk memantau status pengerjaan peserta, sisa durasi ujian, reset sesi login, dan live score secara realtime."
+            badgeText="Monitoring Live"
+            actionText="Pantau Ruang Ujian"
+            icon={Eye}
+            onSelectRoom={handleSelectRoom}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Monitoring dikunci untuk non-admin saat ujian besar (>200 peserta)
+  if (monitoringLocked) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-in fade-in duration-500">
+        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-2xl flex items-center justify-center">
+          <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight text-center">
+          Monitoring Dikunci
+        </h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-md font-semibold">
+          Halaman monitoring dikunci selama ujian besar berlangsung (&gt;200 peserta) untuk menjaga performa server.
+          Hanya admin yang dapat mengakses. Anda tetap dapat mengelola bank soal dan fungsi lainnya.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
       <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
@@ -1308,8 +1353,8 @@ const MonitoringPage = () => {
            ═══════════════════════════════════════════════════════════════ */}
         <NeonPageHeader
           bordered
-          onBack={() => navigate("/admin/ruang-ujian")}
-          backTitle="Kembali ke Ruang Ujian"
+          onBack={handleSwitchRoom}
+          backTitle="Pilih Ruang Lain"
           title={isLoading ? <Skeleton className="h-6 w-44 inline-block" /> : (monitorRoom?.room_name || "Monitoring Ujian")}
           badge={
             !isLoading ? (
@@ -1320,9 +1365,13 @@ const MonitoringPage = () => {
           }
           breadcrumbs={
             <>
-              <Link to="/admin/ruang-ujian" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors shrink-0">
-                Ruang Ujian
-              </Link>
+              <button
+                type="button"
+                onClick={handleSwitchRoom}
+                className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors shrink-0 cursor-pointer text-left"
+              >
+                Pilih Ruangan
+              </button>
               <span>/</span>
               <span className="font-medium text-neutral-700 dark:text-neutral-300 shrink-0">
                 {isLoading ? "..." : (monitorRoom?.subjectName || "Mapel")}
@@ -1333,6 +1382,17 @@ const MonitoringPage = () => {
           }
           actions={
             <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+            {/* 0. Ganti Ruang Button */}
+            <button
+              type="button"
+              onClick={handleSwitchRoom}
+              className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+              title="Ganti Ruangan yang Dimonitor"
+            >
+              <GitBranch className="h-3.5 w-3.5 text-neutral-500" />
+              <span>Ganti Ruang</span>
+            </button>
+
             {/* 1. Penilaian Button (Direct Access) */}
             <button
               type="button"

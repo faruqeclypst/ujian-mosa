@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -53,7 +53,23 @@ import { NeonStatGrid, NeonStatCard } from "../components/ui/NeonStats";
 
 const ClassesPage = () => {
   const { classes, students, loading, createClass, updateClass, deleteClass, resetStudentPasswordBatch } = useExamData();
-  const { terminology, school } = useTenant();
+  const { terminology, school, pb } = useTenant();
+
+  const [fastClassCounts, setFastClassCounts] = useState<Record<string, number>>({});
+  const [fastTotalStudents, setFastTotalStudents] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!pb) return;
+    pb.send("/api/class-student-counts", {})
+      .then((res: any) => {
+        if (res && typeof res === "object") {
+          const { _total, ...rest } = res;
+          setFastClassCounts(rest);
+          if (typeof _total === "number") setFastTotalStudents(_total);
+        }
+      })
+      .catch(() => {});
+  }, [pb]);
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -289,9 +305,11 @@ const ClassesPage = () => {
   [selectedClass]);
 
   const schoolSlug = school?.slug || school?.name?.toLowerCase().replace(/\s+/g, "-") || "modalbangsa";
-  const avgStudentsPerClass = classes.length > 0 ? Math.round(students.length / classes.length) : 0;
+  const totalStudentCount = fastTotalStudents !== null ? fastTotalStudents : students.length;
+  const avgStudentsPerClass = classes.length > 0 ? Math.round(totalStudentCount / classes.length) : 0;
 
   const studentCountMap = useMemo(() => {
+    if (Object.keys(fastClassCounts).length > 0) return fastClassCounts;
     const map: Record<string, number> = {};
     for (const s of students) {
       if (s.classId) {
@@ -299,7 +317,7 @@ const ClassesPage = () => {
       }
     }
     return map;
-  }, [students]);
+  }, [fastClassCounts, students]);
 
   return (
     <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
@@ -454,18 +472,18 @@ const ClassesPage = () => {
           />
           <NeonStatCard
             label={`Total ${terminology.student} Terdaftar`}
-            value={String(students.length)}
+            value={String(totalStudentCount)}
             unit="siswa"
             indicator={true}
             subText="Siswa aktif di seluruh kelas"
-            isLoading={loading}
+            isLoading={loading && fastTotalStudents === null}
           />
           <NeonStatCard
             label="Rata-rata per Kelas"
             value={String(avgStudentsPerClass)}
             unit="siswa / kelas"
             subText="Kepadatan rombel rata-rata"
-            isLoading={loading}
+            isLoading={loading && fastTotalStudents === null}
           />
         </NeonStatGrid>
 

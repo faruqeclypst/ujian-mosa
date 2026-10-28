@@ -5,7 +5,18 @@
    3. Pencegahan Duplikasi: Server terkunci jika dipindah/dicopy ke komputer lain
    4. Proteksi Akses Siswa & Ujian: Memblokir login siswa & attempt jika lisensi tidak sah / expired / duplikat
    5. Remote Kill-Switch Sync saat server terhubung internet
+   6. Jurus 1: Anti-Tamper & Self-Integrity Engine
    ========================================================= */
+
+// Jurus 1: Verifikasi integritas saat boot server
+try {
+    const _bootValidator = require(`${__hooks}/license_validator.js`);
+    if (_bootValidator && typeof _bootValidator.verifyHookIntegrity === "function") {
+        _bootValidator.verifyHookIntegrity(true);
+    }
+} catch (e) {
+    if (typeof $os !== "undefined" && typeof $os.exit === "function") $os.exit(1);
+}
 
 // -------------------------------------------------------------
 // Endpoint 1: Aktivasi Lisensi Server (Auto-Lock ke Mesin Server Pertama Kali)
@@ -233,6 +244,11 @@ onRecordAuthRequest((e) => {
 
     // Hanya batasi siswa di server lokal offline
     if (e.collection.name === "students") {
+        const validator = require(`${__hooks}/license_validator.js`);
+        if (validator && typeof validator.verifyHookIntegrity === "function") {
+            validator.verifyHookIntegrity();
+        }
+
         let license = "";
         let isRevoked = false;
         let isDeviceMismatch = false;
@@ -244,7 +260,6 @@ onRecordAuthRequest((e) => {
                 isRevoked = localStatus === "revoked" || localStatus === "deleted";
                 const lockedDev = list[0].get("locked_device_id") || "";
                 if (license && lockedDev) {
-                    const validator = require(`${__hooks}/license_validator.js`);
                     const hw = validator.getMachineHardwareId();
                     if (lockedDev !== hw.id) {
                         isDeviceMismatch = true;
@@ -265,7 +280,6 @@ onRecordAuthRequest((e) => {
             throw new ForbiddenError("Izin Server Offline CBT belum aktif. Silakan hubungi proktor sekolah.");
         }
 
-        const validator = require(`${__hooks}/license_validator.js`);
         const check = validator.pbVerifyLicense(license);
         if (!check.valid) {
             throw new ForbiddenError(check.message || "Izin Server Offline CBT tidak valid atau masa berlaku telah habis.");
@@ -286,6 +300,11 @@ onRecordCreateRequest((e) => {
     }
 
     if (e.collection.name === "attempts") {
+        const validator = require(`${__hooks}/license_validator.js`);
+        if (validator && typeof validator.verifyHookIntegrity === "function") {
+            validator.verifyHookIntegrity();
+        }
+
         let license = "";
         let isRevoked = false;
         let isDeviceMismatch = false;
@@ -297,7 +316,6 @@ onRecordCreateRequest((e) => {
                 isRevoked = localStatus === "revoked" || localStatus === "deleted";
                 const lockedDev = list[0].get("locked_device_id") || "";
                 if (license && lockedDev) {
-                    const validator = require(`${__hooks}/license_validator.js`);
                     const hw = validator.getMachineHardwareId();
                     if (lockedDev !== hw.id) {
                         isDeviceMismatch = true;
@@ -318,7 +336,6 @@ onRecordCreateRequest((e) => {
             throw new ForbiddenError("Ujian tidak dapat dimulai: Izin Server Offline CBT belum aktif.");
         }
 
-        const validator = require(`${__hooks}/license_validator.js`);
         const check = validator.pbVerifyLicense(license);
         if (!check.valid) {
             throw new ForbiddenError("Ujian tidak dapat dimulai: " + (check.message || "Masa izin server offline telah berakhir."));

@@ -996,7 +996,7 @@ const ExamRoomsPage = () => {
 
   const handleMonitorClick = (room: ExamRoomData) => {
     sessionStorage.setItem("activeMonitoringRoomId", room.id);
-    navigate(`/admin/monitoring`);
+    navigate(`/admin/monitoring?roomId=${room.id}`);
   };
 
   const isRoomActive = selectedRoom ? (

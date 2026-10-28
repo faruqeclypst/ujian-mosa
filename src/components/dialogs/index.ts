@@ -25,3 +25,6 @@ export * from "./ItemAnalysisDialog";
 export { default as AIQuestionRevisionDialog } from "./AIQuestionRevisionDialog";
 export * from "./AIQuestionRevisionDialog";
 
+export { default as StudentProfileDialog } from "./StudentProfileDialog";
+export * from "./StudentProfileDialog";
+

@@ -232,10 +232,16 @@ function pbVerifyLicense(licenseCode) {
 }
 
 // -------------------------------------------------------------
-// Deteksi Sidik Jari Perangkat Keras Mesin Server (Hardware ID)
+// Deteksi Sidik Jari Perangkat Keras Multi-Hardware (Motherboard + CPU + BIOS)
 // -------------------------------------------------------------
+let _cachedHardwareInfo = null;
+
 function getMachineHardwareId() {
-    let rawId = "";
+    if (_cachedHardwareInfo) {
+        return _cachedHardwareInfo;
+    }
+
+    let rawHardwareParts = [];
     let computerName = "";
     try {
         if (typeof $os !== "undefined" && $os.getenv) {
@@ -243,7 +249,31 @@ function getMachineHardwareId() {
         }
     } catch (_) {}
 
-    // 1. Windows: Query MachineGuid dari Registry HKLM
+    // A. WINDOWS: Multi-Hardware Physical SMBIOS Query (Motherboard UUID + BaseBoard + CPU ID + BIOS)
+    // Berada di level chip fisik firmware, BUKAN dari Windows Registry, sehingga 100% kebal dari edit regedit.
+    try {
+        if (typeof $os !== "undefined" && $os.cmd) {
+            const psCmd = $os.cmd(
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy", "Bypass",
+                "-Command",
+                "[string]::Join('|', @((Get-CimInstance Win32_ComputerSystemProduct).UUID, (Get-CimInstance Win32_BaseBoard).SerialNumber, (Get-CimInstance Win32_Processor).ProcessorId, (Get-CimInstance Win32_BIOS).SerialNumber))"
+            );
+            const bytes = psCmd.output();
+            if (bytes && bytes.length > 0) {
+                let outStr = "";
+                for (let i = 0; i < bytes.length; i++) outStr += String.fromCharCode(bytes[i]);
+                const clean = outStr.trim();
+                if (clean && clean.length > 10 && clean.indexOf("|") !== -1) {
+                    rawHardwareParts.push("HW_PHYSICAL:" + clean);
+                }
+            }
+        }
+    } catch (_) {}
+
+    // B. WINDOWS SECONDARY: Registry MachineGuid (sebagai lapisan tambahan)
     try {
         if (typeof $os !== "undefined" && $os.cmd) {
             const c = $os.cmd("reg", "query", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Cryptography", "/v", "MachineGuid");
@@ -253,45 +283,162 @@ function getMachineHardwareId() {
                 for (let i = 0; i < bytes.length; i++) outStr += String.fromCharCode(bytes[i]);
                 const match = outStr.match(/MachineGuid\s+REG_SZ\s+([a-fA-F0-9\-]+)/i);
                 if (match && match[1]) {
-                    rawId = match[1].trim().toLowerCase();
+                    rawHardwareParts.push("REG_GUID:" + match[1].trim().toLowerCase());
                 }
             }
         }
     } catch (_) {}
 
-    // 2. Linux fallback: baca /etc/machine-id
-    if (!rawId) {
-        try {
-            if (typeof $os !== "undefined" && $os.readFile) {
-                const bytes = $os.readFile("/etc/machine-id");
-                if (bytes && bytes.length > 0) {
-                    let s = "";
-                    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-                    rawId = s.trim().toLowerCase();
+    // C. LINUX DMI / SMBIOS HARDWARE FALLBACK (Jika server dijalankan di Linux offline)
+    try {
+        if (typeof $os !== "undefined" && $os.readFile) {
+            try {
+                const b = $os.readFile("/sys/class/dmi/id/product_uuid");
+                if (b && b.length > 0) {
+                    let s = ""; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+                    if (s.trim()) rawHardwareParts.push("DMI_UUID:" + s.trim().toLowerCase());
                 }
-            }
-        } catch (_) {}
-    }
+            } catch (_) {}
+            try {
+                const b = $os.readFile("/sys/class/dmi/id/board_serial");
+                if (b && b.length > 0) {
+                    let s = ""; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+                    if (s.trim()) rawHardwareParts.push("DMI_BOARD:" + s.trim().toLowerCase());
+                }
+            } catch (_) {}
+            try {
+                const b = $os.readFile("/etc/machine-id");
+                if (b && b.length > 0) {
+                    let s = ""; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+                    if (s.trim()) rawHardwareParts.push("LINUX_MID:" + s.trim().toLowerCase());
+                }
+            } catch (_) {}
+        }
+    } catch (_) {}
 
-    // 3. Fallback jika registry/file tidak dapat diakses
-    if (!rawId) {
+    // D. FALLBACK EMERGENCY (jika seluruh query hardware diblokir lingkungan sistem)
+    if (rawHardwareParts.length === 0) {
         let user = "";
         try {
             if (typeof $os !== "undefined" && $os.getenv) {
                 user = $os.getenv("USERNAME") || $os.getenv("USER") || "DEFAULT";
             }
         } catch (_) {}
-        rawId = pbPureSha256("FALLBACK_HWID::" + (computerName || "PC") + "::" + user);
+        rawHardwareParts.push("FALLBACK:" + (computerName || "PC") + "::" + user);
     }
 
-    const hash = pbPureSha256("EXAMKU_HWID_SALT_2026::" + rawId);
+    const combinedRaw = rawHardwareParts.join("::");
+    const hash = pbPureSha256("EXAMKU_MULTI_HWID_SALT_2026::" + combinedRaw);
     const shortCode = (hash.substring(0, 4) + "-" + hash.substring(4, 8) + "-" + hash.substring(8, 12)).toUpperCase();
 
-    return {
+    _cachedHardwareInfo = {
         id: "HWID-" + shortCode,
-        raw: rawId,
-        computerName: computerName || "PC-Server"
+        raw: combinedRaw,
+        computerName: computerName || "PC-Server",
+        hardwareCount: rawHardwareParts.length
     };
+
+    return _cachedHardwareInfo;
+}
+
+/**
+ * Jurus 1: Self-Integrity & Anti-Tamper Engine
+ * Memverifikasi keutuhan berkas lisensi dan mematikan server ($os.exit)
+ * seketika jika kode proteksi dihapus, di-comment, atau dimodifikasi oleh cracker.
+ */
+let _lastIntegrityCheck = 0;
+function verifyHookIntegrity(force) {
+    // Lewati jika berjalan di lingkungan Cloud VPS resmi
+    if (typeof __hooks !== "undefined" && (__hooks.indexOf("/opt/pocketbase") !== -1 || __hooks.indexOf("/schools/") !== -1)) {
+        return true;
+    }
+
+    const now = Date.now();
+    if (!force && (now - _lastIntegrityCheck < 10000)) {
+        return true;
+    }
+
+    try {
+        if (typeof $os === "undefined" || typeof $os.readFile !== "function") {
+            return true;
+        }
+
+        const hooksDir = (typeof __hooks !== "undefined" && __hooks) ? __hooks : "./pb_hooks";
+        const licFile = hooksDir + "/offline_license.pb.js";
+        const valFile = hooksDir + "/license_validator.js";
+
+        // 1. Cek fisik berkas proteksi lisensi
+        let licBytes = null;
+        try {
+            licBytes = $os.readFile(licFile);
+        } catch (_) {}
+        if (!licBytes || licBytes.length < 500) {
+            console.error("\n=======================================================");
+            console.error("❌ [SECURITY FATAL] BERKAS LISENSI OFFLINE HILANG / DIHAPUS!");
+            console.error("   Lokasi: " + licFile);
+            console.error("   Server CBT Offline dinonaktifkan demi integritas sistem.");
+            console.error("=======================================================\n");
+            if (typeof $os.exit === "function") $os.exit(1);
+            return false;
+        }
+
+        // 2. Cek fisik berkas validator kriptografi
+        let valBytes = null;
+        try {
+            valBytes = $os.readFile(valFile);
+        } catch (_) {}
+        if (!valBytes || valBytes.length < 500) {
+            console.error("\n=======================================================");
+            console.error("❌ [SECURITY FATAL] BERKAS VALIDATOR KRIPTOGRAFI HILANG / RUSAK!");
+            console.error("   Lokasi: " + valFile);
+            console.error("   Server CBT Offline dinonaktifkan demi integritas sistem.");
+            console.error("=======================================================\n");
+            if (typeof $os.exit === "function") $os.exit(1);
+            return false;
+        }
+
+        let licStr = "";
+        for (let i = 0; i < licBytes.length; i++) licStr += String.fromCharCode(licBytes[i]);
+
+        // Bersihkan komentar (strip single-line // dan multi-line /* ... */)
+        // agar proteksi tidak bisa di-bypass hanya dengan meng-comment baris kode
+        const licActiveCode = licStr
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/\/\/.*$/gm, "");
+
+        // 3. Verifikasi Kehadiran Anchor Penegak Lisensi yang Aktif
+        const requiredTokens = [
+            "isDeviceMismatch",
+            "onRecordAuthRequest",
+            "onRecordCreateRequest",
+            "getMachineHardwareId",
+            "pbVerifyLicense",
+            "ForbiddenError",
+            "locked_device_id"
+        ];
+
+        for (let i = 0; i < requiredTokens.length; i++) {
+            const token = requiredTokens[i];
+            if (licActiveCode.indexOf(token) === -1) {
+                console.error("\n=======================================================");
+                console.error("❌ [SECURITY FATAL] TERDETEKSI TAMPERING / MODIFIKASI KODE!");
+                console.error("   Token pengaman: [" + token + "] tidak ditemukan atau di-comment.");
+                console.error("   Server CBT Offline otomatis dihentikan demi keamanan.");
+                console.error("=======================================================\n");
+                if (typeof $os.exit === "function") $os.exit(1);
+                return false;
+            }
+        }
+
+        _lastIntegrityCheck = now;
+        return true;
+    } catch (err) {
+        console.error("\n❌ [SECURITY FATAL] Gagal memverifikasi integritas sistem offline:", err);
+        if (typeof $os !== "undefined" && typeof $os.exit === "function") {
+            $os.exit(1);
+        }
+        return false;
+    }
 }
 
 module.exports = {
@@ -300,5 +447,7 @@ module.exports = {
     pbPureSha256,
     pbBase64ToUtf8,
     pbBase64UrlToBytes,
-    getMachineHardwareId
+    getMachineHardwareId,
+    verifyHookIntegrity
 };
+

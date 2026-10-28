@@ -121,12 +121,6 @@ export const StudentTable = ({
                 <span className="sm:hidden text-neutral-700 dark:text-neutral-300 font-sans font-medium truncate max-w-[120px]">
                   • {classes.find(c => c.id === student.classId)?.name || (student.classId === "ALUMNI" ? "Alumni" : "-")}
                 </span>
-                {student.examNumber && student.examNumber !== student.nisn && (
-                  <span className="hidden sm:inline">
-                    <span>• </span>
-                    <span>No: {student.examNumber}</span>
-                  </span>
-                )}
                 {(student.birthPlace || student.birthDate) && (
                   <span className="hidden sm:inline">
                     <span>• </span>
@@ -154,11 +148,6 @@ export const StudentTable = ({
             <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
               {clsName}
             </span>
-            {(student.room || student.session) && (
-              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">
-                {[student.room, student.session].filter(Boolean).join(" • ")}
-              </span>
-            )}
           </div>
         );
       }

@@ -184,17 +184,18 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let unsubscribeTeachers: any, unsubscribeClasses: any, unsubscribeSubjects: any, unsubscribeStudents: any;
     let unsubscribeExams: any, unsubscribeRooms: any, unsubscribeQuestions: any;
+    let backgroundTimer: any;
 
     const setup = async () => {
       pb.autoCancellation(false);
       // Tahap 1: data kritis (ringan) → UI boleh render.
       await initCritical();
 
-      // Tahap 2: students (berat, 10k records) jalan di background,
-      // TIDAK di-await agar tidak memblokir UI maupun subscription di bawah.
-      // Konsumen (mis. ExamRoomsPage) sudah me-recompute saat `students`
-      // berubah, jadi angka akan koreksi sendiri begitu data tiba.
-      loadStudentsBackground();
+      // Tahap 2: students (berat, 10k records) dijadwalkan setelah delay singkat (500ms),
+      // agar tidak bersaing koneksi HTTP dengan pemuatan tabel halaman aktif.
+      backgroundTimer = setTimeout(() => {
+        loadStudentsBackground();
+      }, 500);
 
       // Subscribe with incremental updates instead of initAll (re-fetch everything)
       unsubscribeTeachers = await pb.collection("teachers").subscribe("*", (e) => {
@@ -263,6 +264,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
     setup();
     return () => {
+      if (backgroundTimer) clearTimeout(backgroundTimer);
       if (unsubscribeTeachers) unsubscribeTeachers();
       if (unsubscribeClasses) unsubscribeClasses();
       if (unsubscribeSubjects) unsubscribeSubjects();

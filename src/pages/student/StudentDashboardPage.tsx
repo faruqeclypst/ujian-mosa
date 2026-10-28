@@ -6,8 +6,9 @@ import { useTenant } from "../../context/TenantContext";
 import {
   Calendar, Clock, User, AlertCircle,
   Award, LogOut as LogoutIcon, Sun, Moon, Monitor, KeyRound, ClipboardCheck, Sparkles,
-  Lock,
+  Lock, Camera,
 } from "lucide-react";
+import { StudentProfileDialog } from "../../components/dialogs/StudentProfileDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "../../components/ui/dropdown-menu";
@@ -136,6 +137,9 @@ const StudentDashboardPage = () => {
   const [hasPendingSync, setHasPendingSync] = useState(false);
   const [isSyncingData, setIsSyncingData] = useState(false);
   const [isFirstLoadState, setIsFirstLoadState] = useState(true);
+
+  // Profile Modal State
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // Change Password Modal
   const [isChangePassOpen, setIsChangePassOpen] = useState(false);
@@ -483,8 +487,12 @@ const StudentDashboardPage = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm group cursor-pointer hover:bg-emerald-100 transition-all outline-none">
-                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm group cursor-pointer hover:bg-emerald-100 transition-all outline-none overflow-hidden">
+                  {student?.photo ? (
+                    <img src={student.photo} alt={student.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                  )}
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl border-slate-100 dark:border-slate-800 shadow-2xl">
@@ -492,6 +500,13 @@ const StudentDashboardPage = () => {
                   <span className="text-xs font-black text-slate-800 dark:text-white uppercase truncate">{student?.name}</span>
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{terminology.student.toUpperCase()} • {student?.className} • {terminology.id} {student?.nisn}</span>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
+                <DropdownMenuItem onClick={() => setIsProfileOpen(true)} className="px-3 py-2.5 rounded-xl text-slate-700 dark:text-slate-200 focus:bg-emerald-50 dark:focus:bg-emerald-950/40 focus:text-emerald-700 dark:focus:text-emerald-300 flex items-center gap-3 cursor-pointer transition-colors group">
+                  <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg group-focus:bg-emerald-100 dark:group-focus:bg-emerald-900/40 transition-colors">
+                    <User className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-widest">Profil Saya</span>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
                 <div className="px-3 py-2 flex flex-col gap-2">
                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">Personalisasi Tema</span>
@@ -611,23 +626,23 @@ const StudentDashboardPage = () => {
                 </div>
 
                 <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-full sm:w-fit">
-                  <button 
-                    onClick={() => setActiveTab("active")} 
+                  <button
+                    onClick={() => setActiveTab("active")}
                     className={cn(
-                      "flex-1 sm:flex-none min-h-[40px] px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500", 
-                      activeTab === "active" 
-                        ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-sm font-black" 
+                      "flex-1 sm:flex-none min-h-[40px] px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500",
+                      activeTab === "active"
+                        ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-sm font-black"
                         : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                     )}
                   >
                     Aktif ({totalActive})
                   </button>
-                  <button 
-                    onClick={() => setActiveTab("history")} 
+                  <button
+                    onClick={() => setActiveTab("history")}
                     className={cn(
-                      "flex-1 sm:flex-none min-h-[40px] px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500", 
-                      activeTab === "history" 
-                        ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-sm font-black" 
+                      "flex-1 sm:flex-none min-h-[40px] px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500",
+                      activeTab === "history"
+                        ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-sm font-black"
                         : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                     )}
                   >
@@ -840,12 +855,16 @@ const StudentDashboardPage = () => {
             <Card className="rounded-[2.5rem] border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none bg-white dark:bg-slate-900 overflow-hidden">
               <CardHeader className="p-8 pb-4">
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center border border-emerald-100 dark:border-emerald-800 shadow-sm">
-                    <User className="h-7 w-7 text-emerald-600" />
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center border border-emerald-100 dark:border-emerald-800 shadow-sm overflow-hidden shrink-0">
+                    {student?.photo ? (
+                      <img src={student.photo} alt={student.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="h-7 w-7 text-emerald-600" />
+                    )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[10px] font-black text-emerald-600/60 dark:text-emerald-400/60 uppercase tracking-widest leading-none">Status {terminology.student}</p>
-                    <h4 className="text-base font-black text-slate-800 dark:text-white mt-1 leading-tight">{student?.name}</h4>
+                    <h4 className="text-base font-black text-slate-800 dark:text-white mt-1 leading-tight truncate">{student?.name}</h4>
                   </div>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3">
@@ -857,6 +876,14 @@ const StudentDashboardPage = () => {
                     <span className="text-emerald-600/70 dark:text-emerald-400/70 uppercase">Username / {terminology.id}</span>
                     <span className="text-slate-700 dark:text-slate-200">{student?.nisn}</span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsProfileOpen(true)}
+                    className="w-full mt-2 min-h-[38px] px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800/80 bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors shadow-xs"
+                  >
+                    <Camera className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>{student?.photo ? "Edit Foto & Profil" : "Unggah Pas Foto & Lengkapi Data"}</span>
+                  </button>
                 </div>
               </CardHeader>
               <CardContent className="p-8 pt-2 space-y-6">
@@ -902,6 +929,14 @@ const StudentDashboardPage = () => {
           </div>
         </div>
       </main>
+
+      {/* Student Profile Dialog */}
+      <StudentProfileDialog
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        onChangePassword={() => setIsChangePassOpen(true)}
+        onLogout={logoutStudent}
+      />
 
       {/* Manual Change Password Dialog */}
       <Dialog open={isChangePassOpen} onOpenChange={(open) => { if (!isChangingPass) setIsChangePassOpen(open); setPassError(""); setNewPass(""); setConfirmPass(""); }}>
