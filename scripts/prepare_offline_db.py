@@ -2,6 +2,7 @@ import sqlite3
 import json
 import shutil
 import os
+import tempfile
 
 TEMPLATE_DB = 'vps/template_school/pb_data/data.db'
 OFFLINE_DB = 'offline_package/pb_data/data.db'
@@ -16,10 +17,10 @@ def remove_wal(db_path):
             except Exception:
                 pass
 
-def clean_template_db():
-    print(f"Cleaning template DB: {TEMPLATE_DB}...")
-    remove_wal(TEMPLATE_DB)
-    conn = sqlite3.connect(TEMPLATE_DB)
+def clean_template_db(db_path):
+    print(f"Cleaning template DB copy: {db_path}...")
+    remove_wal(db_path)
+    conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     # Clean old leftover test data from template
     cur.execute("DELETE FROM leaderboards")
@@ -31,14 +32,14 @@ def clean_template_db():
     cur.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     cur.execute("VACUUM")
     conn.close()
-    remove_wal(TEMPLATE_DB)
-    print("Template DB cleaned successfully.")
+    remove_wal(db_path)
+    print("Template DB copy cleaned successfully.")
 
-def build_offline_db():
-    print(f"Building offline DB from {TEMPLATE_DB}...")
+def build_offline_db(src_db):
+    print(f"Building offline DB from {src_db}...")
     remove_wal(OFFLINE_DB)
     # Copy fresh template to offline DB
-    shutil.copyfile(TEMPLATE_DB, OFFLINE_DB)
+    shutil.copyfile(src_db, OFFLINE_DB)
     
     conn = sqlite3.connect(OFFLINE_DB)
     cur = conn.cursor()
@@ -236,5 +237,18 @@ def build_offline_db():
     print(f"Created template at {template_folder}/data.db")
 
 if __name__ == '__main__':
-    clean_template_db()
-    build_offline_db()
+    # Work on a temp copy so the git-tracked template DB is never modified
+    # in place (an in-place clean makes the next `git pull` conflict).
+    tmpdir = tempfile.mkdtemp(prefix='prepare_offline_db_')
+    try:
+        tmp_db = os.path.join(tmpdir, 'data.db')
+        shutil.copyfile(TEMPLATE_DB, tmp_db)
+        # Copy WAL sidecars too, so uncheckpointed rows are not lost.
+        for ext in ['-wal', '-shm']:
+            src = TEMPLATE_DB + ext
+            if os.path.exists(src):
+                shutil.copyfile(src, tmp_db + ext)
+        clean_template_db(tmp_db)
+        build_offline_db(tmp_db)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
