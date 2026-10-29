@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -369,7 +371,7 @@ const RegisterSchoolPage = () => {
 
   // FORM STATE
   return (
-    <div className="min-h-screen bg-slate-50 font-sans pb-16">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-slate-50 font-sans pb-16">
       {/* Top bar */}
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
@@ -908,7 +910,7 @@ const RegisterSchoolPage = () => {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

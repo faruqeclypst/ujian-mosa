@@ -4,6 +4,7 @@ import { User, Shield, ArrowLeft, Save, Sparkles, CheckCircle2, AlertCircle } fr
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
+import { fadeUp } from "../lib/motion";
 import { Link, useNavigate } from "react-router-dom";
 import { useTenant } from "../context/TenantContext";
 import { testAIConnection, AI_MODELS } from "../lib/ai";
@@ -190,7 +191,7 @@ const ProfilePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FBF9F5] dark:bg-[#0A0A0C] p-4 sm:p-6 font-sans relative overflow-hidden">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-[#FBF9F5] dark:bg-[#0A0A0C] p-4 sm:p-6 font-sans relative overflow-hidden">
       {/* Background Micro-Grid Pattern */}
       <div className="absolute inset-0 bg-[radial-gradient(#d1d5db_1px,transparent_1px)] dark:bg-[radial-gradient(#262626_1px,transparent_1px)] [background-size:24px_24px] opacity-30 pointer-events-none" />
 
@@ -495,7 +496,7 @@ const ProfilePage = () => {
           </Card>
         </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

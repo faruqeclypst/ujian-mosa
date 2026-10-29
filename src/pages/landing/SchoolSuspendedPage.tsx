@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import { useNavigate } from "react-router-dom";
 import { useTenant } from "../../context/TenantContext";
 import { AlertOctagon, ArrowLeft, RefreshCw, CreditCard, ShieldAlert, School, ExternalLink } from "lucide-react";
@@ -10,7 +12,7 @@ const SchoolSuspendedPage = () => {
   const schoolName = school?.name || slug?.toUpperCase() || "Institusi";
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 text-slate-900 dark:text-slate-100 relative">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 text-slate-900 dark:text-slate-100 relative">
       {/* Floating Change School Button (Mobile App Only) */}
       {Capacitor.isNativePlatform() && (
         <div className="absolute top-6 left-6 z-50">
@@ -94,7 +96,7 @@ const SchoolSuspendedPage = () => {
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

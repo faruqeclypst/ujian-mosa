@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import { useNavigate } from "react-router-dom";
 import {
   Shield, FileText, Wand2, BarChart3, Zap, Sparkles, Building2,
@@ -148,7 +150,7 @@ const FeaturesPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
       {/* Top Navbar */}
       <nav className="sticky top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -347,7 +349,7 @@ const FeaturesPage = () => {
           </p>
         </div>
       </footer>
-    </div>
+    </motion.div>
   );
 };
 

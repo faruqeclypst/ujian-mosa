@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import { useNavigate } from "react-router-dom";
 import { useTenant } from "../../context/TenantContext";
 import { Building2, ArrowLeft, RefreshCw, LogOut, School, Laptop, ShieldAlert } from "lucide-react";
@@ -9,7 +11,7 @@ const SchoolNotFoundPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-900 relative">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-900 relative">
       {/* Floating Change School Button (Android Only) */}
       {Capacitor.isNativePlatform() && (
         <div className="absolute top-6 left-6 z-50">
@@ -104,7 +106,7 @@ const SchoolNotFoundPage = () => {
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

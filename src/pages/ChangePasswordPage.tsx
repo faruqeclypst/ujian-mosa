@@ -4,6 +4,7 @@ import { Lock, Eye, EyeOff, Sparkles, Shield, ArrowLeft } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
+import { fadeUp } from "../lib/motion";
 import { Link, useNavigate } from "react-router-dom";
 import { useTenant } from "../context/TenantContext";
 
@@ -77,7 +78,7 @@ const ChangePasswordPage = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-gray-900 dark:via-blue-900/20 dark:to-blue-800/20 p-6">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-gray-900 dark:via-blue-900/20 dark:to-blue-800/20 p-6">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
@@ -342,7 +343,7 @@ const ChangePasswordPage = () => {
           </CardContent>
         </Card>
       </motion.div>
-    </div>
+    </motion.div>
   );
 };
 

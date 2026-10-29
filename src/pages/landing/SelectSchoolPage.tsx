@@ -19,6 +19,7 @@ import {
   Info,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import { Capacitor } from "@capacitor/core";
 import { APP_DISPLAY_VERSION } from "../../utils/version";
 import { getAppId, isMainApp, isLocalApp } from "../../lib/appVariant";
@@ -530,7 +531,7 @@ const SelectSchoolPage = () => {
   });
 
   return (
-    <div className="h-screen bg-[#f8fafc] dark:bg-[#070b13] flex flex-col relative font-sans overflow-hidden select-none">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="h-screen bg-[#f8fafc] dark:bg-[#070b13] flex flex-col relative font-sans overflow-hidden select-none">
       {/* Dev Back to Landing Button */}
       {window.location.hostname === "localhost" && !Capacitor.isNativePlatform() && (
         <div className="absolute top-4 left-4 z-50">
@@ -1103,7 +1104,7 @@ const SelectSchoolPage = () => {
           CBT by Alfaruq Asri • {APP_DISPLAY_VERSION}
         </p>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

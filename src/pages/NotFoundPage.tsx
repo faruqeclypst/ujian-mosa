@@ -1,12 +1,13 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { fadeUp } from "../lib/motion";
 import { Home, ArrowLeft } from "lucide-react";
 import { Button } from "../components/ui/button";
 
 const NotFoundPage = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-6 overflow-hidden relative font-sans">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-6 overflow-hidden relative font-sans">
       {/* Dynamic Background */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] animate-pulse"></div>
@@ -83,7 +84,7 @@ const NotFoundPage = () => {
           </p>
         </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

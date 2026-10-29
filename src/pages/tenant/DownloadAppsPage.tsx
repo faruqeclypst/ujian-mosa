@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Download, Monitor, Smartphone, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 
 const DownloadAppsPage = () => {
   const { school } = useTenant();
@@ -62,7 +63,7 @@ const DownloadAppsPage = () => {
   const schoolHost = typeof window !== "undefined" ? window.location.host : "";
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans pb-16 transition-colors">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-neutral-50 dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans pb-16 transition-colors">
       {/* Header */}
       <div className="bg-gradient-to-b from-neutral-900 to-neutral-800 dark:from-neutral-950 dark:to-neutral-900 pb-16 pt-8 sm:pt-12 px-4 relative overflow-hidden border-b border-neutral-800/80">
         <div className="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:20px_20px] opacity-10"></div>
@@ -252,7 +253,7 @@ const DownloadAppsPage = () => {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

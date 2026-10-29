@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ShieldCheck, Lock, Mail, ArrowRight, Loader2 } from "lucide-react";
@@ -44,7 +46,7 @@ const SuperAdminLoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Premium Background Elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-100/40 rounded-full blur-[120px] -translate-y-1/2" />
@@ -173,7 +175,7 @@ const SuperAdminLoginPage = () => {
           </p>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

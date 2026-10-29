@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef } from "react";
+import { motion } from "framer-motion";
+import { fadeUp } from "../lib/motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle, AlertCircle, RefreshCw, ArrowLeft, ShieldCheck } from "lucide-react";
 import { useTenant } from "../context/TenantContext";
@@ -158,7 +160,7 @@ export default function GoogleAuthCallbackPage() {
   }, [searchParams, pb, refreshUser]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#FBF9F5] dark:bg-[#0A0A0C] text-neutral-900 dark:text-neutral-100 font-sans relative overflow-hidden">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen flex items-center justify-center p-4 bg-[#FBF9F5] dark:bg-[#0A0A0C] text-neutral-900 dark:text-neutral-100 font-sans relative overflow-hidden">
       {/* Background Micro-Grid Pattern */}
       <div className="absolute inset-0 bg-[radial-gradient(#d1d5db_1px,transparent_1px)] dark:bg-[radial-gradient(#262626_1px,transparent_1px)] [background-size:24px_24px] opacity-30 pointer-events-none" />
 
@@ -266,6 +268,6 @@ export default function GoogleAuthCallbackPage() {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

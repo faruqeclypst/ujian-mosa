@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import React, { useState, useEffect } from "react";
 import {
   Search, ChevronDown, Copy, Check,
@@ -189,7 +191,7 @@ export const PublicDocsPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900">
       {/* ── TOP NAVBAR (PUBLIC CLEAN THEME) ─────────── */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-4 sm:px-8 py-3.5 flex items-center justify-between shadow-2xs">
         <div className="flex items-center gap-3">
@@ -946,7 +948,7 @@ export const PublicDocsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
 

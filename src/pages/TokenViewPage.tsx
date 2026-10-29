@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
+import { motion } from "framer-motion";
+import { fadeUp } from "../lib/motion";
 import { RefreshCw } from "lucide-react";
 import { useTenant } from "../context/TenantContext";
 import PinGate from "../components/ui/PinGate";
@@ -243,7 +245,7 @@ const TokenViewPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 select-none overflow-hidden relative">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-slate-950 select-none overflow-hidden relative">
 
       {/* PIN Gate */}
       {!pinUnlocked && (
@@ -417,7 +419,7 @@ const TokenViewPage = () => {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

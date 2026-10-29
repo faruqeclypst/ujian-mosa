@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import { Capacitor } from "@capacitor/core";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
@@ -189,7 +191,7 @@ const StudentLoginPage = () => {
   const showChangePassModal = !!(student && !student.hasChangedPassword);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[100dvh] overflow-y-auto bg-[#f8fafc] dark:bg-[#020617] relative font-sans leading-relaxed px-4 py-8">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="flex flex-col items-center justify-center min-h-[100dvh] overflow-y-auto bg-[#f8fafc] dark:bg-[#020617] relative font-sans leading-relaxed px-4 py-8">
       {/* Floating Change School Button */}
       {(Capacitor.isNativePlatform() || window.location.hostname === 'localhost' || (school && isLocalServer(school)) || (typeof window !== 'undefined' && localStorage.getItem('selected_school_slug'))) && (
         <div className="absolute top-[max(1.5rem,calc(env(safe-area-inset-top,0px)+1rem))] left-6 z-50">
@@ -554,7 +556,7 @@ const StudentLoginPage = () => {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 };
 

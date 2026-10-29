@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "../../components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "../../components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useTheme } from "../../context/ThemeContext";
 import { Card, CardHeader, CardContent } from "../../components/ui/card";
@@ -451,7 +452,7 @@ const StudentDashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans pb-20 sm:pb-0">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans pb-20 sm:pb-0">
       <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 min-h-[3.25rem] sm:min-h-[4.5rem] h-auto px-3 sm:px-10 py-1 sm:py-0 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="p-1 sm:p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm shrink-0">
@@ -1022,7 +1023,7 @@ const StudentDashboardPage = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 };
 

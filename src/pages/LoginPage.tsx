@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { fadeUp } from "../lib/motion";
 import { Capacitor } from "@capacitor/core";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -148,7 +150,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col lg:flex-row bg-[#FBF9F5] dark:bg-[#0A0A0C] text-neutral-900 dark:text-neutral-100 selection:bg-emerald-500/20">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-[100dvh] flex flex-col lg:flex-row bg-[#FBF9F5] dark:bg-[#0A0A0C] text-neutral-900 dark:text-neutral-100 selection:bg-emerald-500/20">
       {/* ========================================================
           LEFT PANEL: BRAND & CBT HIGHLIGHTS (DESKTOP ONLY)
           ======================================================== */}
@@ -639,7 +641,7 @@ const LoginPage = () => {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 };
 

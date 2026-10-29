@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import {
   ChevronRight,
   ChevronLeft,
@@ -631,7 +632,7 @@ const InterestSurveyPage = () => {
   const currentQuestion = ALL_QUESTIONS[currentStep];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] bg-emerald-500/5 blur-[120px] pointer-events-none -z-10 rounded-full" />
       <button onClick={() => window.location.href = "/"} className="absolute top-6 right-6 p-4 bg-white shadow-xl rounded-2xl text-slate-400 hover:text-rose-500 z-50 group border border-slate-100"><X className="h-5 w-5" /></button>
 
@@ -676,7 +677,7 @@ const InterestSurveyPage = () => {
           </Card>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };
 

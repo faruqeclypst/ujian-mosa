@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { fadeUp } from "../../lib/motion";
 import { useNavigate } from "react-router-dom";
 import {
   Shield, Zap, ArrowRight, CheckCircle, Building2, Menu, X, Globe,
@@ -538,7 +540,7 @@ const LandingPage = () => {
   });
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
 
       {/* Ambient 3D Mesh Gradient Blobs */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
@@ -2011,7 +2013,7 @@ const LandingPage = () => {
           </svg>
         </div>
       </a>
-    </div>
+    </motion.div>
   );
 };
 
