@@ -95,12 +95,18 @@ const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
     const rect = el.getBoundingClientRect();
     const padding = 8;
 
+    el.style.marginLeft = '0px';
+    let shiftX = 0;
     if (rect.left < padding) {
-      el.style.left = `${padding - rect.left + el.offsetLeft}px`;
-      el.style.right = 'auto';
+      shiftX = padding - rect.left;
     } else if (rect.right > window.innerWidth - padding) {
-      el.style.right = '0px';
-      el.style.left = 'auto';
+      shiftX = (window.innerWidth - padding) - rect.right;
+    }
+    if (rect.left + shiftX < padding) {
+      shiftX = padding - rect.left;
+    }
+    if (shiftX !== 0) {
+      el.style.marginLeft = Math.round(shiftX) + 'px';
     }
   }, [open, align]);
   

@@ -1289,14 +1289,14 @@ const ExamRoomsPage = () => {
             {/* Nama Guru & Mapel */}
             <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 flex-wrap">
               <span
-                className="font-medium text-neutral-700 dark:text-neutral-300 truncate max-w-[200px] sm:max-w-none"
+                className="font-medium text-neutral-700 dark:text-neutral-300 truncate max-w-[140px] sm:max-w-none"
                 title={room.teacherName}
               >
                 {room.teacherName || "Pengampu N/A"}
               </span>
               <span className="text-neutral-300 dark:text-neutral-700 shrink-0">•</span>
               <span
-                className="truncate max-w-[180px] sm:max-w-none"
+                className="truncate max-w-[130px] sm:max-w-none"
                 title={room.subjectName}
               >
                 {room.subjectName || "Mapel N/A"}

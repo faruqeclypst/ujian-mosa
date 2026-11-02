@@ -361,11 +361,11 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
                 />
                 <span>
                   {isFinished
-                    ? isForce ? "Selesai (Paksa)" : "Selesai"
+                    ? isForce ? (<><span className="hidden sm:inline">Selesai (Paksa)</span><span className="sm:hidden">Paksa</span></>) : "Selesai"
                     : isLocked
                     ? "Terkunci"
                     : isOngoing
-                    ? "Mengerjakan"
+                    ? (<><span className="hidden sm:inline">Mengerjakan</span><span className="sm:hidden">Aktif</span></>)
                     : (attempt.status || "Aktif")}
                 </span>
               </span>

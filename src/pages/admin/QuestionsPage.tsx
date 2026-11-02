@@ -4238,7 +4238,7 @@ const QuestionsPage = () => {
         <div className="space-y-1.5 py-0.5">
           <MathText
             content={item.text}
-            className="line-clamp-2 text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4"
+            className="line-clamp-2 text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 !overflow-hidden !overflow-hidden [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4"
           />
           <div className="flex items-center gap-1.5 flex-wrap">
             {(item.imageUrl || item.text.includes("<img")) && (
@@ -5895,7 +5895,7 @@ const QuestionsPage = () => {
         tabs={[
           {
             id: "all",
-            label: "Semua Butir Soal",
+            label: <><span>Semua</span><span className="hidden sm:inline"> Butir Soal</span></>,
             icon: Layers,
             count: questions.length,
             countFormat: "badge",
@@ -5909,7 +5909,7 @@ const QuestionsPage = () => {
           },
           {
             id: "complex",
-            label: "Variasi & Kompleks",
+            label: <><span>Variasi</span><span className="hidden sm:inline"> & Kompleks</span></>,
             icon: Sparkles,
             count: questions.filter(q => (q.type || "pilihan_ganda") !== "pilihan_ganda").length,
             countFormat: "badge",

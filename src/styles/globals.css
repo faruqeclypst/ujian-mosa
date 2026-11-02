@@ -660,3 +660,24 @@ input[type="email"],
   animation: squircleSpin 1.5s ease-in-out infinite;
 }
 
+
+
+/* Utility to hide scrollbars while allowing touch/wheel scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Prevent Quill editor from rendering vertical scrollbar when clamped */
+.line-clamp-1.ql-editor,
+.line-clamp-2.ql-editor,
+.line-clamp-3.ql-editor,
+.math-content.line-clamp-1,
+.math-content.line-clamp-2,
+.math-content.line-clamp-3 {
+  overflow: hidden !important;
+  overflow-y: hidden !important;
+}
