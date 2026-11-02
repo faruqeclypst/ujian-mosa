@@ -17,7 +17,7 @@ import {
   X
 } from "lucide-react";
 import { Dialog, DialogContent } from "../ui/dialog";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Input } from "../ui/input";
 import { Select } from "../ui/select";
 import type { StudentData, ClassData } from "../../types/exam";
@@ -504,7 +504,7 @@ export const PrintExamCardsDialog = ({
 
               <tr>
                 <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
-                  No. Peserta / NISN
+                  No. Peserta / {terminology.id}
                 </td>
                 <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
                 <td style={{ fontWeight: 800, color: "#000000", padding: "2px 0" }}>
@@ -675,11 +675,11 @@ export const PrintExamCardsDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-7xl w-[98vw] h-[94vh] max-h-[95vh] p-0 flex flex-col overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl rounded-2xl">
-        {/* Header Dialog Elegan & Bersih */}
-        <div className="px-6 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+      <DialogContent className="max-w-7xl w-[98vw] h-[94vh] max-h-[95vh] p-0 flex flex-col overflow-hidden bg-neutral-900 border border-neutral-800 shadow-2xl rounded-2xl">
+        {/* Header Dialog Elegan Tema Neon */}
+        <div className="px-6 py-3.5 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/25">
               <Printer className="w-5 h-5" />
             </div>
             <div>
@@ -687,34 +687,37 @@ export const PrintExamCardsDialog = ({
                 <h2 className="text-base font-bold text-white leading-tight">
                   Studio Cetak Kartu Peserta Ujian
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
                   Standar ANBK / CBT
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-neutral-400">
                 Atur tata letak di panel kiri dan lihat hasil pratinjau langsung di kanvas kanan
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
+            <NeonButton
+              variant="secondary"
               size="sm"
               onClick={onClose}
-              className="text-xs h-8 px-3 border-slate-700 text-slate-300 hover:bg-slate-800"
+              className="gap-1"
             >
-              <X className="w-3.5 h-3.5 mr-1" />
-              Tutup
-            </Button>
-            <Button
+              <X className="w-3.5 h-3.5" />
+              <span>Tutup</span>
+            </NeonButton>
+            <NeonButton
+              variant="primary"
+              color="brand"
+              size="sm"
               onClick={handlePrint}
               disabled={studentsToPrint.length === 0}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs h-8 px-5 gap-1.5 shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02]"
+              className="gap-1.5"
             >
               <Printer className="w-4 h-4" />
-              Cetak Sekarang ({studentsToPrint.length} Siswa)
-            </Button>
+              <span>Cetak Sekarang ({studentsToPrint.length} {terminology.student})</span>
+            </NeonButton>
           </div>
         </div>
 
@@ -734,7 +737,7 @@ export const PrintExamCardsDialog = ({
               {/* Target Siswa */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  Target Cetak Siswa
+                  Target Cetak {terminology.student}
                 </label>
                 <Select 
                   value={printScope} 
@@ -742,12 +745,12 @@ export const PrintExamCardsDialog = ({
                   className="h-8 text-xs bg-slate-950 border-slate-700 text-slate-200"
                 >
                   {selectedStudentIds.length > 0 && (
-                    <option value="selected">Siswa Terpilih ({selectedStudentIds.length})</option>
+                    <option value="selected">{terminology.student} Terpilih ({selectedStudentIds.length})</option>
                   )}
                   {filterClassId !== "ALL" && (
-                    <option value="class">Kelas ({classes.find(c => c.id === filterClassId)?.name || filterClassId})</option>
+                    <option value="class">{terminology.class} ({classes.find(c => c.id === filterClassId)?.name || filterClassId})</option>
                   )}
-                  <option value="all">Semua Siswa ({students.length})</option>
+                  <option value="all">Semua {terminology.student} ({students.length})</option>
                 </Select>
               </div>
 
@@ -787,16 +790,15 @@ export const PrintExamCardsDialog = ({
               {/* Password Switch */}
               <div className="flex items-center justify-between pt-1">
                 <span className="text-[11px] font-semibold text-slate-400">Tampilan Password:</span>
-                <Button
+                <NeonButton
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
+                  size="xs"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="h-7 text-xs px-2.5 border-slate-700 bg-slate-950 text-slate-200"
                 >
-                  {showPassword ? <Eye className="w-3 h-3 text-blue-400 mr-1.5" /> : <EyeOff className="w-3 h-3 text-slate-500 mr-1.5" />}
+                  {showPassword ? <Eye className="w-3 h-3 text-emerald-500 mr-1.5" /> : <EyeOff className="w-3 h-3 text-neutral-400 mr-1.5" />}
                   <span>{showPassword ? "Tampil" : "Sensor"}</span>
-                </Button>
+                </NeonButton>
               </div>
             </div>
 
@@ -855,15 +857,15 @@ export const PrintExamCardsDialog = ({
                     className="hidden"
                   />
                   {leftLogoType === "custom" && !customLeftLogoUrl && (
-                    <Button
+                    <NeonButton
                       type="button"
-                      variant="outline"
-                      size="sm"
+                      variant="secondary"
+                      size="xs"
                       onClick={() => leftFileInputRef.current?.click()}
-                      className="mt-1 w-full h-7 text-[10px] border-dashed border-slate-700 text-slate-400"
+                      className="mt-1 w-full"
                     >
                       <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
-                    </Button>
+                    </NeonButton>
                   )}
                 </div>
 
@@ -888,15 +890,15 @@ export const PrintExamCardsDialog = ({
                     className="hidden"
                   />
                   {rightLogoType === "custom" && !customRightLogoUrl && (
-                    <Button
+                    <NeonButton
                       type="button"
-                      variant="outline"
-                      size="sm"
+                      variant="secondary"
+                      size="xs"
                       onClick={() => rightFileInputRef.current?.click()}
-                      className="mt-1 w-full h-7 text-[10px] border-dashed border-slate-700 text-slate-400"
+                      className="mt-1 w-full"
                     >
                       <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
-                    </Button>
+                    </NeonButton>
                   )}
                 </div>
               </div>
@@ -1019,60 +1021,63 @@ export const PrintExamCardsDialog = ({
             <div className="px-6 py-2.5 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
               {/* Info Halaman */}
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+                <NeonButton
+                  variant="secondary"
+                  size="xs"
+                  iconOnly
+                  aria-label="Halaman Sebelumnya"
                   disabled={currentPreviewPage <= 0}
                   onClick={() => setCurrentPreviewPage(p => Math.max(0, p - 1))}
-                  className="h-7 w-7 p-0 border-slate-700 bg-slate-800 text-slate-300"
                 >
                   <ChevronLeft className="w-4 h-4" />
-                </Button>
+                </NeonButton>
                 <span className="text-xs text-slate-300 font-semibold px-1">
                   Halaman {totalPages > 0 ? currentPreviewPage + 1 : 0} dari {totalPages}
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
+                <NeonButton
+                  variant="secondary"
+                  size="xs"
+                  iconOnly
+                  aria-label="Halaman Berikutnya"
                   disabled={currentPreviewPage >= totalPages - 1}
                   onClick={() => setCurrentPreviewPage(p => Math.min(totalPages - 1, p + 1))}
-                  className="h-7 w-7 p-0 border-slate-700 bg-slate-800 text-slate-300"
                 >
                   <ChevronRight className="w-4 h-4" />
-                </Button>
+                </NeonButton>
               </div>
 
               {/* Zoom Controls */}
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+                <NeonButton
+                  variant="secondary"
+                  size="xs"
+                  iconOnly
+                  aria-label="Perkecil"
                   onClick={() => setPreviewZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(1))))}
-                  className="h-7 w-7 p-0 border-slate-700 bg-slate-800 text-slate-300"
                   title="Perkecil"
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
-                </Button>
+                </NeonButton>
                 <span className="text-xs font-mono text-slate-400 min-w-[42px] text-center">
                   {Math.round(previewZoom * 100)}%
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
+                <NeonButton
+                  variant="secondary"
+                  size="xs"
+                  iconOnly
+                  aria-label="Perbesar"
                   onClick={() => setPreviewZoom(z => Math.min(1.2, Number((z + 0.1).toFixed(1))))}
-                  className="h-7 w-7 p-0 border-slate-700 bg-slate-800 text-slate-300"
                   title="Perbesar"
                 >
                   <ZoomIn className="w-3.5 h-3.5" />
-                </Button>
-                <Button
+                </NeonButton>
+                <NeonButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
                   onClick={() => setPreviewZoom(0.75)}
-                  className="h-7 text-[11px] text-slate-400 hover:text-white px-2"
                 >
                   Pas Layar
-                </Button>
+                </NeonButton>
               </div>
             </div>
 

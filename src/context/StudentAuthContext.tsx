@@ -51,7 +51,7 @@ export interface StudentAuthContextValue {
 const StudentAuthContext = createContext<StudentAuthContextValue | undefined>(undefined);
 
 export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
-  const { pb, loading: tenantLoading } = useTenant();
+  const { pb, loading: tenantLoading, terminology } = useTenant();
   const [student, setstudent] = useState<StudentUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isKicked, setIsKicked] = useState(false);
@@ -261,11 +261,11 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
       sessionStorage.removeItem("student_session_id");
       localStorage.removeItem("student_session_id");
       if (err.status === 400 || err.status === 404) {
-        throw new Error("NISN atau Password salah!");
+        throw new Error(`${terminology.id} atau Password salah!`);
       }
       throw new Error(err.message || "Terjadi kesalahan saat login");
     }
-  }, [pb]);
+  }, [pb, terminology]);
 
   const changePassword = useCallback(async (newPassword: string) => {
     if (!student) throw new Error("Tidak ada student yang aktif.");
@@ -293,7 +293,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     setstudent(null);
     sessionStorage.clear();
     window.location.replace(`${window.location.origin}/exam`);
-  }, [pb]);
+  }, [pb, terminology]);
 
   const [isExiting, setIsExiting] = useState(false);
 
@@ -551,7 +551,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
                 Akun Digunakan di HP Lain
               </h2>
               <p className="text-slate-600 dark:text-slate-300 text-xs font-medium leading-relaxed mb-6 px-1">
-                Akun NISN ini baru saja login di perangkat lain. Demi keamanan ujian, akun pada perangkat ini dinonaktifkan.
+                Akun {terminology.id} ini baru saja login di perangkat lain. Demi keamanan ujian, akun pada perangkat ini dinonaktifkan.
               </p>
               <button
                 id="btn-kicked-exit"

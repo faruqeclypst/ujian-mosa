@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../../components/ui/dialog";
-import { Button } from "../../../../components/ui/button";
+import { NeonButton } from "../../../../components/ui/NeonButton";
 import { Zap, RefreshCw } from "lucide-react";
 import { getTargetQuestions, checkAns } from "../utils/helpers";
 
@@ -388,26 +388,28 @@ const handleQuickGrade = async () => {
         )}
       </div>
 
-      <div className="shrink-0 px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 bg-white dark:bg-slate-950">
-        <Button
+      <div className="shrink-0 px-6 py-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-2 bg-white dark:bg-neutral-900">
+        <NeonButton
           variant="ghost"
-          className="rounded-xl text-sm"
+          size="sm"
           onClick={handleClose}
           disabled={quickGradeRunning}
         >
           Tutup
-        </Button>
-        <Button
-          className="rounded-xl text-sm bg-violet-600 hover:bg-violet-700 text-white font-semibold disabled:opacity-50 gap-2"
+        </NeonButton>
+        <NeonButton
+          variant="primary"
+          color="purple"
+          size="sm"
           onClick={handleQuickGrade}
           disabled={quickGradeRunning || !quickGradeText.trim()}
         >
           {quickGradeRunning ? (
-            <><RefreshCw className="h-4 w-4 animate-spin" /> Memproses...</>
+            <><RefreshCw className="h-4 w-4 animate-spin mr-1.5" /> Memproses...</>
           ) : (
-            <><Zap className="h-4 w-4" /> Terapkan Grading</>
+            <><Zap className="h-4 w-4 mr-1.5" /> Terapkan Grading</>
           )}
-        </Button>
+        </NeonButton>
       </div>
     </DialogContent>
   </Dialog>

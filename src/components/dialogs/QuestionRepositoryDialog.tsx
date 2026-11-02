@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../ui/dialog";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { Skeleton } from "../ui/skeleton";
@@ -22,6 +22,7 @@ import { useExamData } from "../../context/ExamDataContext";
 import { useTenant } from "../../context/TenantContext";
 import { fetchWaygroundQuiz, parseWaygroundQuizData, ParsedExternalQuestion } from "../../lib/waygroundApi";
 import type { QuestionData, QuestionType } from "../../pages/admin/QuestionsPage";
+import { cn } from "../../lib/utils";
 
 interface QuestionRepositoryDialogProps {
   isOpen: boolean;
@@ -360,50 +361,56 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 rounded-2xl overflow-hidden">
+      <DialogContent className="w-[calc(100vw-1.5rem)] sm:w-full max-w-4xl max-h-[92vh] flex flex-col p-0 gap-0 rounded-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl">
         {/* Header */}
-        <DialogHeader className="p-5 pb-4 border-b border-slate-200/60 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-blue-100/80 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                <Database className="h-5 w-5" />
+        <DialogHeader className="p-4 sm:p-5 pb-3 sm:pb-4 border-b border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/60 pr-12 sm:pr-10">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0 mt-0.5">
+                <Database className="h-4 sm:h-5 w-4 sm:w-5" />
               </div>
-              <div>
-                <DialogTitle className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  Repository & Impor Butir Soal
-                  <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200 text-[10px]">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <DialogTitle className="text-sm sm:text-base font-bold text-neutral-900 dark:text-neutral-100">
+                    Repository & Impor Butir Soal
+                  </DialogTitle>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
                     Khusus Admin
-                  </Badge>
-                </DialogTitle>
-                <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  </span>
+                </div>
+                <DialogDescription className="text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 leading-snug">
                   Pilih butir soal dari Bank Soal sekolah atau impor otomatis dari Wayground REST API.
                 </DialogDescription>
               </div>
             </div>
 
-            {/* Tab Selector */}
-            <div className="flex bg-slate-200/70 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold">
+            {/* Tab Selector: 2-column grid on mobile, inline on sm+ */}
+            <div className="grid grid-cols-2 sm:inline-flex bg-neutral-100 dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 p-1 rounded-xl text-xs font-semibold w-full sm:w-fit self-start">
               <button
                 type="button"
                 onClick={() => { setActiveTab("internal"); setSelectedQuestionIds(new Set()); }}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${activeTab === "internal"
-                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-                  }`}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs font-semibold",
+                  activeTab === "internal"
+                    ? "bg-white dark:bg-neutral-900 text-emerald-700 dark:text-emerald-300 shadow-2xs"
+                    : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
+                )}
               >
-                <Database className="h-3.5 w-3.5" />
-                Bank Internal
+                <Database className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                <span>Bank Internal</span>
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveTab("wayground"); setSelectedQuestionIds(new Set()); }}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${activeTab === "wayground"
-                  ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-                  }`}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs font-semibold",
+                  activeTab === "wayground"
+                    ? "bg-white dark:bg-neutral-900 text-emerald-700 dark:text-emerald-300 shadow-2xs"
+                    : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
+                )}
               >
-                <Globe className="h-3.5 w-3.5" />
-                Wayground API
+                <Globe className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                <span>Wayground API</span>
               </button>
             </div>
           </div>
@@ -503,22 +510,25 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                   placeholder="Tempel Link / ID Kuis Wayground di sini..."
                   className="h-10 text-xs rounded-xl flex-1 border-purple-200 dark:border-purple-900 focus:ring-purple-500"
                 />
-                <Button
+                <NeonButton
                   type="button"
+                  variant="primary"
+                  color="purple"
+                  size="sm"
                   onClick={handleFetchWayground}
                   disabled={loadingWayground || !waygroundUrl.trim()}
-                  className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs"
                 >
-                  {loadingWayground ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ambil Soal (Auto)"}
-                </Button>
-                <Button
+                  {loadingWayground ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : "Ambil Soal (Auto)"}
+                </NeonButton>
+                <NeonButton
                   type="button"
                   variant="outline"
+                  color="purple"
+                  size="sm"
                   onClick={() => setIsJsonInputMode(!isJsonInputMode)}
-                  className="h-10 px-3 rounded-xl border-purple-200 text-purple-700 dark:text-purple-300 font-semibold text-xs"
                 >
                   {isJsonInputMode ? "Tutup Textarea" : "Paste JSON"}
-                </Button>
+                </NeonButton>
               </div>
 
               {isJsonInputMode && (
@@ -530,14 +540,16 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                     placeholder="Paste teks JSON respons kuis Wayground di sini..."
                     className="w-full p-2.5 text-xs font-mono rounded-lg border border-purple-200 dark:border-purple-900 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100"
                   />
-                  <Button
+                  <NeonButton
                     type="button"
+                    variant="primary"
+                    color="purple"
+                    size="sm"
                     onClick={handleParseJsonInput}
                     disabled={!rawJsonText.trim()}
-                    className="h-8 px-3 rounded-lg bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs"
                   >
                     Parse Data JSON Instan
-                  </Button>
+                  </NeonButton>
                 </div>
               )}
 
@@ -778,34 +790,38 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
         </div>
 
         {/* Footer */}
-        <DialogFooter className="p-4 border-t border-slate-200/60 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
-          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-            {selectedQuestionIds.size} butir soal dipilih
+        <DialogFooter className="p-3.5 sm:p-4 border-t border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/60 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5">
+          <div className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 text-center sm:text-left">
+            <strong className="text-neutral-900 dark:text-neutral-100 font-bold">{selectedQuestionIds.size}</strong> butir soal dipilih
           </div>
-          <div className="flex gap-2">
-            <Button
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <NeonButton
               type="button"
-              variant="outline"
+              variant="secondary"
+              size="sm"
               onClick={() => onOpenChange(false)}
-              className="rounded-xl text-xs"
+              className="flex-1 sm:flex-none justify-center"
             >
               Batal
-            </Button>
-            <Button
+            </NeonButton>
+            <NeonButton
               type="button"
+              variant="primary"
+              color="brand"
+              size="sm"
               onClick={handleExecuteImport}
               disabled={isSubmittingImport || selectedQuestionIds.size === 0}
-              className="rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20"
+              className="flex-1 sm:flex-none justify-center"
             >
               {isSubmittingImport ? (
                 <>
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  Mengimpor...
+                  <span>Mengimpor...</span>
                 </>
               ) : (
-                `Gunakan ${selectedQuestionIds.size} Soal Terpilih`
+                <span>Gunakan {selectedQuestionIds.size} Soal Terpilih</span>
               )}
-            </Button>
+            </NeonButton>
           </div>
         </DialogFooter>
       </DialogContent>

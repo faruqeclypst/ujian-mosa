@@ -14,9 +14,9 @@
 
 routerAdd("POST", "/api/ai-proxy", (c) => {
     function setCors(cc) {
-        try { cc.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) {}
-        try { cc.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) {}
-        try { cc.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
+        try { cc.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) { }
+        try { cc.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) { }
+        try { cc.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) { }
     }
     function allowed(info) {
         try {
@@ -26,7 +26,11 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
             return n === "_superusers" || n === "users";
         } catch (e) { return false; }
     }
-    function chatUrl(baseUrl) {
+    function chatUrl(baseUrl, isAnthropic) {
+        if (isAnthropic) {
+            if (baseUrl.includes("/messages")) return baseUrl;
+            return baseUrl.replace(/\/$/, "") + (baseUrl.includes("/v1") ? "/messages" : "/v1/messages");
+        }
         if (baseUrl.includes("ollama.com") || baseUrl.includes(":11434")) {
             return baseUrl.endsWith("/api/chat") ? baseUrl : baseUrl.replace(/\/$/, "") + "/api/chat";
         }
@@ -44,11 +48,11 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
 
         const settings = $app.findFirstRecordByFilter("settings", "id != ''");
         const bodyData = info.body || {};
-        
+
         let apiKey = (settings ? (settings.getString("ai_gateway_key") || settings.getString("groq_api_key")) : "");
-        let baseUrl = (settings ? settings.getString("ai_gateway_url") : "") || "https://api.groq.com";
-        let model = (settings ? settings.getString("ai_model") : "") || "llama-3.1-8b-instant";
-        
+        let baseUrl = (settings ? settings.getString("ai_gateway_url") : "") || "https://apihub.agnes-ai.com/v1";
+        let model = (settings ? settings.getString("ai_model") : "") || "agnes-2.5-flash";
+
         // Izinkan guru/admin yang terotentikasi membawa API Key, Base URL, atau Model pribadi/khusus
         if (bodyData.apiKey && typeof bodyData.apiKey === "string" && bodyData.apiKey.trim()) {
             apiKey = bodyData.apiKey.trim();
@@ -60,12 +64,70 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
             model = bodyData.model.trim();
         }
 
-        const isOllama = baseUrl.includes("ollama") || baseUrl.includes(":11434") || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1");
+        const isAnthropic = baseUrl.includes("anthropic.com") || baseUrl.includes("/messages") || (apiKey && apiKey.startsWith("sk-ant-")) || bodyData.isAnthropic === true;
+        const isOllama = !isAnthropic && (baseUrl.includes("ollama") || baseUrl.includes(":11434") || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1"));
         if (!isOllama && !apiKey) {
             return c.json(400, { error: "API Key AI belum diatur. Silakan masukkan API Key di Pengaturan AI." });
         }
-        
+        if (!model) {
+            return c.json(400, { error: "Model AI belum ditentukan. Silakan pilih atau masukkan ID Model di Pengaturan AI." });
+        }
+
         const msgs = bodyData["messages"] || [];
+        const maxTokens = bodyData["max_tokens"] ? parseInt(bodyData["max_tokens"]) : 4000;
+
+        if (isAnthropic) {
+            let systemText = "";
+            const anthropicMsgs = [];
+            for (let i = 0; i < msgs.length; i++) {
+                const r = (msgs[i]["role"] || "user").toString();
+                const content = (msgs[i]["content"] || "").toString();
+                if (r === "system") {
+                    systemText = systemText ? systemText + "\n\n" + content : content;
+                } else {
+                    const mappedRole = r === "assistant" ? "assistant" : "user";
+                    if (anthropicMsgs.length > 0 && anthropicMsgs[anthropicMsgs.length - 1].role === mappedRole) {
+                        anthropicMsgs[anthropicMsgs.length - 1].content += "\n\n" + content;
+                    } else {
+                        anthropicMsgs.push({ role: mappedRole, content: content });
+                    }
+                }
+            }
+            if (anthropicMsgs.length === 0 || anthropicMsgs[0].role !== "user") {
+                anthropicMsgs.unshift({ role: "user", content: "Mulai pembuatan butir soal." });
+            }
+
+            const reqBody = {
+                model: model,
+                messages: anthropicMsgs,
+                max_tokens: maxTokens
+            };
+            if (systemText) reqBody["system"] = systemText;
+            if (bodyData["temperature"]) reqBody["temperature"] = bodyData["temperature"];
+
+            const finalUrl = chatUrl(baseUrl, true);
+            console.log("[PROXY-ANTHROPIC] forwarding to " + finalUrl + " model " + model);
+
+            const reqHeaders = {
+                "Content-Type": "application/json",
+                "x-api-key": apiKey,
+                "anthropic-version": "2023-06-01"
+            };
+
+            const res = $http.send({
+                url: finalUrl,
+                method: "POST",
+                headers: reqHeaders,
+                body: JSON.stringify(reqBody),
+                timeout: 60
+            });
+
+            let result = {};
+            try { result = JSON.parse(res.raw || "{}"); } catch (e) { result = { error: "Parse failed", raw: res.raw }; }
+            return c.json(res.statusCode, result);
+        }
+
+        // OpenAI-Compatible / Ollama
         const msgArray = [];
         for (let i = 0; i < msgs.length; i++) {
             msgArray.push({
@@ -77,7 +139,6 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
             return c.json(400, { error: "Messages kosong" });
         }
 
-        const maxTokens = bodyData["max_tokens"] ? parseInt(bodyData["max_tokens"]) : 4000;
         const reqBody = {
             model: model,
             messages: msgArray,
@@ -85,8 +146,9 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
             max_tokens: maxTokens
         };
         if (bodyData["temperature"]) reqBody["temperature"] = bodyData["temperature"];
+        if (bodyData["response_format"]) reqBody["response_format"] = bodyData["response_format"];
 
-        const finalUrl = chatUrl(baseUrl);
+        const finalUrl = chatUrl(baseUrl, false);
         console.log("[PROXY] forwarding to " + finalUrl + " model " + model);
 
         const reqHeaders = { "Content-Type": "application/json" };
@@ -98,7 +160,8 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
             url: finalUrl,
             method: "POST",
             headers: reqHeaders,
-            body: JSON.stringify(reqBody)
+            body: JSON.stringify(reqBody),
+            timeout: 60
         });
 
         let result = {};
@@ -115,9 +178,9 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
 });
 
 routerAdd("OPTIONS", "/api/ai-proxy", (c) => {
-    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) {}
-    try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) {}
-    try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) { }
+    try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) { }
+    try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) { }
     return c.noContent(204);
 });
 
@@ -126,9 +189,9 @@ routerAdd("OPTIONS", "/api/ai-proxy", (c) => {
 // ============================================================
 routerAdd("POST", "/api/ai-proxy-models", (c) => {
     function setCors(cc) {
-        try { cc.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) {}
-        try { cc.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) {}
-        try { cc.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
+        try { cc.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) { }
+        try { cc.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) { }
+        try { cc.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) { }
     }
     function allowed(info) {
         try {
@@ -147,10 +210,10 @@ routerAdd("POST", "/api/ai-proxy-models", (c) => {
 
         const settings = $app.findFirstRecordByFilter("settings", "id != ''");
         const bodyData = info.body || {};
-        
+
         let apiKey = (settings ? (settings.getString("ai_gateway_key") || settings.getString("groq_api_key")) : "");
-        let baseUrl = (settings ? settings.getString("ai_gateway_url") : "") || "https://api.groq.com";
-        
+        let baseUrl = (settings ? settings.getString("ai_gateway_url") : "") || "https://apihub.agnes-ai.com/v1";
+
         if (bodyData.apiKey && typeof bodyData.apiKey === "string" && bodyData.apiKey.trim()) {
             apiKey = bodyData.apiKey.trim();
         }
@@ -158,29 +221,34 @@ routerAdd("POST", "/api/ai-proxy-models", (c) => {
             baseUrl = bodyData.baseUrl.trim();
         }
 
-        const isOllama = baseUrl.includes("ollama") || baseUrl.includes(":11434") || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1");
+        const isAnthropic = baseUrl.includes("anthropic.com") || (apiKey && apiKey.startsWith("sk-ant-"));
+        const isOllama = !isAnthropic && (baseUrl.includes("ollama") || baseUrl.includes(":11434") || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1"));
         if (!isOllama && !apiKey) {
             return c.json(400, { error: "AI belum dikonfigurasi di server" });
         }
 
-        let modelsUrl = baseUrl.replace(/\/$/, "");
-        if (isOllama) {
-            modelsUrl = modelsUrl + "/api/tags";
+        let modelsUrl = baseUrl.replace(/\/$/, "").replace(/\/chat\/completions$/, "").replace(/\/messages$/, "");
+        const reqHeaders = { "Content-Type": "application/json" };
+        if (isAnthropic) {
+            modelsUrl = modelsUrl.endsWith("/models") ? modelsUrl : modelsUrl + (modelsUrl.includes("/v1") ? "/models" : "/v1/models");
+            reqHeaders["x-api-key"] = apiKey;
+            reqHeaders["anthropic-version"] = "2023-06-01";
+        } else if (isOllama) {
+            modelsUrl = modelsUrl.endsWith("/api/tags") ? modelsUrl : modelsUrl + "/api/tags";
         } else {
-            modelsUrl = modelsUrl + "/models";
+            modelsUrl = modelsUrl.endsWith("/models") ? modelsUrl : modelsUrl + "/models";
+            if (apiKey && apiKey !== "no-key") {
+                reqHeaders["Authorization"] = "Bearer " + apiKey;
+            }
         }
 
         console.log("[PROXY-MODELS] fetching: " + modelsUrl);
 
-        const reqHeaders = { "Content-Type": "application/json" };
-        if (apiKey && apiKey !== "no-key" && !isOllama) {
-            reqHeaders["Authorization"] = "Bearer " + apiKey;
-        }
-
         const res = $http.send({
             url: modelsUrl,
             method: "GET",
-            headers: reqHeaders
+            headers: reqHeaders,
+            timeout: 20
         });
 
         let result = {};
@@ -197,9 +265,9 @@ routerAdd("POST", "/api/ai-proxy-models", (c) => {
 });
 
 routerAdd("OPTIONS", "/api/ai-proxy-models", (c) => {
-    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) {}
-    try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) {}
-    try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) { }
+    try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) { }
+    try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) { }
     return c.noContent(204);
 });
 

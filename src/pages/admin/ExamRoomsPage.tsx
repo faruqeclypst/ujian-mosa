@@ -45,6 +45,7 @@ import {
 import { Skeleton } from "../../components/ui/skeleton";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../../components/ui/tooltip";
 
 export interface ExamRoomData {
   id: string;
@@ -539,7 +540,10 @@ const ExamRoomsPage = () => {
   useEffect(() => {
     fetchRooms();
 
-    if (!pb) return;
+    const handleCopilotUpdate = () => { fetchRooms(); };
+    window.addEventListener("exam-rooms-updated", handleCopilotUpdate);
+
+    if (!pb) return () => { window.removeEventListener("exam-rooms-updated", handleCopilotUpdate); };
     const unsubscribe = pb.collection('exam_rooms').subscribe("*", (e) => {
       if (e.action === "create" || e.action === "update") {
         fetchRooms();
@@ -1202,7 +1206,9 @@ const ExamRoomsPage = () => {
       dot = null;
     }
 
-    const classList = (room.className || "").split(", ").filter(Boolean);
+    const classList = room.allClasses
+      ? (examClasses || []).map(c => c.name)
+      : (room.className || "").split(", ").filter(Boolean);
     const classLabel = room.allClasses
       ? `Semua ${terminology.class}`
       : classList.length > 0
@@ -1281,33 +1287,39 @@ const ExamRoomsPage = () => {
             </div>
 
             {/* Nama Guru & Mapel */}
-            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 min-w-0">
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 flex-wrap">
               <span
-                className="font-medium text-neutral-700 dark:text-neutral-300 truncate"
+                className="font-medium text-neutral-700 dark:text-neutral-300 truncate max-w-[200px] sm:max-w-none"
                 title={room.teacherName}
               >
                 {room.teacherName || "Pengampu N/A"}
               </span>
               <span className="text-neutral-300 dark:text-neutral-700 shrink-0">•</span>
               <span
-                className="truncate"
+                className="truncate max-w-[180px] sm:max-w-none"
                 title={room.subjectName}
               >
                 {room.subjectName || "Mapel N/A"}
               </span>
 
-              {/* Kelas on Mobile */}
-              <span
+              {/* Kelas on Mobile (Bisa diklik untuk melihat daftar lengkap) */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowClassesRoom(room);
+                }}
                 className={cn(
-                  "md:hidden inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium border shrink-0",
+                  "md:hidden inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border shrink-0 cursor-pointer transition-colors active:scale-95",
                   room.allClasses
                     ? "bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-900/40"
-                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700"
+                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-emerald-500/50"
                 )}
+                title="Lihat daftar kelas"
               >
-                <Users className="h-2.5 w-2.5 opacity-70" />
+                <Users className="h-2.5 w-2.5 opacity-70 text-emerald-500" />
                 <span>{meta.classLabel}</span>
-              </span>
+              </button>
             </div>
 
             {/* Jadwal on Mobile */}
@@ -1352,7 +1364,7 @@ const ExamRoomsPage = () => {
         return (
           <div className="flex flex-col gap-1 min-w-0">
             {/* Baris 1: Status Pill + Kelas Pill + Live Status */}
-            <div className="flex items-center gap-1.5 flex-nowrap overflow-hidden">
+            <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
               <span
                 className={cn(
                   "inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0",
@@ -1363,46 +1375,87 @@ const ExamRoomsPage = () => {
                 {meta.label}
               </span>
 
-              {/* Kelas dengan Hover Popover / Tooltip */}
-              <div
-                className="relative group/cls inline-flex items-center shrink-0"
-                onClick={(e) => {
-                  if (!room.allClasses && classList.length > 2) {
-                    e.stopPropagation();
-                    setShowClassesRoom(room);
-                  }
-                }}
-              >
-                <span className={cn(
-                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer",
-                  room.allClasses
-                    ? "bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-900/40"
-                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600"
-                )}>
-                  <Users className="h-2.5 w-2.5 opacity-70" />
-                  <span>{meta.classLabel}</span>
-                </span>
+              {/* Kelas dengan Radix Tooltip Hover Popover (Desktop) */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        if (!room.allClasses && classList.length > 2) {
+                          e.stopPropagation();
+                          setShowClassesRoom(room);
+                        }
+                      }}
+                      className={cn(
+                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer shrink-0 focus:outline-none focus:ring-1 focus:ring-emerald-500/40",
+                        room.allClasses
+                          ? "bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                          : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-emerald-500/50 hover:text-emerald-600 dark:hover:text-emerald-400"
+                      )}
+                    >
+                      <Users className="h-2.5 w-2.5 opacity-70" />
+                      <span>{meta.classLabel}</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    align="center"
+                    sideOffset={6}
+                    className="z-50 p-3 rounded-xl bg-neutral-900/95 dark:bg-[#111214]/95 text-white backdrop-blur-md border border-neutral-700/80 dark:border-neutral-800 shadow-2xl max-w-xs animate-in fade-in-0 zoom-in-95 pointer-events-none"
+                  >
+                    <div className="flex items-center justify-between gap-3 pb-2 mb-2 border-b border-neutral-800 dark:border-neutral-800 text-[11px] font-bold tracking-tight">
+                      <span className="text-neutral-300 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-emerald-400" />
+                        Daftar {terminology.class} Terdaftar
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        {room.allClasses ? `Semua (${examClasses.length})` : `${classList.length} Kelas`}
+                      </span>
+                    </div>
 
-                {/* Floating Hover Tooltip: Tampil otomatis saat di-hover */}
-                <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/cls:flex flex-col z-50 w-max max-w-xs p-2 rounded-lg bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-[11px] shadow-xl border border-neutral-700 dark:border-neutral-300 pointer-events-none transition-all">
-                  <div className="font-semibold pb-1 border-b border-neutral-700/60 dark:border-neutral-300/60 text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
-                    Daftar {terminology.class} Terdaftar ({room.allClasses ? "Semua" : classList.length}):
-                  </div>
-                  <div className="pt-1 flex flex-wrap gap-1 leading-snug max-h-36 overflow-y-auto">
-                    {room.allClasses ? (
-                      <span className="text-[10px]">Semua {examClasses.length} kelas aktif</span>
-                    ) : classList.length > 0 ? (
-                      classList.map((c, idx) => (
-                        <span key={idx} className="px-1.5 py-0.5 rounded bg-white/10 dark:bg-black/10 text-[10px] font-medium">
-                          {c}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-[10px] opacity-70">Belum ada kelas dipilih</span>
+                    <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
+                      {room.allClasses ? (
+                        <div className="space-y-1.5 w-full">
+                          <p className="text-[11px] text-neutral-400 leading-relaxed">
+                            Semua {examClasses.length} kelas aktif dapat mengakses ujian ini:
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {classList.slice(0, 15).map((clsName, idx) => (
+                              <span
+                                key={idx}
+                                className="px-1.5 py-0.5 rounded bg-white/10 dark:bg-neutral-800 text-emerald-300 text-[10px] font-medium border border-neutral-700/60"
+                              >
+                                {clsName}
+                              </span>
+                            ))}
+                            {classList.length > 15 && (
+                              <span className="text-[10px] text-neutral-400 self-center">
+                                +{classList.length - 15} lainnya
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : classList.length > 0 ? (
+                        classList.map((clsName, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded-md bg-white/10 dark:bg-neutral-800 text-emerald-300 border border-neutral-700/70 text-[11px] font-medium"
+                          >
+                            {clsName}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-neutral-400">Belum ada kelas dipilih</span>
+                      )}
+                    </div>
+
+                    {!room.allClasses && classList.length > 2 && (
+                      <div className="mt-2 pt-1.5 border-t border-neutral-800 text-[10px] text-neutral-400 text-center">
+                        Klik tombol untuk melihat detail kelas
+                      </div>
                     )}
-                  </div>
-                </div>
-              </div>
+                  </TooltipContent>
+                </Tooltip>
 
               {meta.activeStudents > 0 && (
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 animate-pulse shrink-0">
@@ -1690,7 +1743,7 @@ const ExamRoomsPage = () => {
                 label={`${terminology.student} Aktif`}
                 indicator={true}
                 value={totalOngoing}
-                unit="siswa"
+                unit={terminology.student.toLowerCase()}
                 isLoading={isLoading}
               />
 
@@ -1731,6 +1784,7 @@ const ExamRoomsPage = () => {
             </NeonStatGrid>
 
             {/* 3. Main Neon Table Section */}
+            <TooltipProvider delayDuration={150}>
             <NeonTable
               data={displayRooms}
               columns={neonColumns}
@@ -1830,8 +1884,8 @@ const ExamRoomsPage = () => {
                             {groupFilter === "all"
                               ? "Semua Group"
                               : groupFilter === "__none__"
-                              ? "Tanpa Group"
-                              : groupFilter}
+                                ? "Tanpa Group"
+                                : groupFilter}
                           </span>
                           <ChevronDown className="h-3 w-3 opacity-60" />
                         </button>
@@ -1961,6 +2015,7 @@ const ExamRoomsPage = () => {
                 ) : null
               }
             />
+            </TooltipProvider>
 
           </div>
 
@@ -2000,8 +2055,8 @@ const ExamRoomsPage = () => {
                       value={inspectedRoom.group_name || "Tanpa Group"}
                     />
                     <InspectorField
-                      label="Alokasi Siswa"
-                      value={inspectedRoom.className || "Semua Kelas"}
+                      label={`Alokasi ${terminology.student}`}
+                      value={inspectedRoom.className || `Semua ${terminology.class}`}
                     />
                   </InspectorGrid>
 
@@ -2011,10 +2066,10 @@ const ExamRoomsPage = () => {
                   />
 
                   <InspectorGrid>
-                    <InspectorField label="Siswa Sedang Aktif">
+                    <InspectorField label={`${terminology.student} Sedang Aktif`}>
                       <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span>{liveBreakdown[inspectedRoom.id] || 0} Siswa</span>
+                        <span>{liveBreakdown[inspectedRoom.id] || 0} {terminology.student}</span>
                       </div>
                     </InspectorField>
                     <InspectorField
@@ -2093,7 +2148,7 @@ const ExamRoomsPage = () => {
                   addToast({ title: "Tautan Disalin", description: `${url} disalin ke clipboard.`, type: "success" });
                 }}
               >
-                Salin Link Ujian Siswa
+                Salin Link Ujian {terminology.student}
               </InspectorButton>
             </InspectorCard>
 
@@ -2214,8 +2269,8 @@ const ExamRoomsPage = () => {
               </div>
 
               {/* Status Pemilihan di Bottom Pane Kiri */}
-              <div className="p-2.5 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shrink-0 text-xs">
-                {formValues.examId ? (
+              {formValues.examId && (
+                <div className="p-2.5 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shrink-0 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-neutral-500 truncate max-w-[200px]">
                       Terpilih: <b className="text-neutral-800 dark:text-neutral-200">{exams.find((x: any) => x.id === formValues.examId)?.title || "Soal"}</b>
@@ -2224,12 +2279,8 @@ const ExamRoomsPage = () => {
                       Siap
                     </span>
                   </div>
-                ) : (
-                  <span className="text-[11px] text-rose-500 font-medium">
-                    ⚠️ Silakan klik salah satu bank soal di atas.
-                  </span>
-                )}
-              </div>
+                </div>
+              )}
 
             </div>
 
@@ -2513,7 +2564,7 @@ const ExamRoomsPage = () => {
                               : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
                           )}
                         >
-                          Semua Kelas
+                          Semua {terminology.class}
                         </button>
                         <button
                           type="button"
@@ -2571,10 +2622,8 @@ const ExamRoomsPage = () => {
           {/* 3. Footer Sticky */}
           <div className="px-5 py-3 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/90 dark:bg-neutral-900/60 backdrop-blur-xs flex items-center justify-between shrink-0">
             <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-md hidden sm:block">
-              {formValues.examId ? (
+              {formValues.examId && (
                 <span>Siap meluncurkan ujian dengan bank soal terpilih.</span>
-              ) : (
-                <span className="text-rose-500">Pilih bank soal di kolom kiri untuk melanjutkan.</span>
               )}
             </div>
             <div className="flex items-center gap-2 ml-auto">

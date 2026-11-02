@@ -521,10 +521,10 @@ export default function DashboardPage() {
                   <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                   <div className="space-y-0.5 leading-relaxed">
                     <span className="font-semibold text-red-900 dark:text-red-300 mr-1.5">
-                      Peringatan Pengawas: {lockedAttempts.length} Siswa Terkunci
+                      Peringatan Pengawas: {lockedAttempts.length} {terminology.student} Terkunci
                     </span>
                     <span className="text-red-700 dark:text-red-400">
-                      Siswa terdeteksi keluar dari Exambro atau berpindah tab. Klik tombol di kanan untuk membuka kunci navigasi peserta.
+                      {terminology.student} terdeteksi keluar dari Exambro atau berpindah tab. Klik tombol di kanan untuk membuka kunci navigasi peserta.
                     </span>
                   </div>
                 </div>
@@ -538,7 +538,7 @@ export default function DashboardPage() {
                   }}
                   className="text-xs sm:text-[13px] font-bold text-red-700 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 whitespace-nowrap shrink-0 hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  <span>Buka Kunci Siswa</span>
+                  <span>Buka Kunci {terminology.student}</span>
                   <ArrowRight className="h-3 w-3" />
                 </motion.button>
               </motion.div>
@@ -580,7 +580,7 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3.5 border-b border-neutral-100 dark:border-neutral-800">
                   <div>
                     <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-                      Siswa Mengerjakan Ujian
+                      {terminology.student} Mengerjakan Ujian
                     </p>
                     <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
                       {ongoingStudents} <span className="text-xs font-normal text-neutral-500">{terminology.student}</span>
@@ -628,7 +628,7 @@ export default function DashboardPage() {
                         <div className="flex items-center justify-between text-xs text-neutral-500 pb-1">
                           <span className="flex items-center gap-1.5">
                             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                            Aktivitas Koneksi &amp; Aliran Jawaban Siswa
+                            Aktivitas Koneksi &amp; Aliran Jawaban {terminology.student}
                           </span>
                           <span>Latensi Database: &lt; 2ms (Lokal)</span>
                         </div>
@@ -666,7 +666,7 @@ export default function DashboardPage() {
                               <Area
                                 type="monotone"
                                 dataKey="active"
-                                name="Siswa Mengerjakan"
+                                name={`${terminology.student} Mengerjakan`}
                                 stroke="#10b981"
                                 strokeWidth={2}
                                 fillOpacity={1}
@@ -901,8 +901,8 @@ export default function DashboardPage() {
                     value={`${totalStudents} / ${quota} ${terminology.student}`}
                   />
                   <InspectorField
-                    label="Guru & Rombel"
-                    value={`${teachers.length} guru • ${classes.length} kelas`}
+                    label={`${terminology.teacher} & ${terminology.class}`}
+                    value={`${teachers.length} ${terminology.teacher.toLowerCase()} • ${classes.length} ${terminology.class.toLowerCase()}`}
                   />
                   <InspectorField
                     label="Infrastruktur Node"
@@ -915,7 +915,7 @@ export default function DashboardPage() {
               <InspectorCard
                 title="Koneksi CBT & Exambro"
                 icon={Wifi}
-                description="Siswa dapat langsung terhubung via domain sekolah atau alamat IP server lokal."
+                description={`${terminology.student} dapat langsung terhubung via domain ${terminology.school.toLowerCase()} atau alamat IP server lokal.`}
               >
                 <div className="space-y-1.5 pt-1">
                   <button
@@ -930,7 +930,7 @@ export default function DashboardPage() {
                     onClick={() => navigate("/admin/unduh-aplikasi")}
                     className="w-full py-1.5 px-2.5 text-xs font-medium rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
                   >
-                    Unduh APK Exambro Siswa
+                    Unduh APK Exambro {terminology.student}
                   </button>
                 </div>
               </InspectorCard>
@@ -959,7 +959,7 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-                      Parameter Koneksi Server CBT &amp; Siswa
+                      Parameter Koneksi Server CBT &amp; {terminology.student}
                     </h3>
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                       Gunakan tautan atau konfigurasi ini untuk siswa dan pengawas ruangan
@@ -978,7 +978,7 @@ export default function DashboardPage() {
               <div className="space-y-4 text-xs">
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                    URL Login Siswa (CBT Web / Exambro Kiosk)
+                    URL Login {terminology.student} (CBT Web / Exambro Kiosk)
                   </label>
                   <div className="flex items-center gap-2 p-2 rounded-md bg-neutral-100 dark:bg-neutral-800 font-mono text-[11px] text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700">
                     <span className="flex-1 truncate">{studentExamUrl}</span>
@@ -1045,7 +1045,7 @@ export default function DashboardPage() {
                     navigate("/admin/unduh-aplikasi");
                   }}
                 >
-                  Unduh Exambro Siswa
+                  Unduh Exambro {terminology.student}
                 </Button>
               </div>
             </motion.div>

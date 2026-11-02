@@ -1,6 +1,7 @@
 import React from "react";
 import { Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "../../../../components/ui/dialog";
+import { NeonButton } from "../../../../components/ui/NeonButton";
 import { MathText } from "../../../../components/ui/MathText";
 
 export interface EditAnswerDialogState {
@@ -99,19 +100,26 @@ export const EditAnswerDialog = ({ dialog, setDialog, onSave }: EditAnswerDialog
                 </div>
 
                 <div className="flex gap-3 pt-1">
-                  <button
+                  <NeonButton
+                    type="button"
+                    variant="secondary"
+                    size="md"
                     onClick={() => setDialog(null)}
-                    className="flex-1 h-11 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-colors"
+                    className="flex-1"
                   >
                     Batal
-                  </button>
-                  <button
+                  </NeonButton>
+                  <NeonButton
+                    type="button"
+                    variant="primary"
+                    color="amber"
+                    size="md"
                     onClick={() => onSave(dialog.currentAnswer)}
                     disabled={!dialog.currentAnswer}
-                    className="flex-1 h-11 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white text-xs font-black uppercase tracking-widest transition-colors"
+                    className="flex-1"
                   >
                     Simpan Jawaban
-                  </button>
+                  </NeonButton>
                 </div>
               </div>
             </>

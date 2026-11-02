@@ -1,7 +1,7 @@
 import React from "react";
 import { RotateCcw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../../components/ui/dialog";
-import { Button } from "../../../../components/ui/button";
+import { NeonButton } from "../../../../components/ui/NeonButton";
 import { cn } from "../../../../lib/utils";
 
 export interface ReopenDialogState {
@@ -125,20 +125,21 @@ export const ReopenDialog = ({ dialog, setDialog, monitorRoom, onConfirm, isProc
         </div>
 
         <div className="mt-6 flex items-center justify-end gap-2">
-          <Button
-            variant="outline"
+          <NeonButton
+            variant="secondary"
+            size="sm"
             onClick={() => setDialog(prev => ({ ...prev, isOpen: false }))}
-            className="rounded-xl text-xs h-9 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800"
           >
             Batal
-          </Button>
-          <Button
+          </NeonButton>
+          <NeonButton
+            variant="primary"
+            size="sm"
             onClick={onConfirm}
             disabled={isProcessing}
-            className="rounded-xl text-xs h-9 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold cursor-pointer shadow-xs"
           >
             {isProcessing ? "Memproses..." : `Buka ${dialog.attemptIds.length} Ujian Sekarang`}
-          </Button>
+          </NeonButton>
         </div>
       </DialogContent>
     </Dialog>

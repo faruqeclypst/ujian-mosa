@@ -6,6 +6,8 @@ import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
 import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, generateFromMaterialAI, generateObjectivesAI, AI_MODELS } from "../../lib/ai";
 import { Button } from "../../components/ui/button";
+import { NeonButton } from "../../components/ui/NeonButton";
+import { NeonBadge, type NeonBadgeVariant } from "../../components/ui/NeonBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
 import { NeonTable, type NeonTableColumn } from "../../components/ui/NeonTable";
 import {
@@ -28,6 +30,7 @@ import { cn } from "../../lib/utils";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import BatchProgressDialog from "../../components/dialogs/BatchProgressDialog";
 import QuestionRepositoryDialog from "../../components/dialogs/QuestionRepositoryDialog";
+import { AIChatQuestionDrawer } from "../../components/dialogs/AIChatQuestionDrawer";
 import HotspotAreaEditor, { type HotspotArea } from "../../components/question-editors/HotspotAreaEditor";
 import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
@@ -474,6 +477,21 @@ export const QUESTION_TYPE_LABELS: Record<string, string> = {
   hotspot: "Hotspot",
   urutkan: "Urutkan",
   drag_drop: "Drag & Drop"
+};
+
+export const QUESTION_TYPE_BADGE: Record<string, { variant: NeonBadgeVariant; label: string }> = {
+  pilihan_ganda: { variant: "sky", label: "Pilihan Ganda" },
+  pilihan_ganda_kompleks: { variant: "purple", label: "PG Kompleks" },
+  benar_salah: { variant: "emerald", label: "Benar / Salah" },
+  menjodohkan: { variant: "purple", label: "Menjodohkan" },
+  isian_singkat: { variant: "amber", label: "Isian Singkat" },
+  uraian: { variant: "emerald", label: "Uraian / Esai" },
+  matriks: { variant: "sky", label: "Matriks" },
+  klasifikasi: { variant: "purple", label: "Klasifikasi" },
+  isian_rumpang: { variant: "amber", label: "Isian Rumpang" },
+  hotspot: { variant: "rose", label: "Hotspot" },
+  urutkan: { variant: "sky", label: "Urutkan" },
+  drag_drop: { variant: "rose", label: "Drag & Drop" }
 };
 
 export const getQuestionTypeColor = (type?: string): string => {
@@ -1296,6 +1314,7 @@ const QuestionsPage = () => {
   };
 
   // AI States
+  const [isAIChatDrawerOpen, setIsAIChatDrawerOpen] = useState(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isAIGenerating, setIsAIGenerating] = useState(false);
   const [isAIGeneratingDirect, setIsAIGeneratingDirect] = useState(false);
@@ -2125,28 +2144,30 @@ const QuestionsPage = () => {
         };
       });
 
-      // Jika opsi auto cari gambar aktif, cari & validasi gambar edukasi dengan AI
+      // Jika opsi auto cari gambar aktif, cari & validasi gambar edukasi dengan AI (paralel cepat, maks 5 soal)
       if (aiAutoFindImages) {
         setAiProgress(92);
-        for (let i = 0; i < questionsForReview.length; i++) {
-          const qItem = questionsForReview[i];
-          try {
-            const match = await autoFindValidatedImage(
-              pb,
-              qItem.text,
-              aiTopic,
-              aiSubject || (exam?.subject || ""),
-              Object.values(qItem.choices || {}).map((c: any) => c.text),
-              qItem.correctKey
-            );
-            if (match && match.image?.url) {
-              qItem.text = insertImageIntoQuestionText(qItem.text, match.image.url, match.image.title);
-              (qItem as any).imageUrl = "";
+        const targetItems = questionsForReview.slice(0, 5);
+        await Promise.allSettled(
+          targetItems.map(async (qItem, i) => {
+            try {
+              const match = await autoFindValidatedImage(
+                pb,
+                qItem.text,
+                aiTopic,
+                aiSubject || (exam?.subject || ""),
+                Object.values(qItem.choices || {}).map((c: any) => c.text),
+                qItem.correctKey
+              );
+              if (match && match.image?.url) {
+                qItem.text = insertImageIntoQuestionText(qItem.text, match.image.url, match.image.title);
+                (qItem as any).imageUrl = "";
+              }
+            } catch (e) {
+              console.warn("Auto find image notice for item", i, e);
             }
-          } catch (e) {
-            console.warn("Auto find image notice for item", i, e);
-          }
-        }
+          })
+        );
       }
 
       setBatchQuestions(questionsForReview);
@@ -2187,6 +2208,62 @@ const QuestionsPage = () => {
       { text: "", choices: { a: { text: "" }, b: { text: "" }, c: { text: "" }, d: { text: "" }, e: { text: "" } }, correctKey: "a", imageFile: null }
     ]);
     setIsBatchModalOpen(true);
+  };
+
+  const handleApplyAIChatQuestions = (generated: any[]) => {
+    const questionsForReview = generated.map(q => {
+      const qType = q.type || "pilihan_ganda";
+      const choicesBatch: Record<string, { text: string }> = {};
+      let correctKey = (q.answerKey || "").toLowerCase();
+
+      if (q.choices) {
+        const foundKeys: string[] = [];
+        if (Array.isArray(q.choices)) {
+          q.choices.forEach((c: any, i: number) => {
+            const key = String.fromCharCode(97 + i);
+            choicesBatch[key] = { text: typeof c === 'object' ? (c.text || String(c)) : String(c) };
+            if (typeof c === 'object' && c.isCorrect) foundKeys.push(key);
+          });
+        } else {
+          Object.keys(q.choices).forEach(key => {
+            const lowerKey = key.toLowerCase();
+            const val = (q.choices as any)[key];
+            choicesBatch[lowerKey] = { text: typeof val === 'object' ? (val.text || String(val)) : String(val) };
+            if (typeof val === 'object' && val.isCorrect) foundKeys.push(lowerKey);
+          });
+        }
+        if (foundKeys.length > 0) {
+          correctKey = foundKeys.join(",");
+        }
+      }
+
+      return {
+        text: q.text,
+        type: qType,
+        choices: choicesBatch,
+        correctKey: correctKey,
+        answerKey: q.answerKey || "",
+        pairs: q.pairs || (qType === "menjodohkan" ? [] : undefined),
+        items: q.items || (qType === "urutkan" || qType === "drag_drop" ? [] : undefined),
+        categories: q.categories || (qType === "klasifikasi" ? [] : undefined),
+        statements: q.statements || (qType === "klasifikasi" || qType === "matriks" || qType === "benar_salah" ? [] : undefined),
+        columns: q.columns || (qType === "matriks" ? [] : undefined),
+        blanks: q.blanks || (qType === "isian_rumpang" ? [] : undefined),
+        shuffleStatements: q.shuffleStatements,
+        groupId: q.groupId || "",
+        groupText: q.groupText || "",
+        isFromAI: true,
+        imageUrl: q.imageUrl || ""
+      };
+    });
+
+    setBatchQuestions(questionsForReview);
+    setIsBatchModalOpen(true);
+    addToast({
+      type: "success",
+      title: "Soal Siap Ditinjau",
+      description: `${generated.length} butir soal dari Asisten AI telah masuk ke peninjauan.`
+    });
   };
 
   const handleAddBatchRow = () => {
@@ -3973,11 +4050,11 @@ const QuestionsPage = () => {
       if (stList.length > 0) {
         return (
           <div className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 text-xs font-semibold border border-cyan-500/20">
+            <NeonBadge variant="neutral" size="xs">
               {stList.length} Pernyataan
-            </span>
+            </NeonBadge>
             <div
-              className="flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 cursor-help"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 cursor-help shadow-2xs"
               title={stList.map((s: any, idx: number) => `${idx + 1}. ${s.text ? s.text.replace(/<[^>]*>/g, '').trim() : 'Pernyataan'}: ${(s.answer || 'benar').toUpperCase()}`).join("\n")}
             >
               <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-bold mr-0.5">Kunci:</span>
@@ -3986,10 +4063,12 @@ const QuestionsPage = () => {
                 return (
                   <span
                     key={s.id || idx}
-                    className={`inline-flex items-center justify-center px-1 rounded text-[10px] font-black font-mono ${isBenar
-                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-                        : "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30"
-                      }`}
+                    className={cn(
+                      "inline-flex items-center justify-center px-1 rounded text-[10px] font-bold font-mono",
+                      isBenar
+                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                        : "bg-rose-500/20 text-rose-700 dark:text-rose-300"
+                    )}
                   >
                     {idx + 1}:{isBenar ? "B" : "S"}
                   </span>
@@ -4007,13 +4086,17 @@ const QuestionsPage = () => {
         const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
         return (
           <div className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs border border-neutral-200 dark:border-neutral-700 font-medium">
+            <NeonBadge variant="neutral" size="xs">
               {keys.length} Opsi
-            </span>
-            {correctKeys && (
-              <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+            </NeonBadge>
+            {correctKeys ? (
+              <NeonBadge variant="emerald" size="xs" mono>
                 Kunci: {correctKeys}
-              </span>
+              </NeonBadge>
+            ) : (
+              <NeonBadge variant="amber" size="xs">
+                Belum ada kunci
+              </NeonBadge>
             )}
           </div>
         );
@@ -4029,9 +4112,9 @@ const QuestionsPage = () => {
       const stList = item.options?.statements || [];
       if (stList.length > 0 || cols.length > 0) {
         return (
-          <span className="px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-700 dark:text-teal-400 text-xs font-semibold border border-teal-500/20 whitespace-nowrap">
+          <NeonBadge variant="neutral" size="xs">
             {stList.length} Baris × {cols.length} Kolom
-          </span>
+          </NeonBadge>
         );
       }
       return <span className="text-xs text-neutral-400 italic">Belum ada matriks</span>;
@@ -4042,9 +4125,9 @@ const QuestionsPage = () => {
       const stList = item.options?.statements || [];
       if (stList.length > 0 || cats.length > 0) {
         return (
-          <span className="px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-400 text-xs font-semibold border border-violet-500/20 whitespace-nowrap">
+          <NeonBadge variant="neutral" size="xs">
             {stList.length} Baris × {cats.length} Kat.
-          </span>
+          </NeonBadge>
         );
       }
       return <span className="text-xs text-neutral-400 italic">Belum ada data</span>;
@@ -4053,18 +4136,18 @@ const QuestionsPage = () => {
     if (type === "isian_rumpang") {
       const blanks = item.options?.blanks || [];
       return (
-        <span className="px-2 py-0.5 rounded-md bg-lime-500/10 text-lime-700 dark:text-lime-400 text-xs font-semibold border border-lime-500/20 whitespace-nowrap">
+        <NeonBadge variant="neutral" size="xs">
           {blanks.length} Isian Rumpang
-        </span>
+        </NeonBadge>
       );
     }
 
     if (type === "hotspot") {
       const areas = item.options?.areas || [];
       return (
-        <span className="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-400 text-xs font-semibold border border-sky-500/20 whitespace-nowrap">
+        <NeonBadge variant="neutral" size="xs">
           {areas.length} Area Hotspot
-        </span>
+        </NeonBadge>
       );
     }
 
@@ -4076,17 +4159,17 @@ const QuestionsPage = () => {
 
       return (
         <div className="flex items-center gap-1.5 whitespace-nowrap">
-          <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs font-medium border border-neutral-200/80 dark:border-neutral-700/80">
+          <NeonBadge variant="neutral" size="xs">
             {keys.length} Opsi
-          </span>
+          </NeonBadge>
           {correctCount > 0 ? (
-            <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+            <NeonBadge variant="emerald" size="xs" mono>
               Kunci: {correctKeys}
-            </span>
+            </NeonBadge>
           ) : (
-            <span className="text-[11px] text-amber-600 dark:text-amber-400 italic">
+            <NeonBadge variant="amber" size="xs">
               Belum ada kunci
-            </span>
+            </NeonBadge>
           )}
         </div>
       );
@@ -4094,33 +4177,35 @@ const QuestionsPage = () => {
 
     if (type === "menjodohkan") {
       return (
-        <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs font-semibold border border-amber-500/20 whitespace-nowrap">
+        <NeonBadge variant="neutral" size="xs">
           {(item.pairs || []).length} Pasangan
-        </span>
+        </NeonBadge>
       );
     }
 
     if (type === "isian_singkat" || type === "uraian") {
       return (
-        <div className="text-xs font-medium text-neutral-600 dark:text-neutral-300 truncate max-w-[170px] whitespace-nowrap" title={item.answerKey || "-"}>
-          <span className="text-neutral-400 mr-1">Kunci:</span>
-          <span className="font-semibold text-neutral-800 dark:text-neutral-200">{item.answerKey || "-"}</span>
+        <div className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+          <span className="text-neutral-400 text-xs">Kunci:</span>
+          <span className="font-mono font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-[140px]" title={item.answerKey || "-"}>
+            {item.answerKey || "(Esai)"}
+          </span>
         </div>
       );
     }
 
     if (type === "urutkan" || type === "drag_drop") {
       return (
-        <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-semibold border border-indigo-500/20 whitespace-nowrap">
+        <NeonBadge variant="neutral" size="xs">
           {(item.items || []).length} Item Urutan
-        </span>
+        </NeonBadge>
       );
     }
 
     return null;
   };
 
-  const neonColumns: NeonTableColumn<QuestionData>[] = useMemo(() => [
+    const neonColumns: NeonTableColumn<QuestionData>[] = useMemo(() => [
     {
       key: "no",
       header: "#",
@@ -4148,7 +4233,7 @@ const QuestionsPage = () => {
     {
       key: "text",
       header: "Teks Pertanyaan & Stimulus",
-      className: "min-w-0",
+      className: "min-w-[150px] sm:min-w-0",
       render: (item) => (
         <div className="space-y-1.5 py-0.5">
           <MathText
@@ -4157,24 +4242,29 @@ const QuestionsPage = () => {
           />
           <div className="flex items-center gap-1.5 flex-wrap">
             {(item.imageUrl || item.text.includes("<img")) && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30 text-[10px] font-semibold tracking-tight uppercase shadow-[0_0_8px_rgba(14,165,233,0.15)]">
-                <Image className="h-3 w-3" />
+              <NeonBadge variant="sky" size="xs" icon={Image}>
                 Bergambar
-              </span>
+              </NeonBadge>
             )}
             {item.groupId && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[10px] font-semibold tracking-tight uppercase shadow-[0_0_8px_rgba(245,158,11,0.15)]">
+              <NeonBadge variant="amber" size="xs">
+                <BookOpen className="h-3 w-3" />
                 <span>Paket: {item.groupId}</span>
                 {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && (
-                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[9px] font-black shadow-[0_0_6px_rgba(245,158,11,0.4)]">
-                    MAIN
+                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-600 text-white text-[9px] font-bold">
+                    Wacana
                   </span>
                 )}
-              </span>
+              </NeonBadge>
             )}
             {/* Mobile Type Badge */}
-            <span className="sm:hidden px-1.5 py-0.2 rounded text-[10px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
-              {QUESTION_TYPE_LABELS[item.type || "pilihan_ganda"] || item.type}
+            <span className="sm:hidden">
+              <NeonBadge
+                variant={(QUESTION_TYPE_BADGE[item.type || "pilihan_ganda"]?.variant) || "neutral"}
+                size="xs"
+              >
+                {QUESTION_TYPE_LABELS[item.type || "pilihan_ganda"] || item.type}
+              </NeonBadge>
             </span>
           </div>
         </div>
@@ -4183,15 +4273,16 @@ const QuestionsPage = () => {
     {
       key: "type",
       header: "Tipe Soal",
-      width: "135px",
+      width: "140px",
       className: "hidden sm:table-cell",
       headerClassName: "hidden sm:table-cell",
       render: (item) => {
         const qType = item.type || "pilihan_ganda";
+        const meta = QUESTION_TYPE_BADGE[qType] || { variant: "neutral" as const, label: qType };
         return (
-          <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-semibold border whitespace-nowrap ${getQuestionTypeColor(qType)}`}>
-            {QUESTION_TYPE_LABELS[qType] || qType}
-          </span>
+          <NeonBadge variant={meta.variant} size="sm">
+            {meta.label}
+          </NeonBadge>
         );
       }
     },
@@ -5511,7 +5602,7 @@ const QuestionsPage = () => {
 
       <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
         {/* ── 1. Top Bar: Back, Breadcrumbs, Title, Metadata Pills, Top Actions ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-200 dark:border-neutral-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-200 dark:border-neutral-800 relative z-30 overflow-visible">
         <div className="flex items-start sm:items-center gap-3 min-w-0">
           <Button
             variant="ghost"
@@ -5577,7 +5668,7 @@ const QuestionsPage = () => {
         </div>
 
         {/* Action Buttons Top Right */}
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap overflow-visible relative z-30">
           {/* OPSI DATA DROPDOWN */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -5590,7 +5681,7 @@ const QuestionsPage = () => {
                 <ChevronDown className="h-3 w-3 text-neutral-400" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+            <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-2rem)] p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
               <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
                 Import & Export
               </DropdownMenuLabel>
@@ -5664,7 +5755,7 @@ const QuestionsPage = () => {
                 <ChevronDown className="h-3 w-3 text-neutral-400" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+            <DropdownMenuContent align="start" className="w-56 max-w-[calc(100vw-2rem)] p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
               <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
                 Aksi Tambahan
               </DropdownMenuLabel>
@@ -5701,6 +5792,20 @@ const QuestionsPage = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* ASISTEN AI CHAT BUTTON */}
+          {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
+            <NeonButton
+              variant="outline"
+              color="brand"
+              size="sm"
+              onClick={() => setIsAIChatDrawerOpen(true)}
+              className="h-8 gap-1.5"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Chat AI</span>
+            </NeonButton>
+          )}
+
           {/* TAMBAH SOAL BUTTON / DROPDOWN */}
           {isOwner && (
             <DropdownMenu>
@@ -5714,7 +5819,7 @@ const QuestionsPage = () => {
                   <ChevronDown className="h-3 w-3 text-white/60 dark:text-neutral-600" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-2rem)] p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
                 <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
                   Metode Pembuatan
                 </DropdownMenuLabel>
@@ -5731,13 +5836,26 @@ const QuestionsPage = () => {
                 {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
                   <>
                     <DropdownMenuItem
+                      onClick={() => setIsAIChatDrawerOpen(true)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <div className="flex flex-col">
+                        <span className="font-semibold flex items-center gap-1.5">
+                          Asisten Chat AI
+                          <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[9px] font-bold">Chatbot</span>
+                        </span>
+                        <span className="text-[10px] text-neutral-400">Buat soal santai lewat chat prompt</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
                       onClick={() => setIsAIModalOpen(true)}
                       className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
                     >
-                      <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <Wand2 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                       <div className="flex flex-col">
-                        <span className="font-semibold">Generasi AI</span>
-                        <span className="text-[10px] text-neutral-400">Buat soal otomatis dari materi</span>
+                        <span className="font-semibold">Generator Form AI</span>
+                        <span className="text-[10px] text-neutral-400">Pilih formulir parameter kustom</span>
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -5954,13 +6072,16 @@ const QuestionsPage = () => {
                 <div className="space-y-2.5 text-xs">
                   {/* Tipe Soal & Stimulus */}
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={cn("px-2 py-0.5 rounded text-[10px] font-semibold border", getQuestionTypeColor(inspectedQuestion.type))}>
+                    <NeonBadge
+                      variant={(QUESTION_TYPE_BADGE[inspectedQuestion.type || "pilihan_ganda"]?.variant) || "neutral"}
+                      size="xs"
+                    >
                       {QUESTION_TYPE_LABELS[inspectedQuestion.type || "pilihan_ganda"] || inspectedQuestion.type}
-                    </span>
+                    </NeonBadge>
                     {inspectedQuestion.groupId && (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-[10px] font-semibold">
-                        Paket Stimulus: {inspectedQuestion.groupId}
-                      </span>
+                      <NeonBadge variant="amber" size="xs">
+                        Paket: {inspectedQuestion.groupId}
+                      </NeonBadge>
                     )}
                   </div>
 
@@ -6002,44 +6123,66 @@ const QuestionsPage = () => {
 
                   {/* Choices / Answers Preview */}
                   {(inspectedQuestion.type === "pilihan_ganda" || inspectedQuestion.type === "pilihan_ganda_kompleks") && inspectedQuestion.choices && (
-                    <div className="space-y-2 pt-1 border-t border-neutral-100 dark:border-neutral-800">
-                      <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                    <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                      <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
                         <span>Pilihan Jawaban</span>
-                        <span className="font-mono text-[10px]">{Object.keys(inspectedQuestion.choices).length} Opsi</span>
+                        <span className="font-mono text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-600 dark:text-neutral-400 font-semibold">
+                          {Object.keys(inspectedQuestion.choices).length} Opsi
+                        </span>
                       </div>
-                      <div className="space-y-1.5">
-                        {Object.keys(inspectedQuestion.choices).sort().map((key) => {
+                      <div className="space-y-2">
+                        {Object.keys(inspectedQuestion.choices).sort().map((key, idx) => {
                           const choice = inspectedQuestion.choices![key];
-                          const isCorrect = choice?.isCorrect;
+                          const isCorrect = !!choice?.isCorrect;
+                          const letter = /^[a-zA-Z]$/.test(key)
+                            ? key.toUpperCase()
+                            : String.fromCharCode(65 + idx);
+
                           return (
                             <div
                               key={key}
                               className={cn(
-                                "flex items-start gap-2 p-2 rounded-lg border text-xs transition-colors",
+                                "flex items-start gap-3 p-3 rounded-xl border transition-all text-xs",
                                 isCorrect
-                                  ? "bg-emerald-500/[0.08] border-emerald-500/40 text-emerald-950 dark:text-emerald-100 font-medium"
-                                  : "bg-neutral-50/60 dark:bg-neutral-850/40 border-neutral-200/60 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300"
+                                  ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500/40 text-emerald-950 dark:text-emerald-100 shadow-2xs"
+                                  : "bg-white dark:bg-neutral-850/60 border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 hover:border-neutral-300 dark:hover:border-neutral-700"
                               )}
                             >
-                              <span
+                              {/* Option Letter Badge (A, B, C, D, E) */}
+                              <div
                                 className={cn(
-                                  "h-4.5 w-4.5 shrink-0 rounded flex items-center justify-center font-mono text-[10px] font-bold mt-0.5",
+                                  "w-6 h-6 min-w-[24px] rounded-lg flex items-center justify-center font-bold text-xs shrink-0 select-none transition-colors",
                                   isCorrect
-                                    ? "bg-emerald-500 text-white"
-                                    : "bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300"
+                                    ? "bg-emerald-600 text-white shadow-xs"
+                                    : "bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300"
                                 )}
                               >
-                                {key.toUpperCase()}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <MathText content={choice?.text || ""} className="text-xs ql-editor !p-0 [&_p]:m-0 leading-relaxed" />
+                                {letter}
+                              </div>
+
+                              {/* Option Content & Image */}
+                              <div className="min-w-0 flex-1 pt-0.5">
+                                <MathText
+                                  content={choice?.text || ""}
+                                  disableJustify={true}
+                                  className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed ql-editor !p-0 [&_p]:m-0 break-words"
+                                />
                                 {choice?.imageUrl && (
-                                  <img src={choice.imageUrl} alt={`Opsi ${key}`} className="h-12 object-contain rounded mt-1 border border-neutral-200 dark:border-neutral-700" />
+                                  <div className="mt-2">
+                                    <img
+                                      src={choice.imageUrl}
+                                      alt={`Opsi ${letter}`}
+                                      className="max-h-24 object-contain rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-1"
+                                    />
+                                  </div>
                                 )}
                               </div>
+
+                              {/* KUNCI Pill Indicator */}
                               {isCorrect && (
-                                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider shrink-0 mt-0.5">
-                                  KUNCI
+                                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider shrink-0 mt-0.5">
+                                  <Check className="w-3 h-3 stroke-[3]" />
+                                  <span>KUNCI</span>
                                 </span>
                               )}
                             </div>
@@ -8965,32 +9108,47 @@ Aturan:
         />
 
 
-        {/* MODAL GENERASI AI */}
+        {/* ASISTEN AI CHAT DRAWER */}
+        <AIChatQuestionDrawer
+          isOpen={isAIChatDrawerOpen}
+          onClose={() => setIsAIChatDrawerOpen(false)}
+          exam={exam ? { id: exam.id, name: exam.name, subject: exam.subject } : undefined}
+          onApplyQuestions={handleApplyAIChatQuestions}
+          onSavedQuestionsSuccess={loadQuestions}
+        />
+
+        {/* MODAL GENERASI AI (Neon Theme) */}
         <Dialog open={isAIModalOpen} onOpenChange={setIsAIModalOpen}>
-          <DialogContent className="max-w-2xl rounded-2xl p-0 overflow-hidden border border-slate-200/60 dark:border-slate-800/60 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] bg-white dark:bg-slate-900">
-            {/* Header dengan efek glow */}
-            <div className="relative px-6 py-5 overflow-hidden border-b border-slate-100 dark:border-slate-800/80 bg-gradient-to-r from-indigo-50/50 via-white to-purple-50/50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-purple-950/20">
-              <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/3 w-48 h-48 bg-purple-400/20 dark:bg-purple-600/20 rounded-full blur-3xl opacity-60 mix-blend-multiply dark:mix-blend-lighten pointer-events-none"></div>
-              <div className="absolute bottom-0 left-0 translate-y-1/3 -translate-x-1/3 w-40 h-40 bg-indigo-400/20 dark:bg-indigo-600/20 rounded-full blur-3xl opacity-60 mix-blend-multiply dark:mix-blend-lighten pointer-events-none"></div>
-              
-              <div className="relative flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 ring-4 ring-indigo-50 dark:ring-indigo-900/20">
-                    <Sparkles className="w-6 h-6 text-white" />
+          <DialogContent className="max-w-2xl rounded-2xl p-0 overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-2xl bg-white dark:bg-neutral-850">
+            {/* Header Neon */}
+            <div className="px-6 py-5 border-b border-neutral-100 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shadow-2xs">
+                    <Sparkles className="w-5 h-5" />
                   </div>
                   <div>
-                    <DialogTitle className="text-lg font-black text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
-                      AI Studio Generator <span className="px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-xs text-indigo-700 dark:text-indigo-400 font-semibold uppercase tracking-wider">Beta</span>
+                    <DialogTitle className="text-base font-bold text-neutral-900 dark:text-neutral-100 tracking-tight flex items-center gap-2">
+                      AI Studio Generator
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold uppercase tracking-wider">
+                        Beta
+                      </span>
                     </DialogTitle>
-                    <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5">
-                      <Wand2 className="w-3.5 h-3.5 text-purple-500" />
-                      Powered by <span className="font-bold text-slate-700 dark:text-slate-300">{AI_MODELS.find((m: any) => m.id === activeAIConfig.model)?.name || activeAIConfig.model}</span>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5 mt-0.5">
+                      <Wand2 className="w-3.5 h-3.5 text-emerald-500" />
+                      Powered by <span className="font-semibold text-neutral-700 dark:text-neutral-300">{AI_MODELS.find((m: any) => m.id === activeAIConfig.model)?.name || activeAIConfig.model}</span>
                     </p>
                   </div>
                 </div>
-                <button type="button" onClick={handleRandomFill} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border border-indigo-100 dark:border-indigo-500/20">
-                  <RefreshCw className="w-3.5 h-3.5" /> Isi Otomatis
-                </button>
+                <NeonButton
+                  type="button"
+                  variant="secondary"
+                  size="xs"
+                  onClick={handleRandomFill}
+                  icon={<RefreshCw className="w-3 h-3" />}
+                >
+                  Isi Otomatis
+                </NeonButton>
               </div>
             </div>
 
@@ -9000,32 +9158,32 @@ Aturan:
                 {/* Kolom Kiri: Konteks & Materi */}
                 <div className="space-y-6">
                   <div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-sm shadow-indigo-500/50"></div> Konteks Soal
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Konteks Soal
                     </h4>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="space-y-1.5">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Jenjang / Kelas</label>
-                        <Input value={aiLevel} onChange={(e) => setAiLevel(e.target.value)} placeholder="Contoh: SMA Kelas 11" className="h-10 rounded-xl text-xs bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 transition-colors shadow-sm" />
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Jenjang / Kelas</label>
+                        <Input value={aiLevel} onChange={(e) => setAiLevel(e.target.value)} placeholder="Contoh: SMA Kelas 11" className="h-9 rounded-lg text-xs bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-neutral-900 dark:text-neutral-100 shadow-2xs" />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Mata Pelajaran</label>
-                        <Input value={aiSubject} onChange={(e) => setAiSubject(e.target.value)} placeholder="Contoh: Biologi" className="h-10 rounded-xl text-xs bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 transition-colors shadow-sm" />
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Mata Pelajaran</label>
+                        <Input value={aiSubject} onChange={(e) => setAiSubject(e.target.value)} placeholder="Contoh: Biologi" className="h-9 rounded-lg text-xs bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-neutral-900 dark:text-neutral-100 shadow-2xs" />
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Topik Pembahasan</label>
+                      <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Topik Pembahasan</label>
                       <div className="flex gap-2 group">
-                        <Input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Fotosintesis, Metabolisme..." className="flex-1 h-10 rounded-xl text-xs bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 transition-colors shadow-sm" />
-                        <button type="button" onClick={handleGenerateTopic} disabled={isGeneratingTopic} className="shrink-0 h-10 px-4 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all disabled:opacity-50 border border-indigo-100 dark:border-indigo-500/20 shadow-sm flex items-center justify-center gap-1.5" title="Minta saran topik dari AI">
-                          {isGeneratingTopic ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                        <Input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Fotosintesis, Metabolisme..." className="flex-1 h-9 rounded-lg text-xs bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-neutral-900 dark:text-neutral-100 shadow-2xs" />
+                        <button type="button" onClick={handleGenerateTopic} disabled={isGeneratingTopic} className="shrink-0 h-9 px-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800/60 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 text-xs font-semibold cursor-pointer" title="Minta saran topik dari AI">
+                          {isGeneratingTopic ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                         </button>
                       </div>
                       {dynamicSuggestions.length > 0 && !isFetchingSuggestions && (
                         <div className="flex flex-wrap gap-1.5 mt-2.5">
                           {dynamicSuggestions.map((s, i) => (
-                            <button key={i} type="button" onClick={() => setAiTopic(String(s))} className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors shadow-sm">{String(s)}</button>
+                            <button key={i} type="button" onClick={() => setAiTopic(String(s))} className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-emerald-500/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-2xs cursor-pointer">{String(s)}</button>
                           ))}
                         </div>
                       )}
@@ -9033,37 +9191,37 @@ Aturan:
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></div> Referensi Materi <span className="font-semibold normal-case text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full ml-1 text-xs">Opsional</span>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Referensi Materi <span className="font-semibold normal-case text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-md ml-1 text-[11px]">Opsional</span>
                     </h4>
                     <div className="space-y-2.5">
                       {aiMaterialFileName ? (
-                        <div className="flex items-center gap-3 p-3 bg-emerald-50/80 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800/40 shadow-sm">
-                          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-800/50 flex items-center justify-center">
-                            <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <div className="flex items-center gap-3 p-3 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/80 dark:border-emerald-800/40 shadow-2xs">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                            <FileText className="w-4 h-4" />
                           </div>
                           <div className="flex-1 overflow-hidden">
-                            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 truncate">{aiMaterialFileName}</p>
-                            <p className="text-xs text-emerald-600/70 dark:text-emerald-500/70 font-semibold mt-0.5">{Math.round(aiMaterialText.length / 1000)}k karakter disematkan</p>
+                            <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-200 truncate">{aiMaterialFileName}</p>
+                            <p className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 font-medium mt-0.5">{Math.round(aiMaterialText.length / 1000)}k karakter disematkan</p>
                           </div>
-                          <button onClick={() => { setAiMaterialFile(null); setAiMaterialText(""); setAiMaterialFileName(""); }} className="w-7 h-7 rounded-lg hover:bg-emerald-200/50 dark:hover:bg-emerald-800/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => { setAiMaterialFile(null); setAiMaterialText(""); setAiMaterialFileName(""); }} className="w-7 h-7 rounded-lg hover:bg-emerald-200/50 dark:hover:bg-emerald-800/50 flex items-center justify-center text-emerald-700 dark:text-emerald-300 transition-colors cursor-pointer"><X className="w-3.5 h-3.5" /></button>
                         </div>
                       ) : (
-                        <label className="flex flex-col items-center justify-center gap-2.5 px-4 py-5 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10 transition-all group bg-slate-50/30 dark:bg-slate-800/30">
-                          <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform group-hover:border-indigo-200 dark:group-hover:border-indigo-700">
-                            <Plus className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                        <label className="flex flex-col items-center justify-center gap-2.5 px-4 py-5 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-800 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/20 transition-all group bg-neutral-50/50 dark:bg-neutral-900/30">
+                          <div className="w-9 h-9 rounded-full bg-white dark:bg-neutral-800 shadow-2xs border border-neutral-200 dark:border-neutral-700 flex items-center justify-center group-hover:scale-105 transition-transform group-hover:border-emerald-300 dark:group-hover:border-emerald-600">
+                            <Plus className="w-4 h-4 text-neutral-400 group-hover:text-emerald-600 transition-colors" />
                           </div>
                           <div className="text-center">
-                            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 group-hover:text-indigo-700 dark:group-hover:text-indigo-400 transition-colors">{isExtractingMaterial ? "Mengekstrak Teks..." : "Upload PDF, Word, atau PPT"}</p>
-                            <p className="text-xs font-medium text-slate-400 mt-0.5">Atau paste teks langsung di bawah</p>
+                            <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{isExtractingMaterial ? "Mengekstrak Teks..." : "Upload PDF, Word, atau PPT"}</p>
+                            <p className="text-[11px] text-neutral-400 mt-0.5">Atau paste teks langsung di bawah</p>
                           </div>
                           <input type="file" className="hidden" accept=".pdf,.docx,.docm,.pptx,.ppt,.png,.jpg,.jpeg" onChange={handleAIMaterialUpload} disabled={isExtractingMaterial} />
                         </label>
                       )}
                       
                       <div className="relative">
-                        <textarea value={aiMaterialText} onChange={(e) => setAiMaterialText(e.target.value.substring(0, 4000))} placeholder="Paste teks materi atau artikel di sini..." className="w-full min-h-[90px] p-3.5 pb-7 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-xs resize-none text-slate-700 dark:text-slate-300 placeholder:text-slate-400 transition-all shadow-sm focus:bg-white dark:focus:bg-slate-900" />
-                        {aiMaterialText && <p className="absolute bottom-2.5 right-3 text-xs font-bold text-slate-400">{aiMaterialText.length}/4000</p>}
+                        <textarea value={aiMaterialText} onChange={(e) => setAiMaterialText(e.target.value.substring(0, 4000))} placeholder="Paste teks materi atau artikel di sini..." className="w-full min-h-[90px] p-3 pb-7 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-xs resize-none text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 transition-all shadow-2xs" />
+                        {aiMaterialText && <p className="absolute bottom-2.5 right-3 text-[10px] font-mono text-neutral-400">{aiMaterialText.length}/4000</p>}
                       </div>
                     </div>
                   </div>
@@ -9072,14 +9230,14 @@ Aturan:
                 {/* Kolom Kanan: Pengaturan Output */}
                 <div className="space-y-6">
                   <div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></div> Format Output
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Format Output
                     </h4>
                     
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="space-y-1.5">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tipe Soal</label>
-                        <select value={aiType} onChange={(e) => setAiType(e.target.value)} className="w-full h-11 px-3 rounded-xl text-xs font-bold bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none text-slate-700 dark:text-slate-200 shadow-sm focus:bg-white dark:focus:bg-slate-900 transition-colors">
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Tipe Soal</label>
+                        <select value={aiType} onChange={(e) => setAiType(e.target.value)} className="w-full h-9 px-2.5 rounded-lg text-xs font-semibold bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-neutral-800 dark:text-neutral-200 shadow-2xs transition-colors cursor-pointer">
                           {allowedTypes.pilihan_ganda && <option value="pilihan_ganda">Pilihan Ganda</option>}
                           {allowedTypes.pilihan_ganda_kompleks && <option value="pilihan_ganda_kompleks">PG Kompleks</option>}
                           {allowedTypes.benar_salah && <option value="benar_salah">Benar / Salah</option>}
@@ -9094,74 +9252,74 @@ Aturan:
                         </select>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Jumlah Soal</label>
-                        <div className="flex items-center h-10 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 rounded-xl px-2 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all shadow-sm focus-within:bg-white dark:focus-within:bg-slate-900">
-                          <button onClick={() => setAiCount(Math.max(1, aiCount - 1))} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 font-black text-sm transition-colors">-</button>
-                          <input type="number" value={aiCount || ""} onChange={(e) => setAiCount(e.target.value === "" ? 1 : parseInt(e.target.value, 10) || 1)} className="flex-1 text-center bg-transparent font-black text-slate-800 dark:text-white outline-none text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                          <button onClick={() => setAiCount(Math.min(20, aiCount + 1))} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 font-black text-sm transition-colors">+</button>
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Jumlah Soal</label>
+                        <div className="flex items-center h-9 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-1.5 focus-within:ring-1 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all shadow-2xs">
+                          <button onClick={() => setAiCount(Math.max(1, aiCount - 1))} className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-bold text-xs transition-colors cursor-pointer">-</button>
+                          <input type="number" value={aiCount || ""} onChange={(e) => setAiCount(e.target.value === "" ? 1 : parseInt(e.target.value, 10) || 1)} className="flex-1 text-center bg-transparent font-bold text-neutral-900 dark:text-neutral-100 outline-none text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                          <button onClick={() => setAiCount(Math.min(20, aiCount + 1))} className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-bold text-xs transition-colors cursor-pointer">+</button>
                         </div>
                       </div>
                     </div>
 
-                    <div className="space-y-2 mb-4 bg-slate-50/50 dark:bg-slate-800/30 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
+                    <div className="space-y-2 mb-4 bg-neutral-50/70 dark:bg-neutral-900/50 p-3.5 rounded-xl border border-neutral-200/80 dark:border-neutral-800">
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Taksonomi Bloom</label>
-                        <span className="text-xs font-semibold text-slate-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded shadow-sm">Level Kognitif</span>
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Taksonomi Bloom</label>
+                        <span className="text-[10px] font-semibold text-neutral-400 bg-white dark:bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-200 dark:border-neutral-700 shadow-2xs">Level Kognitif</span>
                       </div>
                       <div className="grid grid-cols-3 gap-1.5">
                         {([['lots', 'LOTS (C1-C3)'], ['campuran', 'Mix'], ['hots', 'HOTS (C4-C6)']] as [string, string][]).map(([key, label]) => (
-                          <button key={key} onClick={() => setTaxonomyPreset(key as "lots" | "hots" | "campuran")} className={`py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${getTaxonomyPreset() === key ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-400 border border-slate-300 dark:border-slate-600 ring-1 ring-indigo-500/20' : 'text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 border border-transparent bg-slate-100/50 dark:bg-slate-800/50'}`}>{label}</button>
+                          <button key={key} onClick={() => setTaxonomyPreset(key as "lots" | "hots" | "campuran")} className={`py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${getTaxonomyPreset() === key ? 'bg-emerald-600 text-white shadow-2xs font-bold' : 'bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-750'}`}>{label}</button>
                         ))}
                       </div>
                       <div className="grid grid-cols-6 gap-1 pt-1.5">
                         {(['C1', 'C2', 'C3', 'C4', 'C5', 'C6'] as string[]).map((c) => (
-                          <button key={c} onClick={() => toggleTaxonomy(c)} className={`py-1.5 rounded-lg text-xs font-black transition-all border ${aiTaxonomy.includes(c) ? 'bg-indigo-500 text-white border-indigo-600 shadow-sm shadow-indigo-500/30' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}>{c}</button>
+                          <button key={c} onClick={() => toggleTaxonomy(c)} className={`py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${aiTaxonomy.includes(c) ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs' : 'bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700 hover:border-emerald-400'}`}>{c}</button>
                         ))}
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                         <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tingkat Kesulitan</label>
-                         <div className="grid grid-cols-3 gap-1 bg-slate-50/80 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                         <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Tingkat Kesulitan</label>
+                         <div className="grid grid-cols-3 gap-1 bg-neutral-100/80 dark:bg-neutral-900/60 p-1 rounded-lg border border-neutral-200/80 dark:border-neutral-800">
                            {['mudah', 'sedang', 'sulit'].map((d) => (
-                             <button key={d} onClick={() => setAiDifficulty(d)} className={`py-2 rounded-lg text-xs font-bold capitalize transition-all shadow-sm ${aiDifficulty === d ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600' : 'text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 border border-transparent'}`}>{d}</button>
+                             <button key={d} onClick={() => setAiDifficulty(d)} className={`py-1.5 rounded-md text-xs font-medium capitalize transition-all cursor-pointer ${aiDifficulty === d ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700 shadow-2xs font-bold' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}`}>{d}</button>
                            ))}
                          </div>
                       </div>
                       <div className="space-y-1.5">
-                         <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                         <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
                             Mode Literasi
                             <label className="relative inline-flex items-center cursor-pointer">
                               <input type="checkbox" className="sr-only peer" checked={isAiLiteracy} onChange={(e) => setIsAiLiteracy(e.target.checked)} />
-                              <div className="w-9 h-5 bg-slate-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                              <div className="w-8 h-4.5 bg-neutral-200 rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
                             </label>
                          </label>
                          {isAiLiteracy ? (
-                           <div className="grid grid-cols-3 gap-1 bg-slate-50/80 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80 h-[38px]">
+                           <div className="grid grid-cols-3 gap-1 bg-neutral-100/80 dark:bg-neutral-900/60 p-1 rounded-lg border border-neutral-200/80 dark:border-neutral-800 h-[34px]">
                              {['pendek', 'sedang', 'panjang'].map((len) => (
-                               <button key={len} type="button" onClick={() => setAiPassageLength(len)} className={`rounded-lg text-xs font-bold capitalize transition-all ${aiPassageLength === len ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}>{len}</button>
+                               <button key={len} type="button" onClick={() => setAiPassageLength(len)} className={`rounded-md text-xs font-medium capitalize transition-all cursor-pointer ${aiPassageLength === len ? 'bg-emerald-600 text-white shadow-2xs font-bold' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}`}>{len}</button>
                              ))}
                            </div>
                          ) : (
-                           <div className="h-[38px] flex items-center px-3 bg-slate-50/80 dark:bg-slate-800/50 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                              <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Buat Teks Bacaan</span>
+                           <div className="h-[34px] flex items-center px-2.5 bg-neutral-50 dark:bg-neutral-900/40 rounded-lg border border-neutral-200/80 dark:border-neutral-800">
+                              <span className="text-xs font-medium text-neutral-500 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Buat Teks Bacaan</span>
                            </div>
                          )}
                       </div>
                     </div>
 
                     {/* Opsi Cari Gambar Otomatis (Validasi AI) */}
-                    <label className="flex items-center justify-between p-3 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/80 dark:border-purple-800/40 cursor-pointer hover:bg-purple-100/40 dark:hover:bg-purple-950/40 transition-colors">
+                    <label className="mt-4 flex items-center justify-between p-3 rounded-xl bg-neutral-50/70 dark:bg-neutral-900/50 border border-neutral-200/80 dark:border-neutral-800 cursor-pointer hover:border-emerald-500/40 transition-colors">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                           <Image className="w-4 h-4" />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                            Cari Gambar Edukatif <span className="px-1.5 py-0.5 rounded-md bg-purple-200/70 dark:bg-purple-900/60 text-[9px] font-black uppercase text-purple-800 dark:text-purple-300">Validasi AI</span>
+                          <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                            Cari Gambar Edukatif <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-[9px] font-bold uppercase tracking-wider">Validasi AI</span>
                           </p>
-                          <p className="text-[11px] text-slate-500 font-medium">
+                          <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal">
                             Cari gambar dari Web Internet & validasi anti-bocor kunci jawaban
                           </p>
                         </div>
@@ -9170,30 +9328,29 @@ Aturan:
                         type="checkbox"
                         checked={aiAutoFindImages}
                         onChange={(e) => setAiAutoFindImages(e.target.checked)}
-                        className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                       />
                     </label>
                   </div>
 
                   {(aiObjectives.length > 0 || isFetchingObjectives) && (
-                    <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-2xl border border-blue-100 dark:border-blue-900/40 shadow-sm relative overflow-hidden">
-                      <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-400/10 rounded-full blur-2xl"></div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="w-6 h-6 rounded-md bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
-                           <Target className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <div className="p-3.5 bg-neutral-50/70 dark:bg-neutral-900/50 rounded-xl border border-neutral-200/80 dark:border-neutral-800 shadow-2xs">
+                      <div className="flex items-center gap-2 mb-2.5">
+                        <div className="w-6 h-6 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                           <Target className="w-3.5 h-3.5" />
                         </div>
-                        <p className="text-xs font-black uppercase tracking-widest text-blue-800 dark:text-blue-300">Indikator Pembelajaran</p>
-                        {isFetchingObjectives && <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin ml-auto" />}
+                        <p className="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">Indikator Pembelajaran</p>
+                        {isFetchingObjectives && <RefreshCw className="w-3.5 h-3.5 text-neutral-400 animate-spin ml-auto" />}
                       </div>
                       {aiObjectives.length > 0 && (
-                        <ul className="space-y-2 relative z-10">
+                        <ul className="space-y-2">
                           {aiObjectives.map((obj, idx) => {
                             const cMatch = obj.match(/^(C[1-6])\s*[:\-]/);
                             const cLevel = cMatch ? cMatch[1] : "";
                             const text = cMatch ? obj.replace(/^C[1-6]\s*[:\-]\s*/, "") : obj;
                             return (
-                              <li key={idx} className="flex items-start gap-2.5 text-xs font-medium leading-relaxed text-blue-950/80 dark:text-blue-200/80">
-                                {cLevel ? <span className="shrink-0 px-2.5 py-1 rounded-full bg-white dark:bg-blue-900/60 shadow-sm border border-blue-100 dark:border-blue-800/50 text-xs font-black mt-0.5 text-blue-700 dark:text-blue-300">{cLevel}</span> : <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></div>}
+                              <li key={idx} className="flex items-start gap-2 text-xs font-normal leading-relaxed text-neutral-700 dark:text-neutral-300">
+                                {cLevel ? <span className="shrink-0 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">{cLevel}</span> : <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0"></div>}
                                 <span>{text}</span>
                               </li>
                             );
@@ -9207,40 +9364,45 @@ Aturan:
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-6 py-5 bg-slate-50/80 dark:bg-slate-900 border-t border-slate-200/60 dark:border-slate-800 flex flex-col gap-3">
+            {/* Footer Neon */}
+            <div className="px-6 py-4 bg-neutral-50/60 dark:bg-neutral-900/50 border-t border-neutral-100 dark:border-neutral-800 flex flex-col gap-3">
               {(isAIGenerating && aiProgress > 0) ? (
-                <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="space-y-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-2 tracking-tight">
-                      <Sparkles className="w-4 h-4 animate-pulse text-purple-500" />
-                      {aiProgress < 40 ? "Merancang kerangka soal terstruktur..." : aiProgress < 80 ? "Memproses konteks & validasi keilmuan..." : "Menyusun format JSON akhir..."} <span className="text-slate-400 ml-1 font-medium text-xs">({aiProgress}%)</span>
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 animate-pulse text-emerald-500" />
+                      {aiProgress < 40 ? "Merancang kerangka soal terstruktur..." : aiProgress < 80 ? "Memproses konteks & validasi keilmuan..." : "Menyusun format JSON akhir..."} <span className="text-neutral-400 ml-1 font-mono text-xs font-medium">({aiProgress}%)</span>
                     </span>
-                    <button onClick={cancelAIGeneration} className="text-xs font-bold text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"><X className="w-3.5 h-3.5" /> Batalkan</button>
+                    <button onClick={cancelAIGeneration} className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1 cursor-pointer"><X className="w-3.5 h-3.5" /> Batalkan</button>
                   </div>
-                  <div className="w-full h-2.5 bg-slate-200/80 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner p-0.5">
-                    <div className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 rounded-full transition-all duration-300 relative bg-[length:200%_auto] animate-gradient" style={{ width: `${aiProgress}%` }}>
-                      <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-                    </div>
+                  <div className="w-full h-2 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden p-0.5">
+                    <div className="h-full bg-emerald-500 rounded-full transition-all duration-300" style={{ width: `${aiProgress}%` }}></div>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-4">
-                  <div className="hidden sm:flex items-center gap-2.5 max-w-[280px]">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                      <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <div className="hidden sm:flex items-center gap-2.5 max-w-[290px]">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <Info className="w-3.5 h-3.5" />
                     </div>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-tight">
-                      Proses akan memakan waktu <span className="font-bold text-slate-700 dark:text-slate-300">beberapa detik</span> karena AI merakit seluruh JSON secara akurat & paralel di belakang layar.
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-snug">
+                      Proses berlangsung beberapa detik karena AI merakit seluruh JSON secara akurat & tervalidasi.
                     </p>
                   </div>
-                  <div className="flex gap-2.5 w-full sm:w-auto ml-auto">
-                    <Button variant="ghost" onClick={() => setIsAIModalOpen(false)} className="rounded-xl text-xs font-bold px-5 h-11 hover:bg-slate-200/50 dark:hover:bg-slate-800">Batal</Button>
-                    <Button onClick={handleAIGenerate} disabled={isAIGenerating || !aiTopic.trim()} className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-sm shadow-indigo-500/25 text-xs font-black px-6 h-11 gap-2 border-0 group overflow-hidden relative">
-                      <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
-                      <Wand2 className="w-4 h-4 relative z-10" />
-                      <span className="relative z-10">Generate {aiCount} Soal</span>
-                    </Button>
+                  <div className="flex items-center gap-2 w-full sm:w-auto ml-auto">
+                    <NeonButton variant="secondary" size="sm" onClick={() => setIsAIModalOpen(false)}>
+                      Batal
+                    </NeonButton>
+                    <NeonButton
+                      variant="primary"
+                      size="sm"
+                      onClick={handleAIGenerate}
+                      disabled={isAIGenerating || !aiTopic.trim()}
+                      loading={isAIGenerating}
+                      icon={<Wand2 className="w-3.5 h-3.5" />}
+                    >
+                      Generate {aiCount} Soal
+                    </NeonButton>
                   </div>
                 </div>
               )}

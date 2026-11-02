@@ -511,12 +511,12 @@ const StudentLoginPage = () => {
 
                 <div className="space-y-1.5 text-left">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 ml-1">
-                    {terminology.id} / Username Siswa
+                    {terminology.id} / Username {terminology.student}
                   </label>
                   <Input
                     value={resetNisn}
                     onChange={(e) => setResetNisn(e.target.value)}
-                    placeholder={`Contoh: 0012345678`}
+                    placeholder={school?.type === "campus" ? `Contoh: 210101001` : `Contoh: 0012345678`}
                     className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-2xl h-12 px-4 text-base focus:ring-2 focus:ring-emerald-500"
                     disabled={resetLoading}
                     autoFocus

@@ -2,11 +2,28 @@ import * as XLSX from "xlsx-js-style";
 
 export const CLASS_IMPORT_HEADERS = ["Nama Kelas"] as const;
 
-export function downloadClassImportTemplate(filename = "template-import-kelas.xlsx") {
+export function downloadClassImportTemplate(terminologyOrFilename?: any) {
+  let terminology: any = null;
+  let filename = "template-import-kelas.xlsx";
+
+  if (typeof terminologyOrFilename === "string") {
+    filename = terminologyOrFilename;
+  } else if (terminologyOrFilename && typeof terminologyOrFilename === "object") {
+    terminology = terminologyOrFilename;
+    const classLabel = terminology?.class || "Kelas";
+    const isCampus = (terminology?.school || "").toLowerCase().includes("kampus") || classLabel.toLowerCase().includes("prodi");
+    filename = isCampus ? "template-import-prodi-semester.xlsx" : `template-import-${classLabel.toLowerCase().replace(/\s+/g, "-")}.xlsx`;
+  }
+
+  const classLabel = terminology?.class || "Kelas";
+  const isCampus = (terminology?.school || "").toLowerCase().includes("kampus") || classLabel.toLowerCase().includes("prodi");
+  const header = `Nama ${classLabel}`;
+
   const ws = XLSX.utils.aoa_to_sheet([
-    [...CLASS_IMPORT_HEADERS],
-    ["X MIPA 1"],
-    ["XI IPS 2"],
+    [header],
+    [isCampus ? "S1 Teknik Informatika - Semester 3" : "X MIPA 1"],
+    [isCampus ? "S1 Sistem Informasi - Semester 1" : "XI IPS 2"],
+    [isCampus ? "D3 Manajemen Informatika - Semester 5" : "XII RPL 1"],
   ]);
   
   const headerStyle = {
@@ -18,18 +35,20 @@ export function downloadClassImportTemplate(filename = "template-import-kelas.xl
   const addr = XLSX.utils.encode_cell({ r: 0, c: 0 });
   if (ws[addr]) (ws[addr] as any).s = headerStyle;
 
-  (ws as any)["!cols"] = [{ wch: 25 }];
+  (ws as any)["!cols"] = [{ wch: 35 }];
 
   const wsNotes = XLSX.utils.aoa_to_sheet([
-    ["Keterangan Import Kelas"],
+    [`Keterangan Import ${classLabel}`],
     [],
     ["Aturan:"],
-    ["- Nama Kelas wajib diisi (misal: X MIPA 1, XII IPS 2)."],
+    [`- Kolom '${header}' wajib diisi.`],
+    [isCampus ? "- Contoh: S1 Teknik Informatika - Semester 3, D3 Kebidanan 2A." : "- Contoh: X MIPA 1, XII IPS 2, X RPL 1."],
+    ["- Pastikan nama tidak duplikat dengan data yang sudah ada."],
   ]);
-  (wsNotes as any)["!cols"] = [{ wch: 60 }];
+  (wsNotes as any)["!cols"] = [{ wch: 70 }];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Class");
+  XLSX.utils.book_append_sheet(wb, ws, isCampus ? "Prodi" : "Class");
   XLSX.utils.book_append_sheet(wb, wsNotes, "Keterangan");
   XLSX.writeFile(wb, filename);
 }
@@ -42,14 +61,26 @@ export async function parseClassImportExcel(file: File): Promise<{ name: string 
 
   const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "" });
   return raw
-    .map((row) => ({ name: String(row["Nama Kelas"] || "").trim() }))
+    .map((row) => {
+      // Robust detection: supports "Nama Kelas", "Nama Prodi", "Nama Prodi / Semester", "Prodi", "Program Studi", "Jurusan", "Semester", "Kelas"
+      const matchedKey = Object.keys(row).find((k) =>
+        /^(Nama\s+)?(Kelas|Prodi|Program\s*Studi|Jurusan|Semester|Rombel|Class)/i.test(k.trim())
+      );
+      const val = matchedKey 
+        ? row[matchedKey] 
+        : (row["Nama Kelas"] || row["Nama Prodi / Semester"] || row["Nama Prodi"] || row["Prodi"] || row["Kelas"] || Object.values(row)[0] || "");
+      return { name: String(val || "").trim() };
+    })
     .filter((v) => v.name.length > 0);
 }
 
-export function exportClassToExcel(params: { classes: Array<{ name: string }>; filename?: string }) {
-  const filename = params.filename ?? "data-kelas.xlsx";
+export function exportClassToExcel(params: { classes: Array<{ name: string }>; filename?: string; terminology?: any }) {
+  const classLabel = params.terminology?.class || "Kelas";
+  const filename = params.filename ?? `data-${classLabel.toLowerCase().replace(/[\/\s]+/g, "-")}.xlsx`;
+  const header = `Nama ${classLabel}`;
+
   const ws = XLSX.utils.aoa_to_sheet([
-    [...CLASS_IMPORT_HEADERS],
+    [header],
     ...params.classes.map((c) => [c.name]),
   ]);
 
@@ -60,9 +91,9 @@ export function exportClassToExcel(params: { classes: Array<{ name: string }>; f
   const addr = XLSX.utils.encode_cell({ r: 0, c: 0 });
   if (ws[addr]) (ws[addr] as any).s = headerStyle;
 
-  (ws as any)["!cols"] = [{ wch: 25 }];
+  (ws as any)["!cols"] = [{ wch: 35 }];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Class");
+  XLSX.utils.book_append_sheet(wb, ws, classLabel.replace(/[\/\s]+/g, "_").substring(0, 31));
   XLSX.writeFile(wb, filename);
 }

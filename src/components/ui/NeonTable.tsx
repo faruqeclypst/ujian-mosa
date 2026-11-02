@@ -320,7 +320,7 @@ export function NeonTable<T>({
 
       {/* ── Main Table Grid ── */}
       <div className="relative w-full overflow-x-auto">
-        <table className="w-full table-fixed sm:table-auto text-left text-xs border-collapse">
+        <table className="min-w-full text-left text-xs border-collapse">
           {/* Table Header */}
           <thead>
             <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/80 dark:bg-[#111214] text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider select-none">
@@ -471,7 +471,6 @@ export function NeonTable<T>({
                       {columns.map((col, cIdx) => (
                         <td
                           key={col.key}
-                          style={{ width: col.width }}
                           className={cn(
                             compact
                               ? "px-2.5 sm:px-3 py-2 text-xs align-middle text-neutral-700 dark:text-neutral-300"

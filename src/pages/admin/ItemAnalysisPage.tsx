@@ -1857,7 +1857,7 @@ export const ItemAnalysisPage: React.FC = () => {
             </>
           }
           actions={
-            <>
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full pb-1 sm:pb-0">
               <button
                 type="button"
                 onClick={() => {
@@ -1913,7 +1913,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 <RefreshCw className={cn("h-3 w-3 text-neutral-400", loading && "animate-spin text-emerald-500")} />
                 <span className="font-sans font-medium text-neutral-500">Refresh</span>
               </button>
-            </>
+            </div>
           }
         />
 

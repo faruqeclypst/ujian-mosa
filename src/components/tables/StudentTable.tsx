@@ -314,7 +314,7 @@ export const StudentTable = ({
       isLoading={tableLoading}
       searchValue={serverSide ? (serverSearchTerm || "") : localSearch}
       onSearchChange={serverSide ? (onServerSearchChange || (() => {})) : setLocalSearch}
-      searchPlaceholder={`Cari nama ${terminology.student.toLowerCase()} atau NISN...`}
+      searchPlaceholder={`Cari nama ${terminology.student.toLowerCase()} atau ${terminology.id}...`}
       filterSlot={filterActions}
       compact
       title={displayTitle}

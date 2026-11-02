@@ -87,6 +87,22 @@ const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
   className
 }) => {
   const { open } = useDropdownMenu();
+  const contentRef = React.useRef<HTMLDivElement>(null);
+
+  React.useLayoutEffect(() => {
+    if (!open || !contentRef.current) return;
+    const el = contentRef.current;
+    const rect = el.getBoundingClientRect();
+    const padding = 8;
+
+    if (rect.left < padding) {
+      el.style.left = `${padding - rect.left + el.offsetLeft}px`;
+      el.style.right = 'auto';
+    } else if (rect.right > window.innerWidth - padding) {
+      el.style.right = '0px';
+      el.style.left = 'auto';
+    }
+  }, [open, align]);
   
   if (!open) return null;
   
@@ -98,8 +114,9 @@ const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
   
   return (
     <div
+      ref={contentRef}
       className={cn(
-        "absolute mt-2 z-[9999] min-w-[8rem] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-1 text-popover-foreground shadow-2xl",
+        "absolute mt-2 z-[9999] min-w-[8rem] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-1 text-popover-foreground shadow-2xl",
         "animate-in fade-in-0 zoom-in-95",
         alignmentClasses[align],
         className

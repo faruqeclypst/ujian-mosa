@@ -28,3 +28,7 @@ export * from "./AIQuestionRevisionDialog";
 export { default as StudentProfileDialog } from "./StudentProfileDialog";
 export * from "./StudentProfileDialog";
 
+export { AIChatQuestionDrawer } from "./AIChatQuestionDrawer";
+export * from "./AIChatQuestionDrawer";
+
+

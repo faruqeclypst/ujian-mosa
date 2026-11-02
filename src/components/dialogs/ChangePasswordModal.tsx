@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AI_MODELS } from "../../lib/ai";
 
 import FormField from "../forms/FormField";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Input } from "../ui/input";
 import ProfilePictureUpload from "../ui/ProfilePictureUpload";
 import { useAuth } from "../../context/AuthContext";
@@ -348,30 +348,30 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
                           <span className="text-[10px] text-neutral-400 mr-1.5">Email:</span>
                           <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100">{linkedGoogleEmail || user?.email}</span>
                         </div>
-                        <Button
+                        <NeonButton
                           type="button"
-                          variant="outline"
-                          size="sm"
+                          variant="dangerGhost"
+                          size="xs"
                           disabled={isUnlinkingGoogle}
                           onClick={handleUnlinkGoogle}
-                          className="h-7.5 px-3 rounded-lg border border-rose-300 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/30 hover:bg-rose-100 text-rose-700 dark:text-rose-400 font-semibold text-xs transition-all cursor-pointer"
                         >
                           {isUnlinkingGoogle ? "Memproses..." : "Putus Tautan"}
-                        </Button>
+                        </NeonButton>
                       </>
                     ) : (
                       <>
                         <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
                           Tautkan untuk login 1-klik yang praktis.
                         </span>
-                        <Button
+                        <NeonButton
                           type="button"
-                          size="sm"
+                          variant="primary"
+                          color="brand"
+                          size="xs"
                           onClick={() => startGoogleRedirectAuth({ action: "link", returnUrl: "/admin" })}
-                          className="h-7.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs shadow-sm shadow-emerald-600/20 hover:shadow-emerald-600/30 transition-all cursor-pointer flex items-center gap-1.5"
                         >
                           <span>Tautkan Akun</span>
-                        </Button>
+                        </NeonButton>
                       </>
                     )}
                   </div>
@@ -394,16 +394,18 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
                 </AnimatePresence>
 
                 <div className="pt-2 flex gap-3">
-                  <Button type="button" variant="ghost" onClick={onClose} className="flex-1 rounded-xl h-11 font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer">
+                  <NeonButton type="button" variant="secondary" onClick={onClose} className="flex-1 justify-center">
                     Batal
-                  </Button>
-                  <Button
+                  </NeonButton>
+                  <NeonButton
                     type="submit"
+                    variant="primary"
+                    color="brand"
                     disabled={isSubmittingProfile || !isProfileDirty}
-                    className="flex-1 rounded-xl h-11 font-bold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 hover:shadow-lg hover:shadow-emerald-600/35 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    className="flex-1 justify-center gap-2"
                   >
                     {isSubmittingProfile ? <RefreshCw className="h-4 w-4 animate-spin" /> : <>Simpan</>}
-                  </Button>
+                  </NeonButton>
                 </div>
               </form>
             </motion.div>
@@ -487,16 +489,18 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
                 </AnimatePresence>
 
                 <div className="pt-2 flex gap-3">
-                  <Button type="button" variant="ghost" onClick={onClose} className="flex-1 rounded-xl h-11 font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer">
+                  <NeonButton type="button" variant="secondary" onClick={onClose} className="flex-1 justify-center">
                     Batal
-                  </Button>
-                  <Button
+                  </NeonButton>
+                  <NeonButton
                     type="submit"
+                    variant="primary"
+                    color="brand"
                     disabled={isSubmittingPassword}
-                    className="flex-1 rounded-xl h-11 font-bold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 hover:shadow-lg hover:shadow-emerald-600/35 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    className="flex-1 justify-center gap-2"
                   >
                     {isSubmittingPassword ? <RefreshCw className="h-4 w-4 animate-spin" /> : <>Perbarui</>}
-                  </Button>
+                  </NeonButton>
                 </div>
               </form>
             </motion.div>

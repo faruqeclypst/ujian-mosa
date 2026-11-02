@@ -275,7 +275,7 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
               className={cn(
                 "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
                 statusFilter === "all"
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                  ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
                   : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
               )}
             >
@@ -284,7 +284,7 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
                 className={cn(
                   "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
                   statusFilter === "all"
-                    ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                    ? "bg-white/20 text-white"
                     : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
                 )}
               >
@@ -297,16 +297,22 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
               className={cn(
                 "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
                 statusFilter === "active"
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                  ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
                   : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
               )}
             >
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 rounded-full shrink-0",
+                  statusFilter === "active" ? "bg-white animate-pulse" : "bg-emerald-500"
+                )}
+              />
               <span>Aktif</span>
               <span
                 className={cn(
                   "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
                   statusFilter === "active"
-                    ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                    ? "bg-white/20 text-white"
                     : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
                 )}
               >
@@ -319,7 +325,7 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
               className={cn(
                 "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
                 statusFilter === "finished"
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                  ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
                   : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
               )}
             >
@@ -328,7 +334,7 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
                 className={cn(
                   "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
                   statusFilter === "finished"
-                    ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                    ? "bg-white/20 text-white"
                     : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
                 )}
               >
@@ -341,7 +347,7 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
               className={cn(
                 "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
                 statusFilter === "archive"
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-2xs"
+                  ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
                   : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
               )}
             >
@@ -350,7 +356,7 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
                 className={cn(
                   "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
                   statusFilter === "archive"
-                    ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                    ? "bg-white/20 text-white"
                     : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
                 )}
               >

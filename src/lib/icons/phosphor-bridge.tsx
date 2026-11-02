@@ -108,6 +108,7 @@ export const SignIn = createIcon(P.SignIn);
 export const Mail = createIcon(P.Envelope);
 export const MapPin = createIcon(P.MapPin);
 export const Maximize2 = createIcon(P.ArrowsOut);
+export const Minimize2 = createIcon(P.ArrowsIn);
 export const Menu = createIcon(P.List);
 export const MessageCircle = createIcon(P.ChatCircle);
 export const Monitor = createIcon(P.Monitor);

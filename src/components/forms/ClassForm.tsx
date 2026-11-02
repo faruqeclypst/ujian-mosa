@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -6,12 +6,11 @@ import * as z from "zod";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import FormField from "./FormField";
+import { useTenant } from "../../context/TenantContext";
 
-const classSchema = z.object({
-  name: z.string().min(1, "Nama kelas wajib diisi"),
-});
-
-export type ClassFormValues = z.infer<typeof classSchema>;
+export type ClassFormValues = {
+  name: string;
+};
 
 interface ClassFormProps {
   defaultValues?: Partial<ClassFormValues>;
@@ -21,6 +20,13 @@ interface ClassFormProps {
 }
 
 export const ClassForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: ClassFormProps) => {
+  const { terminology, school } = useTenant();
+  const isCampus = school?.type === "campus" || (terminology.class || "").toLowerCase().includes("prodi");
+
+  const classSchema = useMemo(() => z.object({
+    name: z.string().min(1, `Nama ${terminology.class.toLowerCase()} wajib diisi`),
+  }), [terminology.class]);
+
   const {
     register,
     handleSubmit,
@@ -49,8 +55,12 @@ export const ClassForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onC
 
   return (
     <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
-      <FormField id="name" label="Nama Kelas" error={errors.name}>
-        <Input id="name" placeholder="Contoh: X RPL 1, XI TKJ 2" {...register("name")} />
+      <FormField id="name" label={`Nama ${terminology.class}`} error={errors.name}>
+        <Input 
+          id="name" 
+          placeholder={isCampus ? "Contoh: S1 Teknik Informatika - Semester 3" : "Contoh: X RPL 1, XI TKJ 2"} 
+          {...register("name")} 
+        />
       </FormField>
       
       <div className="flex justify-end gap-2 pt-4 border-t border-slate-200/60 dark:border-slate-800/40">

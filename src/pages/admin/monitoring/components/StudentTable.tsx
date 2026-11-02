@@ -269,25 +269,26 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
             )}
           </div>
         ),
-        className: "min-w-0 max-w-[340px]",
+        className: "min-w-[150px] sm:min-w-0 max-w-[340px]",
         render: (student) => {
           const isInspected = inspectedStudentId === student.id;
           return (
-            <div className="flex flex-col gap-1 py-1 group/name">
+            <div className="flex flex-col gap-1 py-1 group/name min-w-0">
               <span
                 className={cn(
-                  "text-[13px] font-bold tracking-tight leading-snug transition-colors truncate",
+                  "text-xs sm:text-[13px] font-bold tracking-tight leading-snug transition-colors line-clamp-2 block",
                   isInspected
                     ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
                     : "text-neutral-900 dark:text-neutral-100 group-hover/name:text-emerald-600 dark:group-hover/name:text-emerald-400"
                 )}
+                title={student.name}
               >
                 {student.name}
               </span>
-              <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 font-mono truncate">
-                <span>{student.nisn || "-"}</span>
+              <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 font-mono flex-wrap">
+                <span className="shrink-0">{student.nisn || "-"}</span>
                 <span>•</span>
-                <span className="px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-medium">
+                <span className="px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-medium shrink-0">
                   {student.className}
                 </span>
               </div>
@@ -311,14 +312,14 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
           </div>
         ),
         align: "center",
-        className: "w-28 sm:w-36 shrink-0",
-        headerClassName: "w-28 sm:w-36",
+        className: "w-20 sm:w-36 shrink-0",
+        headerClassName: "w-20 sm:w-36",
         render: (student) => {
           const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
           if (!attempt) {
             return (
               <div className="flex flex-col items-center justify-center py-1">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium text-neutral-400 dark:text-neutral-500 bg-neutral-100/60 dark:bg-neutral-850 border border-neutral-200/60 dark:border-neutral-800">
+                <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-medium text-neutral-400 dark:text-neutral-500 bg-neutral-100/60 dark:bg-neutral-850 border border-neutral-200/60 dark:border-neutral-800">
                   Offline
                 </span>
               </div>
@@ -334,7 +335,7 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
             <div className="flex flex-col items-center justify-center gap-1.5 py-1">
               <span
                 className={cn(
-                  "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold border shrink-0",
+                  "inline-flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-semibold border shrink-0",
                   isFinished
                     ? isForce
                       ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
@@ -489,7 +490,9 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
           key: "nilai",
           header: "Nilai",
           align: "center",
-          width: "90px",
+          width: "70px",
+          className: "w-14 sm:w-[90px] shrink-0",
+          headerClassName: "w-14 sm:w-[90px]",
           render: (student) => {
             const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
             if (!attempt) return <div className="py-1 text-center"><span className="text-neutral-400 font-mono text-xs">-</span></div>;
@@ -604,7 +607,9 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
         key: "actions",
         header: "Aksi",
         align: "right",
-        width: "90px",
+        width: "60px",
+        className: "w-14 sm:w-[90px] shrink-0",
+        headerClassName: "w-14 sm:w-[90px]",
         render: (student) => {
           const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
           const isExpanded = expandedstudent === student.id;
@@ -1025,7 +1030,7 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
         setSearchQuery(val);
         setMonitorPage(1);
       }}
-      searchPlaceholder={`Cari nama ${terminology.student.toLowerCase()} atau NISN...`}
+      searchPlaceholder={`Cari nama ${terminology.student.toLowerCase()} atau ${terminology.id}...`}
       filterSlot={
         <div className="flex items-center gap-1.5 flex-wrap">
           {/* Filter Kelas */}

@@ -316,6 +316,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
 
           let activeLicenseCode = '';
           let licensePayload: OfflineLicensePayload | undefined = undefined;
+          let localSettingsData: any = null;
 
           // 1. Cek database tabel settings server lokal terlebih dahulu
           let isRevoked = false;
@@ -323,6 +324,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             const settingsRes = await localPb.collection('settings').getList(1, 1);
             if (settingsRes.items.length > 0) {
               const sData = settingsRes.items[0];
+              localSettingsData = sData;
               if ((sData as any).offline_license) {
                 activeLicenseCode = (sData as any).offline_license;
               }
@@ -380,7 +382,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             name: schoolName,
             slug: 'local',
             pb_url: targetOrigin,
-            type: 'school',
+            type: ((localSettingsData?.school_type || localSettingsData?.type || (licensePayload as any)?.type) === 'campus') ? 'campus' : 'school',
             is_active: !isRevoked && !isDeviceMismatchDetected,
             logo_url: logoUrl,
             plan: 'offline',
@@ -523,7 +525,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
           name: sData?.name || 'EXAMKU - Server Lokal',
           slug: slug || 'local',
           pb_url: window.location.origin,
-          type: 'school',
+          type: ((sData as any)?.school_type || (sData as any)?.type) === 'campus' ? 'campus' : 'school',
           is_active: true,
           logo_url: sData?.logoUrl || sData?.logo || '',
           offline_license: (sData as any)?.offline_license || '',

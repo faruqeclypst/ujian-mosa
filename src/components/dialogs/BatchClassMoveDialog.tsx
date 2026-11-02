@@ -1,6 +1,6 @@
 import React from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "../ui/dialog";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { ArrowLeftRight } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import type { ClassData } from "../../types/exam";
@@ -70,22 +70,24 @@ export const BatchClassMoveDialog: React.FC<BatchClassMoveDialogProps> = ({
 
         {/* Footer */}
         <div className="p-3.5 bg-neutral-50/70 dark:bg-neutral-900/50 border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-2">
-          <Button
+          <NeonButton
             type="button"
-            variant="outline"
+            variant="secondary"
+            size="sm"
             onClick={() => onOpenChange(false)}
-            className="rounded-xl border-neutral-200 dark:border-neutral-800 h-9 text-xs"
           >
             Batal
-          </Button>
-          <Button
+          </NeonButton>
+          <NeonButton
             type="button"
+            variant="primary"
+            color="brand"
+            size="sm"
             disabled={!targetClassId}
             onClick={onSubmit}
-            className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-xl h-9 text-xs shadow-md shadow-emerald-600/25 disabled:opacity-40"
           >
             Proses Pindah {terminology.class}
-          </Button>
+          </NeonButton>
         </div>
       </DialogContent>
     </Dialog>

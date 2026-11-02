@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Plus, Trash2, Edit2, Check, Landmark } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
+import { NeonButton } from "../ui/NeonButton";
 
 interface BankAccount {
   id: string;
@@ -91,7 +92,7 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               <Landmark size={18} />
             </div>
             <div>
@@ -99,17 +100,18 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
               <p className="text-[10px] text-slate-500 dark:text-neutral-400">Opsi transfer manual untuk tagihan tenant</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded-lg transition-colors cursor-pointer"><X size={16} /></button>
+          <NeonButton variant="ghost" size="sm" iconOnly aria-label="Tutup" onClick={onClose}><X size={16} /></NeonButton>
         </div>
 
         <div className="p-4 overflow-y-auto flex-1 bg-slate-50">
           <div className="flex justify-end mb-4">
-            <button 
+            <NeonButton
+              variant="primary"
+              size="sm"
               onClick={() => { setIsEditing("new"); setForm({ bank_name: "BCA", bank_code: "BCA", account_number: "", account_name: "" }); }}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
             >
-              <Plus size={14} /> Tambah Rekening
-            </button>
+              <Plus size={14} className="mr-1.5" /> Tambah Rekening
+            </NeonButton>
           </div>
 
           <div className="space-y-3">
@@ -144,8 +146,8 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
                       <input type="text" className="w-full text-xs p-2 border rounded-lg" value={form.account_number || ""} onChange={e => setForm({...form, account_number: e.target.value})} placeholder="Contoh: 1234567890" />
                     </div>
                     <div className="col-span-2 flex gap-2 justify-end mt-2">
-                      <button onClick={() => setIsEditing(null)} className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">Batal</button>
-                      <button onClick={handleSave} className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-1"><Check size={14}/> Simpan</button>
+                      <NeonButton variant="secondary" size="sm" onClick={() => setIsEditing(null)}>Batal</NeonButton>
+                      <NeonButton variant="primary" size="sm" onClick={handleSave}><Check size={14} className="mr-1" /> Simpan</NeonButton>
                     </div>
                   </div>
                 ) : (
@@ -204,8 +206,8 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
                   <input type="text" className="w-full text-xs p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" value={form.account_number || ""} onChange={e => setForm({...form, account_number: e.target.value})} placeholder="Contoh: 1234567890" />
                 </div>
                 <div className="col-span-2 flex gap-2 justify-end mt-2">
-                  <button onClick={() => setIsEditing(null)} className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">Batal</button>
-                  <button onClick={handleSave} className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-1"><Check size={14}/> Simpan</button>
+                  <NeonButton variant="secondary" size="sm" onClick={() => setIsEditing(null)}>Batal</NeonButton>
+                  <NeonButton variant="primary" size="sm" onClick={handleSave}><Check size={14} className="mr-1" /> Simpan</NeonButton>
                 </div>
               </div>
             )}

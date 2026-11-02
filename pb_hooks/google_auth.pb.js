@@ -90,38 +90,47 @@ routerAdd("OPTIONS", "/api/auth/google", (c) => {
 
 // 3. POST /api/auth/google (Login, Link, Unlink, Status)
 routerAdd("POST", "/api/auth/google", (c) => {
-    const oauthConfig = resolveGoogleOAuthConfig();
-    const GOOGLE_CLIENT_ID = oauthConfig.clientId;
-    const GOOGLE_CLIENT_SECRET = oauthConfig.clientSecret;
+    // 1. CORS Headers
+    try {
+        c.setResponseHeader("Access-Control-Allow-Origin", "*");
+        c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Token");
+    } catch (_) {}
 
-    // Helper untuk mengambil auth record dari request (dideklarasikan di dalam handler agar aman dari scope issue Goja)
-    function getAuthRecordFromContext(c, body) {
-        try {
-            const info = c.requestInfo();
-            if (info && info.auth) {
-                console.log("[GOOGLE_AUTH] Auth record ditemukan dari c.requestInfo().auth:", info.auth.id);
-                return info.auth;
-            }
-        } catch (_) {}
-        if (c.auth) {
-            console.log("[GOOGLE_AUTH] Auth record ditemukan dari c.auth:", c.auth.id);
-            return c.auth;
-        }
-        try {
-            if (body && body.auth_token && typeof body.auth_token === "string" && body.auth_token.trim().length > 10) {
-                const r = $app.findAuthRecordByToken(body.auth_token.trim());
-                if (r) {
-                    console.log("[GOOGLE_AUTH] Auth record ditemukan dari body.auth_token:", r.id, r.getString("name"));
-                    return r;
+    try {
+        const oauthConfig = resolveGoogleOAuthConfig();
+        const GOOGLE_CLIENT_ID = oauthConfig.clientId;
+        const GOOGLE_CLIENT_SECRET = oauthConfig.clientSecret;
+
+        // Helper untuk mengambil auth record dari request (dideklarasikan di dalam handler agar aman dari scope issue Goja)
+        function getAuthRecordFromContext(c, body) {
+            try {
+                const info = c.requestInfo();
+                if (info && info.auth) {
+                    console.log("[GOOGLE_AUTH] Auth record ditemukan dari c.requestInfo().auth:", info.auth.id);
+                    return info.auth;
                 }
+            } catch (_) {}
+            try {
+                if (c.auth) {
+                    console.log("[GOOGLE_AUTH] Auth record ditemukan dari c.auth:", c.auth.id);
+                    return c.auth;
+                }
+            } catch (_) {}
+            try {
+                if (body && body.auth_token && typeof body.auth_token === "string" && body.auth_token.trim().length > 10) {
+                    const r = $app.findAuthRecordByToken(body.auth_token.trim());
+                    if (r) {
+                        console.log("[GOOGLE_AUTH] Auth record ditemukan dari body.auth_token:", r.id, r.getString("name"));
+                        return r;
+                    }
+                }
+            } catch (errToken) {
+                console.warn("[GOOGLE_AUTH] Gagal findAuthRecordByToken dari body.auth_token:", errToken);
             }
-        } catch (errToken) {
-            console.warn("[GOOGLE_AUTH] Gagal findAuthRecordByToken dari body.auth_token:", errToken);
-        }
-        try {
-            const req = c.request();
-            if (req && req.header) {
-                const headers = req.header;
+            try {
+                const info = c.requestInfo();
+                const headers = (info && info.headers) ? info.headers : {};
                 let token = headers["authorization"] || headers["Authorization"] || headers["x-token"] || headers["X-Token"] || "";
                 if (Array.isArray(token)) token = token[0] || "";
                 if (typeof token === "string" && token.indexOf("Bearer ") === 0) {
@@ -134,20 +143,12 @@ routerAdd("POST", "/api/auth/google", (c) => {
                         return r;
                     }
                 }
+            } catch (errHeader) {
+                console.warn("[GOOGLE_AUTH] Gagal membaca token dari headers:", errHeader);
             }
-        } catch (errHeader) {
-            console.warn("[GOOGLE_AUTH] Gagal membaca token dari headers:", errHeader);
+            return null;
         }
-        return null;
-    }
 
-    try {
-        c.setResponseHeader("Access-Control-Allow-Origin", "*");
-        c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-        c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Token");
-    } catch (_) {}
-
-    try {
         let body = {};
         try {
             const info = c.requestInfo();

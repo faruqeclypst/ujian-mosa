@@ -222,7 +222,7 @@ export const TeacherTable = ({
       pageSize={25}
       pageSizeOptions={[10, 25, 50, 100]}
       emptyTitle={`Belum ada data ${terminology.teacher.toLowerCase()}`}
-      emptySubtitle={`Tambahkan guru baru dengan klik tombol Tambah ${terminology.teacher} di atas.`}
+      emptySubtitle={`Tambahkan ${terminology.teacher.toLowerCase()} baru dengan klik tombol Tambah ${terminology.teacher} di atas.`}
       isLoading={isLoading}
     />
   );

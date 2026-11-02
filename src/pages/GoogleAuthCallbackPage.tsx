@@ -51,6 +51,11 @@ export default function GoogleAuthCallbackPage() {
       if (rawEncodedState) {
         const decodedJson = decodeURIComponent(escape(atob(rawEncodedState)));
         stateData = JSON.parse(decodedJson);
+      } else {
+        const saved = sessionStorage.getItem("examku_google_auth_state");
+        if (saved) stateData = JSON.parse(saved);
+      }
+      if (stateData) {
         setCachedState(stateData);
       }
     } catch (e) {
@@ -66,17 +71,16 @@ export default function GoogleAuthCallbackPage() {
       return;
     }
 
+    // Tunggu koneksi backend sekolah siap sebelum memproses
+    if (!pb) {
+      return;
+    }
+
     // STEP 2: PROSES DI DOMAIN SEKOLAH (TENANT)
     if (hasProcessedRef.current) return;
     hasProcessedRef.current = true;
 
     const processOAuthCode = async () => {
-      if (!pb) {
-        setStatus("error");
-        setErrorMessage("Koneksi ke sistem backend sekolah belum siap. Silakan muat ulang halaman.");
-        return;
-      }
-
       try {
         const redirectUri = getGoogleRedirectUri();
         const action = stateData?.action || "login";
@@ -144,11 +148,12 @@ export default function GoogleAuthCallbackPage() {
         let detailedMessage = serverError;
         if (
           !serverError ||
-          serverError.includes("Something went wrong") ||
-          serverError.includes("invalid_grant") ||
-          serverError.includes("Bad Request")
+          serverError.toLowerCase().includes("invalid_grant") ||
+          serverError.toLowerCase().includes("code has expired")
         ) {
           detailedMessage = "Kode otorisasi Google telah kedaluwarsa atau sudah pernah digunakan. Silakan klik tombol Coba Lagi di bawah untuk meminta kode baru.";
+        } else if (serverError.includes("Something went wrong")) {
+          detailedMessage = "Terjadi gangguan pada respon sistem sekolah. Silakan klik Coba Lagi Sekarang.";
         }
 
         setStatus("error");

@@ -1,3 +1,4 @@
+import { TooltipProvider } from "../ui/tooltip";
 import { ReactNode, Suspense } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -8,6 +9,7 @@ import Sidebar from "./Sidebar";
 import TopNavigation from "./TopNavigation";
 import { useSidebar } from "../../context/SidebarContext";
 import { useTenant } from "../../context/TenantContext";
+import AdminAICopilot from "../copilot/AdminAICopilot";
 
 export interface AdminLayoutProps {
   children?: ReactNode;
@@ -24,6 +26,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const isSuspended = !!subscriptionStatus?.isSuspended;
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="flex h-screen w-full bg-[#fbfbfb] dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 relative overflow-hidden font-sans antialiased">
       <Sidebar />
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden transition-all duration-300 ease-in-out">
@@ -51,7 +54,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           </motion.div>
         </main>
       </div>
+
+      {/* 🤖 Floating AI Copilot (Kanan Bawah) */}
+      <AdminAICopilot />
     </div>
+    </TooltipProvider>
   );
 };
 

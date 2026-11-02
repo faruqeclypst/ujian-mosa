@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { Skeleton } from "../ui/skeleton";
@@ -985,53 +985,48 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
-              <Button
+              <NeonButton
                 type="button"
-                variant="outline"
+                variant={showGuide ? "primary" : "soft"}
                 size="sm"
                 onClick={() => setShowGuide(prev => !prev)}
-                className={`h-9 px-3 rounded-xl text-xs font-semibold gap-1.5 transition-colors ${showGuide
-                  ? "bg-blue-500 text-white border-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
-                  : "bg-blue-50/70 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100"
-                  }`}
                 title="Panduan Cara Hitung & Interpretasi Psikometri"
               >
-                <HelpCircle className="h-3.5 w-3.5" />
+                <HelpCircle className="h-3.5 w-3.5 mr-1.5" />
                 <span>Panduan & Rumus</span>
-              </Button>
-              <Button
+              </NeonButton>
+              <NeonButton
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={loadAnalysisData}
                 disabled={loading}
-                className="h-9 px-3 rounded-xl text-xs font-semibold gap-1.5"
                 title="Muat Ulang Data"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
                 <span className="hidden sm:inline">Refresh</span>
-              </Button>
-              <Button
+              </NeonButton>
+              <NeonButton
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={handlePrint}
-                className="h-9 px-3 rounded-xl text-xs font-semibold gap-1.5 hidden md:flex"
+                className="hidden md:inline-flex"
                 title="Cetak Laporan"
               >
-                <Printer className="h-3.5 w-3.5" />
+                <Printer className="h-3.5 w-3.5 mr-1.5" />
                 <span>Cetak</span>
-              </Button>
-              <Button
+              </NeonButton>
+              <NeonButton
                 type="button"
+                variant="primary"
                 size="sm"
                 onClick={handleExportExcel}
                 disabled={loading || analyzedQuestions.length === 0}
-                className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 gap-1.5"
               >
-                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />
                 <span>Ekspor Excel Lengkap</span>
-              </Button>
+              </NeonButton>
             </div>
           </div>
         </DialogHeader>
@@ -1441,15 +1436,17 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                                     <Target className="h-3.5 w-3.5 text-blue-500" />
                                     Analisis Efektivitas Pilihan Pengecoh (Distractor Analysis):
                                   </span>
-                                  <Button
+                                  <NeonButton
                                     type="button"
-                                    size="sm"
+                                    variant="soft"
+                                    color="purple"
+                                    size="xs"
                                     onClick={() => handleOpenAIRevision(q)}
-                                    className="rounded-lg text-xs bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-xs flex items-center gap-1.5 h-7 px-2.5 cursor-pointer shrink-0"
+                                    className="shrink-0"
                                   >
-                                    <Sparkles className="h-3 w-3 text-amber-300" />
+                                    <Sparkles className="h-3 w-3 mr-1 text-purple-600 dark:text-purple-400" />
                                     <span>Revisi Pilihan AI</span>
-                                  </Button>
+                                  </NeonButton>
                                 </div>
 
                                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-xs">
@@ -1543,9 +1540,9 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
               Rumus: <strong>P = B / N</strong> (Tingkat Kesukaran) · <strong>D = (Bₐ - Bᵦ) / n</strong> (Daya Pembeda 27% Kelompok Atas/Bawah)
             </span>
           </div>
-          <Button type="button" variant="outline" onClick={onClose} className="rounded-xl text-xs">
+          <NeonButton type="button" variant="secondary" size="sm" onClick={onClose}>
             Tutup
-          </Button>
+          </NeonButton>
         </div>
       </DialogContent>
 

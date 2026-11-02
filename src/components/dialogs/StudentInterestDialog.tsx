@@ -27,7 +27,8 @@ import {
   RIASEC_TO_KELOMPOK
 } from "../../lib/riasec";
 import { useTenant } from "../../context/TenantContext";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
+import { X } from "lucide-react";
 
 interface StudentInterestDialogProps {
   isOpen: boolean;
@@ -106,10 +107,9 @@ const StudentInterestDialog = ({ isOpen, onClose, studentId, studentName }: Stud
               <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-1.5">{studentName}</p>
             </div>
           </div>
-          <Button variant="ghost" onClick={onClose} className="h-11 w-11 rounded-full hover:bg-rose-50 hover:text-rose-600 shrink-0">
-            <span className="sr-only">Tutup</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-          </Button>
+          <NeonButton variant="ghost" size="sm" iconOnly aria-label="Tutup" onClick={onClose} className="shrink-0 text-neutral-400 hover:text-rose-600">
+            <X className="h-5 w-5" />
+          </NeonButton>
         </DialogHeader>
 
         {/* Content - Scrollable */}

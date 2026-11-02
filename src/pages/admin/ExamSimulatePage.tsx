@@ -359,27 +359,32 @@ export default function ExamSimulatePage() {
   return (
     <div className="h-screen h-[100dvh] bg-slate-50 dark:bg-slate-950 flex flex-col overflow-hidden select-none font-sans">
       {/* ===== Header ala CBT siswa (timer diganti badge, profil diganti Keluar) ===== */}
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 min-h-[2.85rem] sm:min-h-[4.5rem] h-auto px-2.5 sm:px-8 py-1 sm:py-0 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-1.5 sm:gap-3">
-          <span className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1 sm:py-2 rounded-xl sm:rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-300 text-xs font-black uppercase tracking-widest">
-            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-            Simulasi Guru
+      <header className="sticky top-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl border-b border-slate-200 dark:border-slate-800 min-h-[3rem] sm:min-h-[4.5rem] h-auto px-3 sm:px-8 py-1.5 sm:py-0 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <span className="flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-300 text-[11px] sm:text-xs font-black uppercase tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
+            <span>Simulasi<span className="hidden sm:inline"> Guru</span></span>
           </span>
         </div>
 
         <div className="flex-1 text-center min-w-0 px-2 sm:px-4">
-          <p className="font-black text-slate-800 dark:text-white uppercase tracking-tight text-xs sm:text-base leading-tight" title={examTitle}>{examTitle}</p>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5 sm:mt-1">Tidak disimpan</p>
+          <p className="font-bold text-slate-800 dark:text-white uppercase tracking-tight text-xs sm:text-sm md:text-base leading-tight truncate" title={examTitle}>
+            {examTitle}
+          </p>
+          <p className="text-[10px] sm:text-xs font-mono font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none mt-0.5">
+            (Mode Pratinjau • Tidak Disimpan)
+          </p>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-4 ml-auto relative z-10">
+        <div className="flex items-center gap-1.5 sm:gap-4 shrink-0 relative z-10">
           <button
+            type="button"
             onClick={handleExit}
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 text-xs sm:text-xs font-black uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-950/70 transition-colors active:scale-95"
-            title="Keluar dari simulasi kapan saja"
+            className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors active:scale-95 cursor-pointer shadow-2xs"
+            title="Keluar Simulasi"
+            aria-label="Keluar Simulasi"
           >
-            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="hidden sm:inline">Keluar</span>
+            <LogOut className="w-4 h-4 shrink-0" />
           </button>
         </div>
       </header>
@@ -459,13 +464,7 @@ export default function ExamSimulatePage() {
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-            <button
-              onClick={handleExit}
-              className="mt-3 w-full h-12 rounded-2xl font-black uppercase tracking-widest text-[11px] bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/70 transition-all active:scale-95 flex items-center justify-center gap-2 focus:outline-none"
-            >
-              <LogOut className="w-4 h-4" />
-              Keluar Simulasi
-            </button>
+
           </div>
         </aside>
       </div>

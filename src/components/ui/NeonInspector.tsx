@@ -442,18 +442,21 @@ export const InspectorToggle: React.FC<InspectorToggleProps> = ({
       type="button"
       onClick={onToggle}
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer shadow-2xs",
+        "h-8 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md border transition-all cursor-pointer shadow-2xs select-none",
         active
-          ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 border-neutral-900 dark:border-white"
-          : "bg-white dark:bg-neutral-850 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800",
+          ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-500 dark:border-emerald-500/70 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/40 ring-1 ring-emerald-500/20"
+          : "bg-white dark:bg-neutral-850 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200",
         className
       )}
       title={active ? "Sembunyikan panel detail" : "Tampilkan panel detail"}
       {...props}
     >
-      <span className={cn("h-1.5 w-1.5 rounded-full", active ? "bg-emerald-400 animate-pulse" : "bg-neutral-400")} />
+      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", active ? "bg-emerald-500 animate-pulse" : "bg-neutral-400")} />
       <span>{label}</span>
-      <span className="text-[10px] opacity-75 font-mono ml-0.5">
+      <span className={cn(
+        "text-[10px] font-mono ml-0.5 px-1 py-0.5 rounded",
+        active ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 font-bold" : "opacity-75"
+      )}>
         {active ? "Aktif" : "Mati"}
       </span>
     </button>

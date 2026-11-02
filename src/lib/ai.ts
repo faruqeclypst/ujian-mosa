@@ -126,113 +126,17 @@ export const robustJSONParse = (text: string): any => {
 // 📋 AI Models Registry
 // ═══════════════════════════════════════════════════════════════════════════════
 export const AI_MODELS = [
-  // --- GROQ CLOUD (High Speed & Accuracy) ---
-  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B (Rekomendasi Utama)", speed: "Super Cepat & Akurat", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
-  { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant (Ultra Kilat)", speed: "Hyper Fast", status: "production", provider: "groq", dailyLimit: "~500k token/hari" },
-  { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B", speed: "Fast", status: "production", provider: "groq", dailyLimit: "~500k token/hari" },
-  { id: "meta-llama/llama-4-maverick-17b-128e-instruct", name: "Llama 4 Maverick 17B", speed: "High Performance", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
-  { id: "deepseek-r1-distill-llama-70b", name: "DeepSeek R1 Llama 70B (Reasoning)", speed: "Powerful", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
-  { id: "gemma2-9b-it", name: "Gemma 2 9B", speed: "Fast", status: "production", provider: "groq", dailyLimit: "~500k token/hari" },
-  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B (Latest Reasoning)", speed: "Powerful", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
-  { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B (Fast Reasoning)", speed: "Fast", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
-
-  // --- OLLAMA CLOUD ---
-  { id: "mistral-large-3:675b", name: "Mistral Large 3 (675B Monster)", speed: "Colossal", status: "production", provider: "ollama" },
-  { id: "glm-5.1", name: "GLM 5.1 (Colossal Research)", speed: "Ultimate Brain", status: "production", provider: "ollama" },
-  { id: "deepseek-v3.2", name: "DeepSeek V3.2 (Super Logic)", speed: "God-Tier", status: "production", provider: "ollama" },
-  { id: "kimi-k2.5", name: "Kimi K2.5 (Thinking Expert)", speed: "Reasoning", status: "production", provider: "ollama" },
-  { id: "qwen3.5:397b", name: "Qwen 3.5 397B (Huge Database)", speed: "Vast Knowledge", status: "production", provider: "ollama" },
-  { id: "gpt-oss:120b", name: "Ollama GPT-OSS 120B", speed: "Mastermind", status: "production", provider: "ollama" },
-  { id: "devstral-2:123b", name: "Devstral 2 (123B)", speed: "Pro Developer", status: "production", provider: "ollama" },
-  { id: "qwen3-next:80b", name: "Qwen 3 Next 80B", speed: "Balanced Strong", status: "production", provider: "ollama" },
-  { id: "gemma4:31b", name: "Google Gemma 4 31B", speed: "Smart Small", status: "production", provider: "ollama" },
-  { id: "nemotron-3-super", name: "Nemotron 3 Super (230B)", speed: "Heavyweight", status: "production", provider: "ollama" },
-  { id: "ministral-3:14b", name: "Ministral 3 14B", speed: "Efficient", status: "production", provider: "ollama" },
-  { id: "gemini-3-flash-preview", name: "Gemini 3 Flash (Preview)", speed: "Hyper Speed", status: "preview", provider: "ollama" },
-  { id: "gemma3:4b", name: "Gemma 3 4B (Small)", speed: "Eco-Friendly", status: "production", provider: "ollama" },
-
-  // --- GOOGLE AI STUDIO (Gemini) ---
-  { id: "gemini-2.0-pro-exp-02-05", name: "Gemini 2.0 Pro (Experimental)", speed: "Ultimate Brain", status: "preview", provider: "google" },
-  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash (Next-Gen)", speed: "Hyper Fast", status: "production", provider: "google" },
-  { id: "gemini-2.0-flash-lite-preview-02-05", name: "Gemini 2.0 Flash Lite (Preview)", speed: "Instant", status: "preview", provider: "google" },
-  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro (Powerful)", speed: "Balanced", status: "production", provider: "google" },
-  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash (Fast)", speed: "Instant", status: "production", provider: "google" },
-  { id: "gemini-1.5-flash-8b", name: "Gemini 1.5 Flash 8B", speed: "Hyper Fast", status: "production", provider: "google" },
-
-  // --- CLOUDFLARE WORKERS AI ---
-  { id: "@cf/moonshotai/kimi-k2.5", name: "Kimi K2.5 (256k ctx)", speed: "Powerful", status: "production", provider: "cloudflare" },
-  { id: "@cf/zai-org/glm-4.7-flash", name: "GLM-4.7 Flash", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/openai/gpt-oss-120b", name: "GPT OSS 120B (Reasoning)", speed: "Heavyweight", status: "production", provider: "cloudflare" },
-  { id: "@cf/openai/gpt-oss-20b", name: "GPT OSS 20B", speed: "Balanced", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B (Vision)", speed: "Balanced", status: "production", provider: "cloudflare" },
-  { id: "@cf/google/gemma-4-26b-a4b-it", name: "Gemma 4 26B (Vision)", speed: "Balanced", status: "production", provider: "cloudflare" },
-  { id: "@cf/nvidia/nemotron-3-120b-a12b", name: "Nemotron 3 120B (MoE)", speed: "Heavyweight", status: "production", provider: "cloudflare" },
-  { id: "@cf/ibm/granite-4.0-h-micro", name: "Granite 4.0 Micro (Function)", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/aisingapore/gemma-sea-lion-v4-27b-it", name: "SEA-LION 27B (SE Asian)", speed: "Balanced", status: "production", provider: "cloudflare" },
-  { id: "@cf/qwen/qwq-32b", name: "QwQ 32B (Reasoning)", speed: "Heavyweight", status: "production", provider: "cloudflare" },
-  { id: "@cf/qwen/qwen3-30b-a3b-fp8", name: "Qwen3 30B MoE (FP8)", speed: "Powerful", status: "production", provider: "cloudflare" },
-  { id: "@cf/qwen/qwen2.5-coder-32b-instruct", name: "Qwen 2.5 Coder 32B", speed: "Balanced", status: "production", provider: "cloudflare" },
-  { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", name: "Mistral Small 3.1 24B", speed: "Balanced", status: "production", provider: "cloudflare" },
-  { id: "@cf/mistralai/mistral-7b-instruct-v0.2", name: "Mistral 7B v0.2", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/mistralai/mistral-7b-instruct-v0.1", name: "Mistral 7B v0.1", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", name: "DeepSeek R1 32B (Reasoning)", speed: "Powerful", status: "production", provider: "cloudflare" },
-  { id: "@cf/google/gemma-3-12b-it", name: "Gemma 3 12B", speed: "Balanced", status: "production", provider: "cloudflare" },
-  { id: "@cf/google/gemma-7b-it", name: "Gemma 7B", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", name: "Llama 3.3 70B FP8 (Fast)", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-3.2-3b-instruct", name: "Llama 3.2 3B", speed: "Instant", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-3.2-1b-instruct", name: "Llama 3.2 1B (Ultra Tiny)", speed: "Instant", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-3.1-70b-instruct", name: "Llama 3.1 70B", speed: "Balanced", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-3.1-8b-instruct-fast", name: "Llama 3.1 8B (Fast)", speed: "Hyper Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-3.1-8b-instruct-awq", name: "Llama 3.1 8B AWQ", speed: "Hyper Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-3.1-8b-instruct-fp8", name: "Llama 3.1 8B FP8", speed: "Hyper Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-3-8b-instruct", name: "Llama 3 8B Instruct", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/llama-3-8b-instruct-awq", name: "Llama 3 8B AWQ", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/meta/meta-llama-3-8b-instruct", name: "Meta Llama 3 8B", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@hf/nousresearch/hermes-2-pro-mistral-7b", name: "Hermes 2 Pro Mistral 7B", speed: "Fast", status: "production", provider: "cloudflare" },
-  { id: "@cf/defog/sqlcoder-7b-2", name: "SQLCoder 7B (SQL)", speed: "Fast", status: "production", provider: "cloudflare" },
-
-  // --- OPENROUTER ---
-  { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B (Next-Gen)", speed: "Instant", status: "preview", provider: "openrouter" },
-  { id: "qwen/qwen3-32b", name: "Qwen 3 32B (Latest)", speed: "Powerful", status: "preview", provider: "openrouter" },
-  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B (OpenAI Architecture)", speed: "Colossal", status: "preview", provider: "openrouter" },
-  { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B", speed: "Fast", status: "preview", provider: "openrouter" },
-  { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash (Terbaru)", speed: "Hyper Fast", status: "production", provider: "openrouter" },
-  { id: "google/gemini-2.5-flash-preview-09-2025", name: "Gemini 2.5 Flash Preview", speed: "Hyper Fast", status: "preview", provider: "openrouter" },
-  { id: "google/gemini-2.0-flash-001", name: "Gemini 2.0 Flash", speed: "Hyper Fast", status: "production", provider: "openrouter" },
-  { id: "google/gemini-flash-1.5", name: "Gemini 1.5 Flash", speed: "Fast", status: "production", provider: "openrouter" },
-  { id: "google/gemini-flash-latest", name: "Gemini Flash (Latest)", speed: "Fast", status: "production", provider: "openrouter" },
-  { id: "deepseek/deepseek-r1:free", name: "DeepSeek R1 (Free)", speed: "Powerful", status: "production", provider: "openrouter" },
-
-  // --- GROQ EXPERIMENTAL ---
-  { id: "groq/compound", name: "Groq Compound (Research)", speed: "Fast", status: "preview", provider: "groq", dailyLimit: "~8k token/hari ⚠️" },
-  { id: "groq/compound-mini", name: "Groq Compound Mini", speed: "Hyper Fast", status: "preview", provider: "groq", dailyLimit: "~8k token/hari ⚠️" },
-
-  // --- TOGETHER AI ---
-  { id: "meta-llama/Llama-3-70b-chat-hf", name: "Llama 3 70B", speed: "Fast", status: "production", provider: "together" },
-  { id: "meta-llama/Llama-3-8b-chat-hf", name: "Llama 3 8B", speed: "Instant", status: "production", provider: "together" },
-
-  // --- GITHUB MODELS ---
-  { id: "gpt-4o", name: "GPT-4o (GitHub)", speed: "Ultimate", status: "production", provider: "github" },
-  { id: "gpt-4o-mini", name: "GPT-4o mini (Fast)", speed: "Fast", status: "production", provider: "github" },
-  { id: "meta-llama-3.1-405b-instruct", name: "Llama 3.1 405B (Extreme)", speed: "Heavyweight", status: "production", provider: "github" },
-  { id: "meta-llama-3.1-70b-instruct", name: "Llama 3.1 70B", speed: "Powerful", status: "production", provider: "github" },
-  { id: "meta-llama-3.1-8b-instruct", name: "Llama 3.1 8B", speed: "Fast", status: "production", provider: "github" },
-  { id: "phi-3-medium-128k-instruct", name: "Phi-3 Medium", speed: "Balanced", status: "production", provider: "github" },
-  { id: "phi-3-mini-128k-instruct", name: "Phi-3 Mini", speed: "Fast", status: "production", provider: "github" },
-  { id: "phi-3-small-128k-instruct", name: "Phi-3 Small", speed: "Fast", status: "production", provider: "github" },
-
-  // --- HUGGING FACE ---
-  { id: "meta-llama/Meta-Llama-3-8B-Instruct", name: "Llama 3 8B Instruct", speed: "Fast", status: "production", provider: "huggingface" },
-
-  // --- PUTER (Free, no API Key) ---
-  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B (Puter)", speed: "Heavyweight", status: "production", provider: "puter" },
-  { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B (Puter)", speed: "Fast", status: "production", provider: "puter" },
-  { id: "gpt-5.4-nano", name: "GPT-5.4 Nano (Puter)", speed: "Hyper Fast", status: "production", provider: "puter" },
-  { id: "gpt-5.3-chat", name: "GPT-5.3 Chat (Puter)", speed: "Balanced", status: "production", provider: "puter" },
-  { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4 (Puter)", speed: "Powerful", status: "production", provider: "puter" },
-  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash (Puter)", speed: "Fast", status: "production", provider: "puter" },
-  { id: "meta-llama/llama-4-scout", name: "Llama 4 Scout (Puter)", speed: "Fast", status: "production", provider: "puter" },
+  // --- BYOK / CUSTOM GATEWAY (OpenAI, Anthropic Claude, DeepSeek, Agnes AI, dll.) ---
+  { id: "gpt-4o-mini", name: "GPT-4o Mini (OpenAI Cepat & Hemat)", speed: "Fast", status: "production", provider: "custom" },
+  { id: "gpt-4o", name: "GPT-4o (OpenAI Unggulan)", speed: "Smart", status: "production", provider: "custom" },
+  { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet (Anthropic)", speed: "Superior", status: "production", provider: "custom" },
+  { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku (Anthropic Kilat)", speed: "Hyper Fast", status: "production", provider: "custom" },
+  { id: "deepseek-chat", name: "DeepSeek Chat (V3)", speed: "Logic", status: "production", provider: "custom" },
+  { id: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)", speed: "Deep Thinking", status: "production", provider: "custom" },
+  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B Versatile", speed: "Open Source", status: "production", provider: "custom" },
+  { id: "agnes-2.5-flash", name: "Agnes 2.5 Flash (Super Kilat ~0.7s)", speed: "Hyper Fast", status: "production", provider: "custom" },
+  { id: "agnes-3.0-flash", name: "Agnes 3.0 Flash", speed: "Kilat", status: "production", provider: "custom" },
+  { id: "agnes-3.0-pro", name: "Agnes 3.0 Pro", speed: "Komprehensif", status: "production", provider: "custom" },
 ];
 
 
@@ -275,19 +179,45 @@ const callPuterAI = async (model: string, messages: Array<{ role: string; conten
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🧠 AI Config Resolution
+// 🧠 AI Config Resolution (OpenAI-Compatible & Anthropic Claude Support)
 // ═══════════════════════════════════════════════════════════════════════════════
-interface AIConfig {
+export interface AIConfig {
   apiKey: string;
   useProxy: boolean;
   model: string;
   baseUrl: string;
   provider: string;
+  isAnthropic: boolean;
 }
+
+export const isAnthropicEndpoint = (url: string = "", key: string = ""): boolean => {
+  const u = (url || "").toLowerCase();
+  const k = (key || "").trim();
+  return u.includes("anthropic.com") || u.includes("/messages") || k.startsWith("sk-ant-");
+};
+
+export const resolveCleanUrl = (url: string = "", isAnthropic: boolean = false): string => {
+  if (!url || !url.trim()) {
+    return isAnthropic ? "https://api.anthropic.com/v1/messages" : "https://api.openai.com/v1/chat/completions";
+  }
+  let clean = url.trim().replace(/\/$/, "");
+  if (isAnthropic) {
+    if (clean.includes("/messages")) return clean;
+    if (clean.endsWith("/v1")) return `${clean}/messages`;
+    return `${clean}/v1/messages`;
+  } else {
+    if (clean.includes("/chat/completions") || clean.includes("/api/chat")) return clean;
+    return `${clean}/chat/completions`;
+  }
+};
 
 // Cache config for 30 seconds to avoid repeated DB calls
 let configCache: { data: AIConfig; timestamp: number } | null = null;
 const CONFIG_CACHE_TTL = 30000;
+
+export const invalidateAIConfigCache = (): void => {
+  configCache = null;
+};
 
 const getAIConfig = async (pb: PocketBase): Promise<AIConfig> => {
   if (configCache && Date.now() - configCache.timestamp < CONFIG_CACHE_TTL) {
@@ -302,94 +232,67 @@ const getAIConfig = async (pb: PocketBase): Promise<AIConfig> => {
   const config = settings[0];
 
   let rawModel = AI_MODELS[0].id;
-  let rawProvider = "groq";
+  let rawProvider = "custom";
 
   if (userRole === "admin") {
     rawModel = config?.ai_model || AI_MODELS[0].id;
-    rawProvider = config?.ai_provider || "groq";
+    rawProvider = config?.ai_provider && config?.ai_provider !== "groq" ? config.ai_provider : "custom";
   } else {
     // Cek apakah admin punya key aktif — kalau ya, pakai setting admin
     const tempSettings = config;
-    const adminHasKey = (tempSettings?.ai_provider === "groq" ? tempSettings?.groq_api_key : tempSettings?.ai_gateway_key)?.trim();
+    const adminHasKey = (tempSettings?.ai_gateway_key || tempSettings?.groq_api_key)?.trim();
     if (adminHasKey) {
       // Pakai provider & model dari admin
       rawModel = config?.ai_model || AI_MODELS[0].id;
-      rawProvider = config?.ai_provider || "groq";
+      rawProvider = config?.ai_provider && config?.ai_provider !== "groq" ? config.ai_provider : "custom";
     } else {
       // Fallback ke setting user sendiri
       rawModel = (user as any)?.ai_model || config?.ai_model || AI_MODELS[0].id;
-      rawProvider = (user as any)?.ai_provider || config?.ai_provider || "groq";
+      rawProvider = (user as any)?.ai_provider && (user as any)?.ai_provider !== "groq" ? (user as any).ai_provider : (config?.ai_provider || "custom");
     }
   }
 
-  const isCustom = rawProvider === "custom";
-  const actualModelDef = AI_MODELS.find((m) => m.id === rawModel && m.provider === rawProvider) || AI_MODELS.find((m) => m.id === rawModel);
-
-  const finalModel = isCustom ? rawModel : (actualModelDef ? actualModelDef.id : AI_MODELS[0].id);
-  const finalProvider = isCustom ? "custom" : (rawProvider === "puter" ? "puter" : (actualModelDef ? actualModelDef.provider : "groq"));
-
-  const resolveBaseUrl = (provider: string, gatewayUrl: string) => {
-    switch (provider) {
-      case "puter": return "__PUTER__";
-      case "google": return "https://generativelanguage.googleapis.com/v1beta/openai";
-      case "openrouter": return "https://openrouter.ai/api/v1";
-      case "together": return "https://api.together.xyz/v1";
-      case "huggingface": return "https://api-inference.huggingface.co/v1";
-      case "fireworks": return "https://api.fireworks.ai/inference/v1";
-      case "github": return "https://models.inference.ai.azure.com";
-      case "cloudflare": return gatewayUrl ? `https://api.cloudflare.com/client/v4/accounts/${gatewayUrl}/ai/v1` : "";
-      case "custom": return gatewayUrl;
-      case "ollama": return pb.baseUrl + "/api/ai-proxy";
-      case "groq": return "https://api.groq.com/openai/v1";
-      default: return "https://api.groq.com/openai/v1";
-    }
-  };
-
-  const cleanUrl = (base: string) => {
-    if (!base) return "";
-    let url = base.trim().replace(/\/$/, "");
-    return url.includes("/chat/completions") ? url : `${url}/chat/completions`;
-  };
-
-  const gatewayUrl = config?.ai_gateway_url?.trim() || "";
-  const baseUrl = cleanUrl(resolveBaseUrl(finalProvider, gatewayUrl));
-  const useProxy = finalProvider !== "groq" && finalProvider !== "puter";
+  const finalModel = rawModel || AI_MODELS[0].id;
+  const finalProvider = "custom";
 
   let apiKey = "";
-  if (finalProvider === "puter") {
-    apiKey = "puter-no-key-needed";
-  } else if (finalProvider === "ollama") {
-    apiKey = "ollama-no-key-needed";
-  } else if (userRole === "admin") {
-    apiKey = finalProvider === "groq" ? config?.groq_api_key : config?.ai_gateway_key;
-    if (!apiKey?.trim()) throw new Error(`API Key untuk Provider ${finalProvider.toUpperCase()} belum diatur.`);
+  if (userRole === "admin") {
+    apiKey = config?.ai_gateway_key || config?.groq_api_key || "";
+    if (!apiKey?.trim()) throw new Error("API Key belum diatur di Pengaturan AI.");
   } else {
     // Guru: admin key diprioritaskan, user key hanya fallback jika admin key kosong
-    const adminKey = finalProvider === "groq" ? config?.groq_api_key : config?.ai_gateway_key;
+    const adminKey = config?.ai_gateway_key || config?.groq_api_key;
     const teacherHasOwnKey = userApiKey && userApiKey.trim();
     const isAIAccess = config?.teacher_ai_access ?? false;
 
     if (adminKey?.trim()) {
-      // Admin key selalu diprioritaskan
       apiKey = adminKey;
     } else if (teacherHasOwnKey) {
-      // Fallback ke key pribadi guru jika admin key kosong
       apiKey = userApiKey;
     } else if (isAIAccess) {
-      throw new Error("Admin belum mengatur API Key AI. Hubungi Admin.");
+      throw new Error("Admin belum mengatur API Key AI di Pengaturan.");
     } else {
-      throw new Error("Anda belum memiliki API Key AI. Hubungi Admin untuk mengaktifkan akses AI atau masukkan API Key pribadi di Pengaturan AI.");
+      throw new Error("Anda belum memiliki API Key AI. Hubungi Admin atau masukkan API Key pribadi di Pengaturan AI.");
     }
   }
 
-  const result: AIConfig = { apiKey, useProxy, model: finalModel, baseUrl, provider: finalProvider };
+  const gatewayUrl = config?.ai_gateway_url?.trim() || "";
+  const isAnthropic = isAnthropicEndpoint(gatewayUrl, apiKey);
+  const baseUrl = resolveCleanUrl(gatewayUrl, isAnthropic);
+
+  // Direct fetch dari browser untuk gateway publik agar respon 1-2s.
+  // Otomatis pakai proxy hanya jika server lokal (localhost / LAN).
+  const isLocalOrLAN = baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1") || baseUrl.includes(":11434");
+  const useProxy = isLocalOrLAN;
+
+  const result: AIConfig = { apiKey, useProxy, model: finalModel, baseUrl, provider: finalProvider, isAnthropic };
   configCache = { data: result, timestamp: Date.now() };
   return result;
 };
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🚀 Unified AI Fetch Helper (eliminates code duplication)
+// 🚀 Unified AI Fetch Helper (supports OpenAI & Anthropic Claude)
 // ═══════════════════════════════════════════════════════════════════════════════
 export interface AIFetchOptions {
   pb: PocketBase;
@@ -397,47 +300,204 @@ export interface AIFetchOptions {
   maxTokens?: number;
   temperature?: number;
   jsonMode?: boolean; // Request JSON output format
+  modelOverride?: string;
+  signal?: AbortSignal;
 }
 
 export const fetchAI = async (opts: AIFetchOptions): Promise<string> => {
-  const { pb, messages, maxTokens, temperature = 0.7, jsonMode = true } = opts;
-  const { apiKey, useProxy, model, baseUrl, provider } = await getAIConfig(pb);
-
-  // Puter path
-  if (provider === "puter") {
-    return await callPuterAI(model, messages, maxTokens);
-  }
-
-  // Build request body with JSON mode support
-  const body: any = { model, messages, temperature };
-  if (maxTokens) body.max_tokens = maxTokens;
-  if (jsonMode) {
-    // Providers that support response_format
-    const supportsJsonMode = ["groq", "openrouter", "together", "github", "google", "custom"].includes(provider);
-    if (supportsJsonMode) {
-      body.response_format = { type: "json_object" };
-    }
-  }
+  const { pb, messages, maxTokens, temperature = 0.7, jsonMode = true, modelOverride, signal } = opts;
+  const config = await getAIConfig(pb);
+  const { apiKey, useProxy, baseUrl, isAnthropic } = config;
+  const model = modelOverride || config.model;
 
   let response: Response;
-  if (useProxy) {
-    response = await fetch(pb.baseUrl + "/api/ai-proxy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
-      body: JSON.stringify({ baseUrl, apiKey, model, messages, max_tokens: maxTokens, temperature, stream: false })
-    });
-  } else {
-    response = await fetch(baseUrl, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
+
+  if (isAnthropic) {
+    // 🧠 ANTHROPIC CLAUDE MESSAGES API
+    const systemMessages = messages.filter(m => m.role === "system");
+    const systemPrompt = systemMessages.map(m => m.content).join("\n\n");
+    const nonSystem = messages.filter(m => m.role === "user" || m.role === "assistant");
+
+    // Pastikan percakapan dimulai oleh user dan tidak ada dua pesan berturut-turut dengan role sama
+    const anthropicMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
+    for (const m of nonSystem) {
+      const role = m.role === "assistant" ? "assistant" : "user";
+      if (anthropicMessages.length > 0 && anthropicMessages[anthropicMessages.length - 1].role === role) {
+        anthropicMessages[anthropicMessages.length - 1].content += "\n\n" + m.content;
+      } else {
+        anthropicMessages.push({ role, content: m.content });
+      }
+    }
+    if (anthropicMessages.length === 0 || anthropicMessages[0].role !== "user") {
+      anthropicMessages.unshift({ role: "user", content: "Mulai pembuatan butir soal." });
+    }
+
+    const anthropicBody: any = {
+      model,
+      max_tokens: maxTokens || 4000,
+      temperature,
+      messages: anthropicMessages
+    };
+    if (systemPrompt) anthropicBody.system = systemPrompt;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    };
+
+    if (!useProxy) {
+      try {
+        response = await fetch(baseUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(anthropicBody),
+          signal
+        });
+      } catch (directErr: any) {
+        if (directErr.name === "AbortError") throw directErr;
+        // Fallback otomatis ke proxy PocketBase jika browser diblokir CORS
+        response = await fetch(pb.baseUrl + "/api/ai-proxy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
+          body: JSON.stringify({
+            baseUrl,
+            apiKey,
+            model,
+            messages,
+            max_tokens: maxTokens || 4000,
+            temperature,
+            isAnthropic: true
+          }),
+          signal
+        });
+      }
+    } else {
+      response = await fetch(pb.baseUrl + "/api/ai-proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
+        body: JSON.stringify({
+          baseUrl,
+          apiKey,
+          model,
+          messages,
+          max_tokens: maxTokens || 4000,
+          temperature,
+          isAnthropic: true
+        }),
+        signal
+      });
+    }
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      const msg = errData?.error?.message || errData?.error || `HTTP ${response.status} ${response.statusText}`;
+      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+    }
+
+    const data = await response.json();
+    if (data?.usage) {
+      const total = (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0);
+      if (total) trackTokenUsage(total, undefined, apiKey);
+    }
+
+    const content = data?.content?.map((b: any) => b.text || "").join("") || "";
+    if (!content) {
+      throw new Error(`Anthropic tidak memberikan respon teks yang valid. (model: ${model})`);
+    }
+    return content;
+  }
+
+  // 🤖 OPENAI-COMPATIBLE FORMAT (OpenAI, Agnes AI, AppVerse, DeepSeek, Ollama, Together, vLLM, dll.)
+  const supportsJsonMode = baseUrl.includes("api.openai.com") || baseUrl.includes("openrouter.ai");
+  const body: any = { model, messages, temperature };
+  if (maxTokens) body.max_tokens = maxTokens;
+  if (jsonMode && supportsJsonMode) {
+    body.response_format = { type: "json_object" };
+  }
+
+  // Timeout controller (25s) agar browser tidak menggantung tanpa batas jika upstream macet
+  const timeoutMs = 25000;
+  let timeoutId: any = null;
+  const internalAbort = new AbortController();
+
+  if (signal) {
+    signal.addEventListener("abort", () => internalAbort.abort(signal.reason));
+  }
+  timeoutId = setTimeout(() => {
+    internalAbort.abort(new Error("AI_GATEWAY_TIMEOUT"));
+  }, timeoutMs);
+
+  try {
+    if (!useProxy) {
+      try {
+        response = await fetch(baseUrl, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: internalAbort.signal
+        });
+      } catch (directErr: any) {
+        if (directErr.name === "AbortError" && signal?.aborted) throw directErr;
+        if (directErr?.message === "AI_GATEWAY_TIMEOUT" || directErr.name === "AbortError") {
+          if (model.includes("3.0") && baseUrl.includes("agnes")) {
+            console.warn("[AI] Timeout pada model 3.0, mencoba fallback otomatis ke agnes-2.5-flash...");
+            clearTimeout(timeoutId);
+            return fetchAI({ ...opts, modelOverride: "agnes-2.5-flash" });
+          }
+          throw new Error("Respon server upstream AI melebihi batas waktu (25 detik). Silakan coba lagi atau gunakan model lain.");
+        }
+        // Fallback otomatis ke proxy PocketBase jika browser diblokir CORS pada server custom
+        response = await fetch(pb.baseUrl + "/api/ai-proxy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
+          body: JSON.stringify({
+            baseUrl,
+            apiKey,
+            model,
+            messages,
+            max_tokens: maxTokens,
+            temperature,
+            stream: false,
+            response_format: (jsonMode && supportsJsonMode) ? { type: "json_object" } : undefined
+          }),
+          signal: internalAbort.signal
+        });
+      }
+    } else {
+      response = await fetch(pb.baseUrl + "/api/ai-proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
+        body: JSON.stringify({
+          baseUrl,
+          apiKey,
+          model,
+          messages,
+          max_tokens: maxTokens,
+          temperature,
+          stream: false,
+          response_format: (jsonMode && supportsJsonMode) ? { type: "json_object" } : undefined
+        }),
+        signal: internalAbort.signal
+      });
+    }
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 
   // Handle rate limit
   if (response.status === 429) {
     const errBody = await response.json().catch(() => ({}));
     const msg = errBody?.error?.message || "";
+    // Otomatis coba fallback jika model Agnes AI 3.0 terkena max connection throttle
+    if (model.includes("3.0") && baseUrl.includes("agnes")) {
+      console.warn("[AI] Agnes 3.0 terkena limit/throttle, otomatis fallback ke agnes-2.5-flash...");
+      return fetchAI({
+        ...opts,
+        modelOverride: "agnes-2.5-flash"
+      });
+    }
     const limitMatch = msg.match(/Limit (\d+)/);
     const usedMatch = msg.match(/Used (\d+)/);
     const requestedMatch = msg.match(/Requested (\d+)/);
@@ -508,42 +568,26 @@ const buildFormatRules = (ctx: SubjectContext): string => {
   const rules: string[] = [];
 
   if (ctx.isExact || ctx.isChemistry) {
-    rules.push("ATURAN RUMUS & SIMBOL MATEMATIKA/FISIKA:\n" +
-      "- Gunakan LaTeX HANYA untuk rumus matematika, persamaan, dan simbol ilmiah.\n" +
-      "- Inline: $...$. Display/block: $$...$$\n" +
-      "- JANGAN gunakan LaTeX untuk angka biasa tanpa konteks rumus (contoh: \"5 siswa\", \"tahun 2024\", \"nomor 3\" tetap teks biasa).\n" +
-      "- GUNAKAN LaTeX untuk: rumus ($v = v_0 + at$), angka+satuan fisika ($10\\\\text{ m/s}^2$), simbol ($\\\\rho$, $\\\\Omega$).\n" +
-      "- NOTASI STANDAR:\n" +
-      "  * Logaritma: ${}^a\\\\log b$\n" +
-      "  * Pecahan: $\\\\frac{a}{b}$\n" +
-      "  * Perkalian: $\\\\times$\n" +
-      "  * Pangkat: $10^{22}$\n" +
-      "  * Koma desimal: $9{,}8$\n" +
-      "  * Derajat: $90^\\\\circ$\n" +
-      "- Di dalam JSON string, backslash ditulis ganda: \"$\\\\\\\\frac{1}{2}$\"");
+    rules.push("RUMUS & SIMBOL (LaTeX):\n" +
+      "- Gunakan LaTeX inline $...$ atau display $$...$$ HANYA untuk rumus/simbol ilmiah, BUKAN angka biasa (contoh: 5 siswa tetap teks biasa).\n" +
+      "- Notasi: Pecahan $\\frac{a}{b}$, Pangkat $10^{22}$, Koma desimal $9{,}8$, Derajat $90^\\circ$, Logaritma ${}^a\\log b$.\n" +
+      "- Di JSON, tulis double-backslash: \"$\\\\frac{1}{2}$\"");
   }
 
   if (ctx.isChemistry) {
-    rules.push(`ATURAN WAJIB KIMIA:
-- Semua rumus kimia WAJIB menggunakan $\\\\ce{...}$ (mhchem package).
-- Senyawa: $\\\\ce{H2SO4}$, $\\\\ce{Ca(OH)2}$, $\\\\ce{NaHCO3}$
-- Reaksi: $\\\\ce{2H2 + O2 -> 2H2O}$
-- Ion: $\\\\ce{Na+}$, $\\\\ce{Fe^{2+}}$, $\\\\ce{SO4^{2-}}$
-- Kesetimbangan: $\\\\ce{N2 + 3H2 <=> 2NH3}$
-- DILARANG menulis reaksi kimia sebagai teks biasa. Contoh SALAH: "2H2 + O2 → 2H2O". Contoh BENAR: "$\\\\ce{2H2 + O2 -> 2H2O}$"
-- Di JSON: "$\\\\\\\\ce{H2SO4}$"`);
+    rules.push("KIMIA: Rumus/senyawa/reaksi kimia WAJIB menggunakan $\\ce{...}$ (contoh: $\\ce{H2SO4}$, $\\ce{2H2 + O2 -> 2H2O}$). Di JSON: \"$\\\\ce{H2SO4}$\"");
   }
 
   if (ctx.isProgramming) {
-    rules.push(`KODE PROGRAM: Gunakan <pre class="ql-syntax" data-language="BAHASA">...</pre> HANYA untuk potongan kode/sintaks program yang sebenarnya. JANGAN gunakan code block untuk teks narasi, penjelasan, atau stimulus bacaan — tulis sebagai teks biasa/HTML.`);
+    rules.push(`KODE: Gunakan <pre class="ql-syntax" data-language="BAHASA">...</pre> HANYA untuk potongan kode program. Penjelasan gunakan teks biasa.`);
   }
   if (ctx.explicitlyWantsArabic) {
-    rules.push(`WAJIB sertakan ayat Al-Quran/Hadits dalam TEKS ARAB ASLI ber-harakat. Format: <p dir="rtl" style="text-align:right;font-size:1.3em;line-height:2;margin:12px 0;">AYAT ARAB</p> lalu terjemahan dalam <p style="font-style:italic;margin:8px 0;color:#555;">Terjemahan: "..."</p>.`);
+    rules.push(`Sertakan ayat Arab ber-harakat: <p dir="rtl" style="text-align:right;font-size:1.3em;line-height:2;margin:12px 0;">AYAT</p> lalu terjemahan di bawahnya.`);
   } else if (ctx.isReligious) {
-    rules.push(`Jika relevan, sertakan ayat Arab ber-harakat dalam <p dir="rtl" style="text-align:right;font-size:1.3em;line-height:2;margin:12px 0;">AYAT</p>. Pisahkan dari teks Latin.`);
+    rules.push(`Jika relevan, sertakan ayat Arab ber-harakat dalam <p dir="rtl" style="text-align:right;font-size:1.3em;">AYAT</p>.`);
   }
 
-  return rules.length > 0 ? rules.join("\n\n") : "PENTING: Tulis soal dalam teks biasa (plain text/HTML). JANGAN gunakan simbol $ atau LaTeX kecuali mapel Matematika/Fisika/Kimia.";
+  return rules.length > 0 ? rules.join("\n\n") : "Tulis soal dalam teks biasa (plain text/HTML) tanpa simbol LaTeX $ jika bukan mapel eksakta.";
 };
 
 // Few-shot examples for different subject types
@@ -561,15 +605,16 @@ CONTOH OUTPUT BENAR (Eksakta):
   return "";
 };
 
-// Sanitasi teks materi agar hemat token dan cepat diproses AI
+// Sanitasi teks materi agar hemat token dan cepat diproses AI (dibatasi max 5000 karakter)
 const cleanMaterialPromptText = (text: string): string => {
   if (!text) return "";
-  return text
+  const cleaned = text
     .replace(/<[^>]*>/g, " ")
     .replace(/\r\n/g, "\n")
     .replace(/[ \t]+/g, " ")
     .replace(/\n\s*\n\s*\n+/g, "\n\n")
     .trim();
+  return cleaned.length > 5000 ? cleaned.slice(0, 5000) + "\n...[Materi diringkas untuk efisiensi token]" : cleaned;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -645,31 +690,73 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
       if (uniqueTexts.size < texts.length * 0.7) return false;
     }
 
-    // For menjodohkan: should have pairs (but allow empty for manual editing)
+    // For menjodohkan: should have pairs (left = premis, right = pasangan kunci)
     if (qType === "menjodohkan") {
-      // Try to extract pairs from choices if pairs is missing (AI sometimes returns wrong format)
-      if ((!q.pairs || !Array.isArray(q.pairs) || q.pairs.length === 0) && q.choices) {
-        // Convert choices to pairs: key=left, text=right
-        const keys = Object.keys(q.choices);
-        if (keys.length >= 2) {
-          q.pairs = keys.map((k, idx) => ({
-            id: String(idx + 1),
-            left: k.toUpperCase() + ". " + (q.choices[k]?.text || ""),
-            right: ""
-          }));
+      const rawText = q.text || q.question || "";
+      const textLines = rawText.split("\n").map((l: string) => l.trim()).filter(Boolean);
+      const listItemsFromText: string[] = [];
+      const cleanMainLines: string[] = [];
+
+      for (const line of textLines) {
+        const match = line.match(/^([a-zA-Z0-9][.)\-:]\s*)(.+)$/);
+        if (match) {
+          listItemsFromText.push(match[2].trim());
+        } else {
+          cleanMainLines.push(line);
         }
       }
+
+      const rawChoiceTexts = q.choices
+        ? Object.values(q.choices).map((c: any) => (typeof c === "object" ? (c.text || "") : String(c)).trim()).filter(Boolean)
+        : [];
+
+      const hasValidPairs = Array.isArray(q.pairs) && q.pairs.length >= 2 && q.pairs.some((p: any) => p.left?.trim() && p.right?.trim());
+
+      if (!hasValidPairs) {
+        const existingPairs = Array.isArray(q.pairs) ? q.pairs : [];
+        if (listItemsFromText.length >= 2 && rawChoiceTexts.length >= 2) {
+          // Salvage: choices adalah item kiri, baris teks adalah definisi kanan!
+          const count = Math.min(listItemsFromText.length, rawChoiceTexts.length);
+          q.pairs = [];
+          for (let i = 0; i < count; i++) {
+            q.pairs.push({
+              id: String(i + 1),
+              left: rawChoiceTexts[i],
+              right: listItemsFromText[i]
+            });
+          }
+          if (cleanMainLines.length > 0) {
+            q.text = cleanMainLines.join("\n").replace(/Definisi:?\s*$/i, "").trim() || "Jodohkan setiap istilah berikut dengan definisinya yang tepat:";
+          }
+        } else if (listItemsFromText.length >= 2) {
+          q.pairs = listItemsFromText.map((item, idx) => {
+            const rawLeft = existingPairs[idx]?.left?.trim() || "";
+            const isNumberMarker = /^\d+[.)\-:]?\s*$/.test(rawLeft);
+            return {
+              id: String(idx + 1),
+              left: (!isNumberMarker && rawLeft) ? rawLeft : (rawChoiceTexts[idx] || `Premis ${idx + 1}`),
+              right: item
+            };
+          });
+          if (cleanMainLines.length > 0) {
+            q.text = cleanMainLines.join("\n").replace(/Definisi:?\s*$/i, "").trim() || "Jodohkan setiap istilah berikut dengan pasangannya yang tepat:";
+          }
+        } else if (q.choices && (!q.pairs || q.pairs.length === 0)) {
+          const keys = Object.keys(q.choices);
+          if (keys.length >= 2) {
+            q.pairs = keys.map((k, idx) => ({
+              id: String(idx + 1),
+              left: (q.choices[k]?.text || k).trim(),
+              right: ""
+            }));
+          }
+        }
+      }
+
       if (q.pairs && Array.isArray(q.pairs)) {
-        const validPairs = q.pairs.filter((p: any) => p.left?.trim() && p.right?.trim());
+        const validPairs = q.pairs.filter((p: any) => p.left?.trim() || p.right?.trim());
         if (validPairs.length >= 2) {
           q.pairs = validPairs.map((p: any, idx: number) => ({
-            id: p.id || String(idx + 1),
-            left: p.left.trim(),
-            right: p.right.trim()
-          }));
-        } else if (q.pairs.length >= 2) {
-          // Keep pairs even if some are incomplete (user can edit in batch modal)
-          q.pairs = q.pairs.map((p: any, idx: number) => ({
             id: p.id || String(idx + 1),
             left: (p.left || "").trim(),
             right: (p.right || "").trim()
@@ -872,35 +959,18 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
 // ═══════════════════════════════════════════════════════════════════════════════
 const buildTaxonomyInstruction = (taxonomy: string): string => {
   const levels = taxonomy.split(",").map(s => s.trim()).filter(Boolean);
-
-  const taxonomyMap: Record<string, string> = {
-    C1: "C1 (Mengingat/Remember): mengingat fakta, definisi, istilah",
-    C2: "C2 (Memahami/Understand): menjelaskan, menafsirkan, merangkum",
-    C3: "C3 (Menerapkan/Apply): menggunakan konsep/rumus dalam situasi baru",
-    C4: "C4 (Menganalisis/Analyze): mengurai informasi, membandingkan, sebab-akibat",
-    C5: "C5 (Mengevaluasi/Evaluate): menilai, mengkritisi, membuat keputusan",
-    C6: "C6 (Mencipta/Create): merancang, merumuskan, menghasilkan ide baru"
-  };
-
   const sorted = [...levels].sort();
-  const isLOTS = sorted.join(",") === "C1,C2,C3";
-  const isHOTS = sorted.join(",") === "C4,C5,C6";
   const isFull = sorted.join(",") === "C1,C2,C3,C4,C5,C6";
-
-  const parts: string[] = [];
-
-  if (isFull) {
-    parts.push("TAKSONOMI BLOOM: Variasi level kognitif C1-C6. Campuran LOTS (C1-C3) dan HOTS (C4-C6).");
-  } else if (isLOTS) {
-    parts.push("TAKSONOMI BLOOM: LOTS (Lower Order Thinking Skills). Semua soal WAJIB level C1-C3: mengingat fakta, memahami konsep, menerapkan prosedur. Soal langsung dan jelas. DILARANG soal analisis/evaluasi/kreasi tingkat tinggi.");
-  } else if (isHOTS) {
-    parts.push("TAKSONOMI BLOOM: HOTS (Higher Order Thinking Skills). Semua soal WAJIB level C4-C6: analisis, evaluasi, atau kreasi. Gunakan stimulus/kasus/skenario. DILARANG soal hafalan/ingatan sederhana.");
-  } else {
-    const selectedLabels = levels.map(l => taxonomyMap[l] || l).join("; ");
-    parts.push(`TAKSONOMI BLOOM: Soal WAJIB pada level berikut: ${selectedLabels}. Variasi di antara level yang dipilih.`);
+  if (isFull || levels.length === 0) {
+    return "TAKSONOMI: Variasi level kognitif C1-C6 (campuran LOTS dan HOTS).";
   }
-
-  return parts.join("\n");
+  if (sorted.join(",") === "C1,C2,C3") {
+    return "TAKSONOMI: LOTS (C1-C3: mengingat fakta, memahami, menerapkan). Soal langsung & jelas.";
+  }
+  if (sorted.join(",") === "C4,C5,C6") {
+    return "TAKSONOMI: HOTS (C4-C6: analisis, evaluasi, kreasi). Gunakan konteks/skenario.";
+  }
+  return `TAKSONOMI: Fokus pada level ${levels.join(", ")}.`;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -990,8 +1060,8 @@ const _generateQuestionsAIInternal = async (
     };
     const typeLabel = typeDesc[type] || "Pilihan Ganda";
 
-    // ═══ PARALLEL BATCH for large counts (>7 soal) ═══
-    if (count > 7 && !isLiteracy) {
+    // ═══ PARALLEL BATCH for large counts (>12 soal) ═══
+    if (count > 12 && !isLiteracy) {
       const batchSize = Math.ceil(count / 2);
       const batches = [batchSize, count - batchSize];
       console.log(`⚡ [PARALLEL] Splitting ${count} into batches: ${batches.join(', ')}`);
@@ -1068,24 +1138,22 @@ const _generateQuestionsAIInternal = async (
         ? `1. Buat stimulus/literasi berdasarkan MATERI REFERENSI yang diberikan, sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Olah materi menjadi artikel/studi kasus menarik yang memuat fakta & informasi dari materi. WAJIB menyinggung isi materi referensi. Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.`
         : `1. Buat stimulus/literasi bertema "${topic}" sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Sajikan sebagai artikel/studi kasus menarik (bukan definisi). Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.`;
 
-      const systemPrompt = `Anda adalah Spesialis Evaluasi Pendidikan. Buat stimulus literasi + ${count} soal ${typeLabel} dalam SATU respons.
+      const systemPrompt = `Spesialis Evaluasi Pendidikan: Buat stimulus literasi + ${count} soal ${typeLabel}.
 Jenjang: ${level}, Mapel: ${subject}, Kesulitan: ${difficulty}.
 ${taxonomyInstruction}
-${objectivesSection}
-INSTRUKSI:
+${objectivesSection}INSTRUKSI:
 ${stimulusInstruction}
-2. Buat ${count} soal ${typeLabel} berdasarkan stimulus.${hasMaterial ? " Soal WAJIB menguji pemahaman terhadap isi materi referensi yang diolah dalam stimulus." : ""} ${litTypeInstructions}
+2. Buat ${count} soal ${typeLabel} berdasarkan stimulus.${hasMaterial ? " Menguji pemahaman materi referensi." : ""} ${litTypeInstructions}
 
-STANDAR KUALITAS SOAL & PENGECOH:
-- Pokok soal (stem) harus lugas dan menguji pemahaman makna bacaan (bukan sekadar mencocokkan kata).
-- Pilihan salah (distractor) WAJIB masuk akal dan mencerminkan kemungkinan salah tafsir siswa, bukan jawaban asal-asalan.
-- Panjang opsi A-E harus seimbang. Kunci jawaban tidak boleh tampak paling panjang atau paling mencolok.
-- Pastikan kunci jawaban mutlak benar berdasarkan bacaan.
-${formatRules ? `\nFORMAT KHUSUS:\n${formatRules}` : ""}${fewShotLit ? `\n${fewShotLit}` : ""}
+STANDAR KUALITAS:
+- Stem kontekstual & lugas menguji pemahaman bacaan.
+- Pengecoh masuk akal (miskonsepsi siswa). Panjang opsi A-E seimbang.
+- Kunci jawaban akurat berdasarkan bacaan.
+${formatRules ? `\nFORMAT:\n${formatRules}` : ""}${fewShotLit ? `\n${fewShotLit}` : ""}
 
-OUTPUT JSON (WAJIB):
+OUTPUT JSON:
 ${litTypeFormat}
-Hanya JSON. Pastikan stimulus SELESAI SEMPURNA (tidak terpotong).`;
+Hanya JSON. Pastikan stimulus selesai sempurna.`;
 
       const materialSection = hasMaterial ? `MATERI REFERENSI (WAJIB jadi dasar stimulus & soal):\n${cleanMaterial}\n\n` : "";
       const topicLower = topic.toLowerCase();
@@ -1094,10 +1162,10 @@ Hanya JSON. Pastikan stimulus SELESAI SEMPURNA (tidak terpotong).`;
         ? `${materialSection}INSTRUKSI: ${topic}\nBuat stimulus berdasarkan materi + ${count} soal sesuai instruksi di atas.`
         : `${materialSection}Topik: "${topic}". Buat stimulus literasi${hasMaterial ? " berdasarkan materi referensi di atas" : ""} + ${count} soal ${typeLabel}.`;
 
-      // Token estimation: stimulus + questions combined (optimized)
-      const stimulusTokens = ({ pendek: 700, sedang: 1300, panjang: 2200 }[passageLength] || 1300);
-      const questionTokens = count * (ctx.isReligious || ctx.explicitlyWantsArabic ? 750 : 450);
-      const totalTokens = Math.min(stimulusTokens + questionTokens + 300, 16000);
+      // Token estimation: stimulus + questions combined (lean & optimized)
+      const stimulusTokens = ({ pendek: 500, sedang: 900, panjang: 1500 }[passageLength] || 900);
+      const questionTokens = count * (ctx.isReligious || ctx.explicitlyWantsArabic ? 500 : 320);
+      const totalTokens = Math.min(stimulusTokens + questionTokens + 250, 6144);
 
       const content = await fetchAI({
         pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
@@ -1169,13 +1237,12 @@ CATATAN: Tulis "text" sebagai kalimat/paragraf dengan [[1]], [[2]], dst untuk ba
 
     const systemPrompt = `Buat ${count} soal ${typeLabel}, ${level} - ${subject}, kesulitan ${difficulty}.
 ${taxonomyInstruction}
-${objectivesSection}${hasMaterial ? "PENTING: Soal WAJIB berdasarkan & menyinggung isi MATERI REFERENSI yang diberikan. Gunakan fakta, konsep, dan informasi dari materi sebagai konteks soal.\n" : ""}Variasi panjang stem.${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? " Opsi A-E ringkas & logis. Kunci jawaban acak." : ""}
+${objectivesSection}${hasMaterial ? "Soal WAJIB berdasarkan materi referensi.\n" : ""}Variasi stem.${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? " Opsi A-E ringkas & logis, kunci acak." : ""}
 
-STANDAR KUALITAS SOAL & PENGECOH:
-- Pokok soal (stem) harus lugas, jelas, dan kontekstual tanpa multitafsir.
-- Pilihan pengecoh (distractor salah) WAJIB masuk akal dan mencerminkan miskonsepsi umum siswa, bukan pilihan konyol/asal-asalan.
-- Panjang opsi A-E harus seimbang dan gramatikal. Kunci jawaban TIDAK BOLEH dibuat paling panjang atau paling mencolok.
-- Pastikan kunci jawaban mutlak benar dan terverifikasi secara ilmiah/konseptual sebelum menyusun JSON.
+STANDAR KUALITAS:
+- Pokok soal kontekstual & tidak multitafsir.
+- Pengecoh masuk akal (miskonsepsi siswa), bukan asal-asalan.
+- Panjang opsi A-E seimbang (kunci tidak mencolok). Kunci jawaban akurat.
 ${formatRules ? `\n${formatRules}\n` : ""}${fewShot ? `\n${fewShot}\n` : ""}
 ${typeOutputFormat}
 Hanya JSON.`;
@@ -1188,22 +1255,22 @@ Hanya JSON.`;
       ? `${materialSection}INSTRUKSI PENGGUNA: ${topic}\nBuat ${count} soal ${typeLabel}, ${level} - ${subject}. Soal harus menyinggung isi materi.`
       : `${materialSection}Topik: "${topic}". Buat ${count} soal ${typeLabel}, ${level} - ${subject}.${hasMaterial ? " Soal WAJIB berdasarkan & menyinggung isi materi referensi di atas." : " Variasi panjang stem & tipe pertanyaan."}`;
 
-    // Token estimation: tailored per question type
+    // Token estimation: tailored & lean per question type
     const typeTokensMap: Record<string, number> = {
-      pilihan_ganda: 420,
-      pilihan_ganda_kompleks: 450,
-      benar_salah: 320,
-      isian_singkat: 220,
-      uraian: 380,
-      menjodohkan: 450,
-      urutkan: 400,
-      drag_drop: 400,
-      klasifikasi: 450,
-      matriks: 420,
-      isian_rumpang: 380
+      pilihan_ganda: 320,
+      pilihan_ganda_kompleks: 360,
+      benar_salah: 220,
+      isian_singkat: 160,
+      uraian: 280,
+      menjodohkan: 350,
+      urutkan: 300,
+      drag_drop: 300,
+      klasifikasi: 350,
+      matriks: 300,
+      isian_rumpang: 280
     };
-    const basePerQuestion = (typeTokensMap[type] || 420) + (ctx.isReligious || ctx.explicitlyWantsArabic ? 350 : 0);
-    const maxTokens = Math.min(Math.max(count * basePerQuestion + 400, 1800), 20000);
+    const basePerQuestion = (typeTokensMap[type] || 320) + (ctx.isReligious || ctx.explicitlyWantsArabic ? 250 : 0);
+    const maxTokens = Math.min(Math.max(count * basePerQuestion + 250, 1000), 5120);
 
     const content = await fetchAI({
       pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
@@ -1573,68 +1640,95 @@ Pastikan JSON valid. Di JSON, backslash ditulis ganda.`;
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🧪 Test AI Connection
 // ═══════════════════════════════════════════════════════════════════════════════
-export const testAIConnection = async (pb: PocketBase, apiKey: string, modelId: string, customUrl?: string, provider: string = "groq"): Promise<{ success: boolean; message: string }> => {
+export const testAIConnection = async (
+  pb: PocketBase,
+  apiKey: string,
+  modelId: string,
+  customUrl?: string,
+  _provider?: string
+): Promise<{ success: boolean; message: string }> => {
   try {
     const actualModelDef = AI_MODELS.find(m => m.id === modelId) || AI_MODELS[0];
-    const finalProvider = provider || actualModelDef.provider;
+    if (!apiKey?.trim()) throw new Error("API Key / Token belum diisi.");
 
-    if (finalProvider === "puter") {
-      try {
-        await loadPuterSDK();
-        const puter = (window as any).puter;
-        if (!puter?.ai?.chat) return { success: false, message: "Puter.js SDK tidak tersedia." };
-        try { const isSignedIn = await puter.auth.isSignedIn(); if (!isSignedIn) await puter.auth.signIn(); } catch { }
-        await puter.ai.chat("Say hi", { model: modelId, max_tokens: 10 });
-        return { success: true, message: `Koneksi Puter Berhasil! (Model: ${modelId})` };
-      } catch (e: any) {
-        return { success: false, message: e.message || "Gagal koneksi ke Puter AI." };
-      }
-    }
+    const isAnthropic = isAnthropicEndpoint(customUrl, apiKey);
+    const baseUrl = resolveCleanUrl(customUrl, isAnthropic);
+    const finalModel = modelId?.trim() || (isAnthropic ? "claude-3-5-sonnet-20241022" : actualModelDef.id);
+    if (!finalModel) throw new Error("ID Model belum diisi.");
 
-    if (finalProvider !== "ollama" && !apiKey) throw new Error("API Key Kosong");
-    const useProxy = finalProvider !== "groq";
-
-    const resolveBaseUrl = (p: string, url: string) => {
-      switch (p) {
-        case "google": return "https://generativelanguage.googleapis.com/v1beta/openai";
-        case "openrouter": return "https://openrouter.ai/api/v1";
-        case "together": return "https://api.together.xyz/v1";
-        case "huggingface": return "https://api-inference.huggingface.co/v1";
-        case "fireworks": return "https://api.fireworks.ai/inference/v1";
-        case "github": return "https://models.inference.ai.azure.com";
-        case "cloudflare": return url ? `https://api.cloudflare.com/client/v4/accounts/${url}/ai/v1` : "";
-        case "custom": return url;
-        case "ollama": return pb.baseUrl + "/api/ai-proxy";
-        case "groq": return "https://api.groq.com/openai/v1";
-        default: return "https://api.groq.com/openai/v1";
-      }
-    };
-
-    const cleanUrl = (base: string) => {
-      if (!base) return "";
-      let url = base.trim().replace(/\/$/, "");
-      return url.includes("/chat/completions") ? url : `${url}/chat/completions`;
-    };
-
-    const baseUrl = cleanUrl(resolveBaseUrl(finalProvider, customUrl || ""));
-    if (!baseUrl) throw new Error("Base URL / Account ID belum lengkap.");
+    const isLocalOrLAN = baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1") || baseUrl.includes(":11434");
+    const useProxy = isLocalOrLAN;
 
     let response;
-    if (useProxy) {
-      response = await fetch(pb.baseUrl + "/api/ai-proxy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
-        body: JSON.stringify({ baseUrl, apiKey, model: modelId, messages: [{ role: "user", content: "hi" }], max_tokens: 5, stream: false })
+    if (isAnthropic) {
+      const headers = {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+        "anthropic-dangerous-direct-browser-access": "true"
+      };
+      const body = JSON.stringify({
+        model: finalModel,
+        max_tokens: 10,
+        messages: [{ role: "user", content: "ping" }]
       });
+
+      if (!useProxy) {
+        try {
+          response = await fetch(baseUrl, { method: "POST", headers, body });
+        } catch {
+          response = await fetch(pb.baseUrl + "/api/ai-proxy", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
+            body: JSON.stringify({
+              baseUrl,
+              apiKey,
+              model: finalModel,
+              messages: [{ role: "user", content: "ping" }],
+              max_tokens: 10,
+              isAnthropic: true
+            })
+          });
+        }
+      } else {
+        response = await fetch(pb.baseUrl + "/api/ai-proxy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
+          body: JSON.stringify({
+            baseUrl,
+            apiKey,
+            model: finalModel,
+            messages: [{ role: "user", content: "ping" }],
+            max_tokens: 10,
+            isAnthropic: true
+          })
+        });
+      }
     } else {
-      response = await fetch(baseUrl, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: modelId, messages: [{ role: "user", content: "hi" }], max_tokens: 5 })
-      });
+      // OpenAI Compatible
+      const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" };
+      const body = JSON.stringify({ model: finalModel, messages: [{ role: "user", content: "hi" }], max_tokens: 5 });
+
+      if (!useProxy) {
+        try {
+          response = await fetch(baseUrl, { method: "POST", headers, body });
+        } catch (directErr) {
+          response = await fetch(pb.baseUrl + "/api/ai-proxy", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
+            body: JSON.stringify({ baseUrl, apiKey, model: finalModel, messages: [{ role: "user", content: "hi" }], max_tokens: 5, stream: false })
+          });
+        }
+      } else {
+        response = await fetch(pb.baseUrl + "/api/ai-proxy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
+          body: JSON.stringify({ baseUrl, apiKey, model: finalModel, messages: [{ role: "user", content: "hi" }], max_tokens: 5, stream: false })
+        });
+      }
     }
 
-    if (response.ok) return { success: true, message: "Koneksi Berhasil!" };
+    if (response.ok) return { success: true, message: `Koneksi Berhasil! (Model: ${finalModel})` };
 
     let errorMessage = "Gagal menghubungi AI";
     try {
@@ -1642,9 +1736,17 @@ export const testAIConnection = async (pb: PocketBase, apiKey: string, modelId: 
       errorMessage = err.error?.message || err.error || err.message || JSON.stringify(err);
     } catch { errorMessage = `Server Error: ${response.status} ${response.statusText}`; }
 
+    if (typeof errorMessage === "string" && errorMessage.includes("LiteLLM Virtual Key expected")) {
+      errorMessage = "Kunci ditolak gateway LiteLLM: Endpoint ini (AppVerse/Kenari) memerlukan Virtual Key yang diawali dengan 'sk-', bukan token master 'kn-'. Silakan generate Virtual Key baru di dashboard AppVerse/Kenari Anda atau gunakan OpenAI / Anthropic / Agnes AI.";
+    }
+
     return { success: false, message: errorMessage };
   } catch (error: any) {
-    return { success: false, message: error.message || "Gagal menghubungi server AI." };
+    let msg = error.message || "Gagal menghubungi server AI.";
+    if (typeof msg === "string" && msg.includes("LiteLLM Virtual Key expected")) {
+      msg = "Kunci ditolak gateway LiteLLM: Endpoint ini memerlukan Virtual Key diawali 'sk-', bukan 'kn-'.";
+    }
+    return { success: false, message: msg };
   }
 };
 
@@ -1736,20 +1838,19 @@ KETENTUAN:
 ${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? "3. OPSI: 5 pilihan (A-E) variatif, logis, diawali huruf kapital." : "3. Pastikan format sesuai tipe soal."}
 4. LITERASI: Jika diminta, masukkan stimulus literasi ke "groupText" (BUKAN "text"). Berikan "groupId" sama untuk soal satu paket literasi.
 
-STANDAR KUALITAS SOAL & PENGECOH:
-- Pokok soal (stem) harus lugas, jelas, dan kontekstual tanpa multitafsir.
-- Pilihan pengecoh (distractor) WAJIB masuk akal dan mencerminkan kemungkinan salah paham terhadap materi, bukan jawaban asal-asalan.
-- Panjang opsi harus seimbang dan gramatikal. Kunci jawaban TIDAK BOLEH dibuat paling panjang atau paling mencolok.
-- Pastikan kunci jawaban mutlak benar berdasarkan isi materi.
+STANDAR KUALITAS:
+- Pokok soal kontekstual & tidak multitafsir berdasarkan materi.
+- Pengecoh masuk akal (miskonsepsi siswa). Panjang opsi seimbang.
+- Kunci jawaban mutlak akurat berdasarkan materi.
 ${formatRules ? `\n${formatRules}` : ""}${fewShot ? `\n${fewShot}` : ""}
 
 ${materialTypeFormat}
 Hanya JSON murni.`;
 
-    const userPrompt = `MATERI:\n\n${cleanMaterial}\n\nBuat ${count} soal ${typeDesc}, kesulitan ${difficulty}. WAJIB variasi pola pertanyaan. Jika ada instruksi spesifik dalam materi, ikuti sebagai prioritas.`;
+    const userPrompt = `MATERI:\n\n${cleanMaterial}\n\nBuat ${count} soal ${typeDesc}, kesulitan ${difficulty}. WAJIB variasi pola pertanyaan.`;
 
-    // Parallel batch for large counts
-    if (count > 7) {
+    // Parallel batch for large counts (>12 soal)
+    if (count > 12) {
       const batchSize = Math.ceil(count / 2);
       const batches = [batchSize, count - batchSize];
 
@@ -1758,7 +1859,7 @@ Hanya JSON murni.`;
           const batchUserPrompt = `MATERI:\n\n${cleanMaterial}\n\nBuat ${batchCount} soal ${typeDesc}, kesulitan ${difficulty}. WAJIB variasi pola pertanyaan.`;
           return fetchAI({
             pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: batchUserPrompt }],
-            maxTokens: batchCount * 600 + 400, temperature: 0.6
+            maxTokens: Math.min(batchCount * 380 + 300, 4096), temperature: 0.6
           }).then(content => {
             const parsed = robustJSONParse(content);
             let raw = parsed.questions || parsed.data || parsed.soal || (Array.isArray(parsed) ? parsed : []);
@@ -1778,7 +1879,7 @@ Hanya JSON murni.`;
 
     const content = await fetchAI({
       pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-      maxTokens: Math.min(Math.max(count * 500 + 400, 1800), 20000), temperature: 0.6
+      maxTokens: Math.min(Math.max(count * 380 + 300, 1000), 5120), temperature: 0.6
     });
 
     const parsed = robustJSONParse(content);
@@ -2116,4 +2217,324 @@ Lakukan revisi dan perbaikan pada pilihan jawaban di atas agar butir soal memenu
     answerKey: correctKeys || (parsed.answerKey ? String(parsed.answerKey).toLowerCase() : answerKey.toLowerCase()),
     pedagogicalTip: parsed.pedagogicalTip || parsed.tips || parsed.saran || ""
   };
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 💬 AI Conversational Question Assistant (Chatbot Drawer)
+// ═══════════════════════════════════════════════════════════════════════════════
+export interface AIChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  questions?: AIGeneratedQuestion[];
+  timestamp: number;
+}
+
+export interface AIChatQuestionRequest {
+  pb: PocketBase;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  currentQuestions?: AIGeneratedQuestion[];
+  context?: {
+    subject?: string;
+    level?: string;
+    examName?: string;
+  };
+  speedMode?: "fast" | "accurate";
+  modelOverride?: string;
+  signal?: AbortSignal;
+}
+
+export interface AIChatQuestionResponse {
+  replyText: string;
+  questions: AIGeneratedQuestion[];
+}
+
+const parseQuestionsFromRawText = (text: string, isExact: boolean = false): { replyText: string; questions: AIGeneratedQuestion[] } => {
+  const questions: AIGeneratedQuestion[] = [];
+  let replyText = "Berikut butir soalnya.";
+
+  const firstQuestionIndex = text.search(/(?:\[Soal\s*\d+|(?:\n|^)\s*(?:Soal\s*)?\d+[\.\)])/i);
+  if (firstQuestionIndex > 0) {
+    replyText = text.slice(0, firstQuestionIndex).trim();
+  }
+
+  const questionBlocks = text
+    .split(/(?=(?:\[Soal\s*\d+.*\]|(?:\n|^)\s*(?:Soal\s*)?\d+[\.\)]))/i)
+    .filter(b => b.trim().length > 0);
+
+  for (const block of questionBlocks) {
+    if (!block.match(/(?:[A-E]\.|\([A-E]\))/i) && !block.match(/\[Soal/i)) continue;
+
+    let cleaned = block
+      .replace(/^\[Soal\s*\d+\s*(?:\([^)]+\))?\]:\s*/i, "")
+      .replace(/^\s*(?:Soal\s*)?\d+[\.\)]\s*/i, "");
+
+    let answerKey = "";
+    const keyMatch = cleaned.match(/(?:Kunci(?:\s*jawaban)?|Jawaban\s*benar|Jawaban):\s*([A-Ea-e])/i);
+    if (keyMatch) {
+      answerKey = keyMatch[1].toLowerCase();
+      cleaned = cleaned.replace(keyMatch[0], "");
+    }
+
+    const choiceSplitMatch = cleaned.search(/(?:\nPilihan:\s*\n?|\n\s*(?:[A-E]\.|\([A-E]\)|[A-E]\))\s+)/i);
+    let questionText = cleaned;
+    let choicesText = "";
+
+    if (choiceSplitMatch !== -1) {
+      questionText = cleaned.slice(0, choiceSplitMatch).trim();
+      choicesText = cleaned.slice(choiceSplitMatch).trim();
+      choicesText = choicesText.replace(/^Pilihan:\s*/i, "");
+    }
+
+    const choices: any = {};
+    if (choicesText) {
+      const choiceRegex = /(?:^|\n)\s*([A-Ea-e])[\.\)]\s*([\s\S]*?)(?=(?:\n\s*[A-Ea-e][\.\)]|$))/g;
+      let m;
+      while ((m = choiceRegex.exec(choicesText)) !== null) {
+        const key = m[1].toLowerCase();
+        let val = m[2].trim();
+        let isCorrect = false;
+        if (val.includes("[KUNCI]") || val.includes("(KUNCI)")) {
+          isCorrect = true;
+          val = val.replace(/\[KUNCI\]|\(KUNCI\)/g, "").trim();
+          if (!answerKey) answerKey = key;
+        }
+        if (answerKey && key === answerKey) {
+          isCorrect = true;
+        }
+        choices[key] = { text: stripUnwantedLatex(val, isExact), isCorrect };
+      }
+    }
+
+    const hasValidChoices = Object.keys(choices).length >= 2;
+    // Hanya anggap sebagai soal pilihan ganda jika minimal ada 2 pilihan (A & B)
+    if (questionText.trim() && hasValidChoices) {
+      questions.push({
+        text: stripUnwantedLatex(questionText.trim(), isExact),
+        type: "pilihan_ganda",
+        choices,
+        answerKey: answerKey || (Object.keys(choices).find(k => choices[k].isCorrect) || "a")
+      });
+    }
+  }
+
+  // Jika tidak ada soal yang berhasil diparsing, jadikan seluruh teks sebagai reply chat biasa
+  if (questions.length === 0) {
+    replyText = text.trim();
+  }
+
+  return { replyText, questions };
+};
+
+export const chatQuestionAssistantAI = async (
+  req: AIChatQuestionRequest
+): Promise<AIChatQuestionResponse> => {
+  const { pb, messages, currentQuestions = [], context = {}, speedMode = "fast", modelOverride, signal } = req;
+  const isFast = speedMode === "fast";
+  const maxTokens = isFast ? 1400 : 2800;
+  const temperature = isFast ? 0.2 : 0.6;
+  const lastUserMsg = [...messages].reverse().find(m => m.role === "user")?.content || "";
+
+  // 🚀 Fast-path: Respon seketika (0ms) untuk sapaan, bantuan, & kemampuan asisten
+  const trimmed = lastUserMsg.trim().toLowerCase();
+  const isGreeting = /^(halo|hai|hi|hey|hei|assalamu['a-z]*|selamat\s+(pagi|siang|sore|malam)|sampurasun|salam)[\s!.,?]*$/i.test(trimmed);
+  const isPing = /^(tes|test|testing|ping|p)[\s!.,?]*$/i.test(trimmed);
+  const isThanks = /^(terima\s*kasih|makasih|thanks|thank\s*you|tq|thx)[\s!.,?]*$/i.test(trimmed);
+  const isHelp = /^(bantuan|help|panduan|cara\s+pakai|menu)[\s!.,?]*$/i.test(trimmed);
+  const isCapabilities = /^(kamu\s+(bisa|dapat)\s+apa|bisa\s+apa\s+aja|bisa\s+apa|fitur|kemampuan|apa\s+yang\s+bisa\s+kamu\s+lakukan|apa\s+saja\s+fitur(mu)?|kamu\s+siapa|siapa\s+kamu|apa\s+ini|anda\s+siapa)[\s!.,?]*$/i.test(trimmed);
+
+  if (isGreeting || isPing || isThanks || isHelp || isCapabilities) {
+    let replyText = "";
+    if (isGreeting) {
+      replyText = "Halo! Saya **Asisten AI Bank Soal Examku**. Saya siap membantu Anda membuat dan menyusun butir soal ujian.\n\nSilakan ketik materi dan jumlah soal yang ingin dibuat, contohnya:\n• *\"Buat 5 soal pilihan ganda tentang Jaringan Komputer SMA\"*\n• *\"Buat 3 butir soal HOTS informatika tentang algoritma percabangan\"*\n• *\"Buat 1 soal menjodohkan tentang perangkat keras input dan output\"*";
+    } else if (isPing) {
+      replyText = "Asisten AI aktif dan siap digunakan! Silakan berikan instruksi materi soal yang ingin dibuat.";
+    } else if (isThanks) {
+      replyText = "Sama-sama! Senang bisa membantu Anda. Jika ingin membuat butir soal lainnya, silakan ketik instruksinya.";
+    } else if (isHelp || isCapabilities) {
+      replyText = `Halo! Saya **Asisten AI Bank Soal Examku**. Saya dirancang untuk membantu pendidik menyusun butir soal ujian berkualitas tinggi secara cepat, terstruktur, dan presisi.
+
+### 📝 1. Pembuatan Beragam Tipe Butir Soal
+• **Pilihan Ganda (1–5 Opsi)**: Pilihan A–D atau A–E lengkap dengan opsi pengecoh & kunci jawaban.
+• **Pilihan Ganda Kompleks**: Mendukung lebih dari satu pilihan jawaban yang benar.
+• **Benar / Salah**: Evaluasi konsep atau analisis pernyataan materi.
+• **Menjodohkan**: Pemetaan premis kiri dan pasangan benar di kolom kanan.
+• **Urutkan**: Mengurutkan tahapan proses, siklus peristiwa, atau logika algoritma.
+• **Isian Singkat & Uraian**: Lengkap dengan rubrik penilaian esai.
+
+### 💡 2. Bantuan Pembelajaran & Wacana
+• **Pembuatan Soal HOTS**: Soal berbasis analisis tingkat tinggi, penalaran kritis, dan studi kasus.
+• **Stimulus Literasi**: Pembuatan wacana bacaan kaya data, artikel sains, atau teks narasi.
+• **Penjelasan Konsep**: Membantu menjelaskan materi atau memberikan contoh soal relevan.
+
+### ⚡ 3. Revisi Cerdas (Multi-Turn Chat)
+• Mengingat butir soal yang baru dibuat sebelumnya.
+• Menyesuaikan opsi (contoh: *"jadikan pilihan A-E"*).
+• Menambah butir soal (contoh: *"tambahkan 2 soal uraian"*).
+• Mengubah tingkat kesulitan (contoh: *"buat tingkat kesulitan lebih menantang"*).
+
+Silakan ketik materi atau topik soal yang ingin dibuat, contohnya:
+👉 *"Buat 5 soal pilihan ganda tentang Jaringan Komputer SMA"*`;
+    }
+    return { replyText, questions: [] };
+  }
+
+  const ctx = detectSubjectContext(context.subject || "", lastUserMsg);
+  const formatRules = buildFormatRules(ctx);
+
+  // Ringkas soal yang ada agar hemat token dan respon kilat
+  const existingQuestionsSnippet = currentQuestions.length > 0
+    ? `\nDRAFT SOAL AKTIF:\n` +
+    currentQuestions.map((q, idx) => `${idx + 1}. [${q.type}] ${q.text.slice(0, 100)}... (Kunci: ${q.answerKey || "-"})`).join("\n")
+    : "";
+
+  // Deteksi jumlah soal yang diminta user agar alokasi token hemat & respon super instan
+  const isSingleQuestion = /\b(1|satu)\s*(butir\s*)?soal\b/i.test(lastUserMsg);
+  const calculatedTokens = isSingleQuestion ? 1200 : (isFast ? 2000 : 3500);
+
+  const systemPrompt = `Anda adalah Asisten Pembuat Soal Ujian Cepat & Presisi.
+Mapel: ${context.subject || "Umum"}, Jenjang: ${context.level || "Umum"}.
+
+WAJIB FORMAT JSON OBJECT:
+{
+  "reply": "Siap.",
+  "questions": [
+    ...butir soal sesuai tipe yang diminta...
+  ]
+}
+
+PANDUAN PEMBEDA PERCAKAPAN & PEMBUATAN SOAL:
+A. JIKA PENGGUNA MEMINTA MEMBUAT ATAU MENGUBAH SOAL (misal: "buat 5 soal...", "buatkan soal...", "soal pilihan ganda...", "jadikan A-E", dsb.):
+   - Buat butir soal terstruktur di array 'questions'.
+   - Isi 'reply': 'Berikut butir soalnya.'.
+B. JIKA PENGGUNA BERTANYA UMUM, MEMINTA PENJELASAN KONSEP, ATAU MENANYAKAN KEMAMPUAN (BUKAN meminta membuat soal):
+   - Set array 'questions': [] (WAJIB KOSONG).
+   - Tulis jawaban penjelasan yang ramah, sangat rapi, dan terstruktur dengan format Markdown standar (gunakan ### untuk judul bagian, bullet points •, dan **bold**) di dalam field 'reply'.
+
+PANDUAN FORMAT STRUKTUR BUTIR SOAL SESUAI PERMINTAAN:
+1. Pilihan Ganda (type: "pilihan_ganda"):
+   {"text": "Pertanyaan pokok...", "type": "pilihan_ganda", "choices": {"a": {"text": "...", "isCorrect": false}, "b": {"text": "...", "isCorrect": true}, "c": {"text": "...", "isCorrect": false}, "d": {"text": "...", "isCorrect": false}}, "answerKey": "b"}
+   Jika diminta pilihan A-E (5 pilihan), wajib sediakan 5 opsi ("a", "b", "c", "d", "e").
+
+2. Pilihan Ganda Kompleks (type: "pilihan_ganda_kompleks"):
+   {"text": "Pernyataan/pertanyaan...", "type": "pilihan_ganda_kompleks", "choices": {"a": {"text": "...", "isCorrect": true}, "b": {"text": "...", "isCorrect": false}, "c": {"text": "...", "isCorrect": true}, "d": {"text": "...", "isCorrect": false}}, "answerKey": "a,c"}
+
+3. Benar / Salah (type: "benar_salah"):
+   {"text": "Pernyataan yang harus dinilai...", "type": "benar_salah", "choices": {"a": {"text": "Benar", "isCorrect": true}, "b": {"text": "Salah", "isCorrect": false}}, "answerKey": "a"}
+
+4. Menjodohkan (type: "menjodohkan"):
+   WAJIB array 'pairs' (left = premis kiri, right = jawaban benar kanan).
+   DILARANG menaruh daftar definisi di dalam 'text'! 'text' hanya perintah singkat.
+   {"text": "Jodohkan komponen elektronika berikut dengan fungsinya yang tepat:", "type": "menjodohkan", "pairs": [{"id": "1", "left": "Induktor", "right": "Menyimpan energi dalam medan magnet"}, {"id": "2", "left": "Dioda", "right": "Menyearahkan arus listrik"}, {"id": "3", "left": "Kapasitor", "right": "Menyimpan energi dalam medan listrik"}]}
+
+5. Urutkan (type: "urutkan"):
+   {"text": "Urutkan tahapan metode ilmiah berikut dari awal hingga akhir:", "type": "urutkan", "items": [{"id": "1", "text": "Merumuskan masalah"}, {"id": "2", "text": "Menyusun hipotesis"}, {"id": "3", "text": "Melakukan eksperimen"}]}
+
+6. Isian Singkat (type: "isian_singkat"):
+   {"text": "Komponen elektronika yang berfungsi menghambat arus listrik adalah...", "type": "isian_singkat", "answerKey": "resistor"}
+
+7. Uraian (type: "uraian"):
+   {"text": "Jelaskan prinsip kerja transformator...", "type": "uraian", "answerKey": "Rubrik: Menjelaskan induksi elektromagnetik dan perbandingan lilitan"}
+
+KEMAMPUAN PERCAKAPAN MULTI-TURN & FOLLOW-UP:
+- Anda mengingat dan memahami seluruh riwayat percakapan dan butir soal di atas.
+- Jika pengguna meminta perubahan atau tindak lanjut dari percakapan sebelumnya (misal: "jadikan A-E", "tambah opsi E", "ubah ke tipe menjodohkan", "buat kunci pembahasan", "ganti materi", atau "buat soal serupa/sejenis"):
+  RUJUK & GUNAKAN konteks soal sebelumnya dari riwayat percakapan untuk memenuhi permintaan pengguna dengan presisi!
+
+ATURAN ULTRA KILAT:
+1. LANGSUNG HASILKAN JSON! Jangan tulis teks pembuka, jangan gunakan tag proses berpikir (<think>), jangan tulis pembahasan.
+2. Teks 'reply' cukup 1-3 kata saja (misal: "Siap." atau "Berikut soalnya.").
+3. Pertanyaan dan pilihan to-the-point, akurat, dan bersih.
+4. LaTeX: Gunakan $...$ HANYA jika berupa rumus eksakta.
+${formatRules ? `\nFORMAT: ${formatRules}` : ""}
+${existingQuestionsSnippet}
+Kembalikan HANYA JSON murni tanpa pembungkus narasi apapun.`;
+
+  const conversationHistory = messages.slice(-6).map(m => ({
+    role: m.role,
+    content: m.content
+  }));
+
+  let content = "";
+  try {
+    content = await fetchAI({
+      pb,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...conversationHistory
+      ],
+      maxTokens: calculatedTokens,
+      temperature,
+      jsonMode: true,
+      modelOverride,
+      signal
+    });
+  } catch (err: any) {
+    if (err.message?.includes("AI_RATE_LIMIT") || err.name === "AbortError") throw err;
+    // Hanya retry tanpa jsonMode jika provider mengembalikan error response_format
+    if (err.message?.includes("response_format") || err.message?.includes("json_object")) {
+      content = await fetchAI({
+        pb,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...conversationHistory
+        ],
+        maxTokens: calculatedTokens,
+        temperature,
+        jsonMode: false,
+        modelOverride,
+        signal
+      });
+    } else {
+      throw err;
+    }
+  }
+
+  let replyText = "";
+  let questions: AIGeneratedQuestion[] = [];
+
+  try {
+    const parsed = robustJSONParse(content);
+    if (parsed) {
+      replyText = parsed.reply || parsed.message || parsed.text || "";
+      const rawQuestions = parsed.questions || parsed.data || (Array.isArray(parsed) ? parsed : []);
+      if (rawQuestions.length > 0) {
+        questions = validateQuestions(rawQuestions, ctx.isExact || ctx.isChemistry);
+      }
+    }
+  } catch (parseErr) {
+    // Fallback ekstraksi regex jika model menyelipkan markdown
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      try {
+        const parsed = robustJSONParse(jsonMatch[1]);
+        replyText = parsed.reply || content.replace(/```(?:json)?\s*[\s\S]*?\s*```/, "").trim();
+        const rawQuestions = parsed.questions || parsed.data || (Array.isArray(parsed) ? parsed : []);
+        if (rawQuestions.length > 0) {
+          questions = validateQuestions(rawQuestions, ctx.isExact || ctx.isChemistry);
+        }
+      } catch { }
+    } else {
+      replyText = content.trim();
+    }
+  }
+
+  // 🩹 Fallback Cerdas: Jika model menghasilkan teks bebas bukan JSON murni
+  if (questions.length === 0 && content) {
+    const fallbackResult = parseQuestionsFromRawText(content, ctx.isExact || ctx.isChemistry);
+    if (fallbackResult.questions.length > 0) {
+      questions = fallbackResult.questions;
+      if (fallbackResult.replyText) {
+        replyText = fallbackResult.replyText;
+      }
+    }
+  }
+
+  if (!replyText) {
+    replyText = questions.length > 0
+      ? `Saya telah menyusun ${questions.length} butir soal untuk Anda:`
+      : "Permintaan Anda telah diproses.";
+  }
+
+  return { replyText, questions };
 };

@@ -334,12 +334,12 @@ const Sidebar = () => {
     }
 
     list.push(
-      { to: "/unduh", label: "App Siswa", icon: Smartphone, external: true },
+      { to: "/unduh", label: `App ${terminology.student}`, icon: Smartphone, external: true },
       { to: "/admin/panduan", label: "Panduan", icon: HelpCircle }
     );
 
     return list;
-  }, [isAdmin, unpaidCount]);
+  }, [isAdmin, unpaidCount, terminology]);
 
   if (loading) return <SidebarSkeleton isCollapsed={isCollapsed} />;
 
@@ -686,7 +686,7 @@ const Sidebar = () => {
               </TooltipTrigger>
               <TooltipContent side="right">
                 <p className="font-semibold text-xs">Master Data</p>
-                <p className="text-[10px] text-neutral-400">{examData.students.length} Siswa</p>
+                <p className="text-[10px] text-neutral-400">{examData.students.length} {terminology.student}</p>
               </TooltipContent>
             </Tooltip>
           )}
@@ -841,7 +841,7 @@ const Sidebar = () => {
               </button>
               <div className="font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5 pr-4">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span className="truncate">Exambro Siswa</span>
+                <span className="truncate">Exambro {terminology.student}</span>
               </div>
               <div className="flex items-center gap-2 my-1 text-neutral-400">
                 <Sparkles className="h-3 w-3 text-emerald-500" />
@@ -858,7 +858,7 @@ const Sidebar = () => {
                 className="mt-2 w-full flex items-center justify-center gap-1.5 py-1 px-2 text-[11px] font-medium bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-750 text-neutral-700 dark:text-neutral-200 rounded transition-colors shadow-2xs"
               >
                 <Download className="h-3 w-3 text-neutral-500" />
-                <span>Unduh APK Siswa</span>
+                <span>Unduh APK {terminology.student}</span>
               </a>
             </div>
           )}

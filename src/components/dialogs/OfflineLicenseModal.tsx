@@ -22,7 +22,7 @@ import {
   Building2,
   ChevronDown
 } from "lucide-react";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Input } from "../ui/input";
 import { useToast } from "../ui/toast";
 import { generateOfflineLicense, OfflineLicensePayload } from "../../utils/offlineLicenseHelper";
@@ -408,14 +408,16 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
             </div>
           </div>
 
-          <Button
+          <NeonButton
             type="button"
+            variant="primary"
+            color="purple"
             disabled={isGenerating || !activeName || !activeSlug}
             onClick={handleGenerate}
-            className="w-full h-10 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            className="w-full"
           >
-            <Sparkles size={14} /> {isGenerating ? "Menandatangani Kriptografi..." : "Terbitkan & Tandatangani Lisensi RSA-2048"}
-          </Button>
+            <Sparkles size={14} className="mr-2" /> {isGenerating ? "Menandatangani Kriptografi..." : "Terbitkan & Tandatangani Lisensi RSA-2048"}
+          </NeonButton>
 
           {/* Kotak Hasil Kode Lisensi */}
           {generatedLicense && (
@@ -437,34 +439,36 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
               />
 
               <div className="flex flex-wrap gap-2">
-                <Button
+                <NeonButton
                   type="button"
+                  variant="dark"
                   size="sm"
                   onClick={handleCopy}
-                  className="flex-1 h-9 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center gap-1.5"
+                  className="flex-1"
                 >
-                  {isCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                  {isCopied ? <Check size={13} className="text-emerald-400 mr-1.5" /> : <Copy size={13} className="mr-1.5" />}
                   Salin Kode
-                </Button>
+                </NeonButton>
 
-                <Button
+                <NeonButton
                   type="button"
                   variant="outline"
+                  color="purple"
                   size="sm"
                   onClick={handleDownloadFile}
-                  className="h-9 px-3 rounded-xl text-xs font-bold border-purple-200 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-950 flex items-center gap-1.5"
                 >
-                  <Download size={13} /> Unduh .key
-                </Button>
+                  <Download size={13} className="mr-1.5" /> Unduh .key
+                </NeonButton>
 
-                <Button
+                <NeonButton
                   type="button"
+                  variant="primary"
+                  color="emerald"
                   size="sm"
                   onClick={handleSendWA}
-                  className="h-9 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5"
                 >
-                  <MessageCircle size={13} /> Kirim WhatsApp
-                </Button>
+                  <MessageCircle size={13} className="mr-1.5" /> Kirim WhatsApp
+                </NeonButton>
               </div>
             </div>
           )}

@@ -5,7 +5,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "../ui/dialog";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Input } from "../ui/input";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { useTenant } from "../../context/TenantContext";
@@ -17,17 +17,16 @@ import {
   Camera,
   Trash2,
   Edit,
+  Settings,
   KeyRound,
   LogOut,
   ChevronRight,
-  User,
   MapPin,
   Calendar,
   Lock,
   Loader2,
   AlertCircle,
   CheckCircle2,
-  Info,
 } from "lucide-react";
 
 interface StudentProfileDialogProps {
@@ -67,19 +66,23 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
   onChangePassword,
   onLogout,
 }) => {
-  const { student, updateProfile, logoutStudent } = useStudentAuth();
+  const { student, updateProfile, logoutStudent, changePassword } = useStudentAuth();
   const { terminology, school } = useTenant();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // View mode: 'view' (Flutter profile card) | 'edit' (Form edit biodata)
-  const [viewMode, setViewMode] = useState<"view" | "edit">("view");
+  // View mode: 'view' (Flutter profile card) | 'edit' (Form edit biodata) | 'password' (Ganti Password)
+  const [viewMode, setViewMode] = useState<"view" | "edit" | "password">("view");
 
   // Form states for editing
   const [photoValue, setPhotoValue] = useState<string>("");
   const [gender, setGender] = useState<"L" | "P">("L");
   const [birthPlace, setBirthPlace] = useState<string>("");
   const [birthDate, setBirthDate] = useState<string>("");
+
+  // Form states for password
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   // UI state
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -94,6 +97,8 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
       setGender((student.gender === "P" ? "P" : "L") as "L" | "P");
       setBirthPlace(student.birthPlace || "");
       setBirthDate(student.birthDate || "");
+      setNewPassword("");
+      setConfirmPassword("");
       setErrorMessage(null);
       setSuccessMessage(null);
       setViewMode("view");
@@ -199,6 +204,37 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
     }
   };
 
+  const handleSavePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      setErrorMessage("Password minimal 6 karakter.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrorMessage("Konfirmasi password baru tidak cocok.");
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await changePassword(newPassword);
+      setSuccessMessage("Password berhasil diubah.");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => {
+        setSuccessMessage(null);
+        setViewMode("view");
+      }, 1000);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Gagal mengganti password.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleLogoutClick = () => {
     onClose();
     if (onLogout) {
@@ -208,19 +244,12 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
     }
   };
 
-  const handleChangePasswordClick = () => {
-    onClose();
-    if (onChangePassword) {
-      onChangePassword();
-    }
-  };
-
   // Inisial untuk avatar lingkaran
   const studentInitial = (student?.name || "S").trim().charAt(0).toUpperCase();
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isSaving && !open && onClose()}>
-      <DialogContent className="w-full max-w-md sm:rounded-[2rem] bg-white dark:bg-slate-950 p-0 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+      <DialogContent className="w-full max-w-md sm:rounded-[2rem] bg-white dark:bg-neutral-850 p-0 border border-neutral-200/80 dark:border-neutral-800 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
         {/* Hidden File Input */}
         <input
           ref={fileInputRef}
@@ -232,14 +261,14 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
         />
 
         {/* ── App Bar Gaya Flutter ── */}
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-850 flex items-center justify-between shrink-0 bg-white dark:bg-slate-950 sticky top-0 z-10">
+        <div className="px-5 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between shrink-0 bg-white dark:bg-neutral-850 sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            {viewMode === "edit" ? (
+            {viewMode !== "view" ? (
               <button
                 type="button"
                 onClick={() => setViewMode("view")}
                 disabled={isSaving}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all cursor-pointer"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-95 transition-all cursor-pointer"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -247,14 +276,14 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all cursor-pointer"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-95 transition-all cursor-pointer"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
             )}
 
-            <DialogTitle className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-              {viewMode === "edit" ? "Edit Biodata" : "Profil"}
+            <DialogTitle className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white">
+              {viewMode === "edit" ? "Edit Biodata" : viewMode === "password" ? "Ganti Password" : "Profil"}
             </DialogTitle>
           </div>
 
@@ -262,7 +291,7 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -294,7 +323,7 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
           <div className="flex flex-col items-center text-center pt-2">
             <div className="relative">
               {/* Lingkaran Avatar */}
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-emerald-100 dark:bg-emerald-950/70 border-4 border-white dark:border-slate-900 shadow-md flex items-center justify-center overflow-hidden">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-emerald-100 dark:bg-emerald-950/70 border-4 border-white dark:border-neutral-800 shadow-md flex items-center justify-center overflow-hidden">
                 {photoValue ? (
                   <img
                     src={photoValue}
@@ -315,7 +344,7 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploadingPhoto || isSaving}
                   title="Ganti Foto Profil"
-                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-90 text-white flex items-center justify-center shadow-md transition-transform border-2 border-white dark:border-slate-900 cursor-pointer"
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-90 text-white flex items-center justify-center shadow-md transition-transform border-2 border-white dark:border-neutral-800 cursor-pointer"
                 >
                   {isUploadingPhoto ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -327,12 +356,12 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
             </div>
 
             {/* Nama & Badge Status */}
-            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight mt-3">
+            <h3 className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tracking-tight mt-3">
               {student?.name || "Peserta Didik"}
             </h3>
 
-            <div className="mt-1.5 inline-flex items-center px-3 py-1 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/60 rounded-full text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
-              {terminology.student} • {student?.className || "Rombel"}
+            <div className="mt-1.5 inline-flex items-center px-3.5 py-1 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/60 rounded-full text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
+              {terminology.student || "SISWA"} • {student?.className || "Rombel"}
             </div>
 
             {/* Tombol Hapus Foto (jika ada foto & di view mode) */}
@@ -357,51 +386,51 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
               {/* Grup Informasi Biodata (Card List Flutter Style) */}
               <div className="space-y-2">
                 {/* Username / NISN */}
-                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 dark:text-slate-400 font-medium">
-                    Username ({terminology.id})
+                <div className="bg-neutral-100/90 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-800 rounded-2xl px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">
+                    Username ({terminology.id || "NISN"})
                   </span>
-                  <span className="font-bold text-slate-800 dark:text-slate-100 font-mono">
+                  <span className="font-bold text-neutral-800 dark:text-neutral-100 font-mono">
                     {student?.nisn || "-"}
                   </span>
                 </div>
 
                 {/* Nama Lengkap */}
-                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 dark:text-slate-400 font-medium">
+                <div className="bg-neutral-100/90 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-800 rounded-2xl px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">
                     Nama Lengkap
                   </span>
-                  <span className="font-bold text-slate-800 dark:text-slate-100 truncate max-w-[200px]">
+                  <span className="font-bold text-neutral-800 dark:text-neutral-100 truncate max-w-[200px]">
                     {student?.name || "-"}
                   </span>
                 </div>
 
                 {/* Kelas */}
-                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 dark:text-slate-400 font-medium">
-                    {terminology.class}
+                <div className="bg-neutral-100/90 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-800 rounded-2xl px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">
+                    {terminology.class || "Kelas (Rombel)"}
                   </span>
-                  <span className="font-bold text-slate-800 dark:text-slate-100">
+                  <span className="font-bold text-neutral-800 dark:text-neutral-100">
                     {student?.className || "-"}
                   </span>
                 </div>
 
                 {/* Jenis Kelamin */}
-                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 dark:text-slate-400 font-medium">
+                <div className="bg-neutral-100/90 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-800 rounded-2xl px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">
                     Jenis Kelamin
                   </span>
-                  <span className="font-bold text-slate-800 dark:text-slate-100">
+                  <span className="font-bold text-neutral-800 dark:text-neutral-100">
                     {gender === "P" ? "Perempuan" : "Laki-laki"}
                   </span>
                 </div>
 
                 {/* Tempat, Tanggal Lahir */}
-                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 dark:text-slate-400 font-medium">
+                <div className="bg-neutral-100/90 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-800 rounded-2xl px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">
                     Tempat, Tgl Lahir
                   </span>
-                  <span className="font-bold text-slate-800 dark:text-slate-100 truncate max-w-[190px]">
+                  <span className="font-bold text-neutral-800 dark:text-neutral-100 truncate max-w-[190px]">
                     {birthPlace || birthDate
                       ? `${birthPlace || "-"}, ${formatIndonesianDate(birthDate)}`
                       : "-"}
@@ -410,56 +439,54 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
               </div>
 
               {/* ── Menu Aksi ListTile Gaya Flutter ── */}
-              <div className="space-y-2 pt-2">
+              <div className="space-y-2.5 pt-2">
                 {/* Tombol Edit Biodata */}
                 {!readOnly && (
                   <button
                     type="button"
                     onClick={() => setViewMode("edit")}
-                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-2xl px-4 py-3.5 flex items-center justify-between transition-all shadow-xs group cursor-pointer active:scale-[0.99]"
+                    className="w-full bg-white dark:bg-neutral-850 border border-neutral-200/90 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 rounded-2xl px-5 py-4 flex items-center justify-between transition-all shadow-2xs group cursor-pointer active:scale-[0.99]"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                        <Edit className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        Edit Biodata
+                    <div className="flex items-center gap-3.5">
+                      <Edit className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
+                      <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+                        Edit Profil
                       </span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                    <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 transition-transform" />
                   </button>
                 )}
 
-                {/* Tombol Ganti Password */}
-                {onChangePassword && (
-                  <button
-                    type="button"
-                    onClick={handleChangePasswordClick}
-                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-2xl px-4 py-3.5 flex items-center justify-between transition-all shadow-xs group cursor-pointer active:scale-[0.99]"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                        <KeyRound className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        Ganti Password
-                      </span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
-                )}
+                {/* Tombol Pengaturan / Ganti Password */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onChangePassword) {
+                      onChangePassword();
+                    } else {
+                      setViewMode("password");
+                    }
+                  }}
+                  className="w-full bg-white dark:bg-neutral-850 border border-neutral-200/90 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 rounded-2xl px-5 py-4 flex items-center justify-between transition-all shadow-2xs group cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <Settings className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
+                    <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+                      Pengaturan
+                    </span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 transition-transform" />
+                </button>
 
                 {/* Tombol Keluar / Logout */}
                 <button
                   type="button"
                   onClick={handleLogoutClick}
-                  className="w-full bg-white dark:bg-slate-950 border border-rose-100 dark:border-rose-950/60 hover:bg-rose-50/50 dark:hover:bg-rose-950/30 rounded-2xl px-4 py-3.5 flex items-center justify-between transition-all shadow-xs group cursor-pointer active:scale-[0.99]"
+                  className="w-full bg-white dark:bg-neutral-850 border border-neutral-200/90 dark:border-neutral-800 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 rounded-2xl px-5 py-4 flex items-center justify-between transition-all shadow-2xs group cursor-pointer active:scale-[0.99]"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-500 flex items-center justify-center">
-                      <LogOut className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                  <div className="flex items-center gap-3.5">
+                    <LogOut className="w-5 h-5 text-rose-500" />
+                    <span className="text-sm font-semibold text-rose-600 dark:text-rose-400">
                       Keluar
                     </span>
                   </div>
@@ -476,7 +503,7 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
             <form onSubmit={handleSaveBiodata} className="space-y-4 pt-1">
               {/* Jenis Kelamin */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 text-left">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5 text-left">
                   Jenis Kelamin
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -486,13 +513,13 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
                     onClick={() => setGender("L")}
                     className={`min-h-[44px] flex items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
                       gender === "L"
-                        ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-xs"
-                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-850"
+                        ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-2xs"
+                        : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                     }`}
                   >
                     <span
                       className={`w-2 h-2 rounded-full ${
-                        gender === "L" ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"
+                        gender === "L" ? "bg-emerald-500" : "bg-neutral-300 dark:bg-neutral-700"
                       }`}
                     />
                     <span>Laki-laki</span>
@@ -504,13 +531,13 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
                     onClick={() => setGender("P")}
                     className={`min-h-[44px] flex items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
                       gender === "P"
-                        ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-xs"
-                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-850"
+                        ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-2xs"
+                        : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                     }`}
                   >
                     <span
                       className={`w-2 h-2 rounded-full ${
-                        gender === "P" ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"
+                        gender === "P" ? "bg-emerald-500" : "bg-neutral-300 dark:bg-neutral-700"
                       }`}
                     />
                     <span>Perempuan</span>
@@ -520,7 +547,7 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
 
               {/* Tempat Lahir */}
               <div className="text-left">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                   Tempat Lahir
                 </label>
                 <div className="relative">
@@ -530,15 +557,15 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
                     value={birthPlace}
                     onChange={(e) => setBirthPlace(e.target.value)}
                     disabled={isSaving}
-                    className="h-11 pl-9 rounded-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    className="h-11 pl-9 rounded-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-xs text-neutral-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                   />
-                  <MapPin className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                  <MapPin className="absolute left-3 top-3.5 h-4 w-4 text-neutral-400" />
                 </div>
               </div>
 
               {/* Tanggal Lahir */}
               <div className="text-left">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                   Tanggal Lahir
                 </label>
                 <div className="relative">
@@ -547,46 +574,111 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
                     disabled={isSaving}
-                    className="h-11 pl-9 rounded-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    className="h-11 pl-9 rounded-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-xs text-neutral-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                   />
-                  <Calendar className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                  <Calendar className="absolute left-3 top-3.5 h-4 w-4 text-neutral-400" />
                 </div>
               </div>
 
               {/* Info Terkunci Sekolah */}
-              <div className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-start gap-2 text-left">
-                <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400" />
+              <div className="p-3 bg-neutral-50 dark:bg-neutral-900/60 rounded-xl border border-neutral-200/60 dark:border-neutral-800 text-[11px] text-neutral-500 dark:text-neutral-400 flex items-start gap-2 text-left">
+                <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-neutral-400" />
                 <span>
-                  Nama, NISN, dan Rombel dikunci oleh sekolah demi validitas ujian. Hubungi proktor/operator jika terdapat kekeliruan data resmi.
+                  Nama, {terminology.id}, dan {terminology.class} dikunci oleh {terminology.school.toLowerCase()} demi validitas ujian. Hubungi proktor/operator jika terdapat kekeliruan data resmi.
                 </span>
               </div>
 
               {/* Aksi Form Edit */}
               <div className="pt-2 flex gap-2">
-                <Button
+                <NeonButton
                   type="button"
-                  variant="outline"
+                  variant="secondary"
+                  size="md"
                   onClick={() => setViewMode("view")}
                   disabled={isSaving}
-                  className="flex-1 h-11 rounded-xl text-xs font-semibold border-slate-200 dark:border-slate-750 cursor-pointer"
+                  className="flex-1"
                 >
                   Batal
-                </Button>
+                </NeonButton>
 
-                <Button
+                <NeonButton
                   type="submit"
+                  variant="primary"
+                  size="md"
                   disabled={isSaving}
-                  className="flex-1 h-11 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                  loading={isSaving}
+                  className="flex-1"
                 >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      <span>Menyimpan...</span>
-                    </>
-                  ) : (
-                    <span>Simpan Biodata</span>
-                  )}
-                </Button>
+                  Simpan Biodata
+                </NeonButton>
+              </div>
+            </form>
+          )}
+
+          {/* ══════════════════════════════════════════════
+              MODE 3: FORMULIR GANTI PASSWORD
+              ══════════════════════════════════════════════ */}
+          {viewMode === "password" && (
+            <form onSubmit={handleSavePassword} className="space-y-4 pt-1">
+              {/* Password Baru */}
+              <div className="text-left">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                  Password Baru
+                </label>
+                <div className="relative">
+                  <Input
+                    type="password"
+                    placeholder="Minimal 6 karakter"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    disabled={isSaving}
+                    className="h-11 pl-9 rounded-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-xs text-neutral-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  />
+                  <KeyRound className="absolute left-3 top-3.5 h-4 w-4 text-neutral-400" />
+                </div>
+              </div>
+
+              {/* Konfirmasi Password Baru */}
+              <div className="text-left">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                  Konfirmasi Password Baru
+                </label>
+                <div className="relative">
+                  <Input
+                    type="password"
+                    placeholder="Ulangi password baru"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={isSaving}
+                    className="h-11 pl-9 rounded-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-xs text-neutral-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  />
+                  <Lock className="absolute left-3 top-3.5 h-4 w-4 text-neutral-400" />
+                </div>
+              </div>
+
+              {/* Aksi Form Password */}
+              <div className="pt-2 flex gap-2">
+                <NeonButton
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  onClick={() => setViewMode("view")}
+                  disabled={isSaving}
+                  className="flex-1"
+                >
+                  Batal
+                </NeonButton>
+
+                <NeonButton
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  disabled={isSaving}
+                  loading={isSaving}
+                  className="flex-1"
+                >
+                  Simpan Password
+                </NeonButton>
               </div>
             </form>
           )}

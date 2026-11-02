@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "../ui/dialog";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { KeyRound, AlertTriangle } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useTenant } from "../../context/TenantContext";
@@ -158,22 +158,24 @@ export const ResetStudentPasswordDialog = ({
 
         {/* Footer */}
         <div className="p-3.5 bg-neutral-50/70 dark:bg-neutral-900/50 border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-2">
-          <Button
+          <NeonButton
             type="button"
-            variant="outline"
+            variant="secondary"
+            size="sm"
             onClick={() => onOpenChange(false)}
-            className="rounded-xl border-neutral-200 dark:border-neutral-800 h-9 text-xs"
           >
             Batal
-          </Button>
-          <Button
+          </NeonButton>
+          <NeonButton
             type="button"
+            variant="primary"
+            color="amber"
+            size="sm"
             disabled={resetScope === "class" && !resetSelectedClassId}
             onClick={handleExecute}
-            className="bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold rounded-xl h-9 text-xs shadow-md shadow-amber-600/25 disabled:opacity-40"
           >
             Proses Reset Password
-          </Button>
+          </NeonButton>
         </div>
       </DialogContent>
     </Dialog>

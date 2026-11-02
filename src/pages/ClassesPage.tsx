@@ -256,7 +256,7 @@ const ClassesPage = () => {
   };
 
   const handleExportClasses = () => {
-    exportClassToExcel({ classes, filename: `data-${terminology.class.toLowerCase()}.xlsx` });
+    exportClassToExcel({ classes, terminology, filename: `data-${terminology.class.toLowerCase().replace(/[\/\s]+/g, "-")}.xlsx` });
   };
 
   const handleBatchDelete = async () => {
@@ -419,7 +419,7 @@ const ClassesPage = () => {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
                     <DropdownMenuItem 
-                      onClick={() => downloadClassImportTemplate()} 
+                      onClick={() => downloadClassImportTemplate(terminology)} 
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                     >
                       <FileText className="h-4 w-4 text-neutral-500" />

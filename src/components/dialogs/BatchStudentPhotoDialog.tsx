@@ -14,7 +14,7 @@ import {
   FileImage
 } from "lucide-react";
 import { Dialog, DialogContent } from "../ui/dialog";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Badge } from "../ui/badge";
 import type { StudentData, ClassData } from "../../types/exam";
 
@@ -269,38 +269,40 @@ export const BatchStudentPhotoDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isUploading && onClose()}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[90vh] max-h-[92vh] p-0 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
-        {/* Header Modal */}
-        <div className="p-4 sm:p-5 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
+      <DialogContent className="max-w-4xl w-[95vw] h-[90vh] max-h-[92vh] p-0 flex flex-col overflow-hidden bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl rounded-2xl">
+        {/* Header Modal Neon */}
+        <div className="p-4 sm:p-5 bg-neutral-50/60 dark:bg-neutral-900/60 border-b border-neutral-200/80 dark:border-neutral-800 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-800">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
               <Camera className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-tight">
+              <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100 leading-tight">
                 Upload Pas Foto Massal Siswa
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
                 Cocokkan foto siswa secara otomatis berdasarkan <strong>NISN</strong> atau <strong>Nomor Peserta</strong>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
+            <NeonButton
+              variant="secondary"
               size="sm"
               onClick={onClose}
               disabled={isUploading}
-              className="text-xs h-8 px-3 border-slate-300 dark:border-slate-700"
             >
               Tutup
-            </Button>
+            </NeonButton>
             {photoItems.length > 0 && matchedCount > 0 && (
-              <Button
+              <NeonButton
+                variant="primary"
+                color="brand"
+                size="sm"
                 onClick={handleSavePhotos}
                 disabled={isUploading}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-8 px-4 gap-1.5 shadow-sm"
+                className="gap-1.5"
               >
                 {isUploading ? (
                   <>
@@ -313,7 +315,7 @@ export const BatchStudentPhotoDialog = ({
                     <span>Terapkan {matchedCount} Foto Siswa</span>
                   </>
                 )}
-              </Button>
+              </NeonButton>
             )}
           </div>
         </div>

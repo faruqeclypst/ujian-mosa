@@ -33,7 +33,8 @@ export function NeonTabs<T extends string = string>({
   return (
     <div
       className={cn(
-        "flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 text-xs overflow-x-auto",
+        "flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 text-xs overflow-x-auto no-scrollbar scroll-smooth touch-pan-x",
+        "py-0.5 max-w-full",
         className
       )}
       {...props}

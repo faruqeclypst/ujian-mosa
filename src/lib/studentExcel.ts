@@ -122,24 +122,27 @@ export async function parseStudentImportExcel(
   const skipped: { nisn: string; name: string; className: string }[] = [];
 
   for (const row of raw) {
-    // Robust detection for ID column
+    // Robust detection for ID column (NISN / NIM / NPM / ID / Nomor Induk)
     const nisn = String(
       row["NISN"] || 
       row["NIM"] || 
+      row["NPM"] || 
       row["ID"] || 
-      row["Nomor Induk"] ||
-      (Object.keys(row).find(k => k.match(/^NISN$|^NIM$|^ID$/i)) ? row[Object.keys(row).find(k => k.match(/^NISN$|^NIM$|^ID$/i))!] : "") ||
-      (Object.keys(row).find(k => k.match(/NISN|NIM|Nomor Induk/i)) ? row[Object.keys(row).find(k => k.match(/NISN|NIM|Nomor Induk/i))!] : "")
+      row["Nomor Induk"] || 
+      row["No Induk"] ||
+      (Object.keys(row).find(k => k.match(/^NISN$|^NIM$|^NPM$|^ID$/i)) ? row[Object.keys(row).find(k => k.match(/^NISN$|^NIM$|^NPM$|^ID$/i))!] : "") ||
+      (Object.keys(row).find(k => k.match(/NISN|NIM|NPM|Nomor Induk|No Induk/i)) ? row[Object.keys(row).find(k => k.match(/NISN|NIM|NPM|Nomor Induk|No Induk/i))!] : "")
     ).trim();
 
-    // Robust detection for Name column
+    // Robust detection for Name column (Nama Siswa / Mahasiswa / Peserta)
     const name = String(
       row["Nama Siswa"] || 
       row["Nama Mahasiswa"] || 
+      row["Nama Peserta"] ||
       row["Nama"] || 
       row["Name"] ||
       row["Full Name"] ||
-      (Object.keys(row).find(k => k.match(/Nama Siswa|Nama Lengkap|Full Name/i)) ? row[Object.keys(row).find(k => k.match(/Nama Siswa|Nama Lengkap|Full Name/i))!] : "") ||
+      (Object.keys(row).find(k => k.match(/Nama Siswa|Nama Mahasiswa|Nama Peserta|Nama Lengkap|Full Name/i)) ? row[Object.keys(row).find(k => k.match(/Nama Siswa|Nama Mahasiswa|Nama Peserta|Nama Lengkap|Full Name/i))!] : "") ||
       (Object.keys(row).find(k => k.match(/^Nama$/i)) ? row[Object.keys(row).find(k => k.match(/^Nama$/i))!] : "")
     ).trim();
 
@@ -154,17 +157,26 @@ export async function parseStudentImportExcel(
 
     const gender: "L" | "P" = genderRaw.startsWith("P") ? "P" : "L"; 
 
-    // Detect Class Name with multiple possible header names
-    const className = (
-      row["Nama Kelas"] || 
-      row["Nama Program"] || 
-      row["Kelas"] || 
-      row["Program"] || 
-      row["Class"] || 
-      row["Kls"] || 
-      (Object.keys(row).find(k => k.match(/Nama Kelas|Nama Program/i)) ? row[Object.keys(row).find(k => k.match(/Nama Kelas|Nama Program/i))!] : "") ||
-      (Object.keys(row).find(k => k.match(/^Kelas$/i)) ? row[Object.keys(row).find(k => k.match(/^Kelas$/i))!] : "")
-    ).toString().trim();
+    // Detect Class / Prodi Name with multiple possible header names (Supports Sekolah & Kampus)
+    const classKey = Object.keys(row).find(k =>
+      /(Nama\s+)?(Kelas|Prodi|Program\s*Studi|Jurusan|Semester|Rombel|Class)/i.test(k.trim())
+    );
+    const className = String(
+      classKey ? row[classKey] : (
+        row["Nama Kelas"] || 
+        row["Nama Prodi / Semester"] || 
+        row["Nama Prodi"] || 
+        row["Prodi / Semester"] || 
+        row["Prodi"] || 
+        row["Program Studi"] || 
+        row["Nama Program"] || 
+        row["Kelas"] || 
+        row["Program"] || 
+        row["Class"] || 
+        row["Kls"] || 
+        ""
+      )
+    ).trim();
 
     // Optional profile fields
     const birthPlace = String(
@@ -221,7 +233,7 @@ export async function parseStudentImportExcel(
     if (!nisn && !name) continue;
 
     // Normalize name for comparison (remove spaces, hyphens, dots, underscores)
-    const normalize = (s: string) => s.replace(/[\s\-\._]+/g, "").toLowerCase();
+    const normalize = (s: string) => s.replace(/[\s\-\._\/]+/g, "").toLowerCase();
     
     const foundClass = classes.find(c => {
       const dbClassName = normalize(c.name);

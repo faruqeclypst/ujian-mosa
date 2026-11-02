@@ -3155,11 +3155,10 @@ const CBTPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Student Profile Dialog (Read-Only saat ujian aktif di CBT) */}
+      {/* Student Profile Dialog */}
       <StudentProfileDialog
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
-        readOnly={true}
       />
 
       {/* Modal Blokir Mode Game (Game Turbo / Game Booster) */}

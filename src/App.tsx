@@ -1,3 +1,4 @@
+import { TooltipProvider } from "./components/ui/tooltip";
 import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { IconContext } from "@phosphor-icons/react";
@@ -377,6 +378,7 @@ const App = () => {
     >
       <ThemeProvider defaultTheme="light">
         <ToastProvider>
+          <TooltipProvider delayDuration={150}>
           <SidebarProvider>
             <TenantProvider>
               <AuthProvider>
@@ -387,6 +389,7 @@ const App = () => {
               </AuthProvider>
             </TenantProvider>
           </SidebarProvider>
+        </TooltipProvider>
         </ToastProvider>
       </ThemeProvider>
     </IconContext.Provider>

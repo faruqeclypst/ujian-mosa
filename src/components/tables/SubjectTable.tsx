@@ -148,14 +148,14 @@ export const SubjectTable = ({
       onSearchChange={setSearch}
       searchPlaceholder={`Cari ${terminology.subject.toLowerCase()}...`}
       title={`Daftar ${terminology.subject}`}
-      subtitle={`Kurikulum mata pelajaran aktif yang diujikan.`}
+      subtitle={`Kurikulum ${terminology.subject.toLowerCase()} aktif yang diujikan.`}
       activeKey={activeKey}
       onRowClick={onRowClick}
       pagination
       pageSize={25}
       pageSizeOptions={[10, 25, 50, 100]}
       emptyTitle={`Belum ada data ${terminology.subject.toLowerCase()}`}
-      emptySubtitle={`Tambahkan mata pelajaran baru dengan klik tombol Tambah ${terminology.subject} di atas.`}
+      emptySubtitle={`Tambahkan ${terminology.subject.toLowerCase()} baru dengan klik tombol Tambah ${terminology.subject} di atas.`}
       isLoading={isLoading}
     />
   );

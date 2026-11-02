@@ -15,7 +15,7 @@ import {
   Info
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../ui/dialog";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Badge } from "../ui/badge";
 import { MathText } from "../ui/MathText";
 import { useTenant } from "../../context/TenantContext";
@@ -398,11 +398,13 @@ export const AIQuestionRevisionDialog: React.FC<AIQuestionRevisionDialogProps> =
               <span className="text-[11px] text-slate-400">
                 AI akan mempertahankan kunci substansi benar dan merombak pengecoh yang tidak efektif.
               </span>
-              <Button
+              <NeonButton
                 size="sm"
+                variant="primary"
+                color="brand"
                 onClick={handleRunAIRevision}
                 disabled={isLoading || isApplying}
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 h-9 px-4 shadow-sm cursor-pointer shrink-0"
+                className="w-full sm:w-auto font-semibold gap-1.5 shrink-0"
               >
                 {isLoading ? (
                   <>
@@ -415,7 +417,7 @@ export const AIQuestionRevisionDialog: React.FC<AIQuestionRevisionDialogProps> =
                     <span>{revisionResult ? "Generate Ulang Revisi" : "Mulai Analisis & Revisi Opsi AI"}</span>
                   </>
                 )}
-              </Button>
+              </NeonButton>
             </div>
           </div>
 
@@ -576,43 +578,45 @@ export const AIQuestionRevisionDialog: React.FC<AIQuestionRevisionDialogProps> =
         </div>
 
         {/* MODAL FOOTER */}
-        <DialogFooter className="px-4 sm:px-6 py-3.5 sm:py-4.5 border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 m-0">
-          <Button
+        <DialogFooter className="px-4 sm:px-6 py-3.5 sm:py-4.5 border-t border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 shrink-0 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 m-0">
+          <NeonButton
             type="button"
             variant="ghost"
             onClick={onClose}
             disabled={isApplying}
-            className="w-full sm:w-auto text-xs text-slate-600 dark:text-slate-400 cursor-pointer"
+            className="w-full sm:w-auto text-xs"
           >
             Batal
-          </Button>
+          </NeonButton>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             {revisionResult && (
-              <Button
+              <NeonButton
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleRunAIRevision}
                 disabled={isLoading || isApplying}
-                className="flex-1 sm:flex-initial text-xs border-slate-200 dark:border-slate-700 cursor-pointer flex items-center justify-center gap-1.5 h-9"
+                className="gap-1.5"
               >
                 <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
                 <span>Buat Ulang</span>
-              </Button>
+              </NeonButton>
             )}
 
-            <Button
+            <NeonButton
               type="button"
+              variant="primary"
+              color="brand"
               size="sm"
               onClick={handleSave}
               disabled={isLoading || isApplying || Object.keys(editableChoices).length === 0}
-              className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 h-9 px-4 shadow-sm cursor-pointer"
+              className="gap-1.5"
             >
               {isApplying ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Menyimpan ke Bank Soal...</span>
+                  <span>Menyimpan...</span>
                 </>
               ) : (
                 <>
@@ -620,7 +624,7 @@ export const AIQuestionRevisionDialog: React.FC<AIQuestionRevisionDialogProps> =
                   <span>Terapkan ke Bank Soal</span>
                 </>
               )}
-            </Button>
+            </NeonButton>
           </div>
         </DialogFooter>
       </DialogContent>

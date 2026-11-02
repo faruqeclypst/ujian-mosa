@@ -5,7 +5,7 @@ import { useTenant } from "../context/TenantContext";
 import { masterPb } from "../lib/pocketbase";
 import { uploadInventoryImage, deleteImageFromStorage, isOfflineEnvironment } from "../lib/storage";
 import { compressImage } from "../lib/imageCompression";
-import { AI_MODELS, testAIConnection } from "../lib/ai";
+import { AI_MODELS, testAIConnection, invalidateAIConfigCache } from "../lib/ai";
 import { Skeleton } from "../components/ui/skeleton";
 import { ThemeToggle } from "../components/ui/theme-toggle";
 import { Button } from "../components/ui/button";
@@ -113,10 +113,10 @@ const SettingsPage = () => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [groqApiKey, setGroqApiKey] = useState("");
-  const [aiGatewayUrl, setAiGatewayUrl] = useState("");
+  const [aiGatewayUrl, setAiGatewayUrl] = useState("https://apihub.agnes-ai.com/v1");
   const [aiGatewayKey, setAiGatewayKey] = useState("");
-  const [aiModel, setAiModel] = useState(AI_MODELS[0].id);
-  const [aiProvider, setAiProvider] = useState("groq");
+  const [aiModel, setAiModel] = useState("agnes-2.5-flash");
+  const [aiProvider, setAiProvider] = useState("custom");
 
   const [remoteModels, setRemoteModels] = useState<any[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -415,10 +415,10 @@ const SettingsPage = () => {
         const savedName = data.name || "";
         setSchoolName(savedName && savedName !== "EXAMKU" ? savedName : (school?.name || "EXAMKU"));
         setGroqApiKey(data.groq_api_key || "");
-        setAiGatewayUrl(data.ai_gateway_url || "");
-        setAiGatewayKey(data.ai_gateway_key || "");
-        setAiModel(data.ai_model || AI_MODELS[0].id);
-        setAiProvider(data.ai_provider || "groq");
+        setAiGatewayUrl(data.ai_gateway_url || "https://apihub.agnes-ai.com/v1");
+        setAiGatewayKey(data.ai_gateway_key || data.groq_api_key || "");
+        setAiModel(data.ai_model || "agnes-2.5-flash");
+        setAiProvider(data.ai_provider && data.ai_provider !== "groq" ? data.ai_provider : "custom");
         setIsExambroEnabled(data.is_exambro_enabled ?? false);
         setTeacherFullAccess(data.teacher_full_access || false);
         setTeacherAIAccess(data.teacher_ai_access ?? false);
@@ -441,23 +441,27 @@ const SettingsPage = () => {
   }, [pb, school?.name]);
 
   const handleTestAI = async () => {
-    const targetKey = aiProvider === "puter" ? "puter-no-key" : (aiProvider === "groq" ? groqApiKey : aiGatewayKey);
-    if (!targetKey && aiProvider !== "puter") {
+    const targetKey = aiGatewayKey || groqApiKey;
+    if (!targetKey) {
       addToast({ title: "Gagal", description: "Masukkan API Key terlebih dahulu.", type: "error" });
+      return;
+    }
+    if (!aiModel?.trim()) {
+      addToast({ title: "Gagal", description: "Ketik ID Model terlebih dahulu untuk diuji.", type: "error" });
       return;
     }
     setIsTestingAI(true);
     setTestResult(null);
     try {
-      const res = await testAIConnection(pb!, targetKey, aiModel, aiGatewayUrl || "https://ollama.com", aiProvider);
+      const res = await testAIConnection(pb!, targetKey, aiModel, aiGatewayUrl || "https://apihub.agnes-ai.com/v1");
       setTestResult(res);
       if (res.success) {
-        addToast({ title: "Berhasil!", description: "Koneksi AI berjalan lancar.", type: "success" });
+        addToast({ title: "Berhasil!", description: res.message || "Koneksi AI berjalan lancar.", type: "success" });
       } else {
         addToast({ title: "Gagal", description: res.message, type: "error" });
       }
-    } catch (e) {
-      setTestResult({ success: false, message: "Terjadi kesalahan sistem." });
+    } catch (e: any) {
+      setTestResult({ success: false, message: e.message || "Terjadi kesalahan sistem." });
     } finally {
       setIsTestingAI(false);
     }
@@ -475,15 +479,14 @@ const SettingsPage = () => {
     setIsLoadingModels(true);
     try {
       let baseUrl = aiGatewayUrl.trim().replace(/\/$/, "");
-      baseUrl = baseUrl.replace(/\/chat\/completions$/, "");
-      const modelsUrl = `${baseUrl}/models`;
+      baseUrl = baseUrl.replace(/\/chat\/completions$/, "").replace(/\/models$/, "");
 
       // Gunakan PocketBase proxy untuk menghindari CORS
       const proxyUrl = pb!.baseUrl + "/api/ai-proxy-models";
       const res = await fetch(proxyUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": pb!.authStore.token },
-        body: JSON.stringify({ baseUrl: modelsUrl, apiKey: aiGatewayKey })
+        body: JSON.stringify({ baseUrl, apiKey: aiGatewayKey })
       });
 
       if (res.ok) {
@@ -504,15 +507,26 @@ const SettingsPage = () => {
           addToast({ title: "Berhasil!", description: `${models.length} model ditemukan.`, type: "success" });
         } else {
           setRemoteModels([]);
-          addToast({ title: "Kosong", description: "Tidak ada model yang dikembalikan server.", type: "error" });
+          addToast({ title: "Informasi", description: "Server tidak mengembalikan daftar model. Silakan ketik ID model langsung di bawah.", type: "warning" });
         }
       } else {
+        let errMsg = "";
+        try {
+          const errData = await res.json();
+          if (errData.error?.message) errMsg = errData.error.message;
+          else if (errData.error) errMsg = typeof errData.error === 'string' ? errData.error : JSON.stringify(errData.error);
+          else if (errData.message) errMsg = errData.message;
+        } catch {}
         setRemoteModels([]);
-        addToast({ title: "Gagal", description: "Server menolak permintaan. Periksa Base URL & API Key.", type: "error" });
+        addToast({
+          title: "Endpoint Model Tidak Tersedia",
+          description: errMsg ? `Server menolak: ${errMsg}. Anda tetap bisa mengetik ID model secara langsung di bawah.` : "Gateway ini tidak membuka endpoint /models. Anda dapat langsung mengetik ID model di bawah.",
+          type: "warning"
+        });
       }
     } catch {
       setRemoteModels([]);
-      addToast({ title: "Gagal", description: "Tidak bisa menghubungi server model.", type: "error" });
+      addToast({ title: "Informasi", description: "Tidak dapat memuat model otomatis. Anda dapat langsung mengetik ID model di bawah.", type: "warning" });
     } finally {
       setIsLoadingModels(false);
     }
@@ -619,106 +633,13 @@ const SettingsPage = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Model dimuat manual via tombol "Muat Model" (handleLoadModels) atau diketik langsung oleh pengguna
   useEffect(() => {
     if (loading) return;
-
-    if (aiProvider === "groq" || aiProvider === "ollama" || aiProvider === "puter") {
-      const availableModels = AI_MODELS.filter((m: any) => m.provider === aiProvider);
-      setRemoteModels(availableModels);
-      if (!availableModels.some(m => m.id === aiModel) && availableModels.length > 0) {
-        setAiModel(availableModels[0].id);
-      }
-      return;
+    if (!aiModel && AI_MODELS.length > 0) {
+      setAiModel(AI_MODELS[0].id);
     }
-
-    if (aiProvider === "custom") {
-      // Model dimuat manual via tombol "Muat Model" (handleLoadModels),
-      // bukan otomatis — agar admin kontrol kapan request dikirim.
-      return;
-    }
-
-    // 🚀 ANTI-CORS: Jangan panggil fetch langsung untuk provider yang memblokir Browser (CORS)
-    const corsRestricted = ["cloudflare", "google", "huggingface", "github"];
-    if (corsRestricted.includes(aiProvider)) {
-      const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
-      setRemoteModels(fallback);
-      if (!fallback.some(m => m.id === aiModel) && fallback.length > 0) {
-        setAiModel(fallback[0].id);
-      }
-      return;
-    }
-
-    const key = aiProvider === "groq" ? groqApiKey : aiGatewayKey;
-    if (!key) {
-      setRemoteModels([]);
-      return;
-    }
-
-    const fetchModels = async () => {
-      setIsLoadingModels(true);
-      try {
-        let baseUrl = "";
-        switch (aiProvider) {
-          case "google": baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai"; break;
-          case "openrouter": baseUrl = "https://openrouter.ai/api/v1"; break;
-          case "together": baseUrl = "https://api.together.xyz/v1"; break;
-          case "huggingface": baseUrl = "https://api-inference.huggingface.co/v1"; break;
-          case "fireworks": baseUrl = "https://api.fireworks.ai/inference/v1"; break;
-          case "github": baseUrl = "https://models.inference.ai.azure.com"; break;
-          case "cloudflare":
-            if (!aiGatewayUrl) { setIsLoadingModels(false); return; }
-            baseUrl = `https://api.cloudflare.com/client/v4/accounts/${aiGatewayUrl}/ai/v1`;
-            break;
-        }
-
-        if (!baseUrl) {
-          setIsLoadingModels(false); return;
-        }
-
-        const res = await fetch(`${baseUrl}/models`, {
-          headers: {
-            "Authorization": `Bearer ${key}`
-          }
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const items = data.data || data.models || data;
-          if (Array.isArray(items)) {
-            const models = items.map((m: any) => ({
-              id: m.id,
-              name: m.name || m.id,
-              speed: "Remote API",
-              provider: aiProvider
-            }));
-            models.sort((a: any, b: any) => a.name.localeCompare(b.name));
-            setRemoteModels(models);
-
-            if (!models.find((m: any) => m.id === aiModel) && models.length > 0) {
-              setAiModel(models[0].id);
-            }
-          }
-        } else {
-          // Silent fallback for 401/403/CORS
-          const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
-          if (fallback.length > 0) setRemoteModels(fallback);
-        }
-      } catch (err) {
-        // Suppress console error for expected CORS blocks on local dev
-        const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
-        setRemoteModels(fallback);
-
-        if (!fallback.find((m: any) => m.id === aiModel) && fallback.length > 0) {
-          setAiModel(fallback[0].id);
-        }
-      } finally {
-        setIsLoadingModels(false);
-      }
-    };
-
-    const timeout = setTimeout(fetchModels, 800);
-    return () => clearTimeout(timeout);
-  }, [aiProvider, aiGatewayKey, groqApiKey, aiGatewayUrl, loading]);
+  }, [loading, aiModel]);
 
   const compressLogo = (file: File): Promise<File> =>
     compressImage(file, { maxWidth: 512, maxHeight: 512, quality: 0.85 });
@@ -843,6 +764,7 @@ const SettingsPage = () => {
 
       setSchoolLogo(finalLogoUrl);
       setLogoFile(null);
+      invalidateAIConfigCache();
       addToast({ title: "Berhasil!", description: "Pengaturan berhasil diperbarui.", type: "success" });
       fetchSettings();
     } catch (err: any) {
@@ -1413,153 +1335,72 @@ const SettingsPage = () => {
                 </NeonCardBody>
               </NeonCard>
 
-              {/* Card 2: API Gen-AI Engine */}
+              {/* Card 2: API Gen-AI Engine (BYOK) */}
               <NeonCard>
                 <NeonCardHeader
                   icon={Cpu}
-                  title="API Gen-AI Engine"
-                  subtitle="Konektivitas Large Language Model (LLM) untuk generator soal dan koreksi analitis"
+                  title="API Gen-AI Engine (Bring Your Own Key)"
+                  subtitle="Konektivitas Large Language Model (LLM) OpenAI-Compatible untuk generator soal dan koreksi analitis"
                   badge={
                     <div className="flex items-center gap-1.5">
-                      <NeonBadge variant={aiProvider === "groq" ? "emerald" : aiProvider === "puter" ? "sky" : "neutral"}>
-                        {(aiProvider || "groq").toUpperCase()}
-                      </NeonBadge>
+                      <NeonBadge variant="emerald">BYOK Gateway</NeonBadge>
                       <NeonBadge variant="neutral">OpenAI Compatible</NeonBadge>
                     </div>
                   }
                 />
 
                 <NeonCardBody className="space-y-5">
-                  {/* Provider Quick Picker */}
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                        Pilih Provider LLM
-                      </label>
-                      <span className="text-[10px] font-mono text-neutral-400">
-                        {aiProvider === "groq" ? "LPU Hardware Acceleration" : aiProvider === "puter" ? "Free Tier / No Key" : "REST API"}
-                      </span>
-                    </div>
-
-                    {/* Quick Segmented Buttons */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                      {[
-                        { id: "groq", name: "Groq Cloud", badge: "⚡ Tercepat" },
-                        { id: "google", name: "Gemini", badge: "🔮 Google" },
-                        { id: "openrouter", name: "OpenRouter", badge: "🌐 Multi" },
-                        { id: "ollama", name: "Ollama", badge: "💻 Lokal" },
-                        { id: "puter", name: "Puter", badge: "🎁 Gratis" },
-                      ].map((item) => {
-                        const isSelected = aiProvider === item.id;
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setAiProvider(item.id);
-                              setAiModel("");
-                              setRemoteModels([]);
-                            }}
-                            className={cn(
-                              "px-3 py-2 rounded-xl text-left border transition-all duration-150 cursor-pointer flex flex-col justify-between gap-1",
-                              isSelected
-                                ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                                : "bg-neutral-50/70 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300 border-neutral-200/80 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700"
-                            )}
-                          >
-                            <span className="text-[10px] font-mono opacity-80">{item.badge}</span>
-                            <span className="text-xs font-bold leading-none truncate">{item.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* All Providers Dropdown */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400 shrink-0">
-                        Atau pilih provider lain:
-                      </span>
-                      <select
-                        value={aiProvider}
-                        onChange={(e) => {
-                          setAiProvider(e.target.value);
-                          setAiModel("");
-                          setRemoteModels([]);
-                        }}
-                        className="flex-1 h-8 px-3 rounded-lg text-xs font-semibold bg-neutral-100 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-800 dark:text-neutral-200 outline-none cursor-pointer"
-                      >
-                        <option value="groq">Groq Cloud (LPU Ultra-Fast)</option>
-                        <option value="google">Google AI Studio (Gemini 1.5 / 2.0)</option>
-                        <option value="openrouter">OpenRouter (Ratusan Model Terpadu)</option>
-                        <option value="ollama">Ollama (Server Lokal / Offline LAN)</option>
-                        <option value="puter">Puter.js (Gratis Tanpa API Key)</option>
-                        <option value="together">Together AI</option>
-                        <option value="huggingface">Hugging Face (Serverless Inference)</option>
-                        <option value="fireworks">Fireworks AI</option>
-                        <option value="github">GitHub Models</option>
-                        <option value="cloudflare">Cloudflare Workers AI</option>
-                        <option value="custom">Custom Endpoint (OpenAI Compatible Gateway)</option>
-                      </select>
-                    </div>
-
-                    {/* Provider Info Helper Box */}
-                    <div className="p-2.5 rounded-lg bg-neutral-100/60 dark:bg-neutral-900/60 border border-neutral-200/60 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 flex items-center gap-2">
-                      <Info className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
-                      <span>
-                        {aiProvider === "groq" && "⚡ Groq LPU: Latency ultra cepat (<1 detik per soal), sangat direkomendasikan untuk pembuatan soal massal."}
-                        {aiProvider === "google" && "🔮 Google Gemini: Penalaran analitis mendalam dan jendela konteks luas untuk soal studi kasus."}
-                        {aiProvider === "openrouter" && "🌐 OpenRouter: Gerbang terpadu untuk mengakses Claude, GPT-4, Llama, Mistral, dan ratusan model lainnya."}
-                        {aiProvider === "ollama" && "💻 Ollama: Menjalankan model AI di server LAN offline sekolah tanpa internet eksternal."}
-                        {aiProvider === "puter" && "🎁 Puter: Layanan gratis bawaan tanpa perlu API Key, siap pakai langsung untuk demo dan pengujian."}
-                        {aiProvider === "together" && "🚀 Together AI: Akses inference cepat untuk open models seperti Llama 3 dan Mixtral."}
-                        {aiProvider === "huggingface" && "🤗 Hugging Face: Inference API serverless untuk ribuan model komunitas open-source."}
-                        {aiProvider === "fireworks" && "🎆 Fireworks AI: Engine performa tinggi untuk model fine-tuned dan generative teks."}
-                        {aiProvider === "github" && "🐙 GitHub Models: Akses model AI via GitHub Personal Access Token."}
-                        {aiProvider === "cloudflare" && "☁️ Cloudflare Workers AI: Inference serverless global di edge network Cloudflare."}
-                        {aiProvider === "custom" && "🛠 Custom Endpoint: Hubungkan ke private proxy atau server LLM internal yang kompatibel dengan format OpenAI."}
-                      </span>
+                  {/* Info Banner */}
+                  <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-850/60 border border-neutral-200/80 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 flex items-start gap-2.5">
+                    <Info className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-semibold text-neutral-800 dark:text-neutral-200">
+                        Arsitektur BYOK (OpenAI Compatible & Anthropic Claude)
+                      </p>
+                      <p className="text-[11px] leading-relaxed">
+                        Examku menggunakan sistem <strong>Bring Your Own Key</strong>. Anda bebas memasukkan Base URL dan API Key dari penyedia LLM mana pun (seperti <strong>OpenAI</strong>, <strong>Anthropic Claude</strong>, <strong>Agnes AI</strong>, <strong>AppVerse</strong>, <strong>DeepSeek</strong>, <strong>Ollama</strong>, atau gateway privat sekolah). Permintaan dikirim langsung dari browser (*direct fetch*) untuk respon kilat 1-2 detik.
+                      </p>
                     </div>
                   </div>
 
                   {/* Form Inputs Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                    {(aiProvider === "custom" || aiProvider === "cloudflare") && (
-                      <div className="sm:col-span-2">
-                        <FormField
-                          id="aiGatewayUrl"
-                          label={aiProvider === "cloudflare" ? "Cloudflare Account ID" : "Base URL Endpoint (OpenAI Compatible)"}
-                          error={undefined}
-                        >
-                          <Input
-                            type="text"
-                            value={aiGatewayUrl}
-                            onChange={(e) => setAiGatewayUrl(e.target.value)}
-                            placeholder={aiProvider === "cloudflare" ? "Masukkan Account ID Cloudflare..." : "https://api.openai.com/v1 atau http://localhost:11434/v1"}
-                            className="font-mono text-xs rounded-xl h-11 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800"
-                          />
-                        </FormField>
-                      </div>
-                    )}
+                    {/* Base URL (Kotak Biasa Bebas Diisi Manual) */}
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <FormField
+                        id="aiGatewayUrl"
+                        label="Base URL API Endpoint"
+                        error={undefined}
+                      >
+                        <Input
+                          type="text"
+                          value={aiGatewayUrl}
+                          onChange={(e) => setAiGatewayUrl(e.target.value)}
+                          placeholder="Masukkan Base URL (cth: https://api.openai.com/v1 atau https://api.anthropic.com/v1)"
+                          className="font-mono text-xs rounded-xl h-11 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800"
+                        />
+                      </FormField>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Ketik Base URL API pilihan Anda. Mendukung format standar <strong>OpenAI-Compatible</strong> (<code className="text-emerald-600 dark:text-emerald-400 font-mono">/v1/chat/completions</code>) dan <strong>Anthropic Claude</strong> (<code className="text-emerald-600 dark:text-emerald-400 font-mono">/v1/messages</code>).
+                      </p>
+                    </div>
 
                     {/* API Key */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                          {aiProvider === "groq" ? "Groq API Key" : "API Key / Token"}
+                          API Key / Token
                         </label>
-                        {aiProvider === "puter" && (
-                          <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
-                            Tidak diperlukan
-                          </span>
-                        )}
                       </div>
                       <div className="relative">
                         <Input
                           type={showApiKey ? "text" : "password"}
-                          value={aiProvider === "groq" ? groqApiKey : (aiProvider === "puter" ? "puter-no-key-required" : aiGatewayKey)}
-                          disabled={aiProvider === "puter"}
-                          onChange={(e) => aiProvider === "groq" ? setGroqApiKey(e.target.value) : setAiGatewayKey(e.target.value)}
-                          placeholder={aiProvider === "groq" ? "gsk_xxxxxxxxxxxxxxxxxxxx" : aiProvider === "puter" ? "Gratis - Tanpa Key" : "sk-xxxxxxxxxxxxxxxx"}
+                          value={aiGatewayKey || groqApiKey}
+                          onChange={(e) => {
+                            setAiGatewayKey(e.target.value);
+                            setGroqApiKey(e.target.value);
+                          }}
+                          placeholder="sk-xxxxxxxx atau sk-ant-xxxxxxxx"
                           className="font-mono text-xs rounded-xl h-11 pr-10 border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 disabled:opacity-60"
                         />
                         {aiProvider !== "puter" && (
@@ -1573,6 +1414,9 @@ const SettingsPage = () => {
                           </button>
                         )}
                       </div>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Kunci API resmi Anda (cth: diawali <code className="text-emerald-600 dark:text-emerald-400 font-mono">sk-...</code> atau <code className="text-emerald-600 dark:text-emerald-400 font-mono">sk-ant-...</code>).
+                      </p>
                     </div>
 
                     {/* Model ID Selection */}
@@ -1594,7 +1438,7 @@ const SettingsPage = () => {
                           className="w-full h-11 px-3 rounded-xl text-xs font-semibold font-mono bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 outline-none cursor-pointer text-neutral-800 dark:text-neutral-200"
                           disabled={isLoadingModels}
                         >
-                          <optgroup label={`Model ${aiProvider.toUpperCase()}`}>
+                          <optgroup label="MODEL YANG TERSEDIA DI GATEWAY">
                             {remoteModels.map((m: any) => (
                               <option key={m.id} value={m.id}>
                                 {m.name || m.id} {m.speed ? `(${m.speed})` : ""}
@@ -1607,10 +1451,13 @@ const SettingsPage = () => {
                           type="text"
                           value={aiModel}
                           onChange={(e) => setAiModel(e.target.value)}
-                          placeholder={isLoadingModels ? "Memuat daftar model..." : "Ketik ID Model (cth: llama-3.3-70b-versatile)"}
+                          placeholder={isLoadingModels ? "Memuat daftar model..." : "Ketik ID Model (cth: gpt-4o-mini, claude-3-5-sonnet-20241022)"}
                           className="font-mono text-xs rounded-xl h-11 border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900"
                         />
                       )}
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Pilih dari daftar model atau ketik manual ID model sesuai yang didukung oleh Base URL Anda.
+                      </p>
                     </div>
                   </div>
 
@@ -1644,7 +1491,7 @@ const SettingsPage = () => {
                         <Button
                           type="button"
                           onClick={handleTestAI}
-                          disabled={isTestingAI || (aiProvider === "puter" ? false : (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey))}
+                          disabled={isTestingAI || (aiProvider === "puter" ? false : (!aiGatewayKey && !groqApiKey))}
                           variant="outline"
                           className="h-8 px-3.5 rounded-lg text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-850 cursor-pointer shadow-2xs"
                         >
@@ -2052,23 +1899,23 @@ const SettingsPage = () => {
 
                 <div className="p-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-neutral-400">Provider</span>
+                    <span className="text-[11px] font-medium text-neutral-400">Arsitektur</span>
                     <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                      {aiProvider.toUpperCase()}
+                      BYOK (OpenAI / Anthropic)
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-medium text-neutral-400">Model Aktif</span>
                     <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 truncate max-w-[180px]">
-                      {aiModel || <span className="text-neutral-400 italic">Belum dipilih</span>}
+                      {aiModel || <span className="text-neutral-400 italic">Belum diatur</span>}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-neutral-400">Mode</span>
-                    <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                      {aiProvider === "groq" ? "Direct API" : "Proxy"}
+                    <span className="text-[11px] font-medium text-neutral-400">Koneksi</span>
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      Direct (Ultra Kilat)
                     </span>
                   </div>
 

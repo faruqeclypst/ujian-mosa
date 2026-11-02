@@ -6,7 +6,7 @@ import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 
 import FormField from "../forms/FormField";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Input } from "../ui/input";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
@@ -52,8 +52,8 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
     resolver: zodResolver(aiSettingsSchema),
     defaultValues: {
       ai_api_key: "",
-      ai_provider: "groq",
-      ai_model: "",
+      ai_provider: "custom",
+      ai_model: "agnes-2.5-flash",
     },
   });
 
@@ -68,16 +68,16 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
           if (config) {
             const isOllama = config.ai_provider === 'ollama';
             reset({
-              ai_api_key: isOllama ? (config.ai_gateway_key || config.groq_api_key) : config.groq_api_key,
-              ai_provider: config.ai_provider || "groq",
-              ai_model: config.ai_model || "",
+              ai_api_key: isOllama ? (config.ai_gateway_key || config.groq_api_key) : (config.ai_gateway_key || config.groq_api_key || ""),
+              ai_provider: config.ai_provider && config.ai_provider !== "groq" ? config.ai_provider : "custom",
+              ai_model: config.ai_model || "agnes-2.5-flash",
             });
           }
         } else {
           reset({
             ai_api_key: (user as any)?.ai_api_key || "",
-            ai_provider: (user as any)?.ai_provider || "groq",
-            ai_model: (user as any)?.ai_model || "",
+            ai_provider: (user as any)?.ai_provider && (user as any)?.ai_provider !== "groq" ? (user as any).ai_provider : "custom",
+            ai_model: (user as any)?.ai_model || "agnes-2.5-flash",
           });
         }
       } catch (err) {
@@ -108,8 +108,6 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
 
         if (isPuter) {
           // Puter doesn't need API key
-        } else if (values.ai_provider === 'groq') {
-          payload.groq_api_key = values.ai_api_key || "";
         } else {
           payload.ai_gateway_key = values.ai_api_key || "";
           payload.groq_api_key = values.ai_api_key || "";
@@ -164,11 +162,10 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
       const settings = await pb?.collection("settings").getFullList({ limit: 1 });
       const config = settings?.[0];
 
-      const provider = aiProvider || config?.ai_provider || "groq";
       const modelId = aiModel || config?.ai_model || AI_MODELS[0].id;
-      const customUrl = config?.ai_gateway_url || "https://ollama.com";
+      const customUrl = config?.ai_gateway_url || "https://apihub.agnes-ai.com/v1";
 
-      const res = await testAIConnection(pb!, aiKey || "", modelId, customUrl, provider);
+      const res = await testAIConnection(pb!, aiKey || "", modelId, customUrl);
       setTestResult(res);
 
       if (res.success) {
@@ -187,19 +184,19 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 bg-white dark:bg-gray-900 shadow-2xl rounded-2xl">
-        <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 z-50" />
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl rounded-2xl">
+        <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500 z-50" />
 
-        <DialogHeader className="pt-8 px-8 pb-4">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-2xl text-blue-600 dark:text-blue-400">
-              <Sparkles className="h-6 w-6" />
+        <DialogHeader className="pt-7 px-7 pb-3">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-emerald-500/10 dark:bg-emerald-500/15 rounded-xl text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-xl font-black text-gray-900 dark:text-white">
+              <DialogTitle className="text-lg font-bold text-neutral-900 dark:text-neutral-100">
                 Konfigurasi AI
               </DialogTitle>
-              <DialogDescription className="text-gray-500 dark:text-gray-400 font-medium">
+              <DialogDescription className="text-xs text-neutral-500 dark:text-neutral-400 font-normal">
                 {user?.role === 'admin'
                   ? "Atur kunci pribadi atau biarkan kosong untuk menggunakan Pengaturan Global."
                   : "Atur mesin kecerdasan buatan untuk akun Anda."}
@@ -208,28 +205,30 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="px-8 pb-8 space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="px-7 pb-7 space-y-4">
           <FormField id="ai_api_key" label="API Key">
             <div className="flex gap-2">
               <div className="relative flex-1 group">
-                <Shield className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                <Shield className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400 group-focus-within:text-emerald-600 transition-colors" />
                 <Input
                   id="ai_api_key"
                   type="password"
-                  placeholder="gsk_xxxx..."
-                  className="pl-10 rounded-xl border-gray-200 bg-gray-50 transition-all focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-gray-700 dark:bg-gray-800"
+                  placeholder="sk-... atau sk-ant-..."
+                  className="pl-10 rounded-xl border-neutral-200 bg-neutral-50/50 transition-all focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 dark:border-neutral-750 dark:bg-neutral-850"
                   {...register("ai_api_key")}
                 />
               </div>
-              <Button
+              <NeonButton
                 type="button"
-                variant="outline"
+                variant="soft"
+                color="brand"
+                size="sm"
                 onClick={handleTestAI}
                 disabled={isTestingAI}
-                className="rounded-xl border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 h-11 px-4"
+                className="h-10 px-3.5"
               >
                 {isTestingAI ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Tes"}
-              </Button>
+              </NeonButton>
             </div>
             {testResult && (
               <p className={`text-[10px] mt-1.5 font-bold ${testResult.success ? 'text-emerald-600' : 'text-rose-600'} pl-1`}>
@@ -238,56 +237,36 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
             )}
           </FormField>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField id="ai_provider" label="Provider Mesin">
-              <select
-                {...register("ai_provider")}
-                className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 text-sm px-3 dark:border-gray-700 dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                <option value="groq">Groq Cloud (Cepat)</option>
-                <option value="ollama">Ollama (Lokal)</option>
-                <option value="puter">Puter (Gratis, tanpa API Key, limit terbatas)</option>
-              </select>
-            </FormField>
-
-            <FormField id="ai_model" label="Pilihan Model">
+          <div className="space-y-3.5">
+            <FormField id="ai_model" label="Pilihan Model Kecerdasan (LLM)">
               <select
                 {...register("ai_model")}
-                className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 text-sm px-3 dark:border-gray-700 dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full h-10 rounded-xl border border-neutral-200 dark:border-neutral-750 bg-neutral-50/50 dark:bg-neutral-850 text-xs px-3 text-neutral-800 dark:text-neutral-200 outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
               >
-                {AI_MODELS.filter(m => m.provider === selectedProvider).map(m => (
-                  <option key={m.id} value={m.id}>{m.name}{(m as any).dailyLimit ? ` — ${(m as any).dailyLimit}` : ''}</option>
+                {AI_MODELS.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
             </FormField>
           </div>
 
-          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 space-y-3">
-            <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium leading-relaxed">
-              <strong>Info:</strong> {user?.role === 'admin'
+          <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/80 dark:border-neutral-800 space-y-2">
+            <p className="text-[11px] text-neutral-600 dark:text-neutral-400 font-normal leading-relaxed">
+              <strong className="text-neutral-800 dark:text-neutral-200">Info:</strong> {user?.role === 'admin'
                 ? "Konfigurasi ini digunakan untuk akun Admin Anda saat menyusun naskah di Bank Soal."
-                : "Jika Admin sudah mengaktifkan 'Akses Guru Penuh', Anda bisa langsung menggunakan AI tanpa API Key pribadi. Key di sini bersifat opsional (override)."}
+                : "Jika Admin sudah mengaktifkan 'Akses Guru Penuh', Anda bisa langsung menggunakan AI tanpa API Key pribadi."}
             </p>
-            <div className="pt-2 border-t border-amber-200/50 dark:border-amber-800/50 flex flex-col gap-2">
-              <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Dapatkan Key Gratis:</span>
-              <div className="flex flex-col gap-1.5">
+            <div className="pt-2 border-t border-neutral-200/60 dark:border-neutral-800 flex flex-col gap-1.5">
+              <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Tautan Penyedia AI:</span>
+              <div className="flex flex-col gap-1">
                 <a
-                  href="https://console.groq.com/keys"
+                  href="https://platform.agnes-ai.com/settings/usage"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between group hover:bg-white/50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-amber-200"
+                  className="flex items-center justify-between group hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 p-1.5 rounded-lg transition-colors border border-transparent hover:border-emerald-500/20"
                 >
-                  <span className="text-[10px] font-bold text-indigo-600">🚀 Ambil di Groq Console (Disarankan)</span>
-                  <ExternalLink className="w-3 h-3 text-indigo-400" />
-                </a>
-                <a
-                  href="https://ollama.com/settings/keys"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between group hover:bg-white/50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-amber-200"
-                >
-                  <span className="text-[10px] font-bold text-gray-600">🦙 Ambil di Ollama Keys</span>
-                  <ExternalLink className="w-3 h-3 text-gray-400" />
+                  <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">⚡ Agnes AI Platform (Token Plan & Usage)</span>
+                  <ExternalLink className="w-3 h-3 text-emerald-500" />
                 </a>
               </div>
             </div>
@@ -298,24 +277,37 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 text-red-600 text-xs font-bold"
+                className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 text-rose-600 text-xs font-semibold"
               >
                 {formError}
               </motion.div>
             )}
           </AnimatePresence>
 
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="ghost" onClick={onClose} className="flex-1 rounded-xl h-12 font-bold">
+          <div className="flex gap-2.5 pt-2">
+            <NeonButton type="button" variant="secondary" size="md" onClick={onClose} className="flex-1 justify-center">
               Batal
-            </Button>
-            <Button
+            </NeonButton>
+            <NeonButton
               type="submit"
+              variant="primary"
+              color="brand"
+              size="md"
               disabled={isSubmitting || !isDirty}
-              className="flex-1 rounded-xl h-12 font-bold bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-xl shadow-blue-500/20"
+              className="flex-1 justify-center gap-1.5"
             >
-              {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <div className="flex items-center gap-2"><Save className="h-4 w-4" /> Simpan</div>}
-            </Button>
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  <span>Simpan</span>
+                </>
+              )}
+            </NeonButton>
           </div>
         </form>
       </DialogContent>

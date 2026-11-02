@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTenant } from "../../context/TenantContext";
 import { NeonTable, type NeonTableColumn } from "../ui/NeonTable";
 import type { ClassData } from "../../types/exam";
 import { Edit, Trash, KeyRound, GraduationCap, MoreHorizontal, Users } from "lucide-react";
@@ -35,6 +36,7 @@ export const ClassTable = ({
   activeKey,
   onRowClick
 }: ClassTableProps) => {
+  const { terminology } = useTenant();
   const [search, setSearch] = useState("");
 
   const filteredClasses = useMemo(() => {
@@ -70,7 +72,7 @@ export const ClassTable = ({
               </span>
               <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5 min-w-0">
                 <span className="font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
-                  {count} siswa
+                  {count} {terminology.student.toLowerCase()}
                 </span>
                 <span>•</span>
                 <span className="truncate">Rombel aktif</span>
@@ -176,16 +178,16 @@ export const ClassTable = ({
       onSelectionChange={onSelectChange}
       searchValue={search}
       onSearchChange={setSearch}
-      searchPlaceholder="Cari kelas..."
-      title="Daftar Kelas"
-      subtitle="Kelompok rombongan belajar peserta didik aktif."
+      searchPlaceholder={`Cari ${terminology.class.toLowerCase()}...`}
+      title={`Daftar ${terminology.class}`}
+      subtitle={`Kelompok ${terminology.class.toLowerCase()} peserta didik aktif.`}
       activeKey={activeKey}
       onRowClick={onRowClick}
       pagination
       pageSize={25}
       pageSizeOptions={[10, 25, 50, 100]}
-      emptyTitle="Belum ada data kelas"
-      emptySubtitle="Tambahkan rombel kelas baru dengan klik tombol Tambah Kelas di atas."
+      emptyTitle={`Belum ada data ${terminology.class.toLowerCase()}`}
+      emptySubtitle={`Tambahkan ${terminology.class.toLowerCase()} baru dengan klik tombol Tambah ${terminology.class} di atas.`}
       isLoading={isLoading}
     />
   );
