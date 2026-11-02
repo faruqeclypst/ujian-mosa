@@ -7,7 +7,6 @@ import {
   BarChart3,
   Lock,
   Server,
-  CheckCircle2,
 } from "lucide-react";
 import { APP_DISPLAY_VERSION } from "../../utils/version";
 import { cn } from "../../lib/utils";
@@ -15,7 +14,6 @@ import { cn } from "../../lib/utils";
 interface ChangelogItem {
   id: string;
   category: string;
-  scopeTag: string;
   title: string;
   description: string;
   icon: React.ElementType;
@@ -25,7 +23,6 @@ const CHANGELOG_ITEMS: ChangelogItem[] = [
   {
     id: "fluid-layout",
     category: "Tampilan Layar",
-    scopeTag: "Antarmuka Pengawas",
     title: "Tata Letak Responsif untuk Tablet dan Ponsel Pengawas",
     description:
       "Penyesuaian tata letak tabel dan menu administrasi agar pas di layar tablet dan ponsel pengawas tanpa pergeseran horizontal selama pengawasan sesi ujian berlangsung.",
@@ -34,7 +31,6 @@ const CHANGELOG_ITEMS: ChangelogItem[] = [
   {
     id: "item-analysis",
     category: "Analisis Soal",
-    scopeTag: "Statistik Asesmen",
     title: "Kalkulasi Daya Pembeda & Rekapitulasi Otomatis",
     description:
       "Perhitungan otomatis parameter mutu soal: indeks daya pembeda, tingkat kesukaran butir soal, efektivitas distraktor, serta ekspor rekap nilai siap cetak ke format Excel (.xlsx).",
@@ -43,7 +39,6 @@ const CHANGELOG_ITEMS: ChangelogItem[] = [
   {
     id: "integrity-kiosk",
     category: "Keamanan Kiosk",
-    scopeTag: "Exambro Kiosk",
     title: "Toleransi Jaringan Wi-Fi & Proteksi Anti-Curang",
     description:
       "Penyempurnaan heartbeat siswa dengan pemulihan otomatis saat fluktuasi sinyal router lokal, deteksi peralihan jendela aplikasi, dan penguncian instan sesi ujian.",
@@ -52,7 +47,6 @@ const CHANGELOG_ITEMS: ChangelogItem[] = [
   {
     id: "offline-update",
     category: "Server Offline",
-    scopeTag: "Instalasi Lokal",
     title: "Pembaruan Server Sekolah Sekali Klik",
     description:
       "Instalasi server offline sekolah dapat diperbarui langsung dari antarmuka web dalam 1 klik dengan jaminan database lokal ujian (data.db) tetap aman dan tidak terhapus.",
@@ -133,56 +127,49 @@ export const ReleaseChangelogCard: React.FC = () => {
       onTouchEnd={() => setIsPaused(false)}
       className="rounded-xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] overflow-hidden shadow-2xs transition-all"
     >
-      {/* ── 1. Clean Official Release Header Banner ── */}
-      <div className="relative px-4 sm:px-6 py-4 border-b border-neutral-200/90 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/40">
-        {/* Subtle decorative grid pattern background (low opacity, purely textural) */}
-        <div
-          className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none"
-          style={{
-            backgroundImage: "radial-gradient(currentColor 1px, transparent 1px)",
-            backgroundSize: "16px 16px",
-          }}
+      {/* ── 1. Official Release Header Banner dengan Background Image ── */}
+      <div className="relative h-36 sm:h-44 md:h-48 w-full overflow-hidden bg-slate-100 dark:bg-neutral-950 flex items-center border-b border-neutral-200 dark:border-neutral-800">
+        {/* Background Image Grafis Rilis */}
+        <img
+          src="/images/changelog-banner-light.jpg"
+          alt="Examku CBT Release"
+          className="absolute inset-0 w-full h-full object-cover object-right md:object-center opacity-90 dark:opacity-40 scale-[1.01]"
         />
 
-        <div className="relative z-10 space-y-3">
-          {/* Top Row: Logo + Version + Official Release Status */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 sm:gap-2.5">
-              <img
-                src="/logo-examku-cbt.webp"
-                alt="EXAMKU CBT"
-                className="h-6 sm:h-6.5 w-auto object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/logo-default.webp";
-                }}
-              />
-              <span className="h-3 w-px bg-neutral-300 dark:bg-neutral-700 hidden sm:inline-block" />
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-white dark:bg-neutral-850 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-750 shadow-2xs">
-                {APP_DISPLAY_VERSION}
-              </span>
-              <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500 hidden sm:inline">
-                Rilis Stabil
-              </span>
-            </div>
+        {/* Ambient Gradients: Fade halus untuk keterbacaan teks di light & dark mode */}
+        <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-white/80 to-transparent dark:from-neutral-950 dark:via-neutral-950/85 dark:to-neutral-950/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-white/90 via-transparent to-white/40 dark:from-neutral-950/95 dark:via-transparent dark:to-neutral-950/40" />
 
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-medium font-mono">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Sistem Terkini</span>
-            </div>
+        {/* Konten Banner */}
+        <div className="relative z-10 w-full px-4 sm:px-6 py-3.5 flex flex-col justify-between h-full">
+          {/* Top Row: Logo EXAMKU CBT + Version Pill */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <img
+              src="/logo-examku-cbt.webp"
+              alt="EXAMKU CBT"
+              className="h-6 sm:h-7 w-auto object-contain drop-shadow-sm"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/logo-default.webp";
+              }}
+            />
+            <span className="h-3.5 w-px bg-neutral-300 dark:bg-white/20 hidden sm:inline-block" />
+            <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-bold bg-white/80 dark:bg-white/10 backdrop-blur-md text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 shadow-2xs">
+              {APP_DISPLAY_VERSION}
+            </span>
           </div>
 
-          {/* Headline & Description */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-400 dark:text-neutral-500">
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">Catatan Rilis</span>
+          {/* Bottom Headline & Tagline */}
+          <div className="space-y-1 max-w-xl">
+            <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-mono text-emerald-600 dark:text-emerald-400 uppercase tracking-wider font-bold">
+              <span>Catatan Rilis</span>
               <span>•</span>
               <span>21 Oktober 2026</span>
             </div>
-            <h2 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-neutral-100 tracking-tight leading-snug">
+            <h2 className="text-sm sm:text-base md:text-lg font-bold text-neutral-900 dark:text-white tracking-tight leading-snug drop-shadow-xs">
               Infrastruktur Asesmen Terintegrasi &amp; Pengamanan Kiosk Realtime
             </h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed max-w-2xl hidden sm:block">
-              Pembaruan stabilitas ujian, perlindungan sesi peserta secara realtime, dan rekapitulasi nilai otomatis.
+            <p className="text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400 line-clamp-1 hidden sm:block">
+              Performa stabil, proteksi heartbeat cerdas, dan analisis butir soal otomatis.
             </p>
           </div>
         </div>
@@ -202,15 +189,11 @@ export const ReleaseChangelogCard: React.FC = () => {
           >
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="space-y-1.5 max-w-3xl">
-                {/* Category & Scope Indicator */}
+                {/* Category Indicator */}
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-neutral-100 dark:bg-neutral-850 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-750">
                     <IconComponent className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                     <span>{currentItem.category}</span>
-                  </span>
-
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-neutral-400 dark:text-neutral-500 border border-neutral-200/70 dark:border-neutral-800">
-                    {currentItem.scopeTag}
                   </span>
 
                   <h3 className="font-bold text-xs sm:text-sm text-neutral-900 dark:text-neutral-100">
