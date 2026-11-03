@@ -772,8 +772,8 @@ const LandingPage = () => {
         <div className="max-w-6xl mx-auto">
           {/* Section Heading */}
           <div className="text-center max-w-3xl mx-auto mb-8">
-            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3.5 py-1 rounded-full text-xs font-bold text-emerald-800 uppercase tracking-wider mb-3">
-              <ShieldCheck size={14} className="text-emerald-600" />
+            <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 px-3.5 py-1 rounded-full text-xs font-bold text-blue-700 uppercase tracking-wider mb-3">
+              <ShieldCheck size={14} className="text-blue-600" />
               Galeri Antarmuka EXAMKU · 10 Tampilan Nyata Platform
             </div>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -790,22 +790,22 @@ const LandingPage = () => {
               type="button"
               onClick={() => setActiveSlide(0)}
               className={cn(
-                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500",
+                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500",
                 activeSlide < 2
-                  ? "bg-emerald-600 text-white shadow-xs"
+                  ? "bg-blue-600 text-white shadow-xs"
                   : "bg-slate-100 hover:bg-slate-200 text-slate-700"
               )}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-200" />
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-200" />
               Alur Siswa (1–2)
             </button>
             <button
               type="button"
               onClick={() => setActiveSlide(2)}
               className={cn(
-                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500",
+                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500",
                 activeSlide >= 2 && activeSlide < 5
-                  ? "bg-emerald-600 text-white shadow-xs"
+                  ? "bg-blue-600 text-white shadow-xs"
                   : "bg-slate-100 hover:bg-slate-200 text-slate-700"
               )}
             >
@@ -816,7 +816,7 @@ const LandingPage = () => {
               type="button"
               onClick={() => setActiveSlide(5)}
               className={cn(
-                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500",
+                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500",
                 activeSlide === 5
                   ? "bg-rose-600 text-white shadow-xs"
                   : "bg-slate-100 hover:bg-slate-200 text-slate-700"
@@ -829,7 +829,7 @@ const LandingPage = () => {
               type="button"
               onClick={() => setActiveSlide(6)}
               className={cn(
-                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500",
+                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900",
                 activeSlide >= 6
                   ? "bg-slate-900 text-white shadow-xs"
                   : "bg-slate-100 hover:bg-slate-200 text-slate-700"
@@ -869,7 +869,7 @@ const LandingPage = () => {
 
                   {/* Play/Pause state indicator */}
                   <div className="text-slate-400 text-xs hidden sm:flex items-center gap-1">
-                    <Clock size={13} className="text-emerald-400" />
+                    <Clock size={13} className="text-slate-400" />
                     <span className="text-[10px]">{isGalleryHovered ? "Dijeda" : "Rotasi Otomatis"}</span>
                   </div>
                 </div>
@@ -897,7 +897,7 @@ const LandingPage = () => {
                     <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-auto sm:max-w-md bg-slate-950/90 backdrop-blur-md border border-slate-800 text-white p-3.5 sm:p-4 rounded-xl shadow-2xl">
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-800">
                             {slide.badge}
                           </span>
                           <span className="text-[10px] text-slate-400 font-medium">
@@ -917,14 +917,14 @@ const LandingPage = () => {
                 {/* Left/Right Floating Navigation Arrows */}
                 <button
                   onClick={() => setActiveSlide((prev) => (prev - 1 + gallerySlides.length) % gallerySlides.length)}
-                  className="absolute left-3 sm:left-4 z-20 w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white backdrop-blur-md border border-slate-700 flex items-center justify-center shadow-lg transition-transform hover:scale-110 active:scale-95"
+                  className="absolute left-3 sm:left-4 z-20 w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white backdrop-blur-md border border-slate-700 flex items-center justify-center shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
                   aria-label="Previous Screenshot"
                 >
                   <ChevronLeft size={20} />
                 </button>
                 <button
                   onClick={() => setActiveSlide((prev) => (prev + 1) % gallerySlides.length)}
-                  className="absolute right-3 sm:right-4 z-20 w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white backdrop-blur-md border border-slate-700 flex items-center justify-center shadow-lg transition-transform hover:scale-110 active:scale-95"
+                  className="absolute right-3 sm:right-4 z-20 w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white backdrop-blur-md border border-slate-700 flex items-center justify-center shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
                   aria-label="Next Screenshot"
                 >
                   <ChevronRight size={20} />
@@ -945,7 +945,7 @@ const LandingPage = () => {
                     <div
                       className={cn(
                         "h-full rounded-full transition-colors duration-300",
-                        activeSlide === i ? "bg-emerald-500 w-full" : "w-0"
+                        activeSlide === i ? "bg-blue-500 w-full" : "w-0"
                       )}
                     />
                   </div>
@@ -956,7 +956,7 @@ const LandingPage = () => {
             {/* Minimalist Elegant Slide Navigation Bar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3.5 mt-5 px-1">
               <div className="flex items-center gap-2.5">
-                <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200 shadow-2xs">
+                <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200 shadow-2xs">
                   {String(activeSlide + 1).padStart(2, "0")} / {String(gallerySlides.length).padStart(2, "0")}
                 </span>
                 <span className="text-xs sm:text-sm font-bold text-slate-800">
@@ -1353,8 +1353,8 @@ const LandingPage = () => {
         <div className="max-w-5xl mx-auto">
           {/* Section Header */}
           <div className="text-center max-w-2xl mx-auto mb-12 sm:mb-14">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-3.5 py-1.5 rounded-full mb-3 shadow-2xs">
-              <ShieldCheck size={14} className="text-emerald-600" />
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200/80 px-3.5 py-1.5 rounded-full mb-3 shadow-2xs">
+              <ShieldCheck size={14} className="text-blue-600" />
               Perbandingan Jelas & Transparan
             </span>
             <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
