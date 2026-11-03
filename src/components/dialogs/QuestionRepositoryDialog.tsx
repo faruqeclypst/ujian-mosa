@@ -651,9 +651,9 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
 
                           {/* Paket Literasi Badge & Quick Group Selector */}
                           {item.groupId && (
-                            <div className="flex items-center gap-1.5 min-w-0 max-w-full flex-wrap">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                               <Badge
-                                className="bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-bold py-0.5 px-2 flex items-center gap-1 max-w-[200px] xs:max-w-[260px] sm:max-w-[320px] min-w-0 shrink-0"
+                                className="bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-bold py-0.5 px-2 inline-flex items-center gap-1 max-w-[220px] min-w-0"
                                 title={`Literasi: ${item.groupId}`}
                               >
                                 <FileText className="h-2.5 w-2.5 shrink-0" />

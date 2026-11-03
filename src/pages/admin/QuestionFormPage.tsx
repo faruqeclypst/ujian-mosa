@@ -3842,23 +3842,24 @@ const QuestionFormPage = () => {
       label: "Teks Pertanyaan",
       sortable: true,
       render: (v: string, item: QuestionData) => (
-        <div className="max-w-lg min-w-0">
+        <div className="max-w-lg min-w-[250px]">
           <MathText content={item.text} className="line-clamp-2 text-sm font-serif text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" />
-          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap min-w-0 max-w-full">
+          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {(item.imageUrl || item.text.includes("<img")) && (
-              <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-xs border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight shrink-0">
+              <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-xs border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
                 Bergambar
               </span>
             )}
             {item.groupId && (
               <span
-                className="p-1 px-1.5 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-bold text-xs border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight max-w-[200px] xs:max-w-[260px] sm:max-w-[320px] min-w-0 shrink-0"
-                title={`Paket Literasi: ${item.groupId}`}
+                className="py-0.5 px-2 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 inline-flex items-center gap-1 font-semibold text-[11px] max-w-[220px] min-w-0"
+                title={`Paket Stimulus: ${item.groupId}`}
               >
+                <BookOpen className="h-3 w-3 shrink-0" />
                 <span className="truncate min-w-0">Paket: {item.groupId}</span>
                 {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && (
-                  <span className="ml-1 px-1 py-0.5 rounded bg-amber-500 text-white text-[7px] font-black shrink-0">
-                    MAIN
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-600 text-white text-[9px] font-bold shrink-0">
+                    Wacana
                   </span>
                 )}
               </span>

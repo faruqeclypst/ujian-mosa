@@ -100,7 +100,7 @@ export const NeonBadge: React.FC<NeonBadgeProps> = ({
         />
       )}
       {Icon && <Icon className="h-3 w-3 shrink-0" />}
-      <span>{children}</span>
+      <span className="inline-flex items-center gap-1 min-w-0">{children}</span>
     </span>
   );
 };
