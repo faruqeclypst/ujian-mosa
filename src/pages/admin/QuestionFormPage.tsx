@@ -5299,57 +5299,57 @@ const QuestionFormPage = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-5 relative w-full pb-16">
-      {/* Header Card (Mirip dengan kartu soal & fluid w-full) */}
-      <div className="relative z-20 flex flex-col gap-3 bg-card p-4 sm:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm transition-colors w-full">
-        {/* Breadcrumbs Row */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground overflow-x-auto no-scrollbar py-0.5">
-          <button
-            type="button"
-            onClick={() => navigate("/admin/bank-soal")}
-            className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors shrink-0"
-          >
-            Bank Soal
-          </button>
-          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
-          <button
-            type="button"
-            onClick={() => {
-              if (examId) sessionStorage.setItem("activeQuestionsExamId", examId);
-              navigate("/admin/bank-soal/questions");
-            }}
-            className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors truncate max-w-[200px] sm:max-w-xs shrink-0"
-            title={exam?.title || "Daftar Soal"}
-          >
-            {exam?.title || "Daftar Soal"}
-          </button>
-          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
-          <span className="font-semibold text-foreground shrink-0">
-            {dialogMode === "edit" ? "Edit Butir Soal" : "Tambah Butir Soal"}
-          </span>
-        </nav>
-
-        {/* Main Header Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-0.5">
-          {/* Left: Back Button + Title Block */}
+    <div className="w-full min-h-screen bg-neutral-50/50 dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans pb-32">
+      <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
+        {/* ── Top Bar: Back, Breadcrumbs, Title, Metadata Pills, Top Actions ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800 relative z-30">
           <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xs cursor-pointer"
               onClick={() => {
                 if (examId) sessionStorage.setItem("activeQuestionsExamId", examId);
                 navigate("/admin/bank-soal/questions");
               }}
-              className="shrink-0 w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 flex items-center justify-center transition-all focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 active:scale-95"
-              title="Kembali ke daftar soal"
-              aria-label="Kembali ke daftar soal"
+              title="Kembali ke daftar butir soal"
+              aria-label="Kembali ke daftar butir soal"
             >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 space-y-1">
+              {/* Breadcrumbs Row */}
+              <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 overflow-x-auto no-scrollbar">
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/bank-soal")}
+                  className="hover:text-neutral-800 dark:hover:text-neutral-200 font-medium transition-colors shrink-0 cursor-pointer"
+                >
+                  Bank Soal
+                </button>
+                <ChevronRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (examId) sessionStorage.setItem("activeQuestionsExamId", examId);
+                    navigate("/admin/bank-soal/questions");
+                  }}
+                  className="hover:text-neutral-800 dark:hover:text-neutral-200 font-medium transition-colors truncate max-w-[200px] sm:max-w-xs shrink-0 cursor-pointer"
+                  title={exam?.title || "Daftar Soal"}
+                >
+                  {exam?.title || "Daftar Soal"}
+                </button>
+                <ChevronRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                <span className="font-semibold text-neutral-800 dark:text-neutral-200 shrink-0">
+                  {dialogMode === "edit" ? "Edit Butir Soal" : "Tambah Butir Soal"}
+                </span>
+              </nav>
+
               {/* Title + Badges */}
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight truncate">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 truncate">
                   {dialogMode === "edit" ? "Edit Butir Soal" : "Tambah Butir Soal"}
                 </h1>
 
@@ -5365,31 +5365,30 @@ const QuestionFormPage = () => {
 
                 {/* Dynamic Question Type Pill */}
                 {QUESTION_TYPE_LABELS[formValues.type] && (
-                  <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80">
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200/80 dark:border-neutral-700/80">
                     <Layers className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                     {QUESTION_TYPE_LABELS[formValues.type]}
                   </span>
                 )}
-              </div>
 
-              {/* Meta context: Subject, Teacher, Questions Count */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
                 {exam?.subject && (
-                  <span className="inline-flex items-center gap-1 font-medium text-foreground">
-                    <BookOpen className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
-                    <span className="truncate max-w-[180px]">{exam.subject}</span>
+                  <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
+                    <BookOpen className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                    <span className="truncate max-w-[160px]">{exam.subject}</span>
                   </span>
                 )}
+
                 {exam?.teacherName && (
-                  <span className="inline-flex items-center gap-1 hidden sm:inline-flex">
-                    <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span className="truncate max-w-[160px]">{exam.teacherName}</span>
+                  <span className="hidden lg:inline-flex items-center gap-1 text-xs text-neutral-500">
+                    <User className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate max-w-[140px]">{exam.teacherName}</span>
                   </span>
                 )}
+
                 {questions.length > 0 && (
-                  <span className="inline-flex items-center gap-1 text-muted-foreground hidden md:inline-flex">
+                  <span className="hidden xl:inline-flex items-center gap-1 text-xs text-neutral-400">
                     <Hash className="w-3 h-3 shrink-0" />
-                    Total {questions.length} soal tersimpan
+                    Total {questions.length} soal
                   </span>
                 )}
               </div>
@@ -5402,67 +5401,76 @@ const QuestionFormPage = () => {
             <button
               type="button"
               onClick={() => setShowPreview(!showPreview)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border shadow-xs active:scale-95 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 ${
+              className={`inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg border transition-all shadow-2xs active:scale-95 cursor-pointer ${
                 showPreview
-                  ? "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-indigo-500/20"
-                  : "bg-background hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground border-slate-200 dark:border-slate-700"
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/20"
+                  : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800"
               }`}
               title={showPreview ? "Matikan pratinjau tampilan ujian siswa" : "Aktifkan pratinjau tampilan ujian siswa"}
               aria-pressed={showPreview}
             >
-              {showPreview ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
+              {showPreview ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-neutral-400" />}
               <span>{showPreview ? "Pratinjau: ON" : "Pratinjau: OFF"}</span>
             </button>
 
-            {/* Quick Save Header Button */}
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (examId) sessionStorage.setItem("activeQuestionsExamId", examId);
+                navigate("/admin/bank-soal/questions");
+              }}
+              className="h-9 px-3.5 rounded-lg text-xs font-semibold border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+            >
+              Batal
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
               onClick={(e) => handleSubmit(e, false)}
               disabled={isSavingQuestion}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-xs shadow-indigo-500/20 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30"
-              title="Simpan soal"
+              className="h-9 px-4 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed shadow-2xs shadow-indigo-500/20 cursor-pointer"
+              title="Simpan butir soal"
             >
               {isSavingQuestion ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
                   <span>Menyimpan...</span>
                 </>
               ) : (
                 <>
-                  <Check className="w-3.5 h-3.5" />
+                  <Check className="w-3.5 h-3.5 mr-1.5" />
                   <span>{dialogMode === "edit" ? "Perbarui" : "Simpan"}</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
 
-      {/* Form Content (Fluid Width matching Header Card) */}
-      {formLoading ? (
-        <div className="flex items-center justify-center py-20 bg-card rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-          <span className="ml-3 text-muted-foreground">Memuat soal...</span>
-        </div>
-      ) : (
-        <div className="bg-card rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm overflow-hidden w-full">
-        {/* Form - converted from dialog to page */}
-          <div className="p-0 gap-0 flex flex-col">
-
-            <form onSubmit={(e) => handleSubmit(e, false)} className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              {/* Scrollable Form Body */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 bg-white dark:bg-slate-950">
-                {/* Row 1: Pengaturan Tipe Soal & Stimulus Literasi (Menyatu, Rapi & Tidak Mengambang) */}
-                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 shadow-xs overflow-hidden">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800">
+        {/* ── Form Content Card ── */}
+        {formLoading ? (
+          <div className="flex items-center justify-center py-24 bg-white dark:bg-[#0f1115] rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+            <span className="ml-3 text-sm text-neutral-500">Memuat data soal...</span>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-[#0f1115] rounded-2xl border border-neutral-200/90 dark:border-neutral-800 shadow-xs overflow-hidden">
+            <form onSubmit={(e) => handleSubmit(e, false)} className="flex flex-col">
+              {/* Form Body with Natural Flow & Proper Gaps */}
+              <div className="p-5 sm:p-7 space-y-6">
+                {/* Row 1: Pengaturan Tipe Soal & Stimulus Literasi */}
+                <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/40 shadow-2xs overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-neutral-200 dark:divide-neutral-800">
                     {/* Kolom Kiri: Jenis / Tipe Soal */}
-                    <div className="p-4 space-y-2 flex flex-col justify-between">
+                    <div className="p-4 sm:p-5 space-y-2 flex flex-col justify-between">
                       <div className="flex items-center justify-between">
-                        <label htmlFor="type" className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <label htmlFor="type" className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
                           <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                           <span>Jenis / Tipe Soal</span>
                         </label>
-                        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Format Jawaban</span>
+                        <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">Format Jawaban</span>
                       </div>
 
                       <div className="relative">
@@ -5711,17 +5719,18 @@ const QuestionFormPage = () => {
                 </div>
 
                 {/* Row 2: Editor Pertanyaan Utama */}
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <label htmlFor="text" className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                      Pertanyaan Utama
+                    <label htmlFor="text" className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                      <span>Pertanyaan Utama</span>
+                      <span className="text-rose-500 font-bold">*</span>
                     </label>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-neutral-400 dark:text-neutral-500 hidden sm:inline">
                       Mendukung rumus LaTeX, teks kaya, dan tabel
                     </span>
                   </div>
 
-                  <div className="bg-card rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all flex flex-col">
+                  <div className="bg-white dark:bg-[#0c0d0e] rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-2xs focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all flex flex-col">
                     <ReactQuill
                       key={selectedQuestion ? `edit-${selectedQuestion.id}` : "create-main"}
                       ref={quillRef}
@@ -5734,7 +5743,7 @@ const QuestionFormPage = () => {
                       placeholder="Tuliskan pertanyaan disini..."
                       modules={quillModules}
                       formats={quillFormats}
-                      className="[&_.ql-editor]:min-h-[130px] [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-slate-50/50 dark:[&_.ql-toolbar]:bg-slate-900/30 [&_.ql-toolbar]:overflow-x-auto"
+                      className="[&_.ql-editor]:min-h-[140px] [&_.ql-editor]:text-base [&_.ql-editor]:p-4 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-neutral-200 dark:[&_.ql-toolbar]:border-neutral-800 [&_.ql-toolbar]:bg-neutral-50/70 dark:[&_.ql-toolbar]:bg-neutral-900/50 [&_.ql-toolbar]:px-3 [&_.ql-toolbar]:py-2 [&_.ql-toolbar]:overflow-x-auto"
                     />
 
                     {/* Pratinjau Tampilan (Sesuai Ujian) - Muncul jika showPreview === true */}
@@ -5762,14 +5771,14 @@ const QuestionFormPage = () => {
                 </div>
 
                 {/* Row 4: Kunci Jawaban & Opsi */}
-                <div className="space-y-3.5 pt-1">
-                  <div className="flex items-center justify-between pb-1 border-b border-slate-200/80 dark:border-slate-800">
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-neutral-200 dark:border-neutral-800">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                      <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
                         Jawaban & Kunci Penilaian
                       </span>
                     </div>
-                    <span className="text-xs text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/60 px-2.5 py-1 rounded-full font-semibold">
+                    <span className="text-xs text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/60 px-2.5 py-0.5 rounded-full font-semibold">
                       MODE: {formValues.type.replace(/_/g, " ").toUpperCase()}
                     </span>
                   </div>
@@ -5808,33 +5817,33 @@ const QuestionFormPage = () => {
                               setFormValues(prev => ({ ...prev, choices: updatedChoices }));
                               setDraggedIndex(null);
                             }}
-                            className={`p-3 sm:p-3.5 border rounded-xl transition-all relative ${isCorrect
-                                ? "bg-emerald-50/40 border-emerald-300 dark:bg-emerald-950/20 dark:border-emerald-800/60 shadow-xs"
-                                : "bg-white dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                            className={`p-3.5 sm:p-4 rounded-xl border transition-all ${isCorrect
+                                ? "bg-emerald-50/50 border-emerald-300 dark:bg-emerald-950/25 dark:border-emerald-800 shadow-xs"
+                                : "bg-neutral-50/40 dark:bg-neutral-900/40 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700"
                               }`}
                           >
                             <div className="flex items-start gap-2.5 sm:gap-3">
                               {/* Drag handle & Letter badge */}
-                              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pt-1.5">
+                              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pt-1">
                                 <div
                                   onMouseEnter={() => setCanDrag(true)}
                                   onMouseLeave={() => setCanDrag(false)}
-                                  className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors"
+                                  className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300 transition-colors"
                                   title="Tahan dan geser untuk ubah urutan opsi"
                                 >
                                   <GripVertical className="h-4 w-4" />
                                 </div>
 
-                                <div className={`w-8 h-8 rounded-xl font-black text-sm flex items-center justify-center transition-colors ${isCorrect
+                                <div className={`w-8.5 h-8.5 rounded-xl font-black text-sm flex items-center justify-center transition-colors ${isCorrect
                                     ? "bg-emerald-600 text-white shadow-xs"
-                                    : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                                    : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 shadow-2xs"
                                   }`}>
                                   {letter.toUpperCase()}
                                 </div>
                               </div>
 
                               {/* ReactQuill Editor Opsi */}
-                              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex-1 min-w-0 overflow-hidden shadow-xs focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/10">
+                              <div className="bg-white dark:bg-[#0c0d0e] rounded-xl border border-neutral-200 dark:border-neutral-700 flex-1 min-w-0 overflow-hidden shadow-2xs focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10">
                                 <ReactQuill
                                   key={selectedQuestion ? `edit-${selectedQuestion.id}-${letter}` : `create-${letter}`}
                                   theme="snow"
@@ -5846,30 +5855,30 @@ const QuestionFormPage = () => {
                                   placeholder={`Jawaban opsi ${letter.toUpperCase()} ...`}
                                   modules={quillModulesChoice}
                                   formats={quillFormatsChoice}
-                                  className="[&_.ql-editor]:min-h-[52px] [&_.ql-editor]:py-2 [&_.ql-editor]:text-left [&_.ql-editor_p]:!text-left [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-2 [&_.ql-toolbar]:py-0.5 [&_.ql-toolbar]:bg-slate-50/70 dark:[&_.ql-toolbar]:bg-slate-800/60 [&_.ql-toolbar]:overflow-x-auto"
+                                  className="[&_.ql-editor]:min-h-[52px] [&_.ql-editor]:py-2.5 [&_.ql-editor]:px-3 [&_.ql-editor]:text-left [&_.ql-editor_p]:!text-left [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-neutral-200 dark:[&_.ql-toolbar]:border-neutral-800 [&_.ql-toolbar]:px-2.5 [&_.ql-toolbar]:py-1 [&_.ql-toolbar]:bg-neutral-50/80 dark:[&_.ql-toolbar]:bg-neutral-800/60 [&_.ql-toolbar]:overflow-x-auto"
                                 />
 
                                 {/* Pratinjau Opsi jika showPreview aktif */}
                                 {showPreview && formValues.choices[letter].text && (
-                                  <div className="p-2.5 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-800">
+                                  <div className="p-2.5 bg-neutral-50 dark:bg-neutral-900/60 border-t border-neutral-200 dark:border-neutral-800">
                                     <MathText
                                       content={autoDetectLatex(formValues.choices[letter].text)}
                                       disableJustify={true}
-                                      className="text-xs font-serif ql-editor !p-0 cbt-choice-text text-left text-slate-700 dark:text-slate-300"
+                                      className="text-xs font-serif ql-editor !p-0 cbt-choice-text text-left text-neutral-700 dark:text-neutral-300"
                                     />
                                   </div>
                                 )}
                               </div>
 
-                              {/* 1 Kolom 2 Baris: Kunci di atas, Gambar di bawah (Compact, hemat space) */}
-                              <div className="flex flex-col gap-1.5 shrink-0 w-20 sm:w-22 pt-0.5">
+                              {/* Action Buttons: Kunci & Gambar */}
+                              <div className="flex flex-col gap-1.5 shrink-0 w-22 sm:w-24 pt-0.5">
                                 {/* Baris 1: KUNCI */}
                                 <Button
                                   type="button"
                                   variant="ghost"
-                                  className={`h-8 w-full text-xs font-bold rounded-lg transition-all border flex items-center justify-center gap-1 select-none active:scale-95 shadow-xs ${isCorrect
+                                  className={`h-8.5 w-full text-xs font-bold rounded-lg transition-all border flex items-center justify-center gap-1.5 select-none active:scale-95 shadow-2xs cursor-pointer ${isCorrect
                                       ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:border-emerald-500 shadow-emerald-500/20"
-                                      : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700"
+                                      : "bg-white hover:bg-neutral-100 text-neutral-700 border-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 dark:text-neutral-300 dark:border-neutral-700 hover:border-emerald-400"
                                     }`}
                                   size="sm"
                                   onClick={() => handleChoiceChange(letter, 'isCorrect', !isCorrect)}
@@ -5878,11 +5887,11 @@ const QuestionFormPage = () => {
                                   {isCorrect ? (
                                     <>
                                       <Check className="h-3.5 w-3.5 stroke-[2.5]" />
-                                      <span>Kunci</span>
+                                      <span>KUNCI</span>
                                     </>
                                   ) : (
                                     <>
-                                      <Key className="h-3 w-3 text-slate-400 dark:text-slate-500" />
+                                      <Key className="h-3 w-3 text-neutral-400 dark:text-neutral-500" />
                                       <span>Kunci</span>
                                     </>
                                   )}
@@ -5891,9 +5900,9 @@ const QuestionFormPage = () => {
                                 {/* Baris 2: GAMBAR */}
                                 <button
                                   type="button"
-                                  className={`h-8 w-full text-xs font-semibold rounded-lg transition-all border flex items-center justify-center gap-1 select-none active:scale-95 shadow-xs ${hasImage
+                                  className={`h-8.5 w-full text-xs font-semibold rounded-lg transition-all border flex items-center justify-center gap-1.5 select-none active:scale-95 shadow-2xs cursor-pointer ${hasImage
                                       ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60 dark:hover:bg-blue-900/40"
-                                      : "bg-white hover:bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700"
+                                      : "bg-white hover:bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 dark:text-neutral-300 dark:border-neutral-700"
                                     }`}
                                   onClick={() => {
                                     setGalleryTarget({ type: "choice", letter });
@@ -5901,7 +5910,7 @@ const QuestionFormPage = () => {
                                   }}
                                   title="Tambah atau ubah gambar opsi"
                                 >
-                                  <Image className="w-3.5 h-3.5" />
+                                  <Image className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
                                   <span>{hasImage ? "Ganti" : "Gambar"}</span>
                                 </button>
                               </div>
@@ -5909,12 +5918,12 @@ const QuestionFormPage = () => {
 
                             {/* Image Thumbnail if attached */}
                             {hasImage && (
-                              <div className="mt-2.5 pl-11 sm:pl-12 flex items-center gap-2.5">
+                              <div className="mt-3 pl-12 sm:pl-14 flex items-center gap-3">
                                 <div className="relative group">
                                   <img
                                     src={imageUrl}
                                     alt={`Pratinjau ${letter}`}
-                                    className="h-14 w-auto max-w-[130px] object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs"
+                                    className="h-14 w-auto max-w-[140px] object-cover rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-2xs"
                                   />
                                   <button
                                     type="button"
@@ -5922,13 +5931,13 @@ const QuestionFormPage = () => {
                                       handleChoiceChange(letter, "imageUrl", "");
                                       setChoiceFiles(prev => ({ ...prev, [letter]: null }));
                                     }}
-                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-xs transition-colors"
+                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-xs transition-colors cursor-pointer"
                                     title="Hapus gambar opsi"
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
                                 </div>
-                                <span className="text-xs text-slate-400">Gambar opsi {letter.toUpperCase()}</span>
+                                <span className="text-xs text-neutral-400">Gambar opsi {letter.toUpperCase()}</span>
                               </div>
                             )}
                           </div>
@@ -6013,7 +6022,7 @@ const QuestionFormPage = () => {
                                   const updated = (formValues.statements || []).filter((_, i) => i !== index);
                                   setFormValues(prev => ({ ...prev, statements: updated }));
                                 }}
-                                className="h-11 w-11 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 ml-1 rounded-xl"
+                                className="h-9 w-9 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg cursor-pointer"
                                 disabled={(formValues.statements || []).length <= 1}
                                 title="Hapus Pernyataan"
                               >
@@ -6079,7 +6088,7 @@ const QuestionFormPage = () => {
                                   setFormValues(prev => ({ ...prev, matrixColumns: updated }));
                                 }}
                                 placeholder={`Nama kolom ${cIdx + 1}...`}
-                                className="h-11 text-sm w-32 bg-slate-50/50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                className="h-8 text-xs w-32 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-700"
                               />
                               <Button
                                 type="button"
@@ -6090,7 +6099,7 @@ const QuestionFormPage = () => {
                                   setFormValues(prev => ({ ...prev, matrixColumns: updated }));
                                 }}
                                 disabled={(formValues.matrixColumns || []).length <= 2}
-                                className="h-11 w-11 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg"
+                                className="h-8 w-8 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md cursor-pointer"
                                 title="Hapus Kolom"
                               >
                                 <X className="h-4 w-4" />
@@ -6108,9 +6117,9 @@ const QuestionFormPage = () => {
                                 return { ...prev, matrixColumns: [...list, { id: newId, text: "" }] };
                               });
                             }}
-                            className="h-11 text-xs border-dashed rounded-xl font-semibold text-teal-600 hover:text-teal-700 hover:bg-teal-50/50 dark:hover:bg-teal-950/20 px-4"
+                            className="h-8 text-xs border-dashed rounded-lg font-semibold text-teal-600 hover:text-teal-700 hover:bg-teal-50/50 dark:hover:bg-teal-950/20 px-3 cursor-pointer"
                           >
-                            <Plus className="h-3.5 w-3.5 mr-1.5" /> Kolom
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Kolom
                           </Button>
                         </div>
                       </div>
@@ -6167,7 +6176,7 @@ const QuestionFormPage = () => {
                                     const updated = (formValues.matrixStatements || []).filter((_, i) => i !== index);
                                     setFormValues(prev => ({ ...prev, matrixStatements: updated }));
                                   }}
-                                  className="h-11 w-11 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl"
+                                  className="h-9 w-9 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg cursor-pointer"
                                   disabled={(formValues.matrixStatements || []).length <= 1}
                                   title="Hapus Pernyataan"
                                 >
@@ -6238,7 +6247,7 @@ const QuestionFormPage = () => {
                                   setFormValues(prev => ({ ...prev, klasifikasiCategories: updated }));
                                 }}
                                 disabled={(formValues.klasifikasiCategories || []).length <= 2}
-                                className="h-11 w-11 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg"
+                                className="h-9 w-9 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md cursor-pointer"
                                 title="Hapus Kategori"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -6328,7 +6337,7 @@ const QuestionFormPage = () => {
                                     const updated = (formValues.klasifikasiStatements || []).filter((_, i) => i !== index);
                                     setFormValues(prev => ({ ...prev, klasifikasiStatements: updated }));
                                   }}
-                                  className="h-11 w-11 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl"
+                                  className="h-9 w-9 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg cursor-pointer"
                                   disabled={(formValues.klasifikasiStatements || []).length <= 1}
                                   title="Hapus Pernyataan"
                                 >
@@ -6493,7 +6502,7 @@ const QuestionFormPage = () => {
                                   setHotspotFile(null);
                                   setFormValues(prev => ({ ...prev, hotspotImageUrl: "" }));
                                 }}
-                                className="h-11 w-11 shrink-0 shadow-md"
+                                className="h-9 w-9 shrink-0 shadow-xs cursor-pointer"
                                 title="Hapus gambar"
                               >
                                 <Trash className="h-4 w-4" />
@@ -6599,40 +6608,44 @@ const QuestionFormPage = () => {
                               setDraggedIndex(null);
                             }}
                             onDragEnd={() => { setDraggedIndex(null); setCanDrag(false); }}
-                            className="flex gap-2.5 items-center p-3 rounded-xl bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 shadow-xs"
+                            className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center p-3 sm:p-3.5 rounded-xl bg-neutral-50/40 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 shadow-xs"
                           >
-                            <div
-                              onMouseEnter={() => setCanDrag(true)}
-                              onMouseLeave={() => setCanDrag(false)}
-                              className="cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-500"
-                              title="Tahan dan geser untuk ubah urutan"
-                            >
-                              <GripVertical className="h-4 w-4" />
+                            <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0">
+                              <div
+                                onMouseEnter={() => setCanDrag(true)}
+                                onMouseLeave={() => setCanDrag(false)}
+                                className="cursor-grab active:cursor-grabbing p-1 text-neutral-400 hover:text-neutral-600 shrink-0"
+                                title="Tahan dan geser untuk ubah urutan"
+                              >
+                                <GripVertical className="h-4 w-4" />
+                              </div>
+                              <Input
+                                placeholder="Teks pernyataan kiri..."
+                                value={pair.left}
+                                onChange={(e) => handlePairChange(pair.id, "left", e.target.value)}
+                                className="h-9.5 text-xs flex-1 bg-white dark:bg-[#0c0d0e] border-neutral-200 dark:border-neutral-700"
+                              />
                             </div>
-                            <Input
-                              placeholder="Teks pernyataan kiri..."
-                              value={pair.left}
-                              onChange={(e) => handlePairChange(pair.id, "left", e.target.value)}
-                              className="h-10 text-xs flex-1 bg-slate-50/50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
-                            />
-                            <ArrowLeft className="w-4 h-4 rotate-180 text-slate-400 shrink-0" />
-                            <Input
-                              placeholder="Teks pasangan kanan..."
-                              value={pair.right}
-                              onChange={(e) => handlePairChange(pair.id, "right", e.target.value)}
-                              className="h-10 text-xs flex-1 bg-slate-50/50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemovePair(pair.id)}
-                              className="h-11 w-11 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl shrink-0"
-                              disabled={formValues.pairs.length <= 1}
-                              title="Hapus pasangan"
-                            >
-                              <Trash className="h-4 w-4" />
-                            </Button>
+                            <ArrowLeft className="w-4 h-4 rotate-90 sm:rotate-180 text-neutral-400 shrink-0 self-center" />
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <Input
+                                placeholder="Teks pasangan kanan..."
+                                value={pair.right}
+                                onChange={(e) => handlePairChange(pair.id, "right", e.target.value)}
+                                className="h-9.5 text-xs flex-1 bg-white dark:bg-[#0c0d0e] border-neutral-200 dark:border-neutral-700"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemovePair(pair.id)}
+                                className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg shrink-0 cursor-pointer"
+                                disabled={formValues.pairs.length <= 1}
+                                title="Hapus pasangan"
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -6721,7 +6734,7 @@ const QuestionFormPage = () => {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleRemoveItem(item.id)}
-                              className="h-11 w-11 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl shrink-0"
+                              className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg shrink-0 cursor-pointer"
                               disabled={formValues.items.length <= 1}
                               title="Hapus item"
                             >
@@ -6745,12 +6758,15 @@ const QuestionFormPage = () => {
               </div>
 
               {/* Sticky Footer */}
-              <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-sm flex flex-col-reverse sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="sticky bottom-0 z-20 px-5 sm:px-7 py-4 border-t border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-[#0f1115]/95 backdrop-blur-md flex flex-col-reverse sm:flex-row items-center justify-between gap-3 shrink-0 rounded-b-2xl shadow-lg">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate("/admin/bank-soal/questions")}
-                  className="w-full sm:w-auto px-5 h-10 rounded-xl text-slate-600 dark:text-slate-300 font-semibold"
+                  onClick={() => {
+                    if (examId) sessionStorage.setItem("activeQuestionsExamId", examId);
+                    navigate("/admin/bank-soal/questions");
+                  }}
+                  className="w-full sm:w-auto px-5 h-10 rounded-xl text-neutral-600 dark:text-neutral-300 font-semibold border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
                 >
                   Batal
                 </Button>
@@ -6761,7 +6777,7 @@ const QuestionFormPage = () => {
                       type="button"
                       onClick={(e) => handleSubmit(e, true)}
                       disabled={isSavingQuestion}
-                      className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-10 px-4 shadow-sm shadow-emerald-500/20 active:scale-95 transition-all"
+                      className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-10 px-4 shadow-sm shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
                     >
                       {isSavingQuestion ? (
                         <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...</>
@@ -6773,7 +6789,7 @@ const QuestionFormPage = () => {
                   <Button
                     type="submit"
                     disabled={isSavingQuestion}
-                    className="flex-1 sm:flex-initial bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl h-10 px-5 shadow-sm shadow-indigo-500/20 active:scale-95 transition-all"
+                    className="flex-1 sm:flex-initial bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl h-10 px-5 shadow-sm shadow-indigo-500/20 active:scale-95 transition-all cursor-pointer"
                   >
                     {isSavingQuestion ? (
                       <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...</>
@@ -6785,8 +6801,8 @@ const QuestionFormPage = () => {
               </div>
             </form>
           </div>
-          </div>
         )}
+      </div>
 
       {/* Preview Dialog - kept */}
       {/* Dialog Preview Soal (CBT Look) */}
