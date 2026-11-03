@@ -4,11 +4,11 @@ import { fadeUp } from "../../lib/motion";
 import { useNavigate } from "react-router-dom";
 import {
   Shield, Zap, ArrowRight, CheckCircle, Building2, Menu, X, Globe,
-  Wand2, MessageCircle, Check, Siren, Sparkles, BarChart3,
+  Wand2, MessageCircle, Check, BarChart3,
   FileSpreadsheet, Users, HelpCircle, Phone, Smartphone, Laptop,
-  Lock, ArrowUpRight, Star, GraduationCap, ChevronDown, ChevronLeft, ChevronRight,
-  Eye, Clock, AlertTriangle, Play, Pause, FileText, Search,
-  Server, XCircle, AlertCircle, Crown, CreditCard, BookOpen
+  Lock, Star, GraduationCap, ChevronDown, ChevronLeft, ChevronRight,
+  Eye, Clock, AlertTriangle, FileText, Search,
+  Server, XCircle, AlertCircle, BookOpen, Award, ShieldAlert, ShieldCheck, SlidersHorizontal
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { getDomainSuffix } from "../../utils/domainHelper";
@@ -22,150 +22,110 @@ const LandingPage = () => {
   const [showAllFaqs, setShowAllFaqs] = useState(false);
   const [billingCycle, setBillingCycle] = useState<"1bulan" | "2bulan" | "3bulan" | "semester" | "tahunan">("1bulan");
 
-  // Luxury Interactive Gallery State
+  // Interactive Gallery State
   const [activeSlide, setActiveSlide] = useState(0);
   const [isGalleryHovered, setIsGalleryHovered] = useState(false);
 
   const gallerySlides = [
     {
-      id: "login",
-      title: "01. Portal Login Siswa",
-      badge: "Keamanan Akun",
-      category: "Alur Siswa",
-      desc: "Antarmuka login yang bersih dan ramah siswa. Dilengkapi logo sekolah Anda sendiri dan pemilih mode gelap/terang.",
-      image: "/gallery/1-login.png",
-      url: "sekolahanda.examku.my.id/login",
-      tagline: "Akses Akun Terverifikasi"
-    },
-    {
-      id: "dashboard",
-      title: "02. Dashboard & Agenda Ujian",
+      id: "dashboard-siswa",
+      title: "01. Dashboard Siswa & Agenda Ujian",
       badge: "Pusat Siswa",
       category: "Alur Siswa",
-      desc: "Siswa dapat melihat jadwal ujian yang sedang aktif, identitas kelas/NISN, serta ringkasan pencapaian akademik.",
-      image: "/gallery/2-dashboard.png",
+      desc: "Siswa melihat kartu selamat datang, agenda sesi ujian yang aktif, status kepesertaan, serta tombol konfirmasi pengerjaan instan.",
+      image: "/gallery/1-dashboard-siswa.png",
       url: "sekolahanda.examku.my.id/dashboard",
-      tagline: "Agenda Ujian Real-Time"
+      tagline: "Agenda Ujian & Status Pengerjaan"
     },
     {
-      id: "token",
-      title: "03. Verifikasi Token Ujian",
-      badge: "Proteksi Ujian",
+      id: "token-gate",
+      title: "02. Verifikasi Token Ujian 6-Digit",
+      badge: "Akses Terproteksi",
       category: "Alur Siswa",
-      desc: "Ujian terlindungi dengan kode token 6 digit yang dibagikan proktor ruangan untuk memastikan siswa mulai tepat waktu.",
-      image: "/gallery/3-token.png",
+      desc: "Gerbang verifikasi token acak 6 digit yang dibagikan proktor ruangan untuk memastikan seluruh peserta serentak memulai pada jam yang ditentukan.",
+      image: "/gallery/2-token-gate.png",
       url: "sekolahanda.examku.my.id/cbt/token-gate",
-      tagline: "Akses Terproteksi Token"
+      tagline: "Akses Terverifikasi Proktor"
     },
     {
-      id: "rules",
-      title: "04. Konfirmasi & Aturan Ujian",
-      badge: "Kepatuhan Ujian",
-      category: "Alur Siswa",
-      desc: "Informasi transparan jumlah soal, durasi waktu, serta batas toleransi mode layar penuh sebelum siswa memulai pengerjaan.",
-      image: "/gallery/4-rules.png",
-      url: "sekolahanda.examku.my.id/cbt/konfirmasi",
-      tagline: "Tata Tertib Terpantau"
-    },
-    {
-      id: "exam",
-      title: "05. Lembar Pengerjaan Soal CBT",
-      badge: "Ruang Ujian Interaktif",
-      category: "Alur Siswa",
-      desc: "Navigasi nomor soal 1-25 cepat, timer hitung mundur siaga, status koneksi hijau, dan rendering peta/gambar resolusi tinggi.",
-      image: "/gallery/5-exam.png",
-      url: "sekolahanda.examku.my.id/cbt/workspace",
-      tagline: "Pengalaman Ujian Cepat & Mulus"
-    },
-    {
-      id: "focus",
-      title: "06. Kunci Mode Fokus Layar Penuh",
-      badge: "Kunci Layar Native",
-      category: "Keamanan",
-      desc: "Sistem mewajibkan mode Full Screen terkunci. Siswa tidak dapat membuka tab lain atau aplikasi contekan di latar belakang.",
-      image: "/gallery/6-focus.png",
-      url: "sekolahanda.examku.my.id/cbt/fullscreen-lock",
-      tagline: "Wajib Layar Penuh"
-    },
-    {
-      id: "warning",
-      title: "07. Peringatan Pelanggaran Otomatis",
-      badge: "Alarm & Anti Curang",
-      category: "Keamanan",
-      desc: "Deteksi instan saat siswa berupaya keluar aplikasi atau split-screen. Muncul peringatan batas pelanggaran (2/2) dan sirine alarm kencang.",
-      image: "/gallery/7-warning.png",
-      url: "sekolahanda.examku.my.id/cbt/pelanggaran",
-      tagline: "Sirine Alarm & Deteksi Curang"
-    },
-    {
-      id: "locked",
-      title: "08. Ujian Terkunci & Pembekuan Sesi",
-      badge: "Penalti Keamanan",
-      category: "Keamanan",
-      desc: "Siswa yang melampaui batas pelanggaran (3/2) otomatis dibekukan dengan hitung mundur penalti keamanan untuk efek jera.",
-      image: "/gallery/11-locked.png",
-      url: "sekolahanda.examku.my.id/cbt/freeze-penalty",
-      tagline: "Pembekuan Sesi Pelanggar"
-    },
-    {
-      id: "multi",
-      title: "09. Pilihan Ganda Kompleks",
-      badge: "Standar AKM / ANBK",
-      category: "Ragam Soal",
-      desc: "Mendukung format pilihan ganda kompleks di mana siswa dapat memilih lebih dari satu jawaban benar dengan counter opsi terpilih.",
-      image: "/gallery/8-multi.png",
+      id: "soal-kompleks",
+      title: "03. Pilihan Ganda Kompleks (AKM)",
+      badge: "Standar Asesmen",
+      category: "Ragam Soal CBT",
+      desc: "Mendukung format soal AKM/ANBK di mana siswa dapat memilih lebih dari satu jawaban benar dengan counter opsi terpilih otomatis.",
+      image: "/gallery/3-soal-kompleks.png",
       url: "sekolahanda.examku.my.id/cbt/soal-kompleks",
-      tagline: "Pilih Semua Jawaban Benar"
+      tagline: "Multi-Pilihan & Format Modern"
     },
     {
-      id: "matrix",
-      title: "10. Soal Matriks Benar / Salah",
-      badge: "Evaluasi Logika",
-      category: "Ragam Soal",
-      desc: "Tipe soal tabel matriks interaktif untuk mengevaluasi tiap baris pernyataan dengan validasi kelengkapan visual otomatis.",
-      image: "/gallery/9-matrix.png",
+      id: "soal-matriks",
+      title: "04. Soal Matriks Benar / Salah",
+      badge: "Evaluasi Kritis",
+      category: "Ragam Soal CBT",
+      desc: "Tabel evaluasi logika interaktif untuk mengecek kebenaran butir pernyataan secara baris per baris dengan indikator kelengkapan visual 3/3.",
+      image: "/gallery/4-soal-matriks.png",
       url: "sekolahanda.examku.my.id/cbt/soal-matriks",
-      tagline: "Pernyataan Benar / Salah"
+      tagline: "Tabel Evaluasi Pernyataan"
     },
     {
-      id: "incomplete",
-      title: "11. Validasi Jawaban Belum Lengkap",
-      badge: "Asisten Siswa Cerdas",
-      category: "Ragam Soal",
-      desc: "Mencegah siswa salah pencet selesai saat masih ada butir kosong. Sistem merangkum butir nomor yang terlewat dan memberi tombol lompat instan.",
-      image: "/gallery/10-incomplete.png",
-      url: "sekolahanda.examku.my.id/cbt/cek-kelengkapan",
-      tagline: "Cegah Soal Terlewat"
+      id: "lembar-soal",
+      title: "05. Lembar Soal & Formula KaTeX",
+      badge: "Ruang Ujian Interaktif",
+      category: "Ragam Soal CBT",
+      desc: "Pengerjaan soal cepat dengan rendering rumus kimia dan matematika KaTeX tajam, timer hitung mundur siaga, serta navigasi nomor adaptif.",
+      image: "/gallery/5-lembar-soal.png",
+      url: "sekolahanda.examku.my.id/cbt/workspace",
+      tagline: "Formula Presisi & Respon Mulus"
     },
     {
-      id: "analytics",
-      title: "12. Analisis Butir Soal Psikometri",
-      badge: "Standar Depdiknas",
-      category: "Panel Guru",
-      desc: "Evaluasi otomatis tingkat kesukaran (P), daya pembeda (D), point-biserial, efektivitas pengecoh, dan Decision Engine rekomendasi perbaikan instrumen.",
-      image: "/gallery/12-analytics.png",
-      url: "sekolahanda.examku.my.id/admin/analisis-butir-soal",
-      tagline: "Psikometri Arikunto & CTT"
+      id: "mode-fokus",
+      title: "06. Proteksi Kiosk Layar Penuh",
+      badge: "Integritas Native",
+      category: "Keamanan Kiosk",
+      desc: "Penguncian layar penuh wajib. Mencegah siswa membuka tab browser contekan, mematikan split-screen, dan mencatat riwayat pelanggaran bila keluar aplikasi.",
+      image: "/gallery/6-mode-fokus.png",
+      url: "sekolahanda.examku.my.id/cbt/fullscreen-lock",
+      tagline: "Kunci Layar Penuh Anti-Pindah Tab"
     },
     {
-      id: "editor",
-      title: "13. Bank Soal & Editor Rumus LaTeX",
-      badge: "Kelola Soal Praktis",
-      category: "Panel Guru",
-      desc: "Penyusunan butir soal kaya format dengan editor rumus matematika KaTeX/LaTeX, paket stimulus literasi bersama, dan gambar cover ilustrasi.",
-      image: "/gallery/13-editor.png",
-      url: "sekolahanda.examku.my.id/admin/bank-soal/tambah",
-      tagline: "Mendukung KaTeX & Formula"
+      id: "ruang-ujian",
+      title: "07. Ruang Ujian & Manajemen Sesi",
+      badge: "Konsol Admin",
+      category: "Panel Admin & Guru",
+      desc: "Pengaturan terpadu daftar ruang ujian, pembuatan sesi CBT, kontrol token aktif, inspektur statistik, dan pembagian link pengerjaan instan.",
+      image: "/gallery/7-ruang-ujian.png",
+      url: "sekolahanda.examku.my.id/admin/ruang-ujian",
+      tagline: "Kontrol Sesi & Token Ruangan"
     },
     {
-      id: "word-template",
-      title: "14. Import Soal dari Word (.docx)",
-      badge: "Format Standar Sekolah",
-      category: "Panel Guru",
-      desc: "Guru dapat menyusun soal langsung di Microsoft Word menggunakan template tabel dan KOP resmi sekolah untuk di-import otomatis tanpa ketik ulang.",
-      image: "/gallery/14-word-template.png",
-      url: "sekolahanda.examku.my.id/admin/bank-soal/import-word",
-      tagline: "Tarik Otomatis dari Word"
+      id: "monitoring-live",
+      title: "08. Monitoring Realtime & Proctor",
+      badge: "Pengawasan Aktif",
+      category: "Panel Admin & Guru",
+      desc: "Pantau denyut aktivitas peserta secara live: grafik aliran jawaban, status koneksi perangkat, inspeksi lembar jawaban, dan penanganan insiden satu klik.",
+      image: "/gallery/8-monitoring-live.png",
+      url: "sekolahanda.examku.my.id/admin/monitoring",
+      tagline: "Pantau Peserta & Jawaban Live"
+    },
+    {
+      id: "bank-soal",
+      title: "09. Kelola Bank Soal & Stimulus Literasi",
+      badge: "Kurikulum & Soal",
+      category: "Panel Admin & Guru",
+      desc: "Manajemen butir soal lengkap dengan bacaan stimulus literasi AKM, bobot skor, kunci jawaban, dan status ketersediaan siap uji.",
+      image: "/gallery/9-bank-soal.png",
+      url: "sekolahanda.examku.my.id/admin/bank-soal",
+      tagline: "Bank Soal Kaya Format & Stimulus"
+    },
+    {
+      id: "asisten-ai",
+      title: "10. Asisten AI Pembuat Soal",
+      badge: "Otomasi Kurikulum",
+      category: "Panel Admin & Guru",
+      desc: "Generator cerdas yang merancang butir soal, stimulus bacaan, dan kunci jawaban dari materi atau modul ajar guru secara otomatis dalam hitungan detik.",
+      image: "/gallery/10-asisten-ai.png",
+      url: "sekolahanda.examku.my.id/admin/ai-assistant",
+      tagline: "Generator Butir & Modul Ajar"
     }
   ];
 
@@ -229,9 +189,9 @@ const LandingPage = () => {
       badge: "Akselerasi Global Edge",
     },
     {
-      icon: Sparkles,
-      title: "Desain UI/UX Sangat Ramah Guru & Siswa",
-      desc: "Antarmuka dirancang bersih, intuitif, dan manusiawi. Guru senior dapat mengoperasikan tanpa kendala teknis dan tanpa perlu pelatihan rumit. Siswa mengerjakan soal dengan nyaman dan fokus di smartphone, tablet, maupun laptop.",
+      icon: SlidersHorizontal,
+      title: "Desain Antarmuka Bersih & Ramah Guru-Siswa",
+      desc: "Antarmuka dirancang bersih, intuitif, dan manusiawi tanpa kebingungan teknis. Guru senior dapat mengoperasikan tanpa kendala teknis dan tanpa perlu pelatihan rumit. Siswa mengerjakan soal dengan nyaman dan fokus di smartphone, tablet, maupun laptop.",
       badge: "Mudah Dipahami Siapa Saja",
     },
     {
@@ -251,26 +211,26 @@ const LandingPage = () => {
   const handleFeatureLearnMore = (index: number) => {
     switch (index) {
       case 0:
-        setActiveSlide(5);
+        setActiveSlide(5); // 06. Proteksi Kiosk Layar Penuh
         document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" });
         break;
       case 1:
-        setActiveSlide(13);
+        setActiveSlide(8); // 09. Kelola Bank Soal & Stimulus Literasi
         document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" });
         break;
       case 2:
-        setActiveSlide(12);
+        setActiveSlide(9); // 10. Asisten AI Pembuat Soal
         document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" });
         break;
       case 3:
-        setActiveSlide(11);
+        setActiveSlide(7); // 08. Monitoring Realtime & Proctor
         document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" });
         break;
       case 4:
         document.getElementById("technology")?.scrollIntoView({ behavior: "smooth" });
         break;
       case 5:
-        setActiveSlide(4);
+        setActiveSlide(0); // 01. Dashboard Siswa & Agenda Ujian
         document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" });
         break;
       case 6:
@@ -800,90 +760,94 @@ const LandingPage = () => {
               <span className="leading-snug">APK Android Kiosk & iOS Safe Exam Browser</span>
             </span>
             <span className="flex items-center gap-2 bg-white px-3 sm:px-4 py-2 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-colors max-w-full text-left">
-              <CheckCircle size={16} className="text-blue-600 flex-shrink-0" />
-              <span className="leading-snug">Cloudflare CDN Anti-Lag 99.98%</span>
+              <CheckCircle size={16} className="text-emerald-600 flex-shrink-0" />
+              <span className="leading-snug">Akselerasi Cloudflare Edge CDN & Auto-Save</span>
             </span>
           </div>
         </div>
       </section>
 
-      {/* LUXURY INTERACTIVE AUTO-PLAYING GALLERY SHOWCASE */}
+      {/* INTERACTIVE GALLERY SHOWCASE */}
       <section id="gallery" className="py-16 sm:py-24 px-4 sm:px-6 bg-white border-y border-slate-200/80 relative">
         <div className="max-w-6xl mx-auto">
           {/* Section Heading */}
           <div className="text-center max-w-3xl mx-auto mb-8">
-            <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 px-3.5 py-1 rounded-full text-xs font-bold text-blue-700 uppercase tracking-wider mb-3">
-              <Sparkles size={14} className="text-blue-600" />
-              Galeri Sistem Resmi EXAMKU · 14 Tampilan Nyata
+            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3.5 py-1 rounded-full text-xs font-bold text-emerald-800 uppercase tracking-wider mb-3">
+              <ShieldCheck size={14} className="text-emerald-600" />
+              Galeri Antarmuka EXAMKU · 10 Tampilan Nyata Platform
             </div>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-              Tampilan Nyata Platform yang Elegan & Mudah Digunakan
+              Tampilan Nyata Platform yang Bersih & Siap Digunakan
             </h2>
             <p className="text-slate-600 text-sm sm:text-base mt-2">
-              Jelajahi alur lengkap ujian digital: dari portal login, proteksi sanksi penalti otomatis, ragam soal AKM/ANBK, hingga panel guru dengan psikometri Arikunto & import Word (.docx).
+              Jelajahi alur lengkap ujian digital: dari dashboard siswa, token gate, ragam soal AKM/ANBK, kunci mode fokus layar penuh, hingga panel admin untuk monitoring live & generator soal AI.
             </p>
           </div>
 
           {/* Category Filter Pills for Quick Jumping (4 Categories) */}
           <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
             <button
+              type="button"
               onClick={() => setActiveSlide(0)}
               className={cn(
-                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5",
-                activeSlide < 5
-                  ? "bg-blue-600 text-white shadow-sm shadow-blue-500/25"
+                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500",
+                activeSlide < 2
+                  ? "bg-emerald-600 text-white shadow-xs"
                   : "bg-slate-100 hover:bg-slate-200 text-slate-700"
               )}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-300" />
-              Alur Siswa (1–5)
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-200" />
+              Alur Siswa (1–2)
             </button>
             <button
-              onClick={() => setActiveSlide(5)}
+              type="button"
+              onClick={() => setActiveSlide(2)}
               className={cn(
-                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5",
-                activeSlide >= 5 && activeSlide < 8
-                  ? "bg-rose-600 text-white shadow-sm shadow-rose-500/25"
-                  : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-              )}
-            >
-              <Siren size={13} />
-              Keamanan & Sanksi (6–8)
-            </button>
-            <button
-              onClick={() => setActiveSlide(8)}
-              className={cn(
-                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5",
-                activeSlide >= 8 && activeSlide < 11
-                  ? "bg-emerald-600 text-white shadow-sm shadow-emerald-500/25"
+                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500",
+                activeSlide >= 2 && activeSlide < 5
+                  ? "bg-emerald-600 text-white shadow-xs"
                   : "bg-slate-100 hover:bg-slate-200 text-slate-700"
               )}
             >
               <CheckCircle size={13} />
-              Ragam Soal AKM (9–11)
+              Ragam Soal CBT (3–5)
             </button>
             <button
-              onClick={() => setActiveSlide(11)}
+              type="button"
+              onClick={() => setActiveSlide(5)}
               className={cn(
-                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5",
-                activeSlide >= 11
-                  ? "bg-blue-600 text-white shadow-sm shadow-blue-500/25"
+                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500",
+                activeSlide === 5
+                  ? "bg-rose-600 text-white shadow-xs"
+                  : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+              )}
+            >
+              <ShieldAlert size={13} />
+              Keamanan Kiosk (6)
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSlide(6)}
+              className={cn(
+                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500",
+                activeSlide >= 6
+                  ? "bg-slate-900 text-white shadow-xs"
                   : "bg-slate-100 hover:bg-slate-200 text-slate-700"
               )}
             >
               <BarChart3 size={13} />
-              Panel Guru & Analisis (12–14)
+              Panel Admin & Guru (7–10)
             </button>
           </div>
 
-          {/* Interactive Luxury Screen Carousel Container */}
+          {/* Interactive Screen Carousel Container */}
           <div
             className="relative max-w-5xl mx-auto"
             onMouseEnter={() => setIsGalleryHovered(true)}
             onMouseLeave={() => setIsGalleryHovered(false)}
           >
-            {/* 3D Browser Window Frame */}
-            <div className="bg-slate-900 rounded-2xl sm:rounded-3xl p-2.5 sm:p-4 shadow-2xl shadow-slate-900/25 border border-slate-800 transition-all duration-500 relative">
+            {/* Browser Window Frame */}
+            <div className="bg-slate-900 rounded-2xl sm:rounded-3xl p-2.5 sm:p-4 shadow-2xl shadow-slate-900/25 border border-slate-800 transition-colors duration-300 relative">
 
               {/* Browser Header Bar */}
               <div className="bg-slate-800/90 rounded-xl px-4 py-2.5 mb-3 flex items-center justify-between gap-4 border border-slate-700/60">
@@ -900,13 +864,13 @@ const LandingPage = () => {
                 <div className="flex items-center gap-3">
                   <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/70 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Live System
+                    Sistem Aktif
                   </span>
 
                   {/* Play/Pause state indicator */}
                   <div className="text-slate-400 text-xs hidden sm:flex items-center gap-1">
-                    {isGalleryHovered ? <Pause size={13} /> : <Play size={13} className="text-emerald-400" />}
-                    <span className="text-[10px]">{isGalleryHovered ? "Dijeda" : "Otomatis"}</span>
+                    <Clock size={13} className="text-emerald-400" />
+                    <span className="text-[10px]">{isGalleryHovered ? "Dijeda" : "Rotasi Otomatis"}</span>
                   </div>
                 </div>
               </div>
@@ -917,7 +881,7 @@ const LandingPage = () => {
                   <div
                     key={slide.id}
                     className={cn(
-                      "absolute inset-0 transition-all duration-700 ease-out flex items-center justify-center p-1 sm:p-2",
+                      "absolute inset-0 transition-opacity transition-transform duration-500 ease-out flex items-center justify-center p-1 sm:p-2",
                       activeSlide === idx
                         ? "opacity-100 scale-100 z-10 pointer-events-auto"
                         : "opacity-0 scale-98 z-0 pointer-events-none"
@@ -933,7 +897,7 @@ const LandingPage = () => {
                     <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-auto sm:max-w-md bg-slate-950/90 backdrop-blur-md border border-slate-800 text-white p-3.5 sm:p-4 rounded-xl shadow-2xl">
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-800">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700">
                             {slide.badge}
                           </span>
                           <span className="text-[10px] text-slate-400 font-medium">
@@ -967,7 +931,7 @@ const LandingPage = () => {
                 </button>
               </div>
 
-              {/* Slide Progress Indicator Bar (14 segments) */}
+              {/* Slide Progress Indicator Bar (10 segments) */}
               <div
                 className="grid gap-1 mt-3 px-1"
                 style={{ gridTemplateColumns: `repeat(${gallerySlides.length}, minmax(0, 1fr))` }}
@@ -980,8 +944,8 @@ const LandingPage = () => {
                   >
                     <div
                       className={cn(
-                        "h-full rounded-full transition-all duration-300",
-                        activeSlide === i ? "bg-blue-500 w-full" : "w-0"
+                        "h-full rounded-full transition-colors duration-300",
+                        activeSlide === i ? "bg-emerald-500 w-full" : "w-0"
                       )}
                     />
                   </div>
@@ -992,7 +956,7 @@ const LandingPage = () => {
             {/* Minimalist Elegant Slide Navigation Bar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3.5 mt-5 px-1">
               <div className="flex items-center gap-2.5">
-                <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200 shadow-2xs">
+                <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200 shadow-2xs">
                   {String(activeSlide + 1).padStart(2, "0")} / {String(gallerySlides.length).padStart(2, "0")}
                 </span>
                 <span className="text-xs sm:text-sm font-bold text-slate-800">
@@ -1279,7 +1243,7 @@ const LandingPage = () => {
                   <div>
                     {plan.highlight && (
                       <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-4 py-1 rounded-full shadow-md uppercase tracking-wider flex items-center gap-1">
-                        <Sparkles size={13} className="text-amber-300" />
+                        <Award size={13} className="text-amber-300" />
                         <span>Populer</span>
                       </div>
                     )}
@@ -1389,8 +1353,8 @@ const LandingPage = () => {
         <div className="max-w-5xl mx-auto">
           {/* Section Header */}
           <div className="text-center max-w-2xl mx-auto mb-12 sm:mb-14">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200/80 px-3.5 py-1.5 rounded-full mb-3 shadow-2xs">
-              <Sparkles size={14} className="text-blue-600" />
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-3.5 py-1.5 rounded-full mb-3 shadow-2xs">
+              <ShieldCheck size={14} className="text-emerald-600" />
               Perbandingan Jelas & Transparan
             </span>
             <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -1424,7 +1388,7 @@ const LandingPage = () => {
                     </th>
                     <th className="py-4 px-5 font-bold bg-blue-50/70 border-r border-blue-200 text-slate-900 w-1/4">
                       <span className="inline-flex items-center gap-1 bg-blue-600 text-white text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md mb-1 shadow-2xs">
-                        <Crown size={11} className="text-amber-300" />
+                        <Award size={11} className="text-amber-300" />
                         <span>Rekomendasi Utama</span>
                       </span>
                       <div className="text-sm font-black text-blue-950">
@@ -1509,8 +1473,8 @@ const LandingPage = () => {
                       <div className="text-xs sm:text-sm font-black text-blue-900">
                         Cloudflare CDN (Anti-Lag)
                       </div>
-                      <span className="inline-block text-[11px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md mt-1">
-                        Garansi 99.98% tanpa antrean
+                      <span className="inline-block text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md mt-1">
+                        Akses serentak stabil tanpa antrean
                       </span>
                     </td>
                     <td className="py-4 px-5 text-slate-600 border-r border-slate-200/80">
@@ -1883,7 +1847,7 @@ const LandingPage = () => {
 
             <div className="relative z-10">
               <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md border border-white/20 px-3.5 py-1.5 rounded-full text-xs font-bold text-white mb-6">
-                <Sparkles size={14} className="text-amber-300" />
+                <ShieldCheck size={14} className="text-amber-300" />
                 <span>Uji Coba Gratis 50 Siswa Tanpa Biaya di Awal</span>
               </div>
 
@@ -1900,7 +1864,7 @@ const LandingPage = () => {
               <div className="flex justify-center mb-10">
                 <button
                   onClick={() => navigate("/daftar")}
-                  className="w-full sm:w-auto h-12 px-8 rounded-xl bg-white text-blue-800 hover:bg-blue-50 font-bold text-sm shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full sm:w-auto h-12 px-8 rounded-xl bg-white text-blue-800 hover:bg-blue-50 font-bold text-sm shadow-xl transition-colors duration-150 active:scale-95 flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
                 >
                   <span>Mulai Uji Coba Gratis (50 Siswa)</span>
                   <ArrowRight size={16} />
