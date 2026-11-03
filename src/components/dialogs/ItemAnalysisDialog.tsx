@@ -1288,8 +1288,11 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                                   {q.type}
                                 </Badge>
                                 {q.groupId && (
-                                  <Badge className="bg-amber-500 text-white text-[9px] font-bold py-0.5 px-1.5">
-                                    Literasi: {q.groupId}
+                                  <Badge
+                                    className="bg-amber-500 text-white text-[9px] font-bold py-0.5 px-1.5 max-w-[180px] sm:max-w-[280px] min-w-0 shrink-0"
+                                    title={`Literasi: ${q.groupId}`}
+                                  >
+                                    <span className="truncate min-w-0">Literasi: {q.groupId}</span>
                                   </Badge>
                                 )}
                                 {q.answerKey && (

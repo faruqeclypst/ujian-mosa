@@ -4233,32 +4233,37 @@ const QuestionsPage = () => {
     {
       key: "text",
       header: "Teks Pertanyaan & Stimulus",
-      className: "min-w-[150px] sm:min-w-0",
+      className: "min-w-[150px] sm:min-w-0 max-w-xl",
       render: (item) => (
-        <div className="space-y-1.5 py-0.5">
+        <div className="space-y-1.5 py-0.5 min-w-0">
           <MathText
             content={item.text}
             className="line-clamp-2 text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 !overflow-hidden !overflow-hidden [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4"
           />
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0 max-w-full">
             {(item.imageUrl || item.text.includes("<img")) && (
-              <NeonBadge variant="sky" size="xs" icon={Image}>
+              <NeonBadge variant="sky" size="xs" icon={Image} className="shrink-0">
                 Bergambar
               </NeonBadge>
             )}
             {item.groupId && (
-              <NeonBadge variant="amber" size="xs">
-                <BookOpen className="h-3 w-3" />
-                <span>Paket: {item.groupId}</span>
+              <NeonBadge
+                variant="amber"
+                size="xs"
+                className="max-w-[200px] xs:max-w-[260px] sm:max-w-[320px] md:max-w-[420px] min-w-0 shrink-0"
+                title={`Paket Literasi: ${item.groupId}`}
+              >
+                <BookOpen className="h-3 w-3 shrink-0" />
+                <span className="truncate min-w-0">Paket: {item.groupId}</span>
                 {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && (
-                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-600 text-white text-[9px] font-bold">
+                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-600 text-white text-[9px] font-bold shrink-0">
                     Wacana
                   </span>
                 )}
               </NeonBadge>
             )}
             {/* Mobile Type Badge */}
-            <span className="sm:hidden">
+            <span className="sm:hidden shrink-0">
               <NeonBadge
                 variant={(QUESTION_TYPE_BADGE[item.type || "pilihan_ganda"]?.variant) || "neutral"}
                 size="xs"
@@ -6079,8 +6084,14 @@ const QuestionsPage = () => {
                       {QUESTION_TYPE_LABELS[inspectedQuestion.type || "pilihan_ganda"] || inspectedQuestion.type}
                     </NeonBadge>
                     {inspectedQuestion.groupId && (
-                      <NeonBadge variant="amber" size="xs">
-                        Paket: {inspectedQuestion.groupId}
+                      <NeonBadge
+                        variant="amber"
+                        size="xs"
+                        className="max-w-[220px] min-w-0"
+                        title={`Paket Literasi: ${inspectedQuestion.groupId}`}
+                      >
+                        <BookOpen className="h-3 w-3 shrink-0" />
+                        <span className="truncate min-w-0">Paket: {inspectedQuestion.groupId}</span>
                       </NeonBadge>
                     )}
                   </div>
@@ -7823,7 +7834,12 @@ Aturan:
                       <div className="flex items-center gap-2">
                         <span className="text-sm sm:text-base font-black text-slate-800 dark:text-white uppercase tracking-tight">Pratinjau Siswa</span>
                         {previewQuestion.groupId && (
-                          <span className="px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-xs font-black uppercase tracking-widest">Grup: {previewQuestion.groupId}</span>
+                          <span
+                            className="px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-xs font-black uppercase tracking-widest max-w-[200px] sm:max-w-[320px] truncate"
+                            title={`Grup Literasi: ${previewQuestion.groupId}`}
+                          >
+                            Grup: {previewQuestion.groupId}
+                          </span>
                         )}
                       </div>
                     </div>
