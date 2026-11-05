@@ -69,6 +69,10 @@ export interface NeonTableProps<T> {
   // Compact / Dense layout
   compact?: boolean;
 
+  // Table element styling & layout customization
+  tableClassName?: string;
+  tableLayout?: "auto" | "fixed";
+
   // Empty state
   emptyTitle?: string;
   emptySubtitle?: string;
@@ -103,6 +107,8 @@ export function NeonTable<T>({
   currentPage: controlledPage,
   onPageChange,
   compact = false,
+  tableClassName,
+  tableLayout = "auto",
   totalCount,
   serverSide = false,
   onPageSizeChange,
@@ -320,7 +326,7 @@ export function NeonTable<T>({
 
       {/* ── Main Table Grid ── */}
       <div className="relative w-full overflow-x-auto">
-        <table className="min-w-full text-left text-xs border-collapse">
+        <table className={cn("min-w-full text-left text-xs border-collapse", tableLayout === "fixed" ? "table-fixed" : "", tableClassName)}>
           {/* Table Header */}
           <thead>
             <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/80 dark:bg-[#111214] text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider select-none">

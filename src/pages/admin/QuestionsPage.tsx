@@ -4210,9 +4210,10 @@ const QuestionsPage = () => {
     {
       key: "no",
       header: "#",
-      width: "50px",
+      width: "44px",
       align: "center",
-      className: "text-center",
+      className: "w-11 text-center shrink-0",
+      headerClassName: "w-11 text-center shrink-0",
       render: (item, index) => {
         const isInspected = inspectedQuestion?.id === item.id;
         return (
@@ -4234,13 +4235,21 @@ const QuestionsPage = () => {
     {
       key: "text",
       header: "Teks Pertanyaan & Stimulus",
-      className: "min-w-[150px] sm:min-w-0",
+      className: "min-w-0 break-words",
+      headerClassName: "min-w-0",
       render: (item) => (
-        <div className="space-y-1.5 py-0.5">
+        <div className="space-y-1.5 py-0.5 min-w-0 max-w-full">
           <MathText
             content={item.text}
-            className="line-clamp-2 text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 !overflow-hidden !overflow-hidden [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4"
+            className="line-clamp-2 text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 !overflow-hidden [&_p]:m-0 [&_figure]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4 [&_img]:!max-h-20 sm:[&_img]:!max-h-24 [&_img]:!max-w-[140px] sm:[&_img]:!max-w-[180px] [&_img]:!w-auto [&_img]:!h-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1.5 [&_img]:block shadow-2xs"
           />
+          {item.imageUrl && !item.text?.includes("<img") && (
+            <img
+              src={item.imageUrl}
+              alt="Gambar Soal"
+              className="max-h-16 sm:max-h-20 max-w-[140px] sm:max-w-[180px] w-auto h-auto object-contain rounded-md border border-neutral-200/80 dark:border-neutral-800 my-1 block shadow-2xs"
+            />
+          )}
           <div className="flex items-center gap-1.5 flex-wrap">
             {(item.imageUrl || item.text.includes("<img")) && (
               <NeonBadge variant="sky" size="xs" icon={Image}>
@@ -4296,9 +4305,9 @@ const QuestionsPage = () => {
     {
       key: "type",
       header: "Tipe Soal",
-      width: "140px",
-      className: "hidden sm:table-cell",
-      headerClassName: "hidden sm:table-cell",
+      width: "120px",
+      className: "hidden sm:table-cell w-[120px] shrink-0",
+      headerClassName: "hidden sm:table-cell w-[120px] shrink-0",
       render: (item) => {
         const qType = item.type || "pilihan_ganda";
         const meta = QUESTION_TYPE_BADGE[qType] || { variant: "neutral" as const, label: qType };
@@ -4312,16 +4321,17 @@ const QuestionsPage = () => {
     {
       key: "details",
       header: "Detil & Kunci",
-      width: "180px",
-      className: "hidden md:table-cell",
-      headerClassName: "hidden md:table-cell",
+      width: "150px",
+      className: "hidden md:table-cell w-[150px] shrink-0",
+      headerClassName: "hidden md:table-cell w-[150px] shrink-0",
       render: (item) => renderQuestionDetails(item)
     },
     {
       key: "actions",
       header: "Aksi",
-      className: "w-20 sm:w-28 text-right shrink-0",
-      headerClassName: "w-20 sm:w-28 text-right shrink-0",
+      width: "88px",
+      className: "w-[88px] text-right shrink-0",
+      headerClassName: "w-[88px] text-right shrink-0",
       align: "right",
       render: (item) => {
         const idx = questions.findIndex(q => q.id === item.id);
@@ -5959,6 +5969,7 @@ const QuestionsPage = () => {
         {/* Left: NeonTable */}
         <div className="w-full xl:flex-1 min-w-0">
           <NeonTable<QuestionData>
+            tableLayout="fixed"
             data={displayQuestions}
             columns={neonColumns}
             keyExtractor={(q) => q.id}
@@ -6135,7 +6146,7 @@ const QuestionsPage = () => {
                       </div>
                       <MathText
                         content={inspectedQuestion.groupText}
-                        className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed line-clamp-4 overflow-hidden"
+                        className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed line-clamp-4 overflow-hidden [&_p]:m-0 [&_figure]:m-0 [&_img]:!max-h-36 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1.5 [&_img]:block"
                       />
                     </div>
                   )}
@@ -6146,18 +6157,18 @@ const QuestionsPage = () => {
                     <div className="mt-1 p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800">
                       <MathText
                         content={inspectedQuestion.text}
-                        className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 [&_p]:m-0"
+                        className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_figure]:m-0 [&_img]:!max-h-48 sm:[&_img]:!max-h-52 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-2 [&_img]:block shadow-2xs"
                       />
                     </div>
                   </div>
 
                   {/* Question Image (if available) */}
-                  {inspectedQuestion.imageUrl && (
-                    <div className="rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 p-2 flex justify-center">
+                  {inspectedQuestion.imageUrl && !inspectedQuestion.text?.includes("<img") && (
+                    <div className="rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 p-2 flex justify-center mt-2">
                       <img
                         src={inspectedQuestion.imageUrl}
                         alt="Gambar Soal"
-                        className="max-h-40 object-contain rounded"
+                        className="max-h-40 max-w-full object-contain rounded-lg"
                       />
                     </div>
                   )}
@@ -6206,7 +6217,7 @@ const QuestionsPage = () => {
                                 <MathText
                                   content={choice?.text || ""}
                                   disableJustify={true}
-                                  className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed ql-editor !p-0 [&_p]:m-0 break-words"
+                                  className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_figure]:m-0 break-words [&_img]:!max-h-24 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1 [&_img]:block"
                                 />
                                 {choice?.imageUrl && (
                                   <div className="mt-2">
