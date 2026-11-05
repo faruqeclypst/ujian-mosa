@@ -924,18 +924,27 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
     type: q.type || requestedType || "pilihan_ganda",
     choices: (() => {
       const c = q.choices || q.options || undefined;
-      if (c && !isExactSubject) {
+      const qType = q.type || requestedType || "pilihan_ganda";
+      if (c && typeof c === 'object') {
         const cleaned: any = {};
         Object.keys(c).forEach(k => {
-          cleaned[k] = { ...c[k], text: stripUnwantedLatex(unescapeLatex(c[k]?.text || ""), isExactSubject) };
+          const val = c[k];
+          const rawText = typeof val === 'object' ? (val.text || "") : String(val);
+          const isCorr = typeof val === 'object' ? !!val.isCorrect : false;
+          cleaned[k.toLowerCase()] = {
+            ...val,
+            text: isExactSubject ? unescapeLatex(rawText) : stripUnwantedLatex(unescapeLatex(rawText), isExactSubject),
+            isCorrect: isCorr
+          };
         });
-        return cleaned;
-      }
-      if (c && isExactSubject) {
-        const cleaned: any = {};
-        Object.keys(c).forEach(k => {
-          cleaned[k] = { ...c[k], text: unescapeLatex(c[k]?.text || "") };
-        });
+        // Jaminan 5 Opsi A-E untuk Pilihan Ganda
+        if ((qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks") && Object.keys(cleaned).length >= 2) {
+          ["a", "b", "c", "d", "e"].forEach(letter => {
+            if (!cleaned[letter]) {
+              cleaned[letter] = { text: "", isCorrect: false };
+            }
+          });
+        }
         return cleaned;
       }
       return c;
@@ -2309,6 +2318,11 @@ const parseQuestionsFromRawText = (text: string, isExact: boolean = false): { re
     const hasValidChoices = Object.keys(choices).length >= 2;
     // Hanya anggap sebagai soal pilihan ganda jika minimal ada 2 pilihan (A & B)
     if (questionText.trim() && hasValidChoices) {
+      ["a", "b", "c", "d", "e"].forEach(letter => {
+        if (!choices[letter]) {
+          choices[letter] = { text: "", isCorrect: false };
+        }
+      });
       questions.push({
         text: stripUnwantedLatex(questionText.trim(), isExact),
         type: "pilihan_ganda",
@@ -2355,8 +2369,8 @@ export const chatQuestionAssistantAI = async (
       replyText = `Halo! Saya **Asisten AI Bank Soal Examku**. Saya dirancang untuk membantu pendidik menyusun butir soal ujian berkualitas tinggi secara cepat, terstruktur, dan presisi.
 
 ### 📝 1. Pembuatan Beragam Tipe Butir Soal
-• **Pilihan Ganda (1–5 Opsi)**: Pilihan A–D atau A–E lengkap dengan opsi pengecoh & kunci jawaban.
-• **Pilihan Ganda Kompleks**: Mendukung lebih dari satu pilihan jawaban yang benar.
+• **Pilihan Ganda (5 Opsi A–E)**: Standar wajib 5 opsi A, B, C, D, dan E lengkap dengan opsi pengecoh realistis & kunci jawaban.
+• **Pilihan Ganda Kompleks (5 Opsi A–E)**: Standar 5 opsi A–E dengan lebih dari satu pilihan jawaban yang benar.
 • **Benar / Salah**: Evaluasi konsep atau analisis pernyataan materi.
 • **Menjodohkan**: Pemetaan premis kiri dan pasangan benar di kolom kanan.
 • **Urutkan**: Mengurutkan tahapan proses, siklus peristiwa, atau logika algoritma.
@@ -2413,11 +2427,12 @@ B. JIKA PENGGUNA BERTANYA UMUM, MEMINTA PENJELASAN KONSEP, ATAU MENANYAKAN KEMAM
 
 PANDUAN FORMAT STRUKTUR BUTIR SOAL SESUAI PERMINTAAN:
 1. Pilihan Ganda (type: "pilihan_ganda"):
-   {"text": "Pertanyaan pokok...", "type": "pilihan_ganda", "choices": {"a": {"text": "...", "isCorrect": false}, "b": {"text": "...", "isCorrect": true}, "c": {"text": "...", "isCorrect": false}, "d": {"text": "...", "isCorrect": false}}, "answerKey": "b"}
-   Jika diminta pilihan A-E (5 pilihan), wajib sediakan 5 opsi ("a", "b", "c", "d", "e").
+   WAJIB SELALU 5 OPSI (A, B, C, D, E) — DILARANG HANYA 4 OPSI (A-D)!
+   {"text": "Pertanyaan pokok...", "type": "pilihan_ganda", "choices": {"a": {"text": "...", "isCorrect": false}, "b": {"text": "...", "isCorrect": true}, "c": {"text": "...", "isCorrect": false}, "d": {"text": "...", "isCorrect": false}, "e": {"text": "...", "isCorrect": false}}, "answerKey": "b"}
 
 2. Pilihan Ganda Kompleks (type: "pilihan_ganda_kompleks"):
-   {"text": "Pernyataan/pertanyaan...", "type": "pilihan_ganda_kompleks", "choices": {"a": {"text": "...", "isCorrect": true}, "b": {"text": "...", "isCorrect": false}, "c": {"text": "...", "isCorrect": true}, "d": {"text": "...", "isCorrect": false}}, "answerKey": "a,c"}
+   WAJIB SELALU 5 OPSI (A, B, C, D, E) — DILARANG HANYA 4 OPSI (A-D)!
+   {"text": "Pernyataan/pertanyaan...", "type": "pilihan_ganda_kompleks", "choices": {"a": {"text": "...", "isCorrect": true}, "b": {"text": "...", "isCorrect": false}, "c": {"text": "...", "isCorrect": true}, "d": {"text": "...", "isCorrect": false}, "e": {"text": "...", "isCorrect": false}}, "answerKey": "a,c"}
 
 3. Benar / Salah (type: "benar_salah"):
    {"text": "Pernyataan yang harus dinilai...", "type": "benar_salah", "choices": {"a": {"text": "Benar", "isCorrect": true}, "b": {"text": "Salah", "isCorrect": false}}, "answerKey": "a"}
@@ -2436,15 +2451,19 @@ PANDUAN FORMAT STRUKTUR BUTIR SOAL SESUAI PERMINTAAN:
 7. Uraian (type: "uraian"):
    {"text": "Jelaskan prinsip kerja transformator...", "type": "uraian", "answerKey": "Rubrik: Menjelaskan induksi elektromagnetik dan perbandingan lilitan"}
 
+ATURAN WAJIB JUMLAH OPSI PILIHAN GANDA (SANGAT KETAT):
+- Untuk tipe Pilihan Ganda (pilihan_ganda) maupun Pilihan Ganda Kompleks (pilihan_ganda_kompleks), Anda WAJIB SELALU menghasilkan TEPAT 5 OPSI PILIHAN: A, B, C, D, dan E (keys: "a", "b", "c", "d", "e").
+- JANGAN PERNAH hanya membuat 4 pilihan (A-D)! Opsi E WAJIB disertakan dengan teks pengecoh yang logis, masuk akal, dan proporsional panjangnya.
+
 KEMAMPUAN PERCAKAPAN MULTI-TURN & FOLLOW-UP:
 - Anda mengingat dan memahami seluruh riwayat percakapan dan butir soal di atas.
-- Jika pengguna meminta perubahan atau tindak lanjut dari percakapan sebelumnya (misal: "jadikan A-E", "tambah opsi E", "ubah ke tipe menjodohkan", "buat kunci pembahasan", "ganti materi", atau "buat soal serupa/sejenis"):
+- Jika pengguna meminta perubahan atau tindak lanjut dari percakapan sebelumnya (misal: "tambah opsi E", "ubah ke tipe menjodohkan", "buat kunci pembahasan", "ganti materi", atau "buat soal serupa/sejenis"):
   RUJUK & GUNAKAN konteks soal sebelumnya dari riwayat percakapan untuk memenuhi permintaan pengguna dengan presisi!
 
 ATURAN ULTRA KILAT:
 1. LANGSUNG HASILKAN JSON! Jangan tulis teks pembuka, jangan gunakan tag proses berpikir (<think>), jangan tulis pembahasan.
 2. Teks 'reply' cukup 1-3 kata saja (misal: "Siap." atau "Berikut soalnya.").
-3. Pertanyaan dan pilihan to-the-point, akurat, dan bersih.
+3. Pertanyaan dan pilihan to-the-point, akurat, dan bersih. Pilihan ganda WAJIB 5 opsi (A, B, C, D, E).
 4. LaTeX: Gunakan $...$ HANYA jika berupa rumus eksakta.
 ${formatRules ? `\nFORMAT: ${formatRules}` : ""}
 ${existingQuestionsSnippet}

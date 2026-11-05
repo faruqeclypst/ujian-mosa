@@ -670,8 +670,16 @@ export const AIChatQuestionDrawer: React.FC<AIChatQuestionDrawerProps> = ({
             if (isCorrect && !correctKey) correctKey = lowerKey;
           });
         }
+        // Pastikan pilihan ganda selalu memiliki 5 opsi lengkap A-E
+        if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks") {
+          ["a", "b", "c", "d", "e"].forEach(letter => {
+            if (!choicesObj[letter]) {
+              choicesObj[letter] = { text: "", isCorrect: false };
+            }
+          });
+        }
       } else if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks") {
-        ["a", "b", "c", "d"].forEach(letter => {
+        ["a", "b", "c", "d", "e"].forEach(letter => {
           choicesObj[letter] = { text: "", isCorrect: letter === "a" };
         });
         if (!correctKey) correctKey = "a";
@@ -989,7 +997,8 @@ export const AIChatQuestionDrawer: React.FC<AIChatQuestionDrawerProps> = ({
             a: { text: "", isCorrect: true },
             b: { text: "", isCorrect: false },
             c: { text: "", isCorrect: false },
-            d: { text: "", isCorrect: false }
+            d: { text: "", isCorrect: false },
+            e: { text: "", isCorrect: false }
           };
           correctKey = "a";
         }
@@ -1184,7 +1193,8 @@ export const AIChatQuestionDrawer: React.FC<AIChatQuestionDrawerProps> = ({
         a: { text: "", isCorrect: true },
         b: { text: "", isCorrect: false },
         c: { text: "", isCorrect: false },
-        d: { text: "", isCorrect: false }
+        d: { text: "", isCorrect: false },
+        e: { text: "", isCorrect: false }
       },
       correctKey: "a",
       pairs: [],
