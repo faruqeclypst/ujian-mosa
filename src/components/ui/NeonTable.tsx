@@ -383,20 +383,61 @@ export function NeonTable<T>({
           {/* Table Body */}
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-850/80">
             {isLoading ? (
-              // Skeleton Rows
+              // Skeleton Rows (Accurately mirrors column widths & responsive visibility)
               Array.from({ length: Math.min(pageSize, 6) }).map((_, rIdx) => (
                 <tr key={rIdx} className="animate-pulse">
                   {selectable && (
-                    <td className={cn(compact ? "px-2.5 sm:px-3 py-2.5 sm:py-3 text-center" : "px-4 sm:px-5 py-3.5 sm:py-4 text-center")}>
+                    <td
+                      style={{ width: compact ? "36px" : "40px" }}
+                      className={cn(
+                        compact
+                          ? "w-9 px-2 sm:px-2.5 py-2 text-center"
+                          : "w-9 sm:w-11 px-2.5 sm:px-3 py-2.5 sm:py-3 text-center",
+                        rowVerticalAlign === "top" ? "align-top pt-3 sm:pt-3.5" : "align-middle"
+                      )}
+                    >
                       <Skeleton className="h-3.5 w-3.5 rounded mx-auto" />
                     </td>
                   )}
                   {columns.map((col, cIdx) => (
-                    <td key={cIdx} className={cn(compact ? "px-3 sm:px-3.5 py-2.5 sm:py-3" : "px-4 sm:px-5 py-3.5 sm:py-4")}>
+                    <td
+                      key={col.key || cIdx}
+                      style={{ width: col.width }}
+                      className={cn(
+                        compact
+                          ? "px-2.5 sm:px-3 py-2 text-xs"
+                          : "px-3 sm:px-4 py-2.5 sm:py-3 text-xs",
+                        col.verticalAlign === "top" || rowVerticalAlign === "top"
+                          ? "align-top pt-2.5 sm:pt-3"
+                          : "align-middle",
+                        col.align === "center"
+                          ? "text-center"
+                          : col.align === "right"
+                          ? "text-right"
+                          : "text-left",
+                        col.overflow === "visible" || col.key === "actions" ? "overflow-visible" : "overflow-hidden",
+                        col.className
+                      )}
+                    >
                       <Skeleton
                         className={cn(
                           "h-4 rounded",
-                          cIdx === 0 ? "w-6" : cIdx === 1 ? "w-44" : "w-24"
+                          col.align === "center"
+                            ? "mx-auto"
+                            : col.align === "right"
+                            ? "ml-auto"
+                            : "",
+                          col.key === "no"
+                            ? "w-6 h-6 rounded-md"
+                            : col.key === "actions"
+                            ? "w-14 h-7 rounded-md"
+                            : col.key === "details"
+                            ? "w-24 max-w-full"
+                            : cIdx === 0
+                            ? "w-6"
+                            : cIdx === 1
+                            ? "w-3/4 max-w-[260px]"
+                            : "w-20 max-w-full"
                         )}
                       />
                     </td>

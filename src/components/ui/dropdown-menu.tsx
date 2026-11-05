@@ -59,7 +59,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ children }) => {
 
   return (
     <DropdownMenuContext.Provider value={{ open, setOpen, triggerRef, contentRef }}>
-      <div ref={triggerRef} className={cn("inline-block", open ? "z-50" : "z-auto")} data-dropdown-menu>
+      <div ref={triggerRef} className={cn("inline-flex items-center justify-center shrink-0", open ? "z-50" : "z-auto")} data-dropdown-menu>
         {children}
       </div>
     </DropdownMenuContext.Provider>
