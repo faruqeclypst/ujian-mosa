@@ -1,19 +1,15 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import QRCode from "qrcode";
 import { 
   Printer, 
   Eye, 
   EyeOff, 
   Upload, 
-  User, 
-  AlertCircle,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  ZoomIn,
-  ZoomOut,
-  Layers,
-  Sparkles,
+  ChevronLeft, 
+  ChevronRight, 
+  ZoomIn, 
+  ZoomOut, 
+  SlidersHorizontal,
   X
 } from "lucide-react";
 import { Dialog, DialogContent } from "../ui/dialog";
@@ -32,8 +28,8 @@ interface PrintExamCardsDialogProps {
   filterClassId?: string;
 }
 
-// Logo Resmi Kemdikbud / Tut Wuri Handayani (Vector SVG Tajam)
-const TutWuriHandayaniLogo = ({ size = 38 }: { size?: number }) => (
+// Logo Resmi Kemdikbud / Tut Wuri Handayani (Vektor SVG Presisi)
+const TutWuriHandayaniLogo = ({ size = 36 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
     <polygon points="50,5 92,35 77,88 23,88 8,35" fill="#00529C" stroke="#FFD700" strokeWidth="2.5" />
     <polygon points="50,9 88,37 74,84 26,84 12,37" fill="#005AA9" />
@@ -45,8 +41,8 @@ const TutWuriHandayaniLogo = ({ size = 38 }: { size?: number }) => (
   </svg>
 );
 
-// Logo Kementerian Agama (Vector SVG)
-const KemenagLogo = ({ size = 38 }: { size?: number }) => (
+// Logo Kementerian Agama (Vektor SVG)
+const KemenagLogo = ({ size = 36 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
     <polygon points="50,4 93,35 77,89 23,89 7,35" fill="#1B5E20" stroke="#FFD700" strokeWidth="2.5" />
     <circle cx="50" cy="50" r="32" fill="#2E7D32" stroke="#FFD700" strokeWidth="1.5" />
@@ -68,18 +64,18 @@ export const PrintExamCardsDialog = ({
 }: PrintExamCardsDialogProps) => {
   const { school, terminology } = useTenant();
 
-  // Pengaturan Layout & Konten
+  // Pengaturan Cepat
   const [layoutMode, setLayoutMode] = useState<"4" | "6">("4"); // 4 kartu (2x2) atau 6 kartu (2x3)
   const [printScope, setPrintScope] = useState<"selected" | "class" | "all">(
     selectedStudentIds.length > 0 ? "selected" : (filterClassId !== "ALL" ? "class" : "all")
   );
-  const [showPassword, setShowPassword] = useState(true);
-  const [showRoomSession, setShowRoomSession] = useState(false);
-  const [defaultRoom, setDefaultRoom] = useState("");
-  const [defaultSession, setDefaultSession] = useState("");
-  const [showBirthInfo, setShowBirthInfo] = useState(false);
-
   const [examTitle, setExamTitle] = useState("ASESMEN SUMATIF SEKOLAH");
+  const [showPassword, setShowPassword] = useState(true);
+
+  // Tab Pengaturan (Simpel & Rapi)
+  const [activeTab, setActiveTab] = useState<"quick" | "advanced">("quick");
+
+  // Pengaturan Lanjutan
   const [academicYear, setAcademicYear] = useState(() => {
     const curYear = new Date().getFullYear();
     return `${curYear}/${curYear + 1}`;
@@ -96,15 +92,19 @@ export const PrintExamCardsDialog = ({
   const [signerName, setSignerName] = useState("");
   const [signerNip, setSignerNip] = useState("");
 
+  const [showRoomSession, setShowRoomSession] = useState(false);
+  const [defaultRoom, setDefaultRoom] = useState("");
+  const [defaultSession, setDefaultSession] = useState("");
+  const [showBirthInfo, setShowBirthInfo] = useState(false);
+
   // Logo Kiri & Logo Kanan
   const [leftLogoType, setLeftLogoType] = useState<"tutwuri" | "kemenag" | "custom">("tutwuri");
   const [customLeftLogoUrl, setCustomLeftLogoUrl] = useState<string>("");
-
   const [rightLogoType, setRightLogoType] = useState<"school" | "custom" | "none">("school");
   const [customRightLogoUrl, setCustomRightLogoUrl] = useState<string>("");
   const [schoolLogoFailed, setSchoolLogoFailed] = useState(false);
 
-  // Zoom Pratinjau (75% default agar lembar A4 terlihat utuh tanpa scroll terpotong)
+  // Zoom Pratinjau
   const [previewZoom, setPreviewZoom] = useState(0.8);
   const [currentPreviewPage, setCurrentPreviewPage] = useState(0);
 
@@ -114,7 +114,18 @@ export const PrintExamCardsDialog = ({
   // QR Codes Map
   const [qrCodes, setQrCodes] = useState<Record<string, string>>({});
 
-  // Filter siswa
+  // Sinkronisasi target cetak saat props berubah
+  useEffect(() => {
+    if (selectedStudentIds.length > 0) {
+      setPrintScope("selected");
+    } else if (filterClassId !== "ALL") {
+      setPrintScope("class");
+    } else {
+      setPrintScope("all");
+    }
+  }, [selectedStudentIds, filterClassId, isOpen]);
+
+  // Filter daftar siswa
   const studentsToPrint = useMemo(() => {
     if (printScope === "selected" && selectedStudentIds.length > 0) {
       return students.filter(s => selectedStudentIds.includes(s.id));
@@ -129,14 +140,14 @@ export const PrintExamCardsDialog = ({
   const cardsPerPage = is4Cards ? 4 : 6;
   const totalPages = Math.ceil(studentsToPrint.length / cardsPerPage);
 
-  // Batasi currentPreviewPage jika totalPages berubah
+  // Jaga batasan halaman aktif
   useEffect(() => {
     if (currentPreviewPage >= totalPages && totalPages > 0) {
       setCurrentPreviewPage(totalPages - 1);
     }
   }, [totalPages, currentPreviewPage]);
 
-  // Generate QR Code untuk seluruh siswa yang dicetak
+  // Generate QR Code untuk seluruh siswa
   useEffect(() => {
     if (!isOpen || studentsToPrint.length === 0) return;
 
@@ -147,7 +158,7 @@ export const PrintExamCardsDialog = ({
         try {
           const qrText = st.examNumber || (st as any).username || st.nisn;
           const url = await QRCode.toDataURL(qrText, {
-            width: 100,
+            width: 120,
             margin: 0,
             color: { dark: "#000000", light: "#ffffff" }
           });
@@ -218,7 +229,7 @@ export const PrintExamCardsDialog = ({
         <img 
           src={customLeftLogoUrl} 
           alt="Logo" 
-          style={{ width: `${sizePx}px`, height: `${sizePx}px`, objectFit: "contain" }} 
+          style={{ width: `${sizePx}px`, height: `${sizePx}px`, objectFit: "contain", display: "block" }} 
         />
       );
     }
@@ -239,7 +250,7 @@ export const PrintExamCardsDialog = ({
         <img 
           src={customRightLogoUrl} 
           alt="Logo Sekolah" 
-          style={{ width: `${sizePx}px`, height: `${sizePx}px`, objectFit: "contain" }} 
+          style={{ width: `${sizePx}px`, height: `${sizePx}px`, objectFit: "contain", display: "block" }} 
         />
       );
     }
@@ -251,7 +262,7 @@ export const PrintExamCardsDialog = ({
           src={schoolLogoUrl} 
           alt="" 
           onError={() => setSchoolLogoFailed(true)}
-          style={{ width: `${sizePx}px`, height: `${sizePx}px`, objectFit: "contain" }} 
+          style={{ width: `${sizePx}px`, height: `${sizePx}px`, objectFit: "contain", display: "block" }} 
         />
       );
     }
@@ -292,7 +303,7 @@ export const PrintExamCardsDialog = ({
           <style>
             @page {
               size: 210mm 297mm;
-              margin: 7mm 6mm;
+              margin: 6mm 6mm;
             }
             * {
               box-sizing: border-box;
@@ -308,8 +319,8 @@ export const PrintExamCardsDialog = ({
             }
             .a4-page {
               width: 100%;
-              height: 278mm;
-              max-height: 278mm;
+              height: 282mm;
+              max-height: 282mm;
               display: grid;
               grid-template-columns: 1fr 1fr;
               grid-template-rows: ${is4Cards ? "1fr 1fr" : "1fr 1fr 1fr"};
@@ -328,9 +339,9 @@ export const PrintExamCardsDialog = ({
               break-after: avoid;
             }
             .card-item {
-              border: 1px solid #000000;
-              border-radius: 4px;
-              padding: ${is4Cards ? "6px 8px" : "4px 6px"};
+              border: 1.2px solid #000000;
+              border-radius: 0px;
+              padding: ${is4Cards ? "10px 14px" : "8px 10px"};
               display: flex;
               flex-direction: column;
               justify-content: space-between;
@@ -364,10 +375,8 @@ export const PrintExamCardsDialog = ({
 
   if (!isOpen) return null;
 
-  const logoSizePx = is4Cards ? 38 : 30;
-
-  // Template Tunggal Render Kartu Peserta
-    const renderCardContent = (student: StudentData) => {
+  // 🏛️ TEMPLATE KARTU FORMAL ANBK / KEDINASAN RESMI
+  const renderCardContent = (student: StudentData) => {
     const studentClass = classes.find(c => c.id === student.classId);
     const classNameText = studentClass?.name || student.className || "Kelas";
     const displayUsername = student.examNumber || (student as any).username || student.nisn;
@@ -378,6 +387,8 @@ export const PrintExamCardsDialog = ({
     const sessionVal = student.session || defaultSession;
     const roomSessionDisplay = [roomVal, sessionVal].filter(Boolean).join(" / ");
 
+    const logoSize = is4Cards ? 38 : 30;
+
     return (
       <div 
         key={student.id}
@@ -386,10 +397,10 @@ export const PrintExamCardsDialog = ({
           boxSizing: "border-box", 
           backgroundColor: "#ffffff",
           color: "#000000",
-          fontFamily: "'Arial', 'Helvetica', sans-serif",
-          border: "1px solid #1e293b",
-          borderRadius: "8px",
-          padding: is4Cards ? "14px 18px" : "10px 14px",
+          fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif",
+          border: "1.2px solid #000000",
+          borderRadius: "0px",
+          padding: is4Cards ? "10px 14px" : "7px 10px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -398,61 +409,65 @@ export const PrintExamCardsDialog = ({
           overflow: "hidden"
         }}
       >
-        {/* 1. KOP KARTU */}
-        <div 
-          style={{ 
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "10px",
-            borderBottom: "3px double #0f172a",
-            paddingBottom: "8px",
-            marginBottom: is4Cards ? "12px" : "8px"
-          }}
-        >
-          {/* Logo Kiri */}
-          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {renderLeftLogoComponent(is4Cards ? 42 : 36)}
+        {/* 1. KOP KARTU RESMI KEDINASAN */}
+        <div style={{ marginBottom: is4Cards ? "8px" : "5px" }}>
+          <div 
+            style={{ 
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "8px",
+              paddingBottom: "5px"
+            }}
+          >
+            {/* Logo Kiri */}
+            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {renderLeftLogoComponent(logoSize)}
+            </div>
+
+            {/* Teks Kop Tengah */}
+            <div style={{ flex: 1, textAlign: "center", lineHeight: "1.2" }}>
+              <div style={{ fontSize: is4Cards ? "11.5px" : "10px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px", color: "#000000" }}>
+                KARTU TANDA PESERTA UJIAN
+              </div>
+              <div style={{ fontSize: is4Cards ? "9.5px" : "8px", fontWeight: 700, textTransform: "uppercase", color: "#1e293b", marginTop: "1px" }}>
+                {examTitle}
+              </div>
+              <div style={{ fontSize: is4Cards ? "11px" : "9.5px", fontWeight: 800, textTransform: "uppercase", color: "#000000", marginTop: "1px" }}>
+                {school?.name || "SATUAN PENDIDIKAN"}
+              </div>
+              <div style={{ fontSize: is4Cards ? "8px" : "7px", fontWeight: 600, color: "#475569", marginTop: "1px" }}>
+                TAHUN AJARAN {academicYear}
+              </div>
+            </div>
+
+            {/* Logo Kanan */}
+            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {renderRightLogoComponent(logoSize)}
+            </div>
           </div>
 
-          {/* Teks Kop Tengah */}
-          <div style={{ flex: 1, textAlign: "center", lineHeight: "1.2" }}>
-            <div style={{ fontSize: is4Cards ? "13px" : "11px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "1px", color: "#000000" }}>
-              KARTU TANDA PESERTA UJIAN
-            </div>
-            <div style={{ fontSize: is4Cards ? "10px" : "8.5px", fontWeight: 700, textTransform: "uppercase", color: "#334155", marginTop: "2px" }}>
-              {examTitle}
-            </div>
-            <div style={{ fontSize: is4Cards ? "12px" : "10px", fontWeight: 900, textTransform: "uppercase", color: "#000000", marginTop: "1px" }}>
-              {school?.name || "SATUAN PENDIDIKAN"}
-            </div>
-            <div style={{ fontSize: is4Cards ? "8px" : "7px", fontWeight: 600, color: "#475569", marginTop: "2px" }}>
-              TAHUN PELAJARAN {academicYear}
-            </div>
-          </div>
-
-          {/* Logo Kanan */}
-          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {renderRightLogoComponent(is4Cards ? 42 : 36)}
-          </div>
+          {/* Garis Kop Ganda Kedinasan (Garis tebal atas 1.5px, Garis tipis bawah 0.5px) */}
+          <div style={{ borderBottom: "1.8px solid #000000" }} />
+          <div style={{ borderBottom: "0.5px solid #000000", marginTop: "1.5px" }} />
         </div>
 
-        {/* 2. BODY ATAS: PASFOTO (KIRI) & BIODATA SISWA (KANAN) */}
+        {/* 2. BODY ATAS: PASFOTO 3X4 & BIODATA SISWA */}
         <div 
           style={{ 
             display: "flex", 
             alignItems: "flex-start", 
-            gap: "16px", 
-            marginBottom: is4Cards ? "12px" : "8px"
+            gap: is4Cards ? "12px" : "8px", 
+            marginBottom: is4Cards ? "8px" : "5px"
           }}
         >
-          {/* Pasfoto 3x4 */}
+          {/* Pasfoto 3x4 Formal */}
           <div 
             style={{ 
-              width: is4Cards ? "26mm" : "21mm", 
-              height: is4Cards ? "34mm" : "27mm", 
-              border: "1px solid #cbd5e1",
-              borderRadius: "4px",
+              width: is4Cards ? "24mm" : "20mm", 
+              height: is4Cards ? "32mm" : "26mm", 
+              border: "1px solid #64748b",
+              borderRadius: "0px",
               backgroundColor: "#f8fafc",
               display: "flex",
               flexDirection: "column",
@@ -470,12 +485,11 @@ export const PrintExamCardsDialog = ({
               />
             ) : (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2px", textAlign: "center", color: "#94a3b8" }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, marginBottom: "2px" }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                <span style={{ fontSize: "8px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", color: "#64748b" }}>
+                <span style={{ fontSize: is4Cards ? "8.5px" : "7.5px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", color: "#475569" }}>
                   FOTO
                 </span>
-                <span style={{ fontSize: "7px", fontWeight: 600, color: "#94a3b8" }}>
-                  3 x 4
+                <span style={{ fontSize: is4Cards ? "7.5px" : "6.5px", fontWeight: 600, color: "#64748b" }}>
+                  3 × 4
                 </span>
               </div>
             )}
@@ -487,58 +501,70 @@ export const PrintExamCardsDialog = ({
               flex: 1,
               width: "100%", 
               borderCollapse: "collapse",
-              fontSize: is4Cards ? "10px" : "9px",
-              lineHeight: is4Cards ? "1.4" : "1.3"
+              fontSize: is4Cards ? "9.5px" : "8.5px",
+              lineHeight: is4Cards ? "1.35" : "1.25"
             }}
           >
             <tbody>
               <tr>
-                <td style={{ width: is4Cards ? "85px" : "70px", fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
+                <td style={{ width: is4Cards ? "88px" : "72px", fontWeight: 600, color: "#334155", padding: "1.5px 0", whiteSpace: "nowrap" }}>
+                  No. Peserta
+                </td>
+                <td style={{ width: "8px", fontWeight: 600, color: "#334155", textAlign: "center", padding: "1.5px 0" }}>:</td>
+                <td style={{ fontWeight: 800, color: "#000000", padding: "1.5px 0", fontFamily: "monospace", fontSize: is4Cards ? "10px" : "9px" }}>
+                  {displayUsername}
+                </td>
+              </tr>
+
+              {student.nisn && (
+                <tr>
+                  <td style={{ fontWeight: 600, color: "#334155", padding: "1.5px 0", whiteSpace: "nowrap" }}>
+                    NISN
+                  </td>
+                  <td style={{ fontWeight: 600, color: "#334155", textAlign: "center", padding: "1.5px 0" }}>:</td>
+                  <td style={{ fontWeight: 700, color: "#000000", padding: "1.5px 0", fontFamily: "monospace" }}>
+                    {student.nisn}
+                  </td>
+                </tr>
+              )}
+
+              <tr>
+                <td style={{ fontWeight: 600, color: "#334155", padding: "1.5px 0", whiteSpace: "nowrap" }}>
                   Nama Peserta
                 </td>
-                <td style={{ width: "8px", fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
-                <td style={{ fontWeight: 800, textTransform: "uppercase", color: "#000000", padding: "2px 0", wordBreak: "break-word" }}>
+                <td style={{ fontWeight: 600, color: "#334155", textAlign: "center", padding: "1.5px 0" }}>:</td>
+                <td style={{ fontWeight: 800, textTransform: "uppercase", color: "#000000", padding: "1.5px 0", wordBreak: "break-word" }}>
                   {student.name}
                 </td>
               </tr>
 
               <tr>
-                <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
-                  No. Peserta / {terminology.id}
+                <td style={{ fontWeight: 600, color: "#334155", padding: "1.5px 0", whiteSpace: "nowrap" }}>
+                  {terminology.class} / Rombel
                 </td>
-                <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
-                <td style={{ fontWeight: 800, color: "#000000", padding: "2px 0" }}>
-                  {displayUsername}
-                </td>
-              </tr>
-
-              <tr>
-                <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
-                  {terminology.class}
-                </td>
-                <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
-                <td style={{ fontWeight: 800, color: "#000000", padding: "2px 0" }}>
+                <td style={{ fontWeight: 600, color: "#334155", textAlign: "center", padding: "1.5px 0" }}>:</td>
+                <td style={{ fontWeight: 700, color: "#000000", padding: "1.5px 0" }}>
                   {classNameText}
                 </td>
               </tr>
 
               <tr>
-                <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
+                <td style={{ fontWeight: 600, color: "#334155", padding: "1.5px 0", whiteSpace: "nowrap" }}>
                   Jenis Kelamin
                 </td>
-                <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
-                <td style={{ fontWeight: 700, color: "#000000", padding: "2px 0" }}>
+                <td style={{ fontWeight: 600, color: "#334155", textAlign: "center", padding: "1.5px 0" }}>:</td>
+                <td style={{ fontWeight: 600, color: "#000000", padding: "1.5px 0" }}>
                   {student.gender === "L" ? "Laki-laki" : student.gender === "P" ? "Perempuan" : "-"}
                 </td>
               </tr>
 
               {showBirthInfo && birthText && (
                 <tr>
-                  <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
-                    Tmpt, Tgl Lahir
+                  <td style={{ fontWeight: 600, color: "#334155", padding: "1.5px 0", whiteSpace: "nowrap" }}>
+                    Tempat, Tgl Lahir
                   </td>
-                  <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
-                  <td style={{ fontWeight: 700, color: "#000000", padding: "2px 0", wordBreak: "break-word" }}>
+                  <td style={{ fontWeight: 600, color: "#334155", textAlign: "center", padding: "1.5px 0" }}>:</td>
+                  <td style={{ fontWeight: 600, color: "#000000", padding: "1.5px 0", wordBreak: "break-word" }}>
                     {birthText}
                   </td>
                 </tr>
@@ -546,11 +572,11 @@ export const PrintExamCardsDialog = ({
 
               {showRoomSession && (
                 <tr>
-                  <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
+                  <td style={{ fontWeight: 600, color: "#334155", padding: "1.5px 0", whiteSpace: "nowrap" }}>
                     Ruang / Sesi
                   </td>
-                  <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
-                  <td style={{ fontWeight: 800, color: "#000000", padding: "2px 0" }}>
+                  <td style={{ fontWeight: 600, color: "#334155", textAlign: "center", padding: "1.5px 0" }}>:</td>
+                  <td style={{ fontWeight: 800, color: "#000000", padding: "1.5px 0" }}>
                     {roomSessionDisplay || "-"}
                   </td>
                 </tr>
@@ -559,114 +585,112 @@ export const PrintExamCardsDialog = ({
           </table>
         </div>
 
-        {/* 3. BODY TENGAH: KOTAK AKUN LOGIN + QR CODE RESMI */}
+        {/* 3. KOTAK KREDENSIAL LOGIN CBT (BERSIH & FORMAL TANPA KOTAK PUTUS-PUTUS) */}
         <div 
           style={{
-            border: "1px dashed #94a3b8",
-            borderRadius: "6px",
-            padding: is4Cards ? "8px 12px" : "6px 10px",
-            marginBottom: is4Cards ? "12px" : "8px",
+            border: "1px solid #334155",
+            borderRadius: "0px",
+            backgroundColor: "#f8fafc",
+            padding: is4Cards ? "6px 10px" : "4px 8px",
+            marginBottom: is4Cards ? "8px" : "5px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: "12px"
+            gap: "10px"
           }}
         >
           {/* Akun Login Text */}
           <div style={{ flex: 1 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div style={{ fontSize: is4Cards ? "7.5px" : "6.5px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px", color: "#475569", marginBottom: "3px" }}>
+              Kredensial Login Komputer (CBT / Exambro)
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: is4Cards ? "9px" : "8px" }}>
               <tbody>
                 <tr>
-                  <td style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", width: is4Cards ? "85px" : "70px", paddingBottom: "4px" }}>
+                  <td style={{ fontWeight: 700, color: "#1e293b", width: is4Cards ? "65px" : "55px", padding: "1px 0" }}>
                     Username
                   </td>
-                  <td style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 700, color: "#64748b", width: "8px", textAlign: "center", paddingBottom: "4px" }}>:</td>
-                  <td style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: is4Cards ? "13px" : "11px", fontWeight: 900, color: "#000000", letterSpacing: "1px", paddingBottom: "4px" }}>
+                  <td style={{ fontWeight: 700, color: "#1e293b", width: "8px", textAlign: "center", padding: "1px 0" }}>:</td>
+                  <td style={{ fontFamily: "monospace", fontSize: is4Cards ? "11.5px" : "10px", fontWeight: 900, color: "#000000", padding: "1px 0", letterSpacing: "0.5px" }}>
                     {displayUsername}
                   </td>
                 </tr>
                 <tr>
-                  <td style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", paddingBottom: "4px" }}>
-                    Password Default
+                  <td style={{ fontWeight: 700, color: "#1e293b", padding: "1px 0" }}>
+                    Password
                   </td>
-                  <td style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 700, color: "#64748b", textAlign: "center", paddingBottom: "4px" }}>:</td>
-                  <td style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: is4Cards ? "13px" : "11px", fontWeight: 900, color: "#000000", letterSpacing: "1px", paddingBottom: "4px" }}>
+                  <td style={{ fontWeight: 700, color: "#1e293b", textAlign: "center", padding: "1px 0" }}>:</td>
+                  <td style={{ fontFamily: "monospace", fontSize: is4Cards ? "11.5px" : "10px", fontWeight: 900, color: "#000000", padding: "1px 0", letterSpacing: "0.5px" }}>
                     {displayPassword}
                   </td>
                 </tr>
               </tbody>
             </table>
-
-            <div style={{ fontSize: is4Cards ? "7px" : "6.5px", color: "#64748b", lineHeight: "1.3", marginTop: "4px", paddingTop: "4px", borderTop: "1px dotted #cbd5e1" }}>
-              *) Gunakan password di atas. Jika sudah diubah gunakan password pribadi Anda. Jika lupa hubungi Proktor.
-            </div>
           </div>
 
-          {/* QR Code di sebelah kanan kredensial */}
+          {/* QR Code Login */}
           <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
             {qrCodes[student.id] ? (
               <img 
                 src={qrCodes[student.id]} 
                 alt="QR Login" 
                 style={{ 
-                  width: is4Cards ? "28mm" : "22mm", 
-                  height: is4Cards ? "28mm" : "22mm", 
+                  width: is4Cards ? "23mm" : "18mm", 
+                  height: is4Cards ? "23mm" : "18mm", 
                   display: "block" 
                 }} 
               />
             ) : (
               <div 
                 style={{ 
-                  width: is4Cards ? "28mm" : "22mm", 
-                  height: is4Cards ? "28mm" : "22mm", 
-                  border: "1px dashed #cbd5e1",
-                  borderRadius: "4px"
+                  width: is4Cards ? "23mm" : "18mm", 
+                  height: is4Cards ? "23mm" : "18mm", 
+                  border: "1px solid #cbd5e1"
                 }} 
               />
             )}
-            <span style={{ fontSize: "6.5px", fontWeight: 700, color: "#64748b", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            <span style={{ fontSize: "6px", fontWeight: 700, color: "#475569", marginTop: "1px", textTransform: "uppercase" }}>
               QR Login
             </span>
           </div>
         </div>
 
-        {/* 4. FOOTER: INSTRUKSI & TANDA TANGAN */}
+        {/* 4. FOOTER: KETENTUAN PESERTA & PENGESAHAN */}
         <div 
           style={{ 
-            borderTop: "1px solid #cbd5e1",
-            paddingTop: "8px",
+            borderTop: "1px solid #000000",
+            paddingTop: is4Cards ? "5px" : "3px",
             display: "flex",
             alignItems: "flex-end",
             justifyContent: "space-between",
-            gap: "12px",
+            gap: "10px",
             marginTop: "auto"
           }}
         >
-          {/* Instruksi Penggunaan */}
-          <div style={{ fontSize: is4Cards ? "8px" : "7px", lineHeight: "1.3", color: "#475569", maxWidth: "60%" }}>
-            <p style={{ fontWeight: 800, color: "#0f172a", margin: "0 0 2px 0", textTransform: "uppercase" }}>Ketentuan Peserta:</p>
-            <ol style={{ margin: 0, paddingLeft: "12px" }}>
-              <li>Membawa kartu ini selama ujian berlangsung.</li>
-              <li>Menjaga kerahasiaan Username & Password.</li>
-              <li>Dilarang mencoret/merusak kartu ujian ini.</li>
-            </ol>
+          {/* Ketentuan Peserta */}
+          <div style={{ fontSize: is4Cards ? "7.5px" : "6.5px", lineHeight: "1.3", color: "#334155", maxWidth: "58%" }}>
+            <div style={{ fontWeight: 800, color: "#000000", textTransform: "uppercase", marginBottom: "1px" }}>Ketentuan Peserta:</div>
+            <ul style={{ margin: 0, paddingLeft: "10px" }}>
+              <li>Kartu wajib dibawa selama pelaksanaan asesmen.</li>
+              <li>Jaga kerahasiaan username & password ujian.</li>
+            </ul>
           </div>
 
           {/* Kolom Tanda Tangan */}
-          <div style={{ textAlign: "center", minWidth: is4Cards ? "110px" : "90px", lineHeight: "1.2" }}>
-            <p style={{ fontSize: is4Cards ? "8.5px" : "7.5px", color: "#334155", margin: 0 }}>
+          <div style={{ textAlign: "center", minWidth: is4Cards ? "105px" : "85px", lineHeight: "1.2" }}>
+            <div style={{ fontSize: is4Cards ? "7.5px" : "6.5px", color: "#1e293b" }}>
               {cityDate}
-            </p>
-            <p style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 800, color: "#0f172a", margin: "2px 0 0 0" }}>
+            </div>
+            <div style={{ fontSize: is4Cards ? "8px" : "7px", fontWeight: 800, color: "#000000", marginTop: "1px" }}>
               {signerRole},
-            </p>
-            <div style={{ height: is4Cards ? "30px" : "24px" }} />
-            <p style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 800, textDecoration: "underline", color: "#0f172a", margin: 0 }}>
+            </div>
+            <div style={{ height: is4Cards ? "24px" : "18px" }} />
+            <div style={{ fontSize: is4Cards ? "8px" : "7px", fontWeight: 800, textDecoration: "underline", color: "#000000" }}>
               {signerName || "( ........................................ )"}
-            </p>
-            <p style={{ fontSize: is4Cards ? "7.5px" : "6.5px", color: "#64748b", margin: "2px 0 0 0" }}>
-              {signerNip ? `NIP. ${signerNip}` : "NIP. -"}
-            </p>
+            </div>
+            <div style={{ fontSize: is4Cards ? "6.5px" : "5.5px", color: "#475569", marginTop: "1px" }}>
+              {signerNip ? `NIP. ${signerNip}` : ""}
+            </div>
           </div>
         </div>
       </div>
@@ -676,23 +700,23 @@ export const PrintExamCardsDialog = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-7xl w-[98vw] h-[94vh] max-h-[95vh] p-0 flex flex-col overflow-hidden bg-neutral-900 border border-neutral-800 shadow-2xl rounded-2xl">
-        {/* Header Dialog Elegan Tema Neon */}
-        <div className="px-6 py-3.5 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/25">
-              <Printer className="w-5 h-5" />
+        {/* Header Dialog */}
+        <div className="px-5 py-3 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/25">
+              <Printer className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white leading-tight">
-                  Studio Cetak Kartu Peserta Ujian
+                <h2 className="text-sm font-bold text-white leading-tight">
+                  Cetak Kartu Peserta Ujian
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
-                  Standar ANBK / CBT
+                <span className="px-2 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+                  Format Resmi ANBK / CBT
                 </span>
               </div>
-              <p className="text-xs text-neutral-400">
-                Atur tata letak di panel kiri dan lihat hasil pratinjau langsung di kanvas kanan
+              <p className="text-[11px] text-neutral-400">
+                Pratinjau lembar cetak A4 presisi siap potong
               </p>
             </div>
           </div>
@@ -700,7 +724,7 @@ export const PrintExamCardsDialog = ({
           <div className="flex items-center gap-2">
             <NeonButton
               variant="secondary"
-              size="sm"
+              size="xs"
               onClick={onClose}
               className="gap-1"
             >
@@ -713,10 +737,10 @@ export const PrintExamCardsDialog = ({
               size="sm"
               onClick={handlePrint}
               disabled={studentsToPrint.length === 0}
-              className="gap-1.5"
+              className="gap-1.5 font-bold"
             >
               <Printer className="w-4 h-4" />
-              <span>Cetak Sekarang ({studentsToPrint.length} {terminology.student})</span>
+              <span>Cetak Sekarang ({studentsToPrint.length} Siswa)</span>
             </NeonButton>
           </div>
         </div>
@@ -724,303 +748,336 @@ export const PrintExamCardsDialog = ({
         {/* 2-COLUMN STUDIO LAYOUT */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           {/* ======================================================== */}
-          {/* PANEL KIRI: PENGATURAN KARTU (LEBAR 340px, SCROLLABLE)    */}
+          {/* PANEL KIRI: PENGATURAN KARTU (RINGKAS & SIMPEL)           */}
           {/* ======================================================== */}
-          <div className="w-full lg:w-[340px] xl:w-[360px] flex-shrink-0 bg-slate-950/80 border-b lg:border-r lg:border-b-0 border-slate-800 flex flex-col overflow-y-auto p-4 space-y-4 text-xs h-1/2 lg:h-auto">
-            {/* Bagian 1: Sasaran & Format Kertas */}
-            <div className="bg-slate-900/90 rounded-xl p-3.5 border border-slate-800 space-y-3">
-              <div className="flex items-center gap-1.5 text-blue-400 font-bold text-xs uppercase tracking-wider">
-                <Layers className="w-3.5 h-3.5" />
-                <span>Format Halaman</span>
-              </div>
+          <div className="w-full lg:w-[320px] xl:w-[340px] flex-shrink-0 bg-neutral-950 border-b lg:border-r lg:border-b-0 border-neutral-800 flex flex-col overflow-y-auto p-4 space-y-3.5 text-xs h-1/2 lg:h-auto">
+            
+            {/* Navigasi Tab Pengaturan: Cepat vs Lanjutan */}
+            <div className="grid grid-cols-2 gap-1 bg-neutral-900 p-1 rounded-lg border border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setActiveTab("quick")}
+                className={`py-1.5 rounded-md font-semibold text-xs transition-colors ${
+                  activeTab === "quick" 
+                    ? "bg-neutral-800 text-white shadow-xs" 
+                    : "text-neutral-400 hover:text-neutral-200"
+                }`}
+              >
+                Pengaturan Utama
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("advanced")}
+                className={`py-1.5 rounded-md font-semibold text-xs transition-colors flex items-center justify-center gap-1 ${
+                  activeTab === "advanced" 
+                    ? "bg-neutral-800 text-white shadow-xs" 
+                    : "text-neutral-400 hover:text-neutral-200"
+                }`}
+              >
+                <SlidersHorizontal className="w-3 h-3" />
+                <span>Kop & TTD</span>
+              </button>
+            </div>
 
-              {/* Target Siswa */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  Target Cetak {terminology.student}
-                </label>
-                <Select 
-                  value={printScope} 
-                  onChange={(e) => setPrintScope(e.target.value as any)}
-                  className="h-8 text-xs bg-slate-950 border-slate-700 text-slate-200"
-                >
-                  {selectedStudentIds.length > 0 && (
-                    <option value="selected">{terminology.student} Terpilih ({selectedStudentIds.length})</option>
-                  )}
-                  {filterClassId !== "ALL" && (
-                    <option value="class">{terminology.class} ({classes.find(c => c.id === filterClassId)?.name || filterClassId})</option>
-                  )}
-                  <option value="all">Semua {terminology.student} ({students.length})</option>
-                </Select>
-              </div>
+            {/* TAB 1: PENGATURAN UTAMA (SIMPEL & CEPAT) */}
+            {activeTab === "quick" && (
+              <div className="space-y-3">
+                {/* 1. Target Siswa */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
+                    Target Cetak {terminology.student}
+                  </label>
+                  <Select 
+                    value={printScope} 
+                    onChange={(e) => setPrintScope(e.target.value as any)}
+                    className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
+                  >
+                    {selectedStudentIds.length > 0 && (
+                      <option value="selected">{terminology.student} Terpilih ({selectedStudentIds.length})</option>
+                    )}
+                    {filterClassId !== "ALL" && (
+                      <option value="class">{terminology.class} ({classes.find(c => c.id === filterClassId)?.name || filterClassId})</option>
+                    )}
+                    <option value="all">Semua {terminology.student} ({students.length})</option>
+                  </Select>
+                </div>
 
-              {/* Mode Kartu per Halaman (Segmented Control Mewah) */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  Jumlah Kartu per Lembar A4
-                </label>
-                <div className="grid grid-cols-2 gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                {/* 2. Jumlah Kartu per Lembar A4 */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
+                    Format Kertas A4
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5 bg-neutral-900 p-1 rounded-lg border border-neutral-800">
+                    <button
+                      type="button"
+                      onClick={() => setLayoutMode("4")}
+                      className={`py-1.5 px-2 rounded-md font-bold text-xs transition-colors flex flex-col items-center justify-center ${
+                        layoutMode === "4"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-neutral-400 hover:text-neutral-200"
+                      }`}
+                    >
+                      <span>4 Kartu</span>
+                      <span className="text-[9px] font-normal opacity-85">Standar (2×2)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLayoutMode("6")}
+                      className={`py-1.5 px-2 rounded-md font-bold text-xs transition-colors flex flex-col items-center justify-center ${
+                        layoutMode === "6"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-neutral-400 hover:text-neutral-200"
+                      }`}
+                    >
+                      <span>6 Kartu</span>
+                      <span className="text-[9px] font-normal opacity-85">Hemat (2×3)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Judul Ujian */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
+                    Nama Asesmen / Ujian
+                  </label>
+                  <Input
+                    value={examTitle}
+                    onChange={(e) => setExamTitle(e.target.value)}
+                    placeholder="Contoh: ASESMEN SUMATIF SEKOLAH"
+                    className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
+                  />
+                </div>
+
+                {/* 4. Opsi Tampilkan Password */}
+                <div className="p-2.5 rounded-lg bg-neutral-900/60 border border-neutral-800 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-neutral-200">Tampilkan Password</div>
+                    <div className="text-[10px] text-neutral-400">Tampilkan teks password di kartu</div>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setLayoutMode("4")}
-                    className={`py-1.5 rounded-md font-bold text-xs transition-all flex flex-col items-center justify-center ${
-                      layoutMode === "4"
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "text-slate-400 hover:text-white"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className={`h-6 px-2.5 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors ${
+                      showPassword 
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" 
+                        : "bg-neutral-800 text-neutral-400 border border-neutral-700"
                     }`}
                   >
-                    <span>4 Kartu</span>
-                    <span className="text-[9px] font-normal opacity-80">Standar (2×2)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLayoutMode("6")}
-                    className={`py-1.5 rounded-md font-bold text-xs transition-all flex flex-col items-center justify-center ${
-                      layoutMode === "6"
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    <span>6 Kartu</span>
-                    <span className="text-[9px] font-normal opacity-80">Hemat (2×3)</span>
+                    {showPassword ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    <span>{showPassword ? "Tampil" : "Sensor"}</span>
                   </button>
                 </div>
-              </div>
 
-              {/* Password Switch */}
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] font-semibold text-slate-400">Tampilan Password:</span>
-                <NeonButton
-                  type="button"
-                  variant="secondary"
-                  size="xs"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <Eye className="w-3 h-3 text-emerald-500 mr-1.5" /> : <EyeOff className="w-3 h-3 text-neutral-400 mr-1.5" />}
-                  <span>{showPassword ? "Tampil" : "Sensor"}</span>
-                </NeonButton>
+                {/* Ringkasan Cetak */}
+                <div className="p-3 rounded-lg bg-neutral-900/80 border border-neutral-800 text-[11px] text-neutral-400 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Total Siswa:</span>
+                    <strong className="text-neutral-200 font-mono">{studentsToPrint.length}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Kebutuhan Kertas:</span>
+                    <strong className="text-emerald-400 font-mono">{totalPages} Lembar A4</strong>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Bagian 2: Kop & Instansi */}
-            <div className="bg-slate-900/90 rounded-xl p-3.5 border border-slate-800 space-y-3">
-              <div className="flex items-center gap-1.5 text-blue-400 font-bold text-xs uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Kop & Identitas Ujian</span>
-              </div>
-
-              {/* Judul Ujian */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  Nama Asesmen / Ujian
-                </label>
-                <Input
-                  value={examTitle}
-                  onChange={(e) => setExamTitle(e.target.value)}
-                  placeholder="Contoh: PENILAIAN AKHIR SEMESTER"
-                  className="h-8 text-xs bg-slate-950 border-slate-700 text-slate-200"
-                />
-              </div>
-
-              {/* Tahun Ajaran */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  Tahun Pelajaran
-                </label>
-                <Input
-                  value={academicYear}
-                  onChange={(e) => setAcademicYear(e.target.value)}
-                  className="h-8 text-xs bg-slate-950 border-slate-700 text-slate-200"
-                />
-              </div>
-
-              {/* Logo Kiri & Logo Kanan */}
-              <div className="grid grid-cols-2 gap-2">
+            {/* TAB 2: PENGATURAN KOP & PENGESAHAN */}
+            {activeTab === "advanced" && (
+              <div className="space-y-3">
+                {/* Tahun Ajaran */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Logo Kiri
+                  <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
+                    Tahun Pelajaran
                   </label>
-                  <Select
-                    value={leftLogoType}
-                    onChange={(e) => setLeftLogoType(e.target.value as any)}
-                    className="h-8 text-xs bg-slate-950 border-slate-700 text-slate-200"
-                  >
-                    <option value="tutwuri">Kemdikbud</option>
-                    <option value="kemenag">Kemenag</option>
-                    <option value="custom">Upload File</option>
-                  </Select>
-                  <input
-                    type="file"
-                    ref={leftFileInputRef}
-                    accept="image/*"
-                    onChange={handleLeftLogoUpload}
-                    className="hidden"
+                  <Input
+                    value={academicYear}
+                    onChange={(e) => setAcademicYear(e.target.value)}
+                    className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
                   />
-                  {leftLogoType === "custom" && !customLeftLogoUrl && (
-                    <NeonButton
-                      type="button"
-                      variant="secondary"
-                      size="xs"
-                      onClick={() => leftFileInputRef.current?.click()}
-                      className="mt-1 w-full"
+                </div>
+
+                {/* Logo Kiri & Logo Kanan */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
+                      Logo Kiri
+                    </label>
+                    <Select
+                      value={leftLogoType}
+                      onChange={(e) => setLeftLogoType(e.target.value as any)}
+                      className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
                     >
-                      <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
-                    </NeonButton>
+                      <option value="tutwuri">Kemdikbud</option>
+                      <option value="kemenag">Kemenag</option>
+                      <option value="custom">Upload File</option>
+                    </Select>
+                    <input
+                      type="file"
+                      ref={leftFileInputRef}
+                      accept="image/*"
+                      onChange={handleLeftLogoUpload}
+                      className="hidden"
+                    />
+                    {leftLogoType === "custom" && !customLeftLogoUrl && (
+                      <NeonButton
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => leftFileInputRef.current?.click()}
+                        className="mt-1 w-full text-[10px]"
+                      >
+                        <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
+                      </NeonButton>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
+                      Logo Kanan
+                    </label>
+                    <Select
+                      value={rightLogoType}
+                      onChange={(e) => setRightLogoType(e.target.value as any)}
+                      className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
+                    >
+                      <option value="school">Logo Sekolah</option>
+                      <option value="custom">Upload File</option>
+                      <option value="none">Tanpa Logo</option>
+                    </Select>
+                    <input
+                      type="file"
+                      ref={rightFileInputRef}
+                      accept="image/*"
+                      onChange={handleRightLogoUpload}
+                      className="hidden"
+                    />
+                    {rightLogoType === "custom" && !customRightLogoUrl && (
+                      <NeonButton
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => rightFileInputRef.current?.click()}
+                        className="mt-1 w-full text-[10px]"
+                      >
+                        <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
+                      </NeonButton>
+                    )}
+                  </div>
+                </div>
+
+                {/* Kolom Tambahan */}
+                <div className="p-2.5 rounded-lg bg-neutral-900/60 border border-neutral-800 space-y-2">
+                  <div className="text-[11px] font-semibold text-neutral-300">Kolom Tambahan Biodata</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-neutral-400">Tempat & Tgl Lahir:</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowBirthInfo(!showBirthInfo)}
+                      className={`h-5 px-2 rounded text-[10px] font-semibold transition-colors ${
+                        showBirthInfo ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-neutral-800 text-neutral-400"
+                      }`}
+                    >
+                      {showBirthInfo ? "Aktif" : "Sembunyi"}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-neutral-400">Ruang & Sesi:</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowRoomSession(!showRoomSession)}
+                      className={`h-5 px-2 rounded text-[10px] font-semibold transition-colors ${
+                        showRoomSession ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-neutral-800 text-neutral-400"
+                      }`}
+                    >
+                      {showRoomSession ? "Aktif" : "Sembunyi"}
+                    </button>
+                  </div>
+
+                  {showRoomSession && (
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      <Input
+                        value={defaultRoom}
+                        onChange={(e) => setDefaultRoom(e.target.value)}
+                        placeholder="Ruang Default"
+                        className="h-7 text-[11px] bg-neutral-900 border-neutral-750 text-neutral-100"
+                      />
+                      <Input
+                        value={defaultSession}
+                        onChange={(e) => setDefaultSession(e.target.value)}
+                        placeholder="Sesi Default"
+                        className="h-7 text-[11px] bg-neutral-900 border-neutral-750 text-neutral-100"
+                      />
+                    </div>
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Logo Kanan
-                  </label>
-                  <Select
-                    value={rightLogoType}
-                    onChange={(e) => setRightLogoType(e.target.value as any)}
-                    className="h-8 text-xs bg-slate-950 border-slate-700 text-slate-200"
-                  >
-                    <option value="school">Logo Sekolah</option>
-                    <option value="custom">Upload File</option>
-                    <option value="none">Tanpa Logo</option>
-                  </Select>
-                  <input
-                    type="file"
-                    ref={rightFileInputRef}
-                    accept="image/*"
-                    onChange={handleRightLogoUpload}
-                    className="hidden"
-                  />
-                  {rightLogoType === "custom" && !customRightLogoUrl && (
-                    <NeonButton
-                      type="button"
-                      variant="secondary"
-                      size="xs"
-                      onClick={() => rightFileInputRef.current?.click()}
-                      className="mt-1 w-full"
-                    >
-                      <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
-                    </NeonButton>
-                  )}
+                {/* Pengesahan & Tanda Tangan */}
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
+                      Kota & Tanggal
+                    </label>
+                    <Input
+                      value={cityDate}
+                      onChange={(e) => setCityDate(e.target.value)}
+                      className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
+                        Jabatan TTD
+                      </label>
+                      <Select
+                        value={signerRole}
+                        onChange={(e) => setSignerRole(e.target.value as any)}
+                        className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
+                      >
+                        <option value="Kepala Sekolah">Kepala Sekolah</option>
+                        <option value="Ketua Panitia">Ketua Panitia</option>
+                        <option value="Proktor">Proktor</option>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
+                        Nama Pejabat
+                      </label>
+                      <Input
+                        value={signerName}
+                        onChange={(e) => setSignerName(e.target.value)}
+                        placeholder="Nama Lengkap"
+                        className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
+                      NIP Pejabat (Opsional)
+                    </label>
+                    <Input
+                      value={signerNip}
+                      onChange={(e) => setSignerNip(e.target.value)}
+                      placeholder="NIP. 19..."
+                      className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Bagian 3: Opsi Baris Data Siswa */}
-            <div className="bg-slate-900/90 rounded-xl p-3.5 border border-slate-800 space-y-2.5">
-              <span className="text-blue-400 font-bold text-xs uppercase tracking-wider block">
-                Opsi Kolom Tambahan
-              </span>
-
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-300">Tempat & Tgl Lahir:</span>
-                <button
-                  type="button"
-                  onClick={() => setShowBirthInfo(!showBirthInfo)}
-                  className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
-                    showBirthInfo ? "bg-blue-600/30 text-blue-300 border border-blue-500/40" : "bg-slate-800 text-slate-400"
-                  }`}
-                >
-                  {showBirthInfo ? "Aktif" : "Sembunyi"}
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-300">Ruang & Sesi:</span>
-                <button
-                  type="button"
-                  onClick={() => setShowRoomSession(!showRoomSession)}
-                  className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
-                    showRoomSession ? "bg-blue-600/30 text-blue-300 border border-blue-500/40" : "bg-slate-800 text-slate-400"
-                  }`}
-                >
-                  {showRoomSession ? "Aktif" : "Sembunyi"}
-                </button>
-              </div>
-
-              {showRoomSession && (
-                <div className="grid grid-cols-2 gap-1.5 pt-1">
-                  <Input
-                    value={defaultRoom}
-                    onChange={(e) => setDefaultRoom(e.target.value)}
-                    placeholder="Ruang Default"
-                    className="h-7 text-[11px] bg-slate-950 border-slate-700 text-slate-200"
-                  />
-                  <Input
-                    value={defaultSession}
-                    onChange={(e) => setDefaultSession(e.target.value)}
-                    placeholder="Sesi Default"
-                    className="h-7 text-[11px] bg-slate-950 border-slate-700 text-slate-200"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Bagian 4: Pengesahan & Tanda Tangan */}
-            <div className="bg-slate-900/90 rounded-xl p-3.5 border border-slate-800 space-y-2.5">
-              <span className="text-blue-400 font-bold text-xs uppercase tracking-wider block">
-                Pengesahan & Titimangsa
-              </span>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  Kota & Tanggal
-                </label>
-                <Input
-                  value={cityDate}
-                  onChange={(e) => setCityDate(e.target.value)}
-                  className="h-8 text-xs bg-slate-950 border-slate-700 text-slate-200"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Pejabat TTD
-                  </label>
-                  <Select
-                    value={signerRole}
-                    onChange={(e) => setSignerRole(e.target.value as any)}
-                    className="h-8 text-xs bg-slate-950 border-slate-700 text-slate-200"
-                  >
-                    <option value="Kepala Sekolah">Kepala Sekolah</option>
-                    <option value="Ketua Panitia">Ketua Panitia</option>
-                    <option value="Proktor">Proktor</option>
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Nama Pejabat
-                  </label>
-                  <Input
-                    value={signerName}
-                    onChange={(e) => setSignerName(e.target.value)}
-                    placeholder="Nama Lengkap"
-                    className="h-8 text-xs bg-slate-950 border-slate-700 text-slate-200"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  NIP Pejabat (Opsional)
-                </label>
-                <Input
-                  value={signerNip}
-                  onChange={(e) => setSignerNip(e.target.value)}
-                  placeholder="NIP. 19..."
-                  className="h-8 text-xs bg-slate-950 border-slate-700 text-slate-200"
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           {/* ======================================================== */}
           {/* PANEL KANAN: KANVAS PRATINJAU LIVE LEMBAR A4              */}
           {/* ======================================================== */}
-          <div className="flex-1 flex flex-col bg-slate-950/50 overflow-hidden">
+          <div className="flex-1 flex flex-col bg-neutral-950 overflow-hidden">
             {/* Toolbar Kanvas Pratinjau (Zoom & Halaman) */}
-            <div className="px-6 py-2.5 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+            <div className="px-5 py-2 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between flex-shrink-0">
               {/* Info Halaman */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <NeonButton
                   variant="secondary"
                   size="xs"
@@ -1029,10 +1086,10 @@ export const PrintExamCardsDialog = ({
                   disabled={currentPreviewPage <= 0}
                   onClick={() => setCurrentPreviewPage(p => Math.max(0, p - 1))}
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-3.5 h-3.5" />
                 </NeonButton>
-                <span className="text-xs text-slate-300 font-semibold px-1">
-                  Halaman {totalPages > 0 ? currentPreviewPage + 1 : 0} dari {totalPages}
+                <span className="text-xs text-neutral-300 font-semibold px-1 font-mono">
+                  {totalPages > 0 ? currentPreviewPage + 1 : 0} / {totalPages} Lembar
                 </span>
                 <NeonButton
                   variant="secondary"
@@ -1042,12 +1099,12 @@ export const PrintExamCardsDialog = ({
                   disabled={currentPreviewPage >= totalPages - 1}
                   onClick={() => setCurrentPreviewPage(p => Math.min(totalPages - 1, p + 1))}
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </NeonButton>
               </div>
 
               {/* Zoom Controls */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <NeonButton
                   variant="secondary"
                   size="xs"
@@ -1058,7 +1115,7 @@ export const PrintExamCardsDialog = ({
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
                 </NeonButton>
-                <span className="text-xs font-mono text-slate-400 min-w-[42px] text-center">
+                <span className="text-xs font-mono text-neutral-300 min-w-[38px] text-center">
                   {Math.round(previewZoom * 100)}%
                 </span>
                 <NeonButton
@@ -1081,13 +1138,15 @@ export const PrintExamCardsDialog = ({
               </div>
             </div>
 
-            {/* Kanvas Pratinjau Lembar Kertas A4 */}
-            <div className="flex-1 overflow-auto p-6 flex justify-center items-start bg-slate-900/40">
+            {/* Kanvas Pratinjau Lembar Kertas A4 Realistis */}
+            <div className="flex-1 overflow-auto p-6 flex justify-center items-start bg-neutral-900/50">
               {studentsToPrint.length === 0 ? (
-                <div className="m-auto flex flex-col items-center justify-center text-slate-500 text-center py-20">
-                  <AlertCircle className="w-12 h-12 mb-3 opacity-40 text-blue-400" />
-                  <p className="font-bold text-base text-slate-300">Tidak ada siswa yang dipilih</p>
-                  <p className="text-xs text-slate-500 mt-1">Silakan sesuaikan target siswa di panel sebelah kiri.</p>
+                <div className="m-auto flex flex-col items-center justify-center text-neutral-400 text-center py-20">
+                  <div className="w-12 h-12 rounded-xl bg-neutral-800 text-neutral-500 flex items-center justify-center mb-3">
+                    <Printer className="w-6 h-6" />
+                  </div>
+                  <p className="font-bold text-sm text-neutral-200">Tidak ada siswa yang dipilih</p>
+                  <p className="text-xs text-neutral-400 mt-1">Silakan sesuaikan target siswa di panel sebelah kiri.</p>
                 </div>
               ) : (
                 <div 
@@ -1107,14 +1166,14 @@ export const PrintExamCardsDialog = ({
 
                     return (
                       <div 
-                        className="bg-white text-black shadow-2xl rounded-sm border border-slate-300"
+                        className="bg-white text-black shadow-2xl rounded-none border border-neutral-300"
                         style={{ 
                           width: "210mm", 
-                          height: "278mm",
-                          maxHeight: "278mm",
-                          padding: "7mm 6mm",
+                          height: "282mm",
+                          maxHeight: "282mm",
+                          padding: "6mm 6mm",
                           boxSizing: "border-box",
-                          fontFamily: 'Arial, "Helvetica Neue", Helvetica, sans-serif',
+                          fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif",
                           display: "grid",
                           gridTemplateColumns: "1fr 1fr",
                           gridTemplateRows: is4Cards ? "1fr 1fr" : "1fr 1fr 1fr",
@@ -1147,8 +1206,8 @@ export const PrintExamCardsDialog = ({
                 className="a4-page"
                 style={{ 
                   width: "100%", 
-                  height: "278mm",
-                  maxHeight: "278mm",
+                  height: "282mm",
+                  maxHeight: "282mm",
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   gridTemplateRows: is4Cards ? "1fr 1fr" : "1fr 1fr 1fr",
