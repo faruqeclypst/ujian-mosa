@@ -118,20 +118,21 @@ body {
   }
 }
 
-/* 📸 Force All images inside rich text content/editor to center by default */
-.ql-editor img {
+/* 📸 Force All images inside rich text content/editor to center and never exceed container width */
+.ql-editor img,
+.html-segment img,
+.math-content img {
   display: block !important;
+  max-width: 100% !important;
+  height: auto !important;
   margin-left: auto !important;
   margin-right: auto !important;
+  box-sizing: border-box !important;
 }
 
 /* 📸 Inline images in question text display */
 .html-segment img,
 .math-content img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 0.5rem auto;
   border-radius: 0.5rem;
   cursor: zoom-in;
   transition: opacity 0.4s ease;

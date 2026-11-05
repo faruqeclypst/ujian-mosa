@@ -23,10 +23,10 @@ export const NeonInspector: React.FC<NeonInspectorProps> = ({
   return (
     <aside
       className={cn(
-        "shrink-0 space-y-6",
+        "shrink-0 space-y-6 overflow-x-hidden",
         widthClassName,
         isSticky && "xl:sticky xl:top-6",
-        scrollable && "xl:max-h-[calc(100vh-3.5rem)] xl:overflow-y-auto pr-1",
+        scrollable && "xl:max-h-[calc(100vh-3.5rem)] xl:overflow-y-auto xl:overflow-x-hidden pr-1",
         className
       )}
       {...props}
