@@ -28,9 +28,14 @@ interface PrintExamCardsDialogProps {
   filterClassId?: string;
 }
 
-// Logo Resmi Kemdikbud / Tut Wuri Handayani (Vektor SVG Presisi)
-const TutWuriHandayaniLogo = ({ size = 36 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+// Logo Resmi Kemdikbud / Tut Wuri Handayani (Vektor SVG Presisi - Zero Margin Atas Bawah)
+const TutWuriHandayaniLogo = ({ height = 54 }: { height?: number }) => (
+  <svg 
+    viewBox="8 4 84 85" 
+    style={{ height: height + 'px', width: Math.round(height * (84/85)) + 'px', display: 'block' }} 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <polygon points="50,5 92,35 77,88 23,88 8,35" fill="#00529C" stroke="#FFD700" strokeWidth="2.5" />
     <polygon points="50,9 88,37 74,84 26,84 12,37" fill="#005AA9" />
     <path d="M26 62 C 32 46, 42 42, 50 56 C 58 42, 68 46, 74 62 C 65 60, 56 65, 50 75 C 44 65, 35 60, 26 62 Z" fill="#FFFFFF" />
@@ -41,9 +46,14 @@ const TutWuriHandayaniLogo = ({ size = 36 }: { size?: number }) => (
   </svg>
 );
 
-// Logo Kementerian Agama (Vektor SVG)
-const KemenagLogo = ({ size = 36 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+// Logo Kementerian Agama (Vektor SVG - Zero Margin Atas Bawah)
+const KemenagLogo = ({ height = 54 }: { height?: number }) => (
+  <svg 
+    viewBox="7 3 86 87" 
+    style={{ height: height + 'px', width: Math.round(height * (86/87)) + 'px', display: 'block' }} 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <polygon points="50,4 93,35 77,89 23,89 7,35" fill="#1B5E20" stroke="#FFD700" strokeWidth="2.5" />
     <circle cx="50" cy="50" r="32" fill="#2E7D32" stroke="#FFD700" strokeWidth="1.5" />
     <rect x="47" y="28" width="6" height="34" fill="#FFD700" />
@@ -98,9 +108,9 @@ export const PrintExamCardsDialog = ({
   const [showBirthInfo, setShowBirthInfo] = useState(false);
 
   // Logo Kiri & Logo Kanan
-  const [leftLogoType, setLeftLogoType] = useState<"tutwuri" | "kemenag" | "custom">("tutwuri");
+  const [leftLogoType, setLeftLogoType] = useState<"tutwuri" | "kemenag" | "school" | "custom" | "none">("tutwuri");
   const [customLeftLogoUrl, setCustomLeftLogoUrl] = useState<string>("");
-  const [rightLogoType, setRightLogoType] = useState<"school" | "custom" | "none">("school");
+  const [rightLogoType, setRightLogoType] = useState<"school" | "tutwuri" | "kemenag" | "custom" | "none">("school");
   const [customRightLogoUrl, setCustomRightLogoUrl] = useState<string>("");
   const [schoolLogoFailed, setSchoolLogoFailed] = useState(false);
 
@@ -222,52 +232,62 @@ export const PrintExamCardsDialog = ({
     return place || dateStr || "";
   };
 
-  // Render Logo Kiri
-  const renderLeftLogoComponent = (sizePx: number) => {
-    if (leftLogoType === "custom" && customLeftLogoUrl) {
-      return (
-        <img 
-          src={customLeftLogoUrl} 
-          alt="Logo" 
-          style={{ width: `${sizePx}px`, height: `${sizePx}px`, objectFit: "contain", display: "block" }} 
-        />
-      );
-    }
-    if (leftLogoType === "kemenag") {
-      return <KemenagLogo size={sizePx} />;
-    }
-    return <TutWuriHandayaniLogo size={sizePx} />;
-  };
+  // Render Logo Presisi yang Menempel Rata Atas & Bawah Teks Kop
+  const renderLogoNode = (
+    type: "tutwuri" | "kemenag" | "school" | "custom" | "none",
+    customUrl: string,
+    heightPx: number
+  ) => {
+    if (type === "none") return null;
 
-  // Render Logo Kanan
-  const renderRightLogoComponent = (sizePx: number) => {
-    if (rightLogoType === "none") {
-      return <div style={{ width: `${sizePx}px`, height: `${sizePx}px` }} />;
-    }
-
-    if (rightLogoType === "custom" && customRightLogoUrl) {
-      return (
-        <img 
-          src={customRightLogoUrl} 
-          alt="Logo Sekolah" 
-          style={{ width: `${sizePx}px`, height: `${sizePx}px`, objectFit: "contain", display: "block" }} 
-        />
-      );
+    if (type === "school") {
+      const schoolLogoUrl = (school as any)?.logo_url || (school as any)?.logo;
+      if (schoolLogoUrl && !schoolLogoFailed) {
+        return (
+          <img 
+            src={schoolLogoUrl} 
+            alt="Logo Sekolah" 
+            onError={() => setSchoolLogoFailed(true)}
+            style={{ 
+              height: heightPx + 'px', 
+              width: "auto", 
+              maxHeight: heightPx + 'px',
+              maxWidth: Math.round(heightPx * 1.35) + 'px',
+              objectFit: "contain", 
+              display: "block" 
+            }} 
+          />
+        );
+      }
+      return null;
     }
 
-    const schoolLogoUrl = (school as any)?.logo_url || (school as any)?.logo;
-    if (schoolLogoUrl && !schoolLogoFailed) {
-      return (
-        <img 
-          src={schoolLogoUrl} 
-          alt="" 
-          onError={() => setSchoolLogoFailed(true)}
-          style={{ width: `${sizePx}px`, height: `${sizePx}px`, objectFit: "contain", display: "block" }} 
-        />
-      );
+    if (type === "custom") {
+      if (customUrl) {
+        return (
+          <img 
+            src={customUrl} 
+            alt="Logo" 
+            style={{ 
+              height: heightPx + 'px', 
+              width: "auto", 
+              maxHeight: heightPx + 'px',
+              maxWidth: Math.round(heightPx * 1.35) + 'px',
+              objectFit: "contain", 
+              display: "block" 
+            }} 
+          />
+        );
+      }
+      return null;
     }
 
-    return <div style={{ width: `${sizePx}px`, height: `${sizePx}px` }} />;
+    if (type === "kemenag") {
+      return <KemenagLogo height={heightPx} />;
+    }
+
+    // Default: tutwuri (Kemdikbud)
+    return <TutWuriHandayaniLogo height={heightPx} />;
   };
 
   // 🖨️ FUNGSI CETAK BULLETPROOF VIA ISOLATED IFRAME
@@ -387,7 +407,11 @@ export const PrintExamCardsDialog = ({
     const sessionVal = student.session || defaultSession;
     const roomSessionDisplay = [roomVal, sessionVal].filter(Boolean).join(" / ");
 
-    const logoSize = is4Cards ? 38 : 30;
+    const headerHeight = is4Cards ? 54 : 44;
+    const leftLogoNode = renderLogoNode(leftLogoType, customLeftLogoUrl, headerHeight);
+    const rightLogoNode = renderLogoNode(rightLogoType, customRightLogoUrl, headerHeight);
+    const hasLeft = leftLogoNode !== null;
+    const hasRight = rightLogoNode !== null;
 
     return (
       <div 
@@ -409,47 +433,113 @@ export const PrintExamCardsDialog = ({
           overflow: "hidden"
         }}
       >
-        {/* 1. KOP KARTU RESMI KEDINASAN */}
+        {/* 1. KOP KARTU RESMI KEDINASAN (UKURAN LOGO PRESISI SAMA DENGAN ATAS & BAWAH TEKS) */}
         <div style={{ marginBottom: is4Cards ? "8px" : "5px" }}>
           <div 
             style={{ 
               display: "flex",
-              alignItems: "center",
+              alignItems: "stretch",
               justifyContent: "space-between",
-              gap: "8px",
-              paddingBottom: "5px"
+              gap: is4Cards ? "10px" : "8px",
+              height: headerHeight + "px",
+              minHeight: headerHeight + "px"
             }}
           >
             {/* Logo Kiri */}
-            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {renderLeftLogoComponent(logoSize)}
-            </div>
+            {hasLeft && (
+              <div 
+                style={{ 
+                  flexShrink: 0, 
+                  height: headerHeight + "px",
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center" 
+                }}
+              >
+                {leftLogoNode}
+              </div>
+            )}
 
-            {/* Teks Kop Tengah */}
-            <div style={{ flex: 1, textAlign: "center", lineHeight: "1.2" }}>
-              <div style={{ fontSize: is4Cards ? "11.5px" : "10px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px", color: "#000000" }}>
+            {/* Teks Kop (Sejajar Atas & Bawah Bersama Logo) */}
+            <div 
+              style={{ 
+                flex: 1, 
+                height: headerHeight + "px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                textAlign: (hasLeft && hasRight) ? "center" : (hasLeft && !hasRight) ? "left" : (!hasLeft && hasRight) ? "right" : "center",
+                padding: (hasLeft && hasRight) ? "0 4px" : "0",
+                overflow: "hidden"
+              }}
+            >
+              <div style={{ 
+                fontSize: is4Cards ? "11.5px" : "9.5px", 
+                fontWeight: 800, 
+                textTransform: "uppercase", 
+                letterSpacing: "0.5px", 
+                color: "#000000",
+                lineHeight: 1,
+                margin: 0,
+                padding: 0
+              }}>
                 KARTU TANDA PESERTA UJIAN
               </div>
-              <div style={{ fontSize: is4Cards ? "9.5px" : "8px", fontWeight: 700, textTransform: "uppercase", color: "#1e293b", marginTop: "1px" }}>
+              <div style={{ 
+                fontSize: is4Cards ? "9.5px" : "8px", 
+                fontWeight: 700, 
+                textTransform: "uppercase", 
+                color: "#1e293b",
+                lineHeight: 1,
+                margin: 0,
+                padding: 0
+              }}>
                 {examTitle}
               </div>
-              <div style={{ fontSize: is4Cards ? "11px" : "9.5px", fontWeight: 800, textTransform: "uppercase", color: "#000000", marginTop: "1px" }}>
+              <div style={{ 
+                fontSize: is4Cards ? "11.5px" : "9.5px", 
+                fontWeight: 800, 
+                textTransform: "uppercase", 
+                color: "#000000",
+                lineHeight: 1,
+                margin: 0,
+                padding: 0
+              }}>
                 {school?.name || "SATUAN PENDIDIKAN"}
               </div>
-              <div style={{ fontSize: is4Cards ? "8px" : "7px", fontWeight: 600, color: "#475569", marginTop: "1px" }}>
-                TAHUN AJARAN {academicYear}
+              <div style={{ 
+                fontSize: is4Cards ? "8.5px" : "7px", 
+                fontWeight: 600, 
+                color: "#475569",
+                lineHeight: 1,
+                margin: 0,
+                padding: 0
+              }}>
+                TAHUN PELAJARAN {academicYear}
               </div>
             </div>
 
             {/* Logo Kanan */}
-            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {renderRightLogoComponent(logoSize)}
-            </div>
+            {hasRight && (
+              <div 
+                style={{ 
+                  flexShrink: 0, 
+                  height: headerHeight + "px",
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center" 
+                }}
+              >
+                {rightLogoNode}
+              </div>
+            )}
           </div>
 
-          {/* Garis Kop Ganda Kedinasan (Garis tebal atas 1.5px, Garis tipis bawah 0.5px) */}
-          <div style={{ borderBottom: "1.8px solid #000000" }} />
-          <div style={{ borderBottom: "0.5px solid #000000", marginTop: "1.5px" }} />
+          {/* Garis Kop Ganda Kedinasan */}
+          <div style={{ marginTop: is4Cards ? "5px" : "4px" }}>
+            <div style={{ borderBottom: "1.8px solid #000000" }} />
+            <div style={{ borderBottom: "0.5px solid #000000", marginTop: "1.5px" }} />
+          </div>
         </div>
 
         {/* 2. BODY ATAS: PASFOTO 3X4 & BIODATA SISWA */}
