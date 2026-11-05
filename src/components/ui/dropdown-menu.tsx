@@ -1,10 +1,13 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronRight } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 interface DropdownMenuContextProps {
   open: boolean;
   setOpen: (open: boolean) => void;
+  triggerRef: React.RefObject<HTMLDivElement>;
+  contentRef: React.RefObject<HTMLDivElement>;
 }
 
 const DropdownMenuContext = React.createContext<DropdownMenuContextProps | undefined>(undefined);
@@ -23,24 +26,40 @@ interface DropdownMenuProps {
 
 const DropdownMenu: React.FC<DropdownMenuProps> = ({ children }) => {
   const [open, setOpen] = React.useState(false);
-  
+  const triggerRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+
   React.useEffect(() => {
+    if (!open) return;
+
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!target.closest('[data-dropdown-menu]')) {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target)) {
+        return;
+      }
+      if (contentRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
         setOpen(false);
       }
     };
-    
-    if (open) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [open]);
-  
+
   return (
-    <DropdownMenuContext.Provider value={{ open, setOpen }}>
-      <div className={cn("relative", open ? "z-50" : "z-auto")} data-dropdown-menu>
+    <DropdownMenuContext.Provider value={{ open, setOpen, triggerRef, contentRef }}>
+      <div ref={triggerRef} className={cn("inline-block", open ? "z-50" : "z-auto")} data-dropdown-menu>
         {children}
       </div>
     </DropdownMenuContext.Provider>
@@ -54,12 +73,12 @@ interface DropdownMenuTriggerProps {
 
 const DropdownMenuTrigger: React.FC<DropdownMenuTriggerProps> = ({ children, asChild }) => {
   const { open, setOpen } = useDropdownMenu();
-  
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setOpen(!open);
   };
-  
+
   if (asChild && React.isValidElement(children)) {
     return React.cloneElement(children, {
       onClick: (e: React.MouseEvent) => {
@@ -71,66 +90,124 @@ const DropdownMenuTrigger: React.FC<DropdownMenuTriggerProps> = ({ children, asC
       ...children.props
     });
   }
-  
-  return <div onClick={handleClick}>{children}</div>;
+
+  return (
+    <div onClick={handleClick} className="inline-block cursor-pointer">
+      {children}
+    </div>
+  );
 };
 
 interface DropdownMenuContentProps {
   children: React.ReactNode;
   align?: "start" | "center" | "end";
   className?: string;
+  sideOffset?: number;
+  portal?: boolean;
 }
 
 const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
   children,
   align = "start",
-  className
+  className,
+  sideOffset = 6,
+  portal = true
 }) => {
-  const { open } = useDropdownMenu();
-  const contentRef = React.useRef<HTMLDivElement>(null);
+  const { open, triggerRef, contentRef } = useDropdownMenu();
+  const [coords, setCoords] = React.useState<{ top: number; left?: number; right?: number } | null>(null);
 
-  React.useLayoutEffect(() => {
-    if (!open || !contentRef.current) return;
-    const el = contentRef.current;
-    const rect = el.getBoundingClientRect();
+  const updatePosition = React.useCallback(() => {
+    if (!triggerRef.current) return;
+    const triggerRect = triggerRef.current.getBoundingClientRect();
+    const contentEl = contentRef.current;
+    const contentHeight = contentEl ? contentEl.offsetHeight : 140;
+    const contentWidth = contentEl ? contentEl.offsetWidth : 192;
     const padding = 8;
 
-    el.style.marginLeft = '0px';
-    let shiftX = 0;
-    if (rect.left < padding) {
-      shiftX = padding - rect.left;
-    } else if (rect.right > window.innerWidth - padding) {
-      shiftX = (window.innerWidth - padding) - rect.right;
+    // If bottom would overflow viewport and top has enough space, flip above
+    const spaceBelow = window.innerHeight - triggerRect.bottom;
+    const placeAbove = spaceBelow < contentHeight + sideOffset && triggerRect.top > contentHeight + sideOffset;
+
+    let top = placeAbove
+      ? Math.max(padding, triggerRect.top - contentHeight - sideOffset)
+      : Math.min(window.innerHeight - contentHeight - padding, triggerRect.bottom + sideOffset);
+
+    let left: number | undefined;
+    let right: number | undefined;
+
+    if (align === "end") {
+      const calculatedRight = window.innerWidth - triggerRect.right;
+      if (window.innerWidth - calculatedRight - contentWidth < padding) {
+        left = padding;
+        right = undefined;
+      } else {
+        right = Math.max(padding, calculatedRight);
+      }
+    } else if (align === "center") {
+      const centerX = triggerRect.left + triggerRect.width / 2;
+      let calculatedLeft = centerX - contentWidth / 2;
+      calculatedLeft = Math.max(padding, Math.min(calculatedLeft, window.innerWidth - contentWidth - padding));
+      left = calculatedLeft;
+    } else {
+      let calculatedLeft = triggerRect.left;
+      calculatedLeft = Math.max(padding, Math.min(calculatedLeft, window.innerWidth - contentWidth - padding));
+      left = calculatedLeft;
     }
-    if (rect.left + shiftX < padding) {
-      shiftX = padding - rect.left;
-    }
-    if (shiftX !== 0) {
-      el.style.marginLeft = Math.round(shiftX) + 'px';
-    }
-  }, [open, align]);
-  
+
+    setCoords({ top, left, right });
+  }, [triggerRef, contentRef, align, sideOffset]);
+
+  React.useLayoutEffect(() => {
+    if (!open) return;
+    updatePosition();
+
+    const handleScrollOrResize = () => {
+      updatePosition();
+    };
+
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    window.addEventListener("resize", handleScrollOrResize);
+    return () => {
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
+  }, [open, updatePosition]);
+
   if (!open) return null;
-  
-  const alignmentClasses = {
-    start: "left-0",
-    center: "left-1/2 transform -translate-x-1/2",
-    end: "right-0"
-  };
-  
-  return (
+
+  const contentElement = (
     <div
       ref={contentRef}
+      data-dropdown-menu-content
+      style={
+        portal
+          ? {
+              position: "fixed",
+              top: coords ? `${coords.top}px` : "-9999px",
+              left: coords?.left !== undefined ? `${coords.left}px` : undefined,
+              right: coords?.right !== undefined ? `${coords.right}px` : undefined,
+              opacity: coords ? 1 : 0,
+              zIndex: 99999
+            }
+          : undefined
+      }
       className={cn(
-        "absolute mt-2 z-[9999] min-w-[8rem] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-1 text-popover-foreground shadow-2xl",
+        portal ? "" : "absolute mt-2",
+        "min-w-[8rem] max-w-[calc(100vw-1.5rem)] rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-1 text-neutral-900 dark:text-neutral-100 shadow-xl",
         "animate-in fade-in-0 zoom-in-95",
-        alignmentClasses[align],
         className
       )}
+      onClick={(e) => e.stopPropagation()}
     >
       {children}
     </div>
   );
+
+  if (portal && typeof document !== "undefined") {
+    return createPortal(contentElement, document.body);
+  }
+
+  return contentElement;
 };
 
 interface DropdownMenuItemProps {
@@ -147,17 +224,18 @@ const DropdownMenuItem: React.FC<DropdownMenuItemProps> = ({
   disabled
 }) => {
   const { setOpen } = useDropdownMenu();
-  
-  const handleClick = () => {
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (disabled) return;
     onClick?.();
     setOpen(false);
   };
-  
+
   return (
     <div
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-sm px-2 py-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground hover:bg-accent cursor-pointer",
+        "relative flex cursor-pointer select-none items-center rounded-lg px-2.5 py-1.5 text-xs outline-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300",
         disabled && "opacity-50 pointer-events-none cursor-not-allowed",
         className
       )}
@@ -184,10 +262,13 @@ const DropdownMenuCheckboxItem: React.FC<DropdownMenuCheckboxItemProps> = ({
   return (
     <div
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground",
+        "relative flex cursor-pointer select-none items-center rounded-lg py-1.5 pl-8 pr-2 text-xs outline-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300",
         className
       )}
-      onClick={() => onCheckedChange?.(!checked)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onCheckedChange?.(!checked);
+      }}
     >
       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
         {checked && <Check className="h-4 w-4" />}
@@ -204,7 +285,7 @@ interface DropdownMenuLabelProps {
 
 const DropdownMenuLabel: React.FC<DropdownMenuLabelProps> = ({ children, className }) => {
   return (
-    <div className={cn("px-2 py-1.5 text-sm font-semibold", className)}>
+    <div className={cn("px-2.5 py-1.5 text-xs font-semibold text-neutral-500 dark:text-neutral-400", className)}>
       {children}
     </div>
   );
@@ -215,7 +296,7 @@ interface DropdownMenuSeparatorProps {
 }
 
 const DropdownMenuSeparator: React.FC<DropdownMenuSeparatorProps> = ({ className }) => {
-  return <div className={cn("-mx-1 my-1 h-px bg-muted", className)} />;
+  return <div className={cn("-mx-1 my-1 h-px bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-800", className)} />;
 };
 
 export {

@@ -19,6 +19,7 @@ export interface NeonTableColumn<T> {
   width?: string;
   align?: "left" | "center" | "right";
   verticalAlign?: "top" | "middle" | "bottom";
+  overflow?: "hidden" | "visible" | "clip";
   className?: string;
   headerClassName?: string;
   render: (item: T, index: number) => React.ReactNode;
@@ -498,7 +499,7 @@ export function NeonTable<T>({
                               : col.align === "right"
                               ? "text-right"
                               : "text-left",
-                            "overflow-hidden",
+                            col.overflow === "visible" || col.key === "actions" ? "overflow-visible" : "overflow-hidden",
                             col.className
                           )}
                         >

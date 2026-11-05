@@ -4043,48 +4043,142 @@ const QuestionsPage = () => {
     }
   };
 
-  const renderQuestionDetails = (item: QuestionData) => {
-    const type = item.type || "pilihan_ganda";
+  const renderQuestionDetails = (item: QuestionData, showTypeBadge = true) => {
+    const qType = item.type || "pilihan_ganda";
+    const meta = QUESTION_TYPE_BADGE[qType] || { variant: "neutral" as const, label: qType };
 
-    if (type === "benar_salah") {
-      const stList = item.statements || item.options?.statements || [];
-      if (stList.length > 0) {
+    const renderKeyAndCount = () => {
+      if (qType === "benar_salah") {
+        const stList = item.statements || item.options?.statements || [];
+        if (stList.length > 0) {
+          return (
+            <div className="flex flex-col items-start gap-1 min-w-0">
+              <div
+                className="flex items-center gap-0.5 flex-wrap cursor-help"
+                title={stList.map((s: any, idx: number) => `${idx + 1}. ${s.text ? s.text.replace(/<[^>]*>/g, '').trim() : 'Pernyataan'}: ${(s.answer || 'benar').toUpperCase()}`).join("\n")}
+              >
+                <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-bold mr-0.5">Kunci:</span>
+                {stList.slice(0, 5).map((s: any, idx: number) => {
+                  const isBenar = (s.answer || "benar").toLowerCase() === "benar";
+                  return (
+                    <span
+                      key={s.id || idx}
+                      className={cn(
+                        "inline-flex items-center justify-center px-1 py-0.2 rounded text-[10px] font-bold font-mono",
+                        isBenar
+                          ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                          : "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30"
+                      )}
+                    >
+                      {idx + 1}:{isBenar ? "B" : "S"}
+                    </span>
+                  );
+                })}
+                {stList.length > 5 && <span className="text-[9px] text-neutral-400 font-mono">+{stList.length - 5}</span>}
+              </div>
+              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+                {stList.length} Pernyataan
+              </span>
+            </div>
+          );
+        }
+
+        const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
+        const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
+        if (keys.length > 0) {
+          const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
+          return (
+            <div className="flex flex-col items-start gap-1 min-w-0">
+              {correctKeys ? (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 truncate max-w-full shadow-2xs">
+                  Kunci: {correctKeys}
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                  Belum ada kunci
+                </span>
+              )}
+              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+                {keys.length} Opsi
+              </span>
+            </div>
+          );
+        }
+
+        return (
+          <span className="text-xs text-neutral-400 dark:text-neutral-500 italic">Belum ada pernyataan</span>
+        );
+      }
+
+      if (qType === "matriks") {
+        const cols = item.options?.columns || [];
+        const stList = item.options?.statements || [];
+        if (stList.length > 0 || cols.length > 0) {
+          return (
+            <div className="flex flex-col items-start gap-1 min-w-0">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
+                {stList.length} × {cols.length} Sel
+              </span>
+              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+                Tabel Matriks
+              </span>
+            </div>
+          );
+        }
+        return <span className="text-xs text-neutral-400 italic">Belum ada matriks</span>;
+      }
+
+      if (qType === "klasifikasi") {
+        const cats = item.options?.categories || [];
+        const stList = item.options?.statements || [];
+        if (stList.length > 0 || cats.length > 0) {
+          return (
+            <div className="flex flex-col items-start gap-1 min-w-0">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                {stList.length} Baris × {cats.length} Kat.
+              </span>
+              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+                Klasifikasi
+              </span>
+            </div>
+          );
+        }
+        return <span className="text-xs text-neutral-400 italic">Belum ada data</span>;
+      }
+
+      if (qType === "isian_rumpang") {
+        const blanks = item.options?.blanks || [];
         return (
           <div className="flex flex-col items-start gap-1 min-w-0">
-            <div
-              className="flex items-center gap-0.5 flex-wrap cursor-help"
-              title={stList.map((s: any, idx: number) => `${idx + 1}. ${s.text ? s.text.replace(/<[^>]*>/g, '').trim() : 'Pernyataan'}: ${(s.answer || 'benar').toUpperCase()}`).join("\n")}
-            >
-              <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-bold mr-0.5">Kunci:</span>
-              {stList.slice(0, 5).map((s: any, idx: number) => {
-                const isBenar = (s.answer || "benar").toLowerCase() === "benar";
-                return (
-                  <span
-                    key={s.id || idx}
-                    className={cn(
-                      "inline-flex items-center justify-center px-1 py-0.2 rounded text-[10px] font-bold font-mono",
-                      isBenar
-                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-                        : "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30"
-                    )}
-                  >
-                    {idx + 1}:{isBenar ? "B" : "S"}
-                  </span>
-                );
-              })}
-              {stList.length > 5 && <span className="text-[9px] text-neutral-400 font-mono">+{stList.length - 5}</span>}
-            </div>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+              {blanks.length} Isian Rumpang
+            </span>
             <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-              {stList.length} Pernyataan
+              Teks Rumpang
             </span>
           </div>
         );
       }
 
-      const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
-      const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
-      if (keys.length > 0) {
+      if (qType === "hotspot") {
+        const areas = item.options?.areas || [];
+        return (
+          <div className="flex flex-col items-start gap-1 min-w-0">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+              {areas.length} Area Hotspot
+            </span>
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+              Titik Gambar
+            </span>
+          </div>
+        );
+      }
+
+      if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks") {
+        const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
+        const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
         const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
+
         return (
           <div className="flex flex-col items-start gap-1 min-w-0">
             {correctKeys ? (
@@ -4103,140 +4197,60 @@ const QuestionsPage = () => {
         );
       }
 
-      return (
-        <span className="text-xs text-neutral-400 dark:text-neutral-500 italic">Belum ada pernyataan</span>
-      );
-    }
-
-    if (type === "matriks") {
-      const cols = item.options?.columns || [];
-      const stList = item.options?.statements || [];
-      if (stList.length > 0 || cols.length > 0) {
+      if (qType === "menjodohkan") {
+        const pairs = item.pairs || [];
         return (
           <div className="flex flex-col items-start gap-1 min-w-0">
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
-              {stList.length} × {cols.length} Sel
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+              {pairs.length} Pasangan
             </span>
             <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-              Tabel Matriks
+              Mencocokkan
             </span>
           </div>
         );
       }
-      return <span className="text-xs text-neutral-400 italic">Belum ada matriks</span>;
-    }
 
-    if (type === "klasifikasi") {
-      const cats = item.options?.categories || [];
-      const stList = item.options?.statements || [];
-      if (stList.length > 0 || cats.length > 0) {
+      if (qType === "isian_singkat" || qType === "uraian") {
         return (
           <div className="flex flex-col items-start gap-1 min-w-0">
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
-              {stList.length} Baris × {cats.length} Kat.
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 truncate max-w-[130px]" title={item.answerKey || "-"}>
+              {item.answerKey ? `Kunci: ${item.answerKey}` : "(Rubrik Esai)"}
             </span>
             <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-              Klasifikasi
+              {qType === "uraian" ? "Jawaban Uraian" : "Isian Singkat"}
             </span>
           </div>
         );
       }
-      return <span className="text-xs text-neutral-400 italic">Belum ada data</span>;
-    }
 
-    if (type === "isian_rumpang") {
-      const blanks = item.options?.blanks || [];
-      return (
-        <div className="flex flex-col items-start gap-1 min-w-0">
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-            {blanks.length} Isian Rumpang
-          </span>
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-            Teks Rumpang
-          </span>
-        </div>
-      );
-    }
-
-    if (type === "hotspot") {
-      const areas = item.options?.areas || [];
-      return (
-        <div className="flex flex-col items-start gap-1 min-w-0">
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
-            {areas.length} Area Hotspot
-          </span>
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-            Titik Gambar
-          </span>
-        </div>
-      );
-    }
-
-    if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks") {
-      const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
-      const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
-      const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
-
-      return (
-        <div className="flex flex-col items-start gap-1 min-w-0">
-          {correctKeys ? (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 truncate max-w-full shadow-2xs">
-              Kunci: {correctKeys}
+      if (qType === "urutkan" || qType === "drag_drop") {
+        const items = item.items || [];
+        return (
+          <div className="flex flex-col items-start gap-1 min-w-0">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
+              {items.length} Tahapan
             </span>
-          ) : (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-              Belum ada kunci
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+              Urutan Kronologis
             </span>
-          )}
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-            {keys.length} Opsi
-          </span>
-        </div>
-      );
-    }
+          </div>
+        );
+      }
 
-    if (type === "menjodohkan") {
-      const pairs = item.pairs || [];
-      return (
-        <div className="flex flex-col items-start gap-1 min-w-0">
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
-            {pairs.length} Pasangan
-          </span>
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-            Mencocokkan
-          </span>
-        </div>
-      );
-    }
+      return null;
+    };
 
-    if (type === "isian_singkat" || type === "uraian") {
-      return (
-        <div className="flex flex-col items-start gap-1 min-w-0">
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 truncate max-w-[130px]" title={item.answerKey || "-"}>
-            ${item.answerKey ? `Kunci: {item.answerKey}` : "(Rubrik Esai)"}
-          </span>
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-            ${type === "uraian" ? "Jawaban Uraian" : "Isian Singkat"}
-          </span>
-        </div>
-      );
-    }
-
-    if (type === "urutkan" || type === "drag_drop") {
-      const items = item.items || [];
-      return (
-        <div className="flex flex-col items-start gap-1 min-w-0">
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
-            {items.length} Tahapan
-          </span>
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-            Urutan Kronologis
-          </span>
-        </div>
-      );
-    }
-
-    return null;
+    return (
+      <div className="flex flex-col items-start gap-1.5 min-w-0">
+        {showTypeBadge && (
+          <NeonBadge variant={meta.variant} size="xs" className="shrink-0 font-medium">
+            {meta.label}
+          </NeonBadge>
+        )}
+        {renderKeyAndCount()}
+      </div>
+    );
   };
 
     const neonColumns: NeonTableColumn<QuestionData>[] = useMemo(() => [
@@ -4350,34 +4364,19 @@ const QuestionsPage = () => {
       )
     },
     {
-      key: "type",
-      header: "Tipe Soal",
-      width: "115px",
-      className: "hidden sm:table-cell w-[115px] shrink-0",
-      headerClassName: "hidden sm:table-cell w-[115px] shrink-0",
-      render: (item) => {
-        const qType = item.type || "pilihan_ganda";
-        const meta = QUESTION_TYPE_BADGE[qType] || { variant: "neutral" as const, label: qType };
-        return (
-          <NeonBadge variant={meta.variant} size="xs">
-            {meta.label}
-          </NeonBadge>
-        );
-      }
-    },
-    {
       key: "details",
-      header: "Detil & Kunci",
-      width: "140px",
-      className: "hidden md:table-cell w-[140px] shrink-0",
-      headerClassName: "hidden md:table-cell w-[140px] shrink-0",
-      render: (item) => renderQuestionDetails(item)
+      header: "Detail",
+      width: "145px",
+      className: "hidden sm:table-cell w-[145px] shrink-0",
+      headerClassName: "hidden sm:table-cell w-[145px] shrink-0",
+      render: (item) => renderQuestionDetails(item, true)
     },
     {
       key: "actions",
       header: "Aksi",
       width: "92px",
-      className: "w-[92px] text-right shrink-0 !px-2",
+      overflow: "visible",
+      className: "w-[92px] text-right shrink-0 !px-2 overflow-visible",
       headerClassName: "w-[92px] text-right shrink-0 !px-2",
       align: "right",
       render: (item) => {
@@ -6297,7 +6296,7 @@ const QuestionsPage = () => {
                     <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800 space-y-1">
                       <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Konfigurasi Jawaban</div>
                       <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800">
-                        {renderQuestionDetails(inspectedQuestion)}
+                        {renderQuestionDetails(inspectedQuestion, false)}
                       </div>
                     </div>
                   )}
