@@ -4050,33 +4050,33 @@ const QuestionsPage = () => {
       const stList = item.statements || item.options?.statements || [];
       if (stList.length > 0) {
         return (
-          <div className="flex items-center gap-1.5 whitespace-nowrap">
-            <NeonBadge variant="neutral" size="xs">
-              {stList.length} Pernyataan
-            </NeonBadge>
+          <div className="flex flex-col items-start gap-1 min-w-0">
             <div
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 cursor-help shadow-2xs"
+              className="flex items-center gap-0.5 flex-wrap cursor-help"
               title={stList.map((s: any, idx: number) => `${idx + 1}. ${s.text ? s.text.replace(/<[^>]*>/g, '').trim() : 'Pernyataan'}: ${(s.answer || 'benar').toUpperCase()}`).join("\n")}
             >
               <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-bold mr-0.5">Kunci:</span>
-              {stList.slice(0, 4).map((s: any, idx: number) => {
+              {stList.slice(0, 5).map((s: any, idx: number) => {
                 const isBenar = (s.answer || "benar").toLowerCase() === "benar";
                 return (
                   <span
                     key={s.id || idx}
                     className={cn(
-                      "inline-flex items-center justify-center px-1 rounded text-[10px] font-bold font-mono",
+                      "inline-flex items-center justify-center px-1 py-0.2 rounded text-[10px] font-bold font-mono",
                       isBenar
-                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-                        : "bg-rose-500/20 text-rose-700 dark:text-rose-300"
+                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                        : "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30"
                     )}
                   >
                     {idx + 1}:{isBenar ? "B" : "S"}
                   </span>
                 );
               })}
-              {stList.length > 4 && <span className="text-[10px] text-neutral-400 font-mono">+{stList.length - 4}</span>}
+              {stList.length > 5 && <span className="text-[9px] text-neutral-400 font-mono">+{stList.length - 5}</span>}
             </div>
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+              {stList.length} Pernyataan
+            </span>
           </div>
         );
       }
@@ -4086,19 +4086,19 @@ const QuestionsPage = () => {
       if (keys.length > 0) {
         const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
         return (
-          <div className="flex items-center gap-1.5 whitespace-nowrap">
-            <NeonBadge variant="neutral" size="xs">
-              {keys.length} Opsi
-            </NeonBadge>
+          <div className="flex flex-col items-start gap-1 min-w-0">
             {correctKeys ? (
-              <NeonBadge variant="emerald" size="xs" mono>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 truncate max-w-full shadow-2xs">
                 Kunci: {correctKeys}
-              </NeonBadge>
+              </span>
             ) : (
-              <NeonBadge variant="amber" size="xs">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                 Belum ada kunci
-              </NeonBadge>
+              </span>
             )}
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+              {keys.length} Opsi
+            </span>
           </div>
         );
       }
@@ -4113,9 +4113,14 @@ const QuestionsPage = () => {
       const stList = item.options?.statements || [];
       if (stList.length > 0 || cols.length > 0) {
         return (
-          <NeonBadge variant="neutral" size="xs">
-            {stList.length} Baris × {cols.length} Kolom
-          </NeonBadge>
+          <div className="flex flex-col items-start gap-1 min-w-0">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
+              {stList.length} × {cols.length} Sel
+            </span>
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+              Tabel Matriks
+            </span>
+          </div>
         );
       }
       return <span className="text-xs text-neutral-400 italic">Belum ada matriks</span>;
@@ -4126,9 +4131,14 @@ const QuestionsPage = () => {
       const stList = item.options?.statements || [];
       if (stList.length > 0 || cats.length > 0) {
         return (
-          <NeonBadge variant="neutral" size="xs">
-            {stList.length} Baris × {cats.length} Kat.
-          </NeonBadge>
+          <div className="flex flex-col items-start gap-1 min-w-0">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+              {stList.length} Baris × {cats.length} Kat.
+            </span>
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+              Klasifikasi
+            </span>
+          </div>
         );
       }
       return <span className="text-xs text-neutral-400 italic">Belum ada data</span>;
@@ -4137,69 +4147,92 @@ const QuestionsPage = () => {
     if (type === "isian_rumpang") {
       const blanks = item.options?.blanks || [];
       return (
-        <NeonBadge variant="neutral" size="xs">
-          {blanks.length} Isian Rumpang
-        </NeonBadge>
+        <div className="flex flex-col items-start gap-1 min-w-0">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+            {blanks.length} Isian Rumpang
+          </span>
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+            Teks Rumpang
+          </span>
+        </div>
       );
     }
 
     if (type === "hotspot") {
       const areas = item.options?.areas || [];
       return (
-        <NeonBadge variant="neutral" size="xs">
-          {areas.length} Area Hotspot
-        </NeonBadge>
+        <div className="flex flex-col items-start gap-1 min-w-0">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+            {areas.length} Area Hotspot
+          </span>
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+            Titik Gambar
+          </span>
+        </div>
       );
     }
 
     if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks") {
       const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
       const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
-      const correctCount = keys.filter(k => item.choices?.[k]?.isCorrect).length;
       const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
 
       return (
-        <div className="flex items-center gap-1.5 whitespace-nowrap">
-          <NeonBadge variant="neutral" size="xs">
-            {keys.length} Opsi
-          </NeonBadge>
-          {correctCount > 0 ? (
-            <NeonBadge variant="emerald" size="xs" mono>
+        <div className="flex flex-col items-start gap-1 min-w-0">
+          {correctKeys ? (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 truncate max-w-full shadow-2xs">
               Kunci: {correctKeys}
-            </NeonBadge>
+            </span>
           ) : (
-            <NeonBadge variant="amber" size="xs">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
               Belum ada kunci
-            </NeonBadge>
+            </span>
           )}
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+            {keys.length} Opsi
+          </span>
         </div>
       );
     }
 
     if (type === "menjodohkan") {
+      const pairs = item.pairs || [];
       return (
-        <NeonBadge variant="neutral" size="xs">
-          {(item.pairs || []).length} Pasangan
-        </NeonBadge>
+        <div className="flex flex-col items-start gap-1 min-w-0">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+            {pairs.length} Pasangan
+          </span>
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+            Mencocokkan
+          </span>
+        </div>
       );
     }
 
     if (type === "isian_singkat" || type === "uraian") {
       return (
-        <div className="flex items-center gap-1.5 whitespace-nowrap text-xs">
-          <span className="text-neutral-400 text-xs">Kunci:</span>
-          <span className="font-mono font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-[140px]" title={item.answerKey || "-"}>
-            {item.answerKey || "(Esai)"}
+        <div className="flex flex-col items-start gap-1 min-w-0">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 truncate max-w-[130px]" title={item.answerKey || "-"}>
+            ${item.answerKey ? `Kunci: {item.answerKey}` : "(Rubrik Esai)"}
+          </span>
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+            ${type === "uraian" ? "Jawaban Uraian" : "Isian Singkat"}
           </span>
         </div>
       );
     }
 
     if (type === "urutkan" || type === "drag_drop") {
+      const items = item.items || [];
       return (
-        <NeonBadge variant="neutral" size="xs">
-          {(item.items || []).length} Item Urutan
-        </NeonBadge>
+        <div className="flex flex-col items-start gap-1 min-w-0">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
+            {items.length} Tahapan
+          </span>
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+            Urutan Kronologis
+          </span>
+        </div>
       );
     }
 
@@ -4210,10 +4243,10 @@ const QuestionsPage = () => {
     {
       key: "no",
       header: "#",
-      width: "44px",
+      width: "36px",
       align: "center",
-      className: "w-11 text-center shrink-0",
-      headerClassName: "w-11 text-center shrink-0",
+      className: "w-9 text-center shrink-0",
+      headerClassName: "w-9 text-center shrink-0",
       render: (item, index) => {
         const isInspected = inspectedQuestion?.id === item.id;
         return (
@@ -4235,14 +4268,21 @@ const QuestionsPage = () => {
     {
       key: "text",
       header: "Teks Pertanyaan & Stimulus",
-      className: "min-w-0 break-words",
+      className: "min-w-0 max-w-full break-words",
       headerClassName: "min-w-0",
       render: (item) => (
-        <div className="space-y-1.5 py-0.5 min-w-0 max-w-full">
-          <MathText
-            content={item.text}
-            className="line-clamp-2 text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 !overflow-hidden [&_p]:m-0 [&_figure]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4 [&_img]:!max-h-20 sm:[&_img]:!max-h-24 [&_img]:!max-w-[140px] sm:[&_img]:!max-w-[180px] [&_img]:!w-auto [&_img]:!h-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1.5 [&_img]:block shadow-2xs"
-          />
+        <div className="space-y-1.5 py-0.5 min-w-0 max-w-full overflow-hidden">
+          {/* Question Text & Embedded Table/Image Wrapper (Max height capped to prevent giant rows) */}
+          <div className="relative max-h-24 sm:max-h-28 overflow-hidden rounded-md group/math">
+            <MathText
+              content={item.text}
+              className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_figure]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4 [&_img]:!max-h-20 sm:[&_img]:!max-h-24 [&_img]:!max-w-[140px] sm:[&_img]:!max-w-[180px] [&_img]:!w-auto [&_img]:!h-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1 [&_img]:block [&_table]:!text-[10px] [&_table]:!leading-tight [&_table]:!my-1 [&_table]:!max-w-full [&_table]:!border-collapse [&_td]:!p-0.5 [&_td]:!px-2 [&_th]:!p-0.5 [&_th]:!px-2 [&_td]:!text-[10px] [&_th]:!text-[10px] [&_td]:!border [&_td]:!border-neutral-200 dark:[&_td]:!border-neutral-750 [&_th]:!border [&_th]:!border-neutral-200 dark:[&_th]:!border-neutral-750 [&_th]:!bg-neutral-50 dark:[&_th]:!bg-neutral-850 [&_.ql-table-embed]:!my-0.5 [&_.ql-table-embed]:!p-0 [&_.ql-table-embed]:!border-none [&_.ql-table-embed]:!bg-transparent shadow-2xs"
+            />
+            {/* Subtle bottom fade if table/content overflows max-h */}
+            <div className="pointer-events-none absolute bottom-0 inset-x-0 h-4 bg-gradient-to-t from-white dark:from-[#0c0d0e] to-transparent opacity-75" />
+          </div>
+
+          {/* Standalone Image Thumbnail (if question has item.imageUrl not embedded in text) */}
           {item.imageUrl && !item.text?.includes("<img") && (
             <img
               src={item.imageUrl}
@@ -4250,7 +4290,14 @@ const QuestionsPage = () => {
               className="max-h-16 sm:max-h-20 max-w-[140px] sm:max-w-[180px] w-auto h-auto object-contain rounded-md border border-neutral-200/80 dark:border-neutral-800 my-1 block shadow-2xs"
             />
           )}
-          <div className="flex items-center gap-1.5 flex-wrap">
+
+          {/* Badges Metadata Line */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+            {item.text?.includes("<table") && (
+              <NeonBadge variant="neutral" size="xs" icon={FileSpreadsheet}>
+                Tabel Data
+              </NeonBadge>
+            )}
             {(item.imageUrl || item.text.includes("<img")) && (
               <NeonBadge variant="sky" size="xs" icon={Image}>
                 Bergambar
@@ -4305,14 +4352,14 @@ const QuestionsPage = () => {
     {
       key: "type",
       header: "Tipe Soal",
-      width: "120px",
-      className: "hidden sm:table-cell w-[120px] shrink-0",
-      headerClassName: "hidden sm:table-cell w-[120px] shrink-0",
+      width: "115px",
+      className: "hidden sm:table-cell w-[115px] shrink-0",
+      headerClassName: "hidden sm:table-cell w-[115px] shrink-0",
       render: (item) => {
         const qType = item.type || "pilihan_ganda";
         const meta = QUESTION_TYPE_BADGE[qType] || { variant: "neutral" as const, label: qType };
         return (
-          <NeonBadge variant={meta.variant} size="sm">
+          <NeonBadge variant={meta.variant} size="xs">
             {meta.label}
           </NeonBadge>
         );
@@ -4321,17 +4368,17 @@ const QuestionsPage = () => {
     {
       key: "details",
       header: "Detil & Kunci",
-      width: "150px",
-      className: "hidden md:table-cell w-[150px] shrink-0",
-      headerClassName: "hidden md:table-cell w-[150px] shrink-0",
+      width: "140px",
+      className: "hidden md:table-cell w-[140px] shrink-0",
+      headerClassName: "hidden md:table-cell w-[140px] shrink-0",
       render: (item) => renderQuestionDetails(item)
     },
     {
       key: "actions",
       header: "Aksi",
-      width: "88px",
-      className: "w-[88px] text-right shrink-0",
-      headerClassName: "w-[88px] text-right shrink-0",
+      width: "76px",
+      className: "w-[76px] text-right shrink-0",
+      headerClassName: "w-[76px] text-right shrink-0",
       align: "right",
       render: (item) => {
         const idx = questions.findIndex(q => q.id === item.id);
@@ -5970,6 +6017,7 @@ const QuestionsPage = () => {
         <div className="w-full xl:flex-1 min-w-0">
           <NeonTable<QuestionData>
             tableLayout="fixed"
+            rowVerticalAlign="top"
             data={displayQuestions}
             columns={neonColumns}
             keyExtractor={(q) => q.id}
@@ -6157,7 +6205,7 @@ const QuestionsPage = () => {
                     <div className="mt-1 p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800">
                       <MathText
                         content={inspectedQuestion.text}
-                        className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_figure]:m-0 [&_img]:!max-h-48 sm:[&_img]:!max-h-52 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-2 [&_img]:block shadow-2xs"
+                        className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_figure]:m-0 [&_img]:!max-h-48 sm:[&_img]:!max-h-52 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-2 [&_img]:block [&_table]:!text-xs [&_table]:!my-2 [&_table]:!w-full [&_table]:!border-collapse [&_td]:!p-1.5 [&_td]:!px-2.5 [&_th]:!p-1.5 [&_th]:!px-2.5 [&_td]:!text-xs [&_th]:!text-xs [&_td]:!border [&_td]:!border-neutral-200 dark:[&_td]:!border-neutral-750 [&_th]:!border [&_th]:!border-neutral-200 dark:[&_th]:!border-neutral-750 [&_th]:!bg-neutral-50 dark:[&_th]:!bg-neutral-850 [&_.ql-table-embed]:!my-2 [&_.ql-table-embed]:!p-0 [&_.ql-table-embed]:!border-none [&_.ql-table-embed]:!bg-transparent shadow-2xs"
                       />
                     </div>
                   </div>

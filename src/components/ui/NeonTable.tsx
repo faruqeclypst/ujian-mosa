@@ -18,6 +18,7 @@ export interface NeonTableColumn<T> {
   header: React.ReactNode;
   width?: string;
   align?: "left" | "center" | "right";
+  verticalAlign?: "top" | "middle" | "bottom";
   className?: string;
   headerClassName?: string;
   render: (item: T, index: number) => React.ReactNode;
@@ -72,6 +73,7 @@ export interface NeonTableProps<T> {
   // Table element styling & layout customization
   tableClassName?: string;
   tableLayout?: "auto" | "fixed";
+  rowVerticalAlign?: "top" | "middle";
 
   // Empty state
   emptyTitle?: string;
@@ -109,6 +111,7 @@ export function NeonTable<T>({
   compact = false,
   tableClassName,
   tableLayout = "auto",
+  rowVerticalAlign = "middle",
   totalCount,
   serverSide = false,
   onPageSizeChange,
@@ -326,7 +329,7 @@ export function NeonTable<T>({
 
       {/* ── Main Table Grid ── */}
       <div className="relative w-full overflow-x-auto">
-        <table className={cn("min-w-full text-left text-xs border-collapse", tableLayout === "fixed" ? "table-fixed" : "", tableClassName)}>
+        <table className={cn("w-full max-w-full text-left text-xs border-collapse", tableLayout === "fixed" ? "table-fixed" : "", tableClassName)}>
           {/* Table Header */}
           <thead>
             <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/80 dark:bg-[#111214] text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider select-none">
@@ -451,10 +454,12 @@ export function NeonTable<T>({
                       {/* Selection Checkbox */}
                       {selectable && (
                         <td
+                          style={{ width: compact ? "36px" : "40px" }}
                           className={cn(
                             compact
-                              ? "w-9 px-2 sm:px-2.5 py-2 text-center align-middle relative"
-                              : "w-9 sm:w-11 px-2.5 sm:px-3 py-2.5 sm:py-3 text-center align-middle relative",
+                              ? "w-9 px-2 sm:px-2.5 py-2 text-center relative"
+                              : "w-9 sm:w-11 px-2.5 sm:px-3 py-2.5 sm:py-3 text-center relative",
+                            rowVerticalAlign === "top" ? "align-top pt-3 sm:pt-3.5" : "align-middle",
                             isActive ? "border-l-[3px] border-l-emerald-500" : ""
                           )}
                           onClick={(e) => e.stopPropagation()}
@@ -477,10 +482,14 @@ export function NeonTable<T>({
                       {columns.map((col, cIdx) => (
                         <td
                           key={col.key}
+                          style={{ width: col.width }}
                           className={cn(
                             compact
-                              ? "px-2.5 sm:px-3 py-2 text-xs align-middle text-neutral-700 dark:text-neutral-300"
-                              : "px-3 sm:px-4 py-2.5 sm:py-3 text-xs align-middle text-neutral-700 dark:text-neutral-300",
+                              ? "px-2.5 sm:px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300"
+                              : "px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-neutral-700 dark:text-neutral-300",
+                            col.verticalAlign === "top" || rowVerticalAlign === "top"
+                              ? "align-top pt-2.5 sm:pt-3"
+                              : "align-middle",
                             !selectable && cIdx === 0 && isActive
                               ? "border-l-[3px] border-l-emerald-500"
                               : "",
@@ -489,6 +498,7 @@ export function NeonTable<T>({
                               : col.align === "right"
                               ? "text-right"
                               : "text-left",
+                            "overflow-hidden",
                             col.className
                           )}
                         >
