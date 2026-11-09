@@ -341,7 +341,15 @@ export function exportStudentLoginsToExcel(params: {
   const classLabel = params.terminology?.class || "Kelas";
   
   const filename = params.filename ?? `data-login-${studentLabel.toLowerCase()}.xlsx`;
-  const headers = [idLabel, `Nama ${studentLabel}`, `Nama ${classLabel}`, "Username", "Password"];
+  const headers = [
+    idLabel, 
+    `Nama ${studentLabel}`, 
+    `Nama ${classLabel}`, 
+    "Username Akun", 
+    "Password Akun", 
+    "Username Sesi Ujian (Kartu)", 
+    "Password Sesi Ujian (Kartu)"
+  ];
 
   const headerStyle = {
     font: { bold: true, color: { rgb: "FFFFFF" } },
@@ -352,8 +360,10 @@ export function exportStudentLoginsToExcel(params: {
     { wch: 15 }, // ID
     { wch: 25 }, // Nama student
     { wch: 20 }, // Nama Kelas
-    { wch: 20 }, // Username
-    { wch: 15 }, // Password
+    { wch: 20 }, // Username Akun
+    { wch: 18 }, // Password Akun
+    { wch: 26 }, // Username Sesi Ujian
+    { wch: 26 }, // Password Sesi Ujian
   ];
 
   const wb = XLSX.utils.book_new();
@@ -369,7 +379,9 @@ export function exportStudentLoginsToExcel(params: {
           s.name, 
           cls ? cls.name : `Tanpa ${classLabel}`,
           s.nisn, 
-          "12345678"
+          s.hasChangedPassword ? "(Diubah Siswa)" : "12345678",
+          s.examUsername || (s.nisn ? `TU${s.nisn}` : "-"),
+          s.examPassword || "-"
         ];
       })
     ];

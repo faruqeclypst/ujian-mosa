@@ -25,6 +25,7 @@ interface StudentTableProps {
   onViewInterest?: (student: StudentData) => void;
   onViewScores?: (student: StudentData) => void;
   onPrintExamCard?: (student: StudentData) => void;
+  onRegenerateExamCredentials?: (student: StudentData) => void;
   filterActions?: React.ReactNode;
   customActions?: (student: StudentData) => React.ReactNode;
   // ── Mode server-side ──
@@ -55,6 +56,7 @@ export const StudentTable = ({
   onViewInterest,
   onViewScores,
   onPrintExamCard,
+  onRegenerateExamCredentials,
   filterActions,
   customActions,
   title,
@@ -91,7 +93,8 @@ export const StudentTable = ({
     { 
       key: "name", 
       header: `Nama ${terminology.student} & Identitas`, 
-      className: "min-w-0",
+      className: "w-[40%] min-w-[200px]",
+      headerClassName: "w-[40%] min-w-[200px] whitespace-nowrap",
       render: (student) => {
         const initials = (student.name || "S").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
         return (
@@ -138,14 +141,14 @@ export const StudentTable = ({
     { 
       key: "classId", 
       header: terminology.class, 
-      className: "hidden sm:table-cell w-36",
-      headerClassName: "hidden sm:table-cell w-36",
+      className: "hidden sm:table-cell w-[22%] min-w-[120px]",
+      headerClassName: "hidden sm:table-cell w-[22%] min-w-[120px] whitespace-nowrap",
       render: (student) => {
         const cls = classes.find(c => c.id === student.classId);
         const clsName = cls?.name || (student.classId === "ALUMNI" ? "Alumni" : `Tanpa ${terminology.class}`);
         return (
-          <div className="flex flex-col gap-0.5 py-0.5">
-            <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
+          <div className="flex flex-col gap-0.5 py-0.5 min-w-0">
+            <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate" title={clsName}>
               {clsName}
             </span>
           </div>
@@ -155,10 +158,9 @@ export const StudentTable = ({
     { 
       key: "gender", 
       header: "L/P", 
-      width: "50px",
       align: "center",
-      className: "hidden sm:table-cell text-center",
-      headerClassName: "hidden sm:table-cell text-center",
+      className: "hidden md:table-cell text-center w-[10%] min-w-[50px]",
+      headerClassName: "hidden md:table-cell text-center w-[10%] min-w-[50px] whitespace-nowrap",
       render: (student) => (
         <span className={cn(
           "inline-flex items-center justify-center h-5 w-5 rounded text-[10px] font-bold font-mono border",
@@ -173,9 +175,8 @@ export const StudentTable = ({
     {
       key: "hasChangedPassword",
       header: "Password",
-      width: "110px",
-      className: "hidden md:table-cell",
-      headerClassName: "hidden md:table-cell",
+      className: "hidden lg:table-cell w-[14%] min-w-[90px]",
+      headerClassName: "hidden lg:table-cell w-[14%] min-w-[90px] whitespace-nowrap",
       render: (student) => {
         const hasChanged = student.hasChangedPassword;
         const isResetReq = !!student.resetRequested;
@@ -201,8 +202,8 @@ export const StudentTable = ({
     {
       key: "actions",
       header: "Aksi",
-      className: "w-20 sm:w-28 text-right shrink-0",
-      headerClassName: "w-20 sm:w-28 text-right shrink-0",
+      className: "w-[14%] min-w-[100px] text-right shrink-0 whitespace-nowrap",
+      headerClassName: "w-[14%] min-w-[100px] text-right shrink-0 whitespace-nowrap",
       align: "right",
       render: (student) => {
         if (customActions) return customActions(student);
@@ -211,22 +212,22 @@ export const StudentTable = ({
             {role === "admin" && (
               <button 
                 type="button"
-                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
                 onClick={() => onEdit(student)}
                 title={`Edit data ${terminology.student}`}
               >
-                <Edit className="h-3.5 w-3.5" />
+                <Edit className="h-4 w-4" />
               </button>
             )}
 
             {role === "admin" && onResetPassword && (
               <button 
                 type="button"
-                className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center border transition-colors shadow-2xs cursor-pointer bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                className="hidden sm:flex h-8 w-8 rounded-lg items-center justify-center border transition-colors shadow-2xs cursor-pointer bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 shrink-0"
                 onClick={() => onResetPassword(student)}
                 title={`Reset Password ${terminology.student}`}
               >
-                <KeyRound className="h-3.5 w-3.5" />
+                <KeyRound className="h-4 w-4" />
               </button>
             )}
 
@@ -234,10 +235,10 @@ export const StudentTable = ({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="relative h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  className="relative h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
                   title="Menu Lainnya"
                 >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
+                  <MoreHorizontal className="h-4 w-4" />
                   {student.resetRequested && (
                     <span className="sm:hidden absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 animate-pulse border border-white dark:border-neutral-900" />
                   )}
@@ -263,6 +264,15 @@ export const StudentTable = ({
                   >
                     <Printer className="h-3.5 w-3.5 text-neutral-500" />
                     <span>Cetak Kartu Ujian</span>
+                  </DropdownMenuItem>
+                )}
+                {role === "admin" && onRegenerateExamCredentials && (
+                  <DropdownMenuItem
+                    onClick={() => onRegenerateExamCredentials(student)}
+                    className="text-xs cursor-pointer gap-2 py-1.5"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Regenerate Kredensial Ujian</span>
                   </DropdownMenuItem>
                 )}
                 {onViewScores && (
@@ -317,6 +327,7 @@ export const StudentTable = ({
       searchPlaceholder={`Cari nama ${terminology.student.toLowerCase()} atau ${terminology.id}...`}
       filterSlot={filterActions}
       compact
+      tableLayout="fixed"
       title={displayTitle}
       subtitle={`Kelola data dan status akun login ${terminology.student.toLowerCase()}.`}
       activeKey={activeKey}

@@ -1,3 +1,4 @@
+import { generateExamCredentials } from "../utils/examCredentials";
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 import { useTenant } from "./TenantContext";
@@ -44,6 +45,8 @@ interface ExamDataContextType {
   resetUserPassword: (userId: string) => Promise<void>;
   deleteStudentsBatch: (studentIds: string[]) => Promise<void>;
   updateStudentClassBatch: (studentIds: string[], newClassId: string) => Promise<void>;
+  regenerateExamCredentials: (id: string, prefix?: string) => Promise<{ examUsername: string; examPassword: string }>;
+  regenerateExamCredentialsBatch: (studentIds: string[], prefix?: string, onProgress?: (current: number, total: number) => void) => Promise<void>;
 
   // Universal Token
   universalToken: string;
@@ -113,7 +116,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   // (fastHash 64 char × N siswa, tokenKey, activeSessionId) dibuang agar
   // fetch 10k siswa tidak memakan bandwidth/memori berlebih.
   const STUDENT_FIELDS =
-    "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,resetRequested,created,updated";
+    "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,resetRequested,examUsername,examPassword,created,updated";
 
   // Mapping record students -> StudentData (satu sumber kebenaran, dipakai
   // init critical, background load, dan realtime handler agar konsisten).
@@ -132,6 +135,8 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       session: i.session || "",
       examNumber: i.examNumber || "",
       resetRequested: i.resetRequested || "",
+      examUsername: i.examUsername || "",
+      examPassword: i.examPassword || "",
     } as any;
   }, []);
 
@@ -514,6 +519,8 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     if (payload.room !== undefined) updateData.room = payload.room;
     if (payload.session !== undefined) updateData.session = payload.session;
     if (payload.examNumber !== undefined) updateData.examNumber = payload.examNumber;
+    if (payload.examUsername !== undefined) updateData.examUsername = payload.examUsername;
+    if (payload.examPassword !== undefined) updateData.examPassword = payload.examPassword;
 
     const record = await pb.collection("students").update(id, updateData);
     setStudents(prev => {
@@ -599,6 +606,122 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     setStudents(prev => prev.filter(student => !studentIds.includes(student.id)));
   };
 
+  const regenerateExamCredentials = async (id: string, prefix = "TU") => {
+    try {
+      const res = await fetch(`${pb.baseUrl}/api/student/generate-exam-credentials`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": pb.authStore.token
+        },
+        body: JSON.stringify({ studentIds: [id], prefix, onlyEmpty: false }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const cred = data.credentials?.[0];
+        if (cred) {
+          setStudents(prev => prev.map(item => item.id === id ? { 
+            ...item, 
+            examUsername: cred.examUsername, 
+            examPassword: cred.examPassword 
+          } : item));
+          return { examUsername: cred.examUsername, examPassword: cred.examPassword };
+        }
+      }
+    } catch (_) {}
+
+    const student = students.find(s => s.id === id);
+    const nisn = student?.nisn || (student as any)?.username || id.substring(0, 8);
+    const creds = generateExamCredentials(nisn, prefix);
+    
+    await pb.collection("students").update(id, {
+      examUsername: creds.examUsername,
+      examPassword: creds.examPassword,
+    });
+
+    setStudents(prev => prev.map(item => item.id === id ? { 
+      ...item, 
+      examUsername: creds.examUsername, 
+      examPassword: creds.examPassword 
+    } : item));
+
+    return creds;
+  };
+
+  const regenerateExamCredentialsBatch = async (
+    studentIds: string[], 
+    prefix = "TU", 
+    onProgress?: (current: number, total: number) => void
+  ) => {
+    let usedFastEndpoint = false;
+    try {
+      const res = await fetch(`${pb.baseUrl}/api/student/generate-exam-credentials`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": pb.authStore.token
+        },
+        body: JSON.stringify({ studentIds, prefix, onlyEmpty: false }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.credentials && Array.isArray(data.credentials)) {
+          const credsMap = new Map<string, { examUsername: string; examPassword: string }>(
+            data.credentials.map((c: any) => [c.id, { examUsername: c.examUsername, examPassword: c.examPassword }])
+          );
+          setStudents(prev => prev.map(item => {
+            const found = credsMap.get(item.id);
+            if (found) {
+              return { ...item, examUsername: found.examUsername, examPassword: found.examPassword };
+            }
+            return item;
+          }));
+        }
+        usedFastEndpoint = true;
+      } else {
+        const errJson = await res.json().catch(() => null);
+        console.warn("[REGENERATE_CREDS] Fast endpoint returned non-ok:", res.status, errJson);
+      }
+    } catch (err) {
+      console.warn("[REGENERATE_CREDS] Fast endpoint fetch error:", err);
+    }
+
+    if (usedFastEndpoint) {
+      if (onProgress) onProgress(studentIds.length, studentIds.length);
+      return;
+    }
+
+    const chunkSize = 25;
+    const studentMap = new Map(students.map(s => [s.id, s]));
+    const updatedMap: Record<string, { examUsername: string; examPassword: string }> = {};
+
+    for (let i = 0; i < studentIds.length; i += chunkSize) {
+      const chunk = studentIds.slice(i, i + chunkSize);
+      await Promise.all(chunk.map(async (id) => {
+        const student = studentMap.get(id);
+        const nisn = student?.nisn || (student as any)?.username || id.substring(0, 8);
+        const creds = generateExamCredentials(nisn, prefix);
+        updatedMap[id] = creds;
+        await pb.collection("students").update(id, {
+          examUsername: creds.examUsername,
+          examPassword: creds.examPassword,
+        });
+      }));
+
+      if (onProgress) {
+        onProgress(Math.min(i + chunkSize, studentIds.length), studentIds.length);
+      }
+    }
+
+    setStudents(prev => prev.map(item => {
+      const creds = updatedMap[item.id];
+      if (creds) {
+        return { ...item, examUsername: creds.examUsername, examPassword: creds.examPassword };
+      }
+      return item;
+    }));
+  };
+
   return (
     <ExamDataContext.Provider
       value={{
@@ -613,7 +736,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         createTeacher, updateTeacher, deleteTeacher,
         createClass, updateClass, deleteClass,
         createSubject, updateSubject, deleteSubject,
-        createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch, dismissResetRequest, resetUserPassword, updateStudentClassBatch, deleteStudentsBatch,
+        createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch, dismissResetRequest, resetUserPassword, updateStudentClassBatch, deleteStudentsBatch, regenerateExamCredentials, regenerateExamCredentialsBatch,
         universalToken, timeLeft, teacherFullAccess, teacherAIAccess
       }}
     >

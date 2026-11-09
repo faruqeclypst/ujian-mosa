@@ -294,7 +294,7 @@ export default function DashboardPage() {
         count++;
       }
     });
-    return count > 0 ? Math.round(sum / count) : 74;
+    return count > 0 ? Math.round(sum / count) : 0;
   }, [attempts]);
 
   // Chart timeline activity
@@ -304,12 +304,11 @@ export default function DashboardPage() {
     for (let i = 9; i >= 0; i--) {
       const t = new Date(now.getTime() - i * 3 * 60 * 1000);
       const timeStr = t.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-      const randomVariance = Math.floor(Math.sin((10 - i) * 0.8) * 3);
-      const val = Math.max(0, ongoingStudents + randomVariance);
+      const val = ongoingStudents > 0 ? Math.max(0, ongoingStudents + Math.floor(Math.sin((10 - i) * 0.8) * Math.min(3, ongoingStudents))) : 0;
       points.push({
         time: timeStr,
         active: val,
-        throughput: Math.max(1, Math.round(val * 1.5) + 3),
+        throughput: ongoingStudents > 0 ? Math.max(1, Math.round(val * 1.5) + 3) : 0,
       });
     }
     return points;

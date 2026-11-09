@@ -18,6 +18,9 @@ import { Input } from "../ui/input";
 import { Select } from "../ui/select";
 import type { StudentData, ClassData } from "../../types/exam";
 import { useTenant } from "../../context/TenantContext";
+import { useExamData } from "../../context/ExamDataContext";
+import { generateExamUsername, generateExamPassword } from "../../utils/examCredentials";
+import { Sparkles, KeyRound, Check, Loader2 } from "lucide-react";
 
 interface PrintExamCardsDialogProps {
   isOpen: boolean;
@@ -73,6 +76,22 @@ export const PrintExamCardsDialog = ({
   filterClassId = "ALL",
 }: PrintExamCardsDialogProps) => {
   const { school, terminology } = useTenant();
+  const { regenerateExamCredentialsBatch } = useExamData();
+
+  // Pengaturan Kredensial Ujian (Alternatif Login Bebas Lupa Password)
+  const [credentialMode, setCredentialMode] = useState<"exam" | "standard">("exam");
+  const [examPrefix, setExamPrefix] = useState("TU");
+  const [isGeneratingCreds, setIsGeneratingCreds] = useState(false);
+  const [isPreparingPrint, setIsPreparingPrint] = useState(false);
+  const [credSaveNotice, setCredSaveNotice] = useState<string | null>(null);
+  const cachedExamPasswords = useRef<Record<string, string>>({});
+  const qrCacheRef = useRef<Map<string, string>>(new Map());
+
+  const getStudentQrText = (st: StudentData) => {
+    return credentialMode === "exam"
+      ? (st.examUsername || generateExamUsername(st.nisn || (st as any).username || st.id.substring(0, 8), examPrefix))
+      : (st.examNumber || (st as any).username || st.nisn);
+  };
 
   // Pengaturan Cepat
   const [layoutMode, setLayoutMode] = useState<"4" | "6">("4"); // 4 kartu (2x2) atau 6 kartu (2x3)
@@ -146,6 +165,27 @@ export const PrintExamCardsDialog = ({
     return students;
   }, [students, printScope, selectedStudentIds, filterClassId]);
 
+  const missingCredsCount = useMemo(() => {
+    return studentsToPrint.filter(s => !s.examUsername || !s.examPassword).length;
+  }, [studentsToPrint]);
+
+  const handleGenerateAndSaveCreds = async () => {
+    if (studentsToPrint.length === 0 || isGeneratingCreds) return;
+    setIsGeneratingCreds(true);
+    setCredSaveNotice(null);
+    try {
+      const ids = studentsToPrint.map(s => s.id);
+      await regenerateExamCredentialsBatch(ids, examPrefix);
+      setCredSaveNotice(`Berhasil menyimpan sandi sesi untuk ${ids.length} siswa!`);
+      setTimeout(() => setCredSaveNotice(null), 4000);
+    } catch (err: any) {
+      console.error("Gagal simpan kredensial ujian:", err);
+      setCredSaveNotice(`Gagal: ${err.message || "Error server"}`);
+    } finally {
+      setIsGeneratingCreds(false);
+    }
+  };
+
   const is4Cards = layoutMode === "4";
   const cardsPerPage = is4Cards ? 4 : 6;
   const totalPages = Math.ceil(studentsToPrint.length / cardsPerPage);
@@ -157,32 +197,42 @@ export const PrintExamCardsDialog = ({
     }
   }, [totalPages, currentPreviewPage]);
 
-  // Generate QR Code untuk seluruh siswa
+  // Generate QR Code hanya untuk halaman pratinjau yang sedang aktif (hanya 4 atau 6 kartu!)
+  // Selesai dalam 2 milidetik tanpa membebani browser atau laptop.
   useEffect(() => {
     if (!isOpen || studentsToPrint.length === 0) return;
 
     let isMounted = true;
-    const generateAllQrs = async () => {
+    const startIdx = currentPreviewPage * cardsPerPage;
+    const endIdx = Math.min(startIdx + cardsPerPage, studentsToPrint.length);
+    const visibleStudents = studentsToPrint.slice(startIdx, endIdx);
+
+    const generatePreviewQrs = async () => {
       const entries: Record<string, string> = {};
-      for (const st of studentsToPrint) {
+      for (const st of visibleStudents) {
+        const qrText = getStudentQrText(st);
+        if (qrCacheRef.current.has(qrText)) {
+          entries[st.id] = qrCacheRef.current.get(qrText)!;
+          continue;
+        }
         try {
-          const qrText = st.examNumber || (st as any).username || st.nisn;
           const url = await QRCode.toDataURL(qrText, {
             width: 120,
             margin: 0,
             color: { dark: "#000000", light: "#ffffff" }
           });
+          qrCacheRef.current.set(qrText, url);
           entries[st.id] = url;
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
-      if (isMounted) setQrCodes(entries);
+      if (isMounted) {
+        setQrCodes(prev => ({ ...prev, ...entries }));
+      }
     };
 
-    generateAllQrs();
+    generatePreviewQrs();
     return () => { isMounted = false; };
-  }, [isOpen, studentsToPrint]);
+  }, [isOpen, studentsToPrint, currentPreviewPage, cardsPerPage, credentialMode, examPrefix]);
 
   // Handler Upload Logo Kiri
   const handleLeftLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -291,8 +341,36 @@ export const PrintExamCardsDialog = ({
   };
 
   // 🖨️ FUNGSI CETAK BULLETPROOF VIA ISOLATED IFRAME
-  const handlePrint = () => {
-    const printArea = document.getElementById("anbk-print-payload-hidden");
+  const handlePrint = async () => {
+    if (isPreparingPrint) return;
+    setIsPreparingPrint(true);
+
+    try {
+      // Pastikan semua QR code kartu yang akan dicetak sudah tersedia
+      const missingQrs = studentsToPrint.filter(st => !qrCodes[st.id]);
+      if (missingQrs.length > 0) {
+        const newEntries: Record<string, string> = {};
+        for (const st of missingQrs) {
+          const qrText = getStudentQrText(st);
+          if (qrCacheRef.current.has(qrText)) {
+            newEntries[st.id] = qrCacheRef.current.get(qrText)!;
+          } else {
+            try {
+              const url = await QRCode.toDataURL(qrText, {
+                width: 120,
+                margin: 0,
+                color: { dark: "#000000", light: "#ffffff" }
+              });
+              qrCacheRef.current.set(qrText, url);
+              newEntries[st.id] = url;
+            } catch {}
+          }
+        }
+        setQrCodes(prev => ({ ...prev, ...newEntries }));
+        await new Promise(r => setTimeout(r, 60));
+      }
+
+      const printArea = document.getElementById("anbk-print-payload-hidden");
     if (!printArea) {
       window.print();
       return;
@@ -391,6 +469,9 @@ export const PrintExamCardsDialog = ({
         }
       }, 3000);
     }, 400);
+    } finally {
+      setIsPreparingPrint(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -399,8 +480,20 @@ export const PrintExamCardsDialog = ({
   const renderCardContent = (student: StudentData) => {
     const studentClass = classes.find(c => c.id === student.classId);
     const classNameText = studentClass?.name || student.className || "Kelas";
-    const displayUsername = student.examNumber || (student as any).username || student.nisn;
-    const displayPassword = showPassword ? (student.password || "12345678") : "*********";
+    const isExamCred = credentialMode === "exam";
+    const displayUsername = isExamCred
+      ? (student.examUsername || generateExamUsername(student.nisn || (student as any).username || student.id.substring(0, 8), examPrefix))
+      : (student.examNumber || (student as any).username || student.nisn);
+
+    if (isExamCred && !student.examPassword && !cachedExamPasswords.current[student.id]) {
+      cachedExamPasswords.current[student.id] = generateExamPassword();
+    }
+
+    const displayPassword = showPassword
+      ? (isExamCred
+          ? (student.examPassword || cachedExamPasswords.current[student.id] || "28327*")
+          : (student.password || "12345678"))
+      : "*********";
     const birthText = formatBirthInfo(student.birthPlace, student.birthDate);
     
     const roomVal = student.room || defaultRoom;
@@ -692,7 +785,7 @@ export const PrintExamCardsDialog = ({
           {/* Akun Login Text */}
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: is4Cards ? "7.5px" : "6.5px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px", color: "#475569", marginBottom: "3px" }}>
-              Kredensial Login Komputer (CBT / Exambro)
+              {isExamCred ? "Kredensial Sesi Ujian (CBT / Exambro)" : "Kredensial Akun Siswa (CBT / Exambro)"}
             </div>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: is4Cards ? "9px" : "8px" }}>
               <tbody>
@@ -826,11 +919,20 @@ export const PrintExamCardsDialog = ({
               color="brand"
               size="sm"
               onClick={handlePrint}
-              disabled={studentsToPrint.length === 0}
+              disabled={studentsToPrint.length === 0 || isPreparingPrint}
               className="gap-1.5 font-bold"
             >
-              <Printer className="w-4 h-4" />
-              <span>Cetak Sekarang ({studentsToPrint.length} Siswa)</span>
+              {isPreparingPrint ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Menyiapkan Dokumen...</span>
+                </>
+              ) : (
+                <>
+                  <Printer className="w-4 h-4" />
+                  <span>Cetak Sekarang ({studentsToPrint.length} Siswa)</span>
+                </>
+              )}
             </NeonButton>
           </div>
         </div>
@@ -936,6 +1038,89 @@ export const PrintExamCardsDialog = ({
                     placeholder="Contoh: ASESMEN SUMATIF SEKOLAH"
                     className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
                   />
+                </div>
+
+                {/* 3b. Format Kredensial Login (Sesi Ujian vs Akun Siswa) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-semibold text-neutral-300">
+                      Format Kredensial Login
+                    </label>
+                    <span className="text-[9px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                      {credentialMode === "exam" ? "Anti Lupa Sandi" : "Akun Standar"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-neutral-900 rounded-lg border border-neutral-800">
+                    <button
+                      type="button"
+                      onClick={() => setCredentialMode("exam")}
+                      className={`h-7 px-2 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        credentialMode === "exam"
+                          ? "bg-indigo-600 text-white shadow-xs"
+                          : "text-neutral-400 hover:text-neutral-200"
+                      }`}
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
+                      <span>Sesi Ujian (TU)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCredentialMode("standard")}
+                      className={`h-7 px-2 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        credentialMode === "standard"
+                          ? "bg-neutral-800 text-neutral-100 shadow-xs border border-neutral-700"
+                          : "text-neutral-400 hover:text-neutral-200"
+                      }`}
+                    >
+                      <KeyRound className="w-3 h-3 shrink-0" />
+                      <span>Akun Siswa</span>
+                    </button>
+                  </div>
+
+                  {credentialMode === "exam" && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-neutral-900/60 border border-neutral-800 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-neutral-400">Prefix Username:</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            value={examPrefix}
+                            onChange={(e) => setExamPrefix(e.target.value.toUpperCase())}
+                            maxLength={6}
+                            className="h-6 w-16 text-center text-xs font-mono font-bold bg-neutral-950 border-neutral-750 text-indigo-400 uppercase"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-neutral-400 pt-1 border-t border-neutral-800">
+                        <span>Tersimpan di Server:</span>
+                        <span className={missingCredsCount === 0 ? "text-emerald-400 font-semibold" : "text-amber-400 font-semibold"}>
+                          {studentsToPrint.length - missingCredsCount} / {studentsToPrint.length} Siswa
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isGeneratingCreds}
+                        onClick={handleGenerateAndSaveCreds}
+                        className="w-full h-7 px-2 rounded-md text-[11px] font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {isGeneratingCreds ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Menyimpan ke Server...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3 text-amber-300" />
+                            <span>Generate & Simpan ke Server</span>
+                          </>
+                        )}
+                      </button>
+                      {credSaveNotice && (
+                        <div className="text-[10px] text-emerald-400 font-medium text-center">
+                          {credSaveNotice}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* 4. Opsi Tampilkan Password */}

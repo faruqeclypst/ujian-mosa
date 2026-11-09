@@ -12,7 +12,9 @@ onBootstrap((e) => {
             "session",
             "examNumber",
             "fastHash",
-            "resetRequested"
+            "resetRequested",
+            "examUsername",
+            "examPassword"
         ];
         
         for (let i = 0; i < requiredCols.length; i++) {
@@ -27,6 +29,7 @@ onBootstrap((e) => {
         // Auto-ensure database performance indexes for fast table queries & CBT stability
         try {
             const perfIndexes = [
+                "CREATE INDEX IF NOT EXISTS idx_students_examUsername ON students(examUsername)",
                 "CREATE INDEX IF NOT EXISTS idx_students_classId ON students(classId)",
                 "CREATE INDEX IF NOT EXISTS idx_students_name ON students(name)",
                 "CREATE INDEX IF NOT EXISTS idx_students_created ON students(created)",

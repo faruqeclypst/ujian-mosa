@@ -16,9 +16,11 @@ import {
   Square,
   FileText,
   Sparkles,
-  Layers
+  Layers,
+  User
 } from "lucide-react";
 import { useExamData } from "../../context/ExamDataContext";
+import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
 import { fetchWaygroundQuiz, parseWaygroundQuizData, ParsedExternalQuestion } from "../../lib/waygroundApi";
 import type { QuestionData, QuestionType } from "../../pages/admin/QuestionsPage";
@@ -30,6 +32,7 @@ interface QuestionRepositoryDialogProps {
   targetExamId: string;
   targetExamTitle?: string;
   onImportQuestions: (questionsToImport: Partial<QuestionData>[]) => Promise<void>;
+  initialTab?: "internal" | "wayground";
 }
 
 export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> = ({
@@ -37,16 +40,33 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
   onOpenChange,
   targetExamId,
   targetExamTitle,
-  onImportQuestions
+  onImportQuestions,
+  initialTab = "internal"
 }) => {
   const { pb } = useTenant();
   const { subjects } = useExamData();
+  const { user, role, teacherId } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"internal" | "wayground">("internal");
+  const [activeTab, setActiveTab] = useState<"internal" | "wayground">(initialTab);
+
+  // Sync activeTab when dialog opens or initialTab changes
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
+
+  // Helper cek kepemilikan bank soal oleh guru saat ini
+  const isExamOwnedByMe = (exam: any) => {
+    if (role === "admin") return true;
+    const tId = exam.teacherId || exam.teacherid;
+    return (teacherId && tId === teacherId) || (user?.id && (tId === user?.id || exam.created_by === user?.id));
+  };
 
   // State Tab Internal
   const [examsList, setExamsList] = useState<any[]>([]);
   const [selectedSourceExamId, setSelectedSourceExamId] = useState<string>("");
+  const [examScope, setExamScope] = useState<"all" | "mine">(() => (role !== "admin" ? "mine" : "all"));
   const [internalQuestions, setInternalQuestions] = useState<QuestionData[]>([]);
   const [loadingInternalExams, setLoadingInternalExams] = useState(false);
   const [loadingInternalQuestions, setLoadingInternalQuestions] = useState(false);
@@ -77,15 +97,29 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
           filter: `id != "${targetExamId}"`,
           sort: "-created"
         });
-        // Urutkan: bank aktif dulu, yang diarsipkan di bawah
+        // Urutkan: bank milik guru saat ini & bank aktif dulu, yang diarsipkan di bawah
         const sorted = [...records].sort((a: any, b: any) => {
           const aArch = a.status === "archive" ? 1 : 0;
           const bArch = b.status === "archive" ? 1 : 0;
           if (aArch !== bArch) return aArch - bArch;
+
+          // Jika guru, dahulukan bank soal miliknya
+          if (role !== "admin") {
+            const aMine = isExamOwnedByMe(a) ? 1 : 0;
+            const bMine = isExamOwnedByMe(b) ? 1 : 0;
+            if (aMine !== bMine) return bMine - aMine;
+          }
           return 0; // di dalam grup tetap -created dari server
         });
         setExamsList(sorted);
-        if (sorted.length > 0) {
+
+        // Pilih default exam: jika guru punya bank soal sendiri, dahulukan yang miliknya
+        const myFirst = sorted.find((e: any) => isExamOwnedByMe(e));
+        if (role !== "admin" && myFirst) {
+          setExamScope("mine");
+          setSelectedSourceExamId(myFirst.id);
+        } else if (sorted.length > 0) {
+          setExamScope("all");
           setSelectedSourceExamId(sorted[0].id);
         }
       } catch (e) {
@@ -96,7 +130,19 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
     };
 
     fetchInternalExams();
-  }, [isOpen, pb, targetExamId]);
+  }, [isOpen, pb, targetExamId, role, teacherId, user]);
+
+  // Filter daftar bank soal berdasarkan cakupan (Milik Saya vs Semua)
+  const myExams = useMemo(() => {
+    return examsList.filter((e) => isExamOwnedByMe(e));
+  }, [examsList, role, teacherId, user]);
+
+  const filteredExamsList = useMemo(() => {
+    if (examScope === "mine" && myExams.length > 0) {
+      return myExams;
+    }
+    return examsList;
+  }, [examsList, examScope, myExams]);
 
   // Fetch & Normalisasi butir soal dari Bank Soal Internal terpilih
   useEffect(() => {
@@ -366,20 +412,36 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
         <DialogHeader className="p-4 sm:p-5 pb-3 sm:pb-4 border-b border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/60 pr-12 sm:pr-10">
           <div className="flex flex-col gap-3">
             <div className="flex items-start gap-3">
-              <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0 mt-0.5">
-                <Database className="h-4 sm:h-5 w-4 sm:w-5" />
+              <div className={cn(
+                "p-2 sm:p-2.5 rounded-xl border shrink-0 mt-0.5",
+                activeTab === "internal"
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                  : "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+              )}>
+                {activeTab === "internal" ? (
+                  <Database className="h-4 sm:h-5 w-4 sm:w-5" />
+                ) : (
+                  <Globe className="h-4 sm:h-5 w-4 sm:w-5" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <DialogTitle className="text-sm sm:text-base font-bold text-neutral-900 dark:text-neutral-100">
-                    Repository & Impor Butir Soal
+                    {activeTab === "internal" ? "Pilih Butir Soal dari Bank Soal" : "Impor Soal dari Wayground / Quizizz"}
                   </DialogTitle>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                    Khusus Admin
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-bold border",
+                    activeTab === "internal"
+                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                      : "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30"
+                  )}>
+                    {activeTab === "internal" ? (role === "admin" ? "Master Bank Soal" : "Bank Soal Guru") : "REST API Importer"}
                   </span>
                 </div>
                 <DialogDescription className="text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 leading-snug">
-                  Pilih butir soal dari Bank Soal sekolah atau impor otomatis dari Wayground REST API.
+                  {activeTab === "internal"
+                    ? "Pilih butir soal dari bank soal yang sudah ada atau bank soal milik Anda sendiri untuk disalin ke paket ini."
+                    : "Tempelkan tautan kuis atau data JSON Wayground / Quizizz untuk mengambil butir soal secara instan."}
                 </DialogDescription>
               </div>
             </div>
@@ -392,12 +454,12 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                 className={cn(
                   "px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs font-semibold",
                   activeTab === "internal"
-                    ? "bg-white dark:bg-neutral-900 text-emerald-700 dark:text-emerald-300 shadow-2xs"
+                    ? "bg-white dark:bg-neutral-900 text-amber-700 dark:text-amber-300 shadow-2xs"
                     : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
                 )}
               >
-                <Database className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                <span>Bank Internal</span>
+                <Database className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                <span>Pilih dari Bank Soal</span>
               </button>
               <button
                 type="button"
@@ -405,12 +467,12 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                 className={cn(
                   "px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs font-semibold",
                   activeTab === "wayground"
-                    ? "bg-white dark:bg-neutral-900 text-emerald-700 dark:text-emerald-300 shadow-2xs"
+                    ? "bg-white dark:bg-neutral-900 text-purple-700 dark:text-purple-300 shadow-2xs"
                     : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
                 )}
               >
-                <Globe className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                <span>Wayground API</span>
+                <Globe className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                <span>Impor Wayground</span>
               </button>
             </div>
           </div>
@@ -423,27 +485,67 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 {/* Select Bank Soal Sumber */}
-                <div className="flex-1 min-w-[240px]">
-                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-                    Pilih Bank Soal Sumber:
-                  </label>
+                <div className="flex-1 min-w-[260px]">
+                  <div className="flex items-center justify-between gap-1 mb-1 flex-wrap">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                      Pilih Bank Soal Sumber:
+                    </label>
+                    {/* Toggle Milik Saya vs Semua untuk Guru / Admin */}
+                    <div className="inline-flex p-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExamScope("mine");
+                          if (myExams.length > 0) setSelectedSourceExamId(myExams[0].id);
+                        }}
+                        className={cn(
+                          "px-1.5 py-0.5 rounded font-medium transition-colors cursor-pointer flex items-center gap-1",
+                          examScope === "mine"
+                            ? "bg-white dark:bg-neutral-900 text-emerald-700 dark:text-emerald-300 shadow-2xs font-bold"
+                            : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                        )}
+                      >
+                        <User className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>Milik Saya ({myExams.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExamScope("all");
+                          if (examsList.length > 0) setSelectedSourceExamId(examsList[0].id);
+                        }}
+                        className={cn(
+                          "px-1.5 py-0.5 rounded font-medium transition-colors cursor-pointer flex items-center gap-1",
+                          examScope === "all"
+                            ? "bg-white dark:bg-neutral-900 text-amber-700 dark:text-amber-300 shadow-2xs font-bold"
+                            : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                        )}
+                      >
+                        <Database className="h-2.5 w-2.5 text-amber-600 dark:text-amber-400" />
+                        <span>Semua ({examsList.length})</span>
+                      </button>
+                    </div>
+                  </div>
                   {loadingInternalExams ? (
                     <Skeleton className="h-9 w-full rounded-xl" />
                   ) : (
                     <select
                       value={selectedSourceExamId}
                       onChange={(e) => setSelectedSourceExamId(e.target.value)}
-                      className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-medium focus:ring-2 focus:ring-blue-500"
+                      className="w-full h-9 px-3 text-xs rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-100 font-medium focus:ring-2 focus:ring-amber-500"
                     >
-                      {examsList.length === 0 ? (
-                        <option value="">(Tidak ada Bank Soal lain)</option>
+                      {filteredExamsList.length === 0 ? (
+                        <option value="">
+                          {examScope === "mine" ? "(Anda belum memiliki Bank Soal lain)" : "(Tidak ada Bank Soal lain)"}
+                        </option>
                       ) : (
-                        examsList.map((exam) => {
+                        filteredExamsList.map((exam) => {
                           const subjName = subjects.find((s: any) => s.id === (exam.subjectId || exam.subjectid))?.name || "";
                           const isArchived = exam.status === "archive";
+                          const isMine = isExamOwnedByMe(exam);
                           return (
                             <option key={exam.id} value={exam.id}>
-                              {exam.title} {subjName ? `(${subjName})` : ""}{isArchived ? " [Arsip]" : ""}
+                              {isMine ? "⭐ " : ""}{exam.title} {subjName ? `(${subjName})` : ""}{isMine ? " [Milik Saya]" : ""}{isArchived ? " [Arsip]" : ""}
                             </option>
                           );
                         })

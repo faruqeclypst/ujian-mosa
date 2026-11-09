@@ -80,16 +80,20 @@ const StudentsPage = () => {
   const navigate = useNavigate();
   const { role } = useAuth();
   const { school, terminology, pb, subscriptionStatus } = useTenant();
-  const { students, classes, loading, createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch } = useExamData();
+  const { students, classes, loading, createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch, regenerateExamCredentials, regenerateExamCredentialsBatch } = useExamData();
 
   const isOffline = school?.plan === "offline" || school?.id === "local_server";
   const quota = isOffline ? 999999 : (subscriptionStatus?.effectiveQuota || school?.student_quota || (school?.plan === "free" ? 50 : 250));
   const planName = isOffline ? "Offline Mandiri" : (school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free");
-  // Total siswa dari server (diisi fetch tabel); fallback ke context saat belum load
+  // Total seluruh siswa terdaftar di server (global, independen dari filter/sortir kelas atau search)
+  const [serverAllStudentsCount, setServerAllStudentsCount] = useState<number | null>(() => studentTableCache?.total ?? (students.length > 0 ? students.length : null));
+  // Total siswa dari server untuk hasil filter tabel aktif
   const [tableTotal, setTableTotal] = useState<number | null>(() => studentTableCache?.total ?? null);
-  const studentCount = tableTotal ?? students.length;
-  const quotaUsedPercent = isOffline ? 0 : Math.min(100, Math.round((studentCount / Math.max(1, quota)) * 100));
-  const isQuotaFull = isOffline ? false : studentCount >= quota;
+  
+  // Total semua siswa se-sekolah terdaftar (tetap utuh 614 meskipun sedang sortir/filter kelas)
+  const totalStudents = serverAllStudentsCount ?? (students.length > 0 ? students.length : (tableTotal ?? 0));
+  const quotaUsedPercent = isOffline ? 0 : Math.min(100, Math.round((totalStudents / Math.max(1, quota)) * 100));
+  const isQuotaFull = isOffline ? false : totalStudents >= quota;
   const isQuotaWarning = isOffline ? false : quotaUsedPercent >= 80;
   const schoolSlug = school?.slug || school?.name?.toLowerCase().replace(/\s+/g, "-") || "modalbangsa";
 
@@ -101,7 +105,7 @@ const StudentsPage = () => {
   // Tabel TIDAK menunggu context memuat 10k siswa; fetch 50/page langsung dari server.
   const STUDENT_PAGE_SIZE = 50;
   const STUDENT_LIST_FIELDS =
-    "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,resetRequested,created,updated";
+    "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,resetRequested,examUsername,examPassword,created,updated";
   const STUDENT_SORT_MAP: Record<string, string> = {
     nisn: "username",
     name: "name",
@@ -123,6 +127,8 @@ const StudentsPage = () => {
     session: i.session || "",
     examNumber: i.examNumber || "",
     resetRequested: i.resetRequested || "",
+    examUsername: i.examUsername || "",
+    examPassword: i.examPassword || "",
   } as StudentData);
 
   const [tablePage, setTablePage] = useState(1);
@@ -132,6 +138,20 @@ const StudentsPage = () => {
   const [tableRows, setTableRows] = useState<StudentData[]>(() => studentTableCache?.rows || []);
   const [tableLoading, setTableLoading] = useState(false);
   const [tableLoadedOnce, setTableLoadedOnce] = useState(() => !studentTableCache);
+
+  const isFiltered = filterClassId !== "ALL" || Boolean(tableSearch);
+
+  // Fetch total seluruh siswa se-sekolah secara independen dari filter aktif
+  useEffect(() => {
+    if (!pb) return;
+    pb.collection("students").getList(1, 1, { fields: "id" })
+      .then((res) => {
+        if (typeof res?.totalItems === "number") {
+          setServerAllStudentsCount(res.totalItems);
+        }
+      })
+      .catch(() => {});
+  }, [pb]);
 
   // Debounce search 400ms agar tidak spam request per ketikan;
   // sekalian reset ke halaman 1 (dibatch dalam satu render -> 1x fetch)
@@ -173,11 +193,14 @@ const StudentsPage = () => {
       setTableRows(mappedRows);
       setTableTotal(res.totalItems);
       setTableLoadedOnce(true);
-      if (tablePage === 1 && filterClassId === "ALL" && !tableSearch) {
-        studentTableCache = {
-          rows: mappedRows,
-          total: res.totalItems,
-        };
+      if (filterClassId === "ALL" && !tableSearch) {
+        setServerAllStudentsCount(res.totalItems);
+        if (tablePage === 1) {
+          studentTableCache = {
+            rows: mappedRows,
+            total: res.totalItems,
+          };
+        }
       }
     } catch (err) {
       console.error("Gagal memuat daftar siswa:", err);
@@ -346,10 +369,10 @@ const StudentsPage = () => {
 
     // Cek Batasan Kuota Hanya Jika Menambah Siswa Baru (Bypass jika offline)
     if (dialogMode === "create" && !isOffline) {
-      if (studentCount >= quota) {
+      if (totalStudents >= quota) {
         return showAlert(
           "Batas Kuota Tercapai",
-          `Penambahan tidak dapat diproses. ${terminology.school} Anda telah mencapai batas maksimal kuota (${studentCount}/${quota} ${terminology.student}) pada paket ${planName}. Silakan tingkatkan paket langganan Anda untuk menambah kapasitas.`,
+          `Penambahan tidak dapat diproses. ${terminology.school} Anda telah mencapai batas maksimal kuota (${totalStudents}/${quota} ${terminology.student}) pada paket ${planName}. Silakan tingkatkan paket langganan Anda untuk menambah kapasitas.`,
           "warning",
           () => navigate("/admin/invoice"),
           true,
@@ -428,6 +451,97 @@ const StudentsPage = () => {
       },
       true,
       "Ya, Reset"
+    );
+  };
+
+  const handleRegenerateExamCredentials = async (student: StudentData) => {
+    showAlert(
+      "Regenerate Sandi Ujian",
+      `Buat kredensial sesi ujian baru untuk ${student.name}? Username diawali "TU" dan password acak (contoh: TU${student.nisn || (student as any).username || "123"} / 28327*). Kredensial ini langsung aktif dan siswa dapat login tanpa mengubah password akun utamanya.`,
+      "warning",
+      async () => {
+        try {
+          const creds = await regenerateExamCredentials(student.id);
+          setTableRows(prev => prev.map(s => s.id === student.id ? { ...s, examUsername: creds.examUsername, examPassword: creds.examPassword } : s));
+          fetchStudentTable();
+          showAlert(
+            "Kredensial Ujian Berhasil Dibuat",
+            `Username: ${creds.examUsername}\nPassword: ${creds.examPassword}\n\nKredensial ini sudah tersimpan dan akan otomatis tercetak di kartu ujian peserta.`,
+            "success"
+          );
+        } catch (error: any) {
+          console.error("Gagal regenerate kredensial ujian:", error);
+          showAlert("Gagal", error.message || "Gagal membuat kredensial ujian.", "danger");
+        }
+      },
+      true,
+      "Ya, Generate"
+    );
+  };
+
+  const handleBatchRegenerateExamCredentials = async (targetIds?: string[], onlyEmpty: boolean = false) => {
+    if (!pb) return;
+    let idsToProcess = targetIds;
+    if (!idsToProcess || idsToProcess.length === 0) {
+      try {
+        let filter = "";
+        if (onlyEmpty) {
+          filter = "examUsername = '' || examPassword = ''";
+        }
+        const list = await pb.collection("students").getFullList({
+          filter: filter || undefined,
+          fields: "id",
+        });
+        idsToProcess = list.map((item: any) => item.id);
+      } catch (e: any) {
+        console.error("Gagal mengambil data siswa:", e);
+        showAlert("Gagal", "Gagal mengambil data siswa: " + (e.message || "Error"), "danger");
+        return;
+      }
+    }
+
+    if (!idsToProcess || idsToProcess.length === 0) {
+      showAlert("Informasi", onlyEmpty ? "Semua siswa sudah memiliki kredensial sesi ujian." : "Tidak ada siswa yang dipilih.", "info");
+      return;
+    }
+
+    showAlert(
+      onlyEmpty ? "Generate Sandi Ujian (Yang Belum Ada)" : "Generate Sandi Ujian Massal",
+      `Akan dibuatkan username & password ujian alternatif untuk ${idsToProcess.length} ${terminology.student.toLowerCase()}. Format: TU[NISN] dan sandi acak bintang (contoh: 28327*). Akun utama siswa tetap aman dan tidak berubah. Lanjutkan?`,
+      "warning",
+      async () => {
+        setBatchProgress({
+          isOpen: true,
+          total: idsToProcess.length,
+          current: 0,
+          message: "Menyiapkan kredensial ujian...",
+          title: "Generate Kredensial Ujian"
+        });
+
+        try {
+          await regenerateExamCredentialsBatch(idsToProcess, "TU", (current, total) => {
+            setBatchProgress(prev => ({
+              ...prev,
+              current,
+              message: `Memproses kredensial sesi ujian (${current}/${total})`
+            }));
+          });
+          setSelectedIds([]);
+          showAlert(
+            "Berhasil",
+            `Kredensial sesi ujian untuk ${idsToProcess.length} ${terminology.student.toLowerCase()} berhasil digenerate dan tersimpan di server. Kartu ujian siap dicetak.`,
+            "success"
+          );
+        } catch (error: any) {
+          console.error("Gagal generate kredensial ujian massal:", error);
+          showAlert("Gagal", error.message || "Gagal memproses kredensial ujian.", "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+          fetchStudentTable();
+        }
+      },
+      true,
+      "Ya, Generate"
     );
   };
 
@@ -597,10 +711,10 @@ const StudentsPage = () => {
       }
 
       // Validasi Kapasitas Kuota SaaS (Hanya dihitung untuk siswa baru)
-      if (!isOffline && studentCount + toCreate.length > quota) {
+      if (!isOffline && totalStudents + toCreate.length > quota) {
         return showAlert(
           "Melebihi Kuota Langganan",
-          `Gagal mengimpor data. Anda mencoba menambahkan ${toCreate.length} ${terminology.student.toLowerCase()} baru, tapi sisa kuota paket ${planName} Anda tinggal ${Math.max(0, quota - studentCount)} ${terminology.student.toLowerCase()} (Batas maksimal: ${quota}). Silakan sesuaikan file Excel Anda atau tingkatkan paket langganan institusi.`,
+          `Gagal mengimpor data. Anda mencoba menambahkan ${toCreate.length} ${terminology.student.toLowerCase()} baru, tapi sisa kuota paket ${planName} Anda tinggal ${Math.max(0, quota - totalStudents)} ${terminology.student.toLowerCase()} (Batas maksimal: ${quota}). Silakan sesuaikan file Excel Anda atau tingkatkan paket langganan institusi.`,
           "danger",
           () => navigate("/admin/invoice"),
           true,
@@ -1000,6 +1114,16 @@ const StudentsPage = () => {
                             <span className="text-[10px] text-neutral-400">Reset {selectedIds.length} terpilih</span>
                           </div>
                         </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setTimeout(() => handleBatchRegenerateExamCredentials(selectedIds), 150)}
+                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                        >
+                          <Sparkles className="h-4 w-4 text-purple-600 shrink-0" />
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Generate Sandi Ujian</span>
+                            <span className="text-[10px] text-neutral-400">Sandi sesi untuk {selectedIds.length} terpilih</span>
+                          </div>
+                        </DropdownMenuItem>
 
                         <DropdownMenuItem
                           onClick={() => {
@@ -1102,6 +1226,26 @@ const StudentsPage = () => {
                           <span className="text-[10px] text-neutral-400">Per kelas atau seluruh siswa</span>
                         </div>
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleBatchRegenerateExamCredentials(undefined, false)}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        <Sparkles className="h-4 w-4 text-purple-600 shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Generate Sandi Ujian (Semua)</span>
+                          <span className="text-[10px] text-neutral-400">Regenerate akun kartu ujian</span>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleBatchRegenerateExamCredentials(undefined, true)}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        <KeyRound className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Generate Sandi Ujian (Kosong)</span>
+                          <span className="text-[10px] text-neutral-400">Hanya siswa tanpa sandi sesi</span>
+                        </div>
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
                       <DropdownMenuItem
                         onClick={isExportingScores ? undefined : handleExportAllScores}
@@ -1192,10 +1336,14 @@ const StudentsPage = () => {
         <NeonStatGrid cols={4}>
           <NeonStatCard
             label={`Total ${terminology.student} Aktif`}
-            value={studentCount.toLocaleString("id-ID")}
+            value={totalStudents.toLocaleString("id-ID")}
             unit={terminology.student.toLowerCase()}
-            subText={isOffline ? "Server mandiri offline" : "Terdaftar di sistem"}
-            isLoading={loading}
+            subText={
+              isFiltered
+                ? `${(tableTotal ?? 0).toLocaleString("id-ID")} siswa disaring`
+                : (isOffline ? "Server mandiri offline" : "Terdaftar di sistem")
+            }
+            isLoading={loading && serverAllStudentsCount === null}
           />
           <NeonStatCard
             label={`Total ${terminology.class}`}
@@ -1208,15 +1356,15 @@ const StudentsPage = () => {
             label="Kapasitas Kuota"
             value={isOffline ? "100%" : `${quotaUsedPercent}%`}
             unit={isOffline ? "mandiri" : "terpakai"}
-            subText={isOffline ? "Unlimited tanpa batas" : `${Math.max(0, quota - studentCount).toLocaleString("id-ID")} slot tersisa`}
-            isLoading={loading}
+            subText={isOffline ? "Unlimited tanpa batas" : `${Math.max(0, quota - totalStudents).toLocaleString("id-ID")} slot tersisa`}
+            isLoading={loading && serverAllStudentsCount === null}
           />
           <NeonStatCard
             label={`Siswa per ${terminology.class}`}
-            value={classes.length > 0 ? String(Math.round(studentCount / classes.length)) : "0"}
+            value={classes.length > 0 ? String(Math.round(totalStudents / classes.length)) : "0"}
             unit="rata-rata"
             subText="Distribusi per rombel"
-            isLoading={loading}
+            isLoading={loading && serverAllStudentsCount === null}
           />
         </NeonStatGrid>
 
@@ -1355,7 +1503,7 @@ const StudentsPage = () => {
                   Server Mandiri Offline: Tanpa Batas Kuota {terminology.student}
                 </p>
                 <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                  Saat ini terdapat <strong className="font-mono text-neutral-800 dark:text-neutral-200">{studentCount.toLocaleString("id-ID")}</strong> {terminology.student.toLowerCase()} terdaftar. Anda dapat menambahkan data siswa sebanyak kapasitas server lokal.
+                  Saat ini terdapat <strong className="font-mono text-neutral-800 dark:text-neutral-200">{totalStudents.toLocaleString("id-ID")}</strong> {terminology.student.toLowerCase()} terdaftar. Anda dapat menambahkan data siswa sebanyak kapasitas server lokal.
                 </p>
               </div>
             </div>
@@ -1396,10 +1544,15 @@ const StudentsPage = () => {
                   )}
                 </div>
                 <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
-                  <strong className="font-mono text-neutral-800 dark:text-neutral-200">{studentCount.toLocaleString("id-ID")}</strong>
+                  <strong className="font-mono text-neutral-800 dark:text-neutral-200">{totalStudents.toLocaleString("id-ID")}</strong>
                   {" dari "}
                   <strong className="font-mono text-neutral-700 dark:text-neutral-300">{quota.toLocaleString("id-ID")}</strong>
                   {" slot terdaftar"}
+                  {isFiltered && (
+                    <span className="text-neutral-400 dark:text-neutral-500 ml-1">
+                      (sedang menyortir {(tableTotal ?? 0).toLocaleString("id-ID")} {terminology.student.toLowerCase()})
+                    </span>
+                  )}
                 </p>
               </div>
 
@@ -1440,7 +1593,7 @@ const StudentsPage = () => {
                     <>
                       Tersisa{" "}
                       <strong className="font-mono font-semibold text-neutral-800 dark:text-neutral-200">
-                        {Math.max(0, quota - studentCount).toLocaleString("id-ID")}
+                        {Math.max(0, quota - totalStudents).toLocaleString("id-ID")}
                       </strong>{" "}
                       slot {terminology.student.toLowerCase()} aktif
                     </>
@@ -1502,6 +1655,7 @@ const StudentsPage = () => {
               onEdit={handleEditClick}
               onDelete={handleDeleteClick}
               onResetPassword={role === "admin" ? handleResetPassword : undefined}
+              onRegenerateExamCredentials={role === "admin" ? handleRegenerateExamCredentials : undefined}
               onViewInterest={handleViewInterest}
               onViewScores={handleViewScores}
               onPrintExamCard={(student) => {
@@ -1611,6 +1765,25 @@ const StudentsPage = () => {
                     )}
                   </InspectorField>
 
+                  <InspectorField label="Kredensial Sesi Ujian" truncate={false}>
+                    {inspectedStudent.examUsername && inspectedStudent.examPassword ? (
+                      <div className="space-y-1.5 pt-1 w-full">
+                        <div className="flex items-center justify-between gap-2 text-xs font-mono bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1.5 rounded-lg border border-neutral-200/80 dark:border-neutral-700/80">
+                          <span className="text-neutral-500 text-[10px] uppercase font-sans font-medium tracking-wider shrink-0">User Ujian</span>
+                          <span className="font-bold text-indigo-600 dark:text-indigo-400 select-all tracking-tight truncate">{inspectedStudent.examUsername}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 text-xs font-mono bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1.5 rounded-lg border border-neutral-200/80 dark:border-neutral-700/80">
+                          <span className="text-neutral-500 text-[10px] uppercase font-sans font-medium tracking-wider shrink-0">Sandi Sesi</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 select-all tracking-wider">{inspectedStudent.examPassword}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-neutral-400 italic py-1">
+                        Belum dibuat (akan dibuat otomatis saat kartu dicetak)
+                      </div>
+                    )}
+                  </InspectorField>
+
                   <InspectorActions>
                     {role === "admin" && (
                       <InspectorButton
@@ -1628,6 +1801,15 @@ const StudentsPage = () => {
                         onClick={() => handleResetPassword(inspectedStudent)}
                       >
                         Reset Password
+                      </InspectorButton>
+                    )}
+                    {role === "admin" && (
+                      <InspectorButton
+                        variant="secondary"
+                        icon={Sparkles}
+                        onClick={() => handleRegenerateExamCredentials(inspectedStudent)}
+                      >
+                        Regenerate Sandi Ujian
                       </InspectorButton>
                     )}
                     <InspectorButton

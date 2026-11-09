@@ -9,8 +9,6 @@ import {
   Lock, Camera,
 } from "lucide-react";
 import { StudentProfileDialog } from "../../components/dialogs/StudentProfileDialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
-import { Input } from "../../components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "../../components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import { fadeUp } from "../../lib/motion";
@@ -137,18 +135,11 @@ const StudentDashboardPage = () => {
   const [activeTab, setActiveTab] = useState<"active" | "history">("active");
   const [hasPendingSync, setHasPendingSync] = useState(false);
   const [isSyncingData, setIsSyncingData] = useState(false);
-  const [isFirstLoadState, setIsFirstLoadState] = useState(true);
+  const hasAnimatedCardsRef = useRef(false);
 
-  // Profile Modal State
+  // Profile Modal State (satu modal tunggal, berganti view di dalamnya)
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-
-  // Change Password Modal
-  const [isChangePassOpen, setIsChangePassOpen] = useState(false);
-  const [newPass, setNewPass] = useState("");
-  const [confirmPass, setConfirmPass] = useState("");
-  const [passError, setPassError] = useState("");
-  const [isChangingPass, setIsChangingPass] = useState(false);
-  const { changePassword } = useStudentAuth();
+  const [profileInitialView, setProfileInitialView] = useState<"view" | "edit" | "password">("view");
 
   const isSyncingRef = useRef(false);
   const selectedRoomRef = useRef<any>(null);
@@ -225,18 +216,25 @@ const StudentDashboardPage = () => {
 
       if (!student) return;
 
-      // 1. Fetch Rooms and Attempts in Parallel (Faster)
+      // 1. Fetch Rooms and Attempts in Parallel (Faster, requestKey: null to avoid autocancellation)
       const [roomsRecords, attemptsRecords] = await Promise.all([
         pb.collection("exam_rooms").getFullList({
           filter: 'status != "archive"',
           expand: "examId,examId.subjectId,examId.teacherId",
           sort: "-created",
-          requestKey: "dashboard_rooms"
+          requestKey: null
         }),
         pb.collection("attempts").getFullList({
           filter: `studentId = "${student.id}"`,
-          requestKey: "dashboard_attempts"
-        })
+          requestKey: null
+        }),
+        student?.id ? pb.collection("student_interests").getFullList({
+          filter: `studentId = "${student.id}"`,
+          requestKey: null
+        }).then(res => {
+          setHasInterests(res && res.length > 0);
+          return res;
+        }).catch(() => []) : Promise.resolve([])
       ]);
 
       // 2. Map Attempts for lookup
@@ -332,8 +330,21 @@ const StudentDashboardPage = () => {
         return order[a.timeStatus] - order[b.timeStatus];
       });
 
-      setUserAttempts(myStatus);
-      setActiveRooms(allRooms);
+      setUserAttempts(prev => {
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(myStatus);
+        if (prevKeys.length === nextKeys.length && prevKeys.every(k => prev[k]?.status === myStatus[k]?.status && prev[k]?.score === myStatus[k]?.score)) {
+          return prev;
+        }
+        return myStatus;
+      });
+
+      setActiveRooms(prev => {
+        if (prev.length === allRooms.length && prev.every((r: any, i: number) => r.id === allRooms[i].id && r.timeStatus === allRooms[i].timeStatus && (r as any).show_result === (allRooms[i] as any).show_result)) {
+          return prev;
+        }
+        return allRooms;
+      });
 
       // 4. Handle Redirection if locked
       if (lockedRoomId && !window.location.pathname.includes('/cbt')) {
@@ -345,8 +356,6 @@ const StudentDashboardPage = () => {
       console.error("Dashboard fetch error:", err);
     } finally {
       setLoading(false);
-      // Tunggu sebentar agar animasi pertama selesai baru matikan state first load
-      setTimeout(() => setIsFirstLoadState(false), 1000);
     }
   };
 
@@ -403,14 +412,6 @@ const StudentDashboardPage = () => {
       unsubR.then(u => u()).catch(() => { });
     };
   }, [student?.id, pb]);
-
-  useEffect(() => {
-    if (student?.id && pb && navigator.onLine) {
-      syncPendingDataLocked(pb, student.id).then((synced) => {
-        if (synced && synced.length > 0) fetchData(true);
-      });
-    }
-  }, [student?.id]);
 
   const isRoomFinishedOrExpired = useCallback((r: any) => {
     const att = userAttempts[r.id];
@@ -502,7 +503,7 @@ const StudentDashboardPage = () => {
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{terminology.student.toUpperCase()} • {student?.className} • {terminology.id} {student?.nisn}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
-                <DropdownMenuItem onClick={() => setIsProfileOpen(true)} className="px-3 py-2.5 rounded-xl text-slate-700 dark:text-slate-200 focus:bg-emerald-50 dark:focus:bg-emerald-950/40 focus:text-emerald-700 dark:focus:text-emerald-300 flex items-center gap-3 cursor-pointer transition-colors group">
+                <DropdownMenuItem onClick={() => { setProfileInitialView("view"); setIsProfileOpen(true); }} className="px-3 py-2.5 rounded-xl text-slate-700 dark:text-slate-200 focus:bg-emerald-50 dark:focus:bg-emerald-950/40 focus:text-emerald-700 dark:focus:text-emerald-300 flex items-center gap-3 cursor-pointer transition-colors group">
                   <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg group-focus:bg-emerald-100 dark:group-focus:bg-emerald-900/40 transition-colors">
                     <User className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
@@ -524,7 +525,7 @@ const StudentDashboardPage = () => {
                   </div>
                 </div>
                 <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
-                <DropdownMenuItem onClick={() => setIsChangePassOpen(true)} className="px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-300 focus:bg-slate-50 dark:focus:bg-slate-900/50 flex items-center gap-3 cursor-pointer transition-colors group">
+                <DropdownMenuItem onClick={() => { setProfileInitialView("password"); setIsProfileOpen(true); }} className="px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-300 focus:bg-slate-50 dark:focus:bg-slate-900/50 flex items-center gap-3 cursor-pointer transition-colors group">
                   <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg group-focus:bg-emerald-50 dark:group-focus:bg-emerald-900/20 transition-colors">
                     <KeyRound className="h-4 w-4" />
                   </div>
@@ -683,9 +684,10 @@ const StudentDashboardPage = () => {
 
                         return (
                           <motion.div
-                            initial={isFirstLoadState ? { opacity: 0, scale: 0.95 } : false}
+                            initial={!hasAnimatedCardsRef.current ? { opacity: 0, scale: 0.98 } : false}
                             animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: isFirstLoadState ? idx * 0.05 : 0 }}
+                            transition={{ duration: 0.2, delay: !hasAnimatedCardsRef.current ? idx * 0.04 : 0 }}
+                            onAnimationComplete={() => { hasAnimatedCardsRef.current = true; }}
                             key={room.id}
                             className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-800/50 transition-all overflow-hidden flex flex-col h-full text-left"
                           >
@@ -702,60 +704,35 @@ const StudentDashboardPage = () => {
                               </div>
 
                               <div className="mt-1 space-y-3 flex-1">
-                                {/* Paket Soal - High Visibility */}
+                                {/* Paket Soal - High Visibility (Clean Minimalist Without Icons) */}
                                 <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 group-hover:border-emerald-100 dark:group-hover:border-emerald-900/40 transition-colors">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center border border-slate-200 dark:border-slate-800 shadow-sm">
-                                      <ClipboardCheck className="w-4 h-4 text-emerald-500" />
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest leading-none">Paket Soal</span>
-                                      <span className="text-[11px] font-black text-slate-700 dark:text-slate-200 uppercase mt-1 leading-tight line-clamp-1">{room.examDescription}</span>
-                                    </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] font-black text-emerald-600/80 dark:text-emerald-400/80 uppercase tracking-wider leading-none">Paket Soal</span>
+                                    <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase mt-1 leading-snug line-clamp-1">{room.examDescription}</span>
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
-                                      <User className="w-4 h-4 text-emerald-500" />
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest leading-none">Pengampu</span>
-                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[100px]">{room.teacherName}</span>
-                                    </div>
+                                <div className="grid grid-cols-2 gap-3 py-1">
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none">Pengampu</span>
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate mt-1">{room.teacherName}</span>
                                   </div>
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
-                                      <Calendar className="w-4 h-4 text-emerald-500" />
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest leading-none">Hari & Tanggal</span>
-                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                        {new Date(room.startTimeDate).toLocaleDateString("id-ID", { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-                                      </span>
-                                    </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none">Hari & Tanggal</span>
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">
+                                      {new Date(room.startTimeDate).toLocaleDateString("id-ID", { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                                    </span>
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
-                                      <Clock className="w-4 h-4 text-emerald-500" />
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest leading-none">Durasi</span>
-                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{room.duration} Menit</span>
-                                    </div>
+                                <div className="grid grid-cols-2 gap-3 pb-1">
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none">Durasi</span>
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">{room.duration} Menit</span>
                                   </div>
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
-                                      <Clock className="w-4 h-4 text-emerald-500" />
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest leading-none">Waktu Mulai</span>
-                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pkl {new Date(room.startTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })} WIB</span>
-                                    </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none">Waktu Mulai</span>
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">Pkl {new Date(room.startTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })} WIB</span>
                                   </div>
                                 </div>
                                 <div className="mt-auto pt-4 border-t border-slate-50 dark:border-slate-800/50">
@@ -879,7 +856,10 @@ const StudentDashboardPage = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsProfileOpen(true)}
+                    onClick={() => {
+                      setProfileInitialView("edit");
+                      setIsProfileOpen(true);
+                    }}
                     className="w-full mt-2 min-h-[38px] px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800/80 bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors shadow-xs"
                   >
                     <Camera className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -931,98 +911,13 @@ const StudentDashboardPage = () => {
         </div>
       </main>
 
-      {/* Student Profile Dialog */}
+      {/* Student Profile Dialog (Single Dialog with In-Place Password & Biodata view modes) */}
       <StudentProfileDialog
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
-        onChangePassword={() => setIsChangePassOpen(true)}
+        initialView={profileInitialView}
         onLogout={logoutStudent}
       />
-
-      {/* Manual Change Password Dialog */}
-      <Dialog open={isChangePassOpen} onOpenChange={(open) => { if (!isChangingPass) setIsChangePassOpen(open); setPassError(""); setNewPass(""); setConfirmPass(""); }}>
-        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-950 rounded-3xl border-none shadow-2xl p-0 overflow-hidden">
-          <div className="bg-emerald-600 px-8 py-10 text-white relative">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><Lock className="w-20 h-20" /></div>
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black uppercase tracking-tight">Ganti Password</DialogTitle>
-              <p className="text-emerald-50/80 text-xs font-bold uppercase tracking-widest mt-2 opacity-90">Perbarui keamanan akun Anda</p>
-            </DialogHeader>
-          </div>
-          <div className="p-8 space-y-6">
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Password Baru</label>
-                <div className="relative">
-                  <Input
-                    type="password"
-                    value={newPass}
-                    onChange={(e) => setNewPass(e.target.value)}
-                    placeholder="Minimal 6 karakter"
-                    className="h-14 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl px-5 font-bold"
-                    disabled={isChangingPass}
-                  />
-                  <KeyRound className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Konfirmasi Password Baru</label>
-                <div className="relative">
-                  <Input
-                    type="password"
-                    value={confirmPass}
-                    onChange={(e) => setConfirmPass(e.target.value)}
-                    placeholder="Ulangi password baru"
-                    className="h-14 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl px-5 font-bold"
-                    disabled={isChangingPass}
-                  />
-                  <Lock className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
-                </div>
-              </div>
-              {passError && (
-                <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
-                  <p className="text-[10px] font-black text-rose-600 uppercase tracking-wide leading-tight">{passError}</p>
-                </div>
-              )}
-            </div>
-            <DialogFooter className="flex-col sm:flex-row gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => setIsChangePassOpen(false)}
-                className="h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                disabled={isChangingPass}
-              >
-                Batal
-              </Button>
-              <Button
-                onClick={async () => {
-                  setPassError("");
-                  if (newPass.length < 6) return setPassError("Password minimal 6 karakter!");
-                  if (newPass !== confirmPass) return setPassError("Konfirmasi password tidak cocok!");
-
-                  setIsChangingPass(true);
-                  try {
-                    await changePassword(newPass);
-                    setIsChangePassOpen(false);
-                    // Reset fields
-                    setNewPass("");
-                    setConfirmPass("");
-                  } catch (err: any) {
-                    setPassError(err.message || "Gagal mengganti password.");
-                  } finally {
-                    setIsChangingPass(false);
-                  }
-                }}
-                className="flex-1 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-emerald-200 dark:shadow-none transition-all active:scale-95"
-                disabled={isChangingPass}
-              >
-                {isChangingPass ? "Memproses..." : "Simpan Password"}
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
     </motion.div>
   );
 };

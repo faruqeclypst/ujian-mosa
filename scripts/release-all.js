@@ -66,7 +66,7 @@ try {
 
   // ── [1/6] BUILD WEB FRONTEND ──
   console.log('\n📦 [1/6] Membangun bundle web frontend (npm run build)...');
-  execSync('npm run build', { stdio: 'inherit' });
+  execSync('npm run build', { stdio: 'inherit', env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' } });
 
   // ── [2/6] DEPLOY WEB KE MASTER VPS ──
   console.log('\n🌐 [2/6] Mengirim dan mengekstrak bundle web ke Master VPS...');

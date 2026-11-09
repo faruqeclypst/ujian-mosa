@@ -438,6 +438,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             setLoading(false);
             return;
           }
+          setCachedSchool(cacheKey, record);
           setSchool(record);
           setPb(getSchoolPb(record.pb_url));
           setLoading(false);
@@ -453,6 +454,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             is_active: true,
             type: 'school',
           };
+          setCachedSchool(cacheKey, devSchool);
           setSchool(devSchool);
           setPb(getSchoolPb(directPbUrl));
           setLoading(false);

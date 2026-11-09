@@ -111,7 +111,7 @@ export function NeonTable<T>({
   onPageChange,
   compact = false,
   tableClassName,
-  tableLayout = "auto",
+  tableLayout = "fixed",
   rowVerticalAlign = "middle",
   totalCount,
   serverSide = false,

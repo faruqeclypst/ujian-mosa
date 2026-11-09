@@ -124,7 +124,7 @@ export const ExambroGuideModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl rounded-2xl p-0 border border-neutral-200 dark:border-neutral-800 shadow-2xl bg-white dark:bg-neutral-900 overflow-hidden flex flex-col max-h-[90vh]">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl rounded-2xl p-0 border border-neutral-200 dark:border-neutral-800 shadow-2xl bg-white dark:bg-neutral-900 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header Modal */}
         <div className="p-6 pb-4 border-b border-neutral-100 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-850/60 relative">
           <DialogTitle className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2.5">

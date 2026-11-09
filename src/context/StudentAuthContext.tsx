@@ -21,6 +21,8 @@ export interface StudentUser {
   session?: string;
   examNumber?: string;
   hasChangedPassword?: boolean;
+  examUsername?: string;
+  examPassword?: string;
 }
 
 const isStudentPasswordDefault = (data: any): boolean => {
@@ -94,8 +96,12 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
           room: model.room || "",
           session: model.session || "",
           examNumber: model.examNumber || "",
-          hasChangedPassword: model.hasChangedPassword !== false && model.hasChangedPassword !== "false" && model.hasChangedPassword !== "0" && model.hasChangedPassword !== 0
+          hasChangedPassword: !isStudentPasswordDefault(model),
+          examUsername: model.examUsername || (model as any).exam_username || "",
+          examPassword: model.examPassword || (model as any).exam_password || "",
         });
+        // Unblock UI segera (0ms paint) tanpa menunggu network query expand
+        setLoading(false);
 
         try {
           const studentFields = ["classId", "classid", "class_id", "class", "id_kelas", "kode_kelas"];
@@ -122,20 +128,42 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
             }
           }
 
-          setstudent({
-            id: refreshed.id,
-            nisn: refreshed.username,
-            name: refreshed.name,
-            classId: refreshed.classId || refreshed.classid || (refreshed as any).class_id || "",
-            className: classObj?.name || classObj?.nama || (classObj as any)?.classname || "-",
-            gender: refreshed.gender || model.gender || "L",
-            photo: refreshed.photo || model.photo || "",
-            birthPlace: refreshed.birthPlace || model.birthPlace || "",
-            birthDate: refreshed.birthDate || model.birthDate || "",
-            room: refreshed.room || model.room || "",
-            session: refreshed.session || model.session || "",
-            examNumber: refreshed.examNumber || model.examNumber || "",
-            hasChangedPassword: !isStudentPasswordDefault(refreshed),
+          setstudent(prev => {
+            const newClassName = classObj?.name || classObj?.nama || (classObj as any)?.classname || "-";
+            const newClassId = refreshed.classId || refreshed.classid || (refreshed as any).class_id || "";
+            const newPhoto = refreshed.photo || model.photo || "";
+            const newName = refreshed.name || model.name || "-";
+            const newHasChanged = !isStudentPasswordDefault(refreshed);
+
+            if (
+              prev &&
+              prev.id === refreshed.id &&
+              prev.className === newClassName &&
+              prev.classId === newClassId &&
+              prev.photo === newPhoto &&
+              prev.name === newName &&
+              prev.hasChangedPassword === newHasChanged
+            ) {
+              return prev;
+            }
+
+            return {
+              id: refreshed.id,
+              nisn: refreshed.username,
+              name: newName,
+              classId: newClassId,
+              className: newClassName,
+              gender: refreshed.gender || model.gender || "L",
+              photo: newPhoto,
+              birthPlace: refreshed.birthPlace || model.birthPlace || "",
+              birthDate: refreshed.birthDate || model.birthDate || "",
+              room: refreshed.room || model.room || "",
+              session: refreshed.session || model.session || "",
+              examNumber: refreshed.examNumber || model.examNumber || "",
+              hasChangedPassword: newHasChanged,
+              examUsername: refreshed.examUsername || (refreshed as any).exam_username || model.examUsername || (model as any).exam_username || "",
+              examPassword: refreshed.examPassword || (refreshed as any).exam_password || model.examPassword || (model as any).exam_password || "",
+            };
           });
         } catch (err: any) {
           if (err.status === 404) {
@@ -145,8 +173,8 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } else {
         setstudent(null);
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initAuth();
@@ -174,9 +202,30 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     sessionStorage.setItem("student_login_at", Date.now().toString());
 
     try {
-      // --- FAST-LOGIN: coba SHA-256 dulu, fallback ke bcrypt + migrasi otomatis ---
       let authData: any = null;
       let usedFastLogin = false;
+
+      // --- 1. KREDENSIAL UJIAN (EXAM-LOGIN): Cek kredensial alternatif berbasis sesi ujian ---
+      try {
+        const examRes = await fetch(`${pb.baseUrl}/api/student/exam-login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: nisn.trim(), password: password.trim() }),
+        });
+        if (examRes.ok) {
+          const examData = await examRes.json();
+          if (examData.token && examData.record) {
+            pb.authStore.save(examData.token, examData.record);
+            authData = { record: examData.record, token: examData.token };
+            usedFastLogin = true;
+            sessionStorage.setItem("logged_via_exam_credentials", "true");
+          }
+        }
+      } catch (examErr) {
+        // Fallback jika hook belum tersedia / koneksi gagal
+      }
+
+      // --- 2. FAST-LOGIN: coba SHA-256 dulu, fallback ke bcrypt + migrasi otomatis ---
       try {
         const fastRes = await fetch(`${pb.baseUrl}/api/fast-login`, {
           method: "POST",
@@ -255,9 +304,12 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         session: fullModel.session || "",
         examNumber: fullModel.examNumber || "",
         hasChangedPassword: !isDefault,
+        examUsername: fullModel.examUsername || (fullModel as any).exam_username || "",
+        examPassword: fullModel.examPassword || (fullModel as any).exam_password || "",
       });
     } catch (err: any) {
       sessionStorage.removeItem("student_session_active");
+    sessionStorage.removeItem("logged_via_exam_credentials");
       sessionStorage.removeItem("student_session_id");
       localStorage.removeItem("student_session_id");
       if (err.status === 400 || err.status === 404) {
@@ -434,7 +486,9 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
           setstudent(prev => prev ? { 
             ...prev, 
             name: e.record.name, 
-            hasChangedPassword: true 
+            hasChangedPassword: true,
+            examUsername: e.record.examUsername || (e.record as any).exam_username || prev.examUsername,
+            examPassword: e.record.examPassword || (e.record as any).exam_password || prev.examPassword,
           } : null);
         }
       }

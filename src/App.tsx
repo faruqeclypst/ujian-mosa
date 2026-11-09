@@ -24,6 +24,7 @@ import StudentLoginPage from "./pages/student/StudentLoginPage";
 import GoogleAuthCallbackPage from "./pages/GoogleAuthCallbackPage";
 
 const StudentDashboardPage = lazy(() => import("./pages/student/StudentDashboardPage"));
+const StudentProfilePage = lazy(() => import("./pages/student/StudentProfilePage"));
 const CBTPage = lazy(() => import("./pages/student/CBTPage"));
 const InterestSurveyPage = lazy(() => import("./pages/student/InterestSurveyPage"));
 
@@ -120,13 +121,16 @@ const SchoolAppContent = () => {
     }
   }, [school]);
 
-  const isGlobalLoading = adminLoading || studentLoading;
+  const isStudentRoute = location.pathname.startsWith("/exam") || location.pathname.startsWith("/cbt") || location.pathname.startsWith("/minat-bakat");
+
+  // Route-aware auth loading: Rute siswa hanya menunggu studentLoading, rute admin hanya menunggu adminLoading
+  const isCurrentAuthLoading = isAdminRoute ? adminLoading : isStudentRoute ? studentLoading : (adminLoading && studentLoading);
 
   useEffect(() => {
-    if (!tenantLoading && (!isGlobalLoading || isAdminRoute)) {
+    if (!tenantLoading && !isCurrentAuthLoading) {
       hidePreloader();
     }
-  }, [tenantLoading, isGlobalLoading, isAdminRoute]);
+  }, [tenantLoading, isCurrentAuthLoading]);
 
   if (tenantLoading) {
     return document.getElementById("preloader") ? null : <LoadingScreen />;
@@ -154,7 +158,7 @@ const SchoolAppContent = () => {
 
   return (
     <OfflineServerGuard>
-      {isGlobalLoading && !isAdminRoute ? (
+      {isCurrentAuthLoading ? (
         document.getElementById("preloader") ? null : <LoadingScreen />
       ) : (
         <Suspense fallback={<LoadingScreen />}>
@@ -165,6 +169,14 @@ const SchoolAppContent = () => {
               element={
                 <ExambroGuard>
                   {student && student.hasChangedPassword ? <StudentDashboardPage /> : <StudentLoginPage />}
+                </ExambroGuard>
+              }
+            />
+            <Route
+              path="/exam/profile"
+              element={
+                <ExambroGuard>
+                  <StudentAuthGuard><StudentProfilePage /></StudentAuthGuard>
                 </ExambroGuard>
               }
             />
@@ -365,7 +377,7 @@ const App = () => {
     // Safety fallback: ensure preloader is removed even if error occurs
     const timer = setTimeout(() => {
       hidePreloader();
-    }, 3500);
+    }, 1800);
     return () => clearTimeout(timer);
   }, []);
 

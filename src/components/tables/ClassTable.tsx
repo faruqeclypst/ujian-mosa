@@ -54,7 +54,8 @@ export const ClassTable = ({
           <span className="sm:hidden">Nama Kelas</span>
         </span>
       ),
-      className: "min-w-0",
+      className: "w-[55%] min-w-[200px]",
+      headerClassName: "w-[55%] min-w-[200px]",
       render: (cls) => {
         const count = studentCounts[cls.id] || 0;
         return (
@@ -85,14 +86,14 @@ export const ClassTable = ({
     {
       key: "student_count",
       header: "Jumlah Siswa",
-      className: "hidden sm:table-cell w-36",
-      headerClassName: "hidden sm:table-cell w-36",
+      className: "hidden sm:table-cell w-[30%] min-w-[150px] whitespace-nowrap",
+      headerClassName: "hidden sm:table-cell w-[30%] min-w-[150px] whitespace-nowrap",
       render: (cls) => {
         const count = studentCounts[cls.id] || 0;
         return (
           <div className="flex items-center gap-1.5 py-0.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 font-mono">
             <Users className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
-            <span>{count} peserta didik</span>
+            <span className="whitespace-nowrap">{count} peserta didik</span>
           </div>
         );
       }
@@ -100,28 +101,28 @@ export const ClassTable = ({
     {
       key: "actions",
       header: "Aksi",
-      className: "w-20 sm:w-28 text-right shrink-0",
-      headerClassName: "w-20 sm:w-28 text-right shrink-0",
+      className: "w-[15%] min-w-[110px] text-right shrink-0 whitespace-nowrap",
+      headerClassName: "w-[15%] min-w-[110px] text-right shrink-0 whitespace-nowrap",
       align: "right",
       render: (cls) => (
         <div className="flex justify-end items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
           <button 
             type="button"
-            className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+            className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
             onClick={() => onEdit(cls)}
             title="Edit Kelas"
           >
-            <Edit className="h-3.5 w-3.5" />
+            <Edit className="h-4 w-4" />
           </button>
 
           {onResetPassword && (
             <button 
               type="button"
-              className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              className="hidden sm:flex h-8 w-8 rounded-lg items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
               onClick={() => onResetPassword(cls)}
               title="Reset Password Siswa Kelas Ini (12345678)"
             >
-              <KeyRound className="h-3.5 w-3.5" />
+              <KeyRound className="h-4 w-4" />
             </button>
           )}
 
@@ -129,10 +130,10 @@ export const ClassTable = ({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
                 title="Menu Lainnya"
               >
-                <MoreHorizontal className="h-3.5 w-3.5" />
+                <MoreHorizontal className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
@@ -173,6 +174,7 @@ export const ClassTable = ({
       columns={columns}
       keyExtractor={(c) => c.id}
       compact
+      tableLayout="fixed"
       selectable
       selectedKeys={selectedIds}
       onSelectionChange={onSelectChange}

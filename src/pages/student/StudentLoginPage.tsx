@@ -188,7 +188,8 @@ const StudentLoginPage = () => {
     }
   };
 
-  const showChangePassModal = !!(student && !student.hasChangedPassword);
+  const isExamLogin = typeof window !== "undefined" && sessionStorage.getItem("logged_via_exam_credentials") === "true";
+  const showChangePassModal = !!(student && !student.hasChangedPassword && !isExamLogin);
 
   return (
     <motion.div variants={fadeUp} initial="hidden" animate="visible" className="flex flex-col items-center justify-center min-h-[100dvh] overflow-y-auto bg-[#f8fafc] dark:bg-[#020617] relative font-sans leading-relaxed px-4 py-8">

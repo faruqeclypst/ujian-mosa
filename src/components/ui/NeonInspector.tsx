@@ -156,12 +156,12 @@ export const InspectorField: React.FC<InspectorFieldProps> = ({
         <span>{label}</span>
         {hint && <span className="text-[10px] text-neutral-400 font-normal">{hint}</span>}
       </div>
-      <div className="flex items-center justify-between gap-1">
+      <div className="flex items-center justify-between gap-1 w-full">
         <div
           className={cn(
-            "font-semibold text-neutral-900 dark:text-neutral-100 text-xs",
+            "font-semibold text-neutral-900 dark:text-neutral-100 text-xs w-full",
             mono && "font-mono font-normal text-neutral-700 dark:text-neutral-300",
-            truncate && "truncate"
+            truncate && !children && "truncate"
           )}
         >
           {value ?? children}

@@ -232,7 +232,7 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
         <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
           <DialogTitle className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-sm">

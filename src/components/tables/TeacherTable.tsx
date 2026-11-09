@@ -53,7 +53,8 @@ export const TeacherTable = ({
     { 
       key: "name", 
       header: `Nama ${terminology.teacher} & Identitas`, 
-      className: "min-w-0",
+      className: "w-[40%] min-w-[200px]",
+      headerClassName: "w-[40%] min-w-[200px] whitespace-nowrap",
       render: (teacher) => {
         const initials = teacher.code || (teacher.name || "G").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
         return (
@@ -91,20 +92,20 @@ export const TeacherTable = ({
     { 
       key: "contact",
       header: "Kontak",
-      className: "hidden md:table-cell w-48",
-      headerClassName: "hidden md:table-cell w-48",
+      className: "hidden md:table-cell w-[24%] min-w-[130px]",
+      headerClassName: "hidden md:table-cell w-[24%] min-w-[130px] whitespace-nowrap",
       render: (teacher) => (
-        <div className="flex flex-col gap-0.5 py-0.5 font-mono text-[11px]">
+        <div className="flex flex-col gap-0.5 py-0.5 font-mono text-[11px] min-w-0">
           {teacher.email ? (
-            <span className="inline-flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
+            <span className="inline-flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400 min-w-0">
               <Mail className="h-3 w-3 shrink-0 text-neutral-400" />
-              <span className="truncate max-w-[170px]">{teacher.email}</span>
+              <span className="truncate max-w-[140px] lg:max-w-[160px]">{teacher.email}</span>
             </span>
           ) : null}
           {teacher.phone ? (
-            <span className="inline-flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
+            <span className="inline-flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400 min-w-0">
               <Phone className="h-3 w-3 shrink-0 text-neutral-400" />
-              <span>{teacher.phone}</span>
+              <span className="truncate max-w-[140px]">{teacher.phone}</span>
             </span>
           ) : null}
           {!teacher.email && !teacher.phone && (
@@ -116,19 +117,20 @@ export const TeacherTable = ({
     { 
       key: "subjects", 
       header: terminology.subject, 
-      className: "hidden sm:table-cell w-52",
-      headerClassName: "hidden sm:table-cell w-52",
+      className: "hidden sm:table-cell w-[24%] min-w-[130px]",
+      headerClassName: "hidden sm:table-cell w-[24%] min-w-[130px] whitespace-nowrap",
       render: (teacher) => {
         const subjects = teacher.subjects || [];
         if (subjects.length === 0) {
           return <span className="text-neutral-400 dark:text-neutral-500 italic text-xs">Belum diatur</span>;
         }
         return (
-          <div className="flex flex-wrap gap-1 py-0.5">
+          <div className="flex flex-wrap gap-1 py-0.5 min-w-0">
             {subjects.map((sub, i) => (
               <span 
                 key={i} 
-                className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-750 text-neutral-700 dark:text-neutral-300"
+                className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-750 text-neutral-700 dark:text-neutral-300 truncate max-w-[110px]"
+                title={sub}
               >
                 {sub}
               </span>
@@ -140,36 +142,36 @@ export const TeacherTable = ({
     {
       key: "actions",
       header: "Aksi",
-      className: "w-20 sm:w-28 text-right shrink-0",
-      headerClassName: "w-20 sm:w-28 text-right shrink-0",
+      className: "w-[12%] min-w-[100px] text-right shrink-0 whitespace-nowrap",
+      headerClassName: "w-[12%] min-w-[100px] text-right shrink-0 whitespace-nowrap",
       align: "right",
       render: (teacher) => (
         <div className="flex justify-end items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
           <button 
             type="button"
-            className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+            className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
             onClick={() => onEdit(teacher)}
             title={`Edit ${terminology.teacher}`}
           >
-            <Edit className="h-3.5 w-3.5" />
+            <Edit className="h-4 w-4" />
           </button>
           <button 
             type="button"
-            className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+            className="hidden sm:flex h-8 w-8 rounded-lg items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
             onClick={() => onResetPassword(teacher.id)}
             title={`Reset Password ${terminology.teacher}`}
           >
-            <KeyRound className="h-3.5 w-3.5" />
+            <KeyRound className="h-4 w-4" />
           </button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
                 title="Menu Lainnya"
               >
-                <MoreHorizontal className="h-3.5 w-3.5" />
+                <MoreHorizontal className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
@@ -208,6 +210,7 @@ export const TeacherTable = ({
       columns={columns}
       keyExtractor={(t) => t.id}
       compact
+      tableLayout="fixed"
       selectable
       selectedKeys={selectedIds}
       onSelectionChange={onSelectChange}

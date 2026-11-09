@@ -1230,17 +1230,18 @@ const ExamRoomsPage = () => {
   const neonColumns: NeonTableColumn<ExamRoomData>[] = useMemo(() => [
     {
       key: "room_name",
-      header: "Ruang Ujian & Pengampu",
-      className: "min-w-0 max-w-[340px]",
+      header: "Ruang Ujian",
+      className: "w-[50%] min-w-[200px]",
+      headerClassName: "w-[50%] min-w-[200px] whitespace-nowrap",
       render: (room) => {
         const meta = getRoomScheduleMeta(room);
 
         return (
-          <div className="flex flex-col gap-1 min-w-0">
-            {/* Header: Nama Ruang + Status (Mobile) + Kiosk + Live */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex flex-col gap-1 min-w-0 py-0.5">
+            {/* Baris 1: Nama Ruang + Status (Mobile) + Kiosk + Live */}
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
               <span
-                className="text-[13px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors"
+                className="text-[13px] font-bold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate max-w-[200px] sm:max-w-[280px]"
                 title={room.room_name || room.examTitle || "Tanpa Nama"}
               >
                 {room.room_name || room.examTitle || "Tanpa Nama"}
@@ -1248,7 +1249,7 @@ const ExamRoomsPage = () => {
 
               {room.group_name && (
                 <span
-                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 shrink-0 max-w-[150px] truncate"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 shrink-0 max-w-[130px] truncate"
                   title={`Group: ${room.group_name}`}
                 >
                   <Folder className="h-2.5 w-2.5 shrink-0 text-purple-500" />
@@ -1286,68 +1287,29 @@ const ExamRoomsPage = () => {
               )}
             </div>
 
-            {/* Nama Guru & Mapel */}
-            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 flex-wrap">
-              <span
-                className="font-medium text-neutral-700 dark:text-neutral-300 truncate max-w-[140px] sm:max-w-none"
-                title={room.teacherName}
-              >
-                {room.teacherName || "Pengampu N/A"}
+            {/* Baris 2: Mapel • Pengampu (Hanya field penting, bersih & leluasa) */}
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 min-w-0 truncate">
+              <span className="font-medium text-neutral-700 dark:text-neutral-300 truncate">
+                {room.subjectName || "Semua Mapel"}
               </span>
-              <span className="text-neutral-300 dark:text-neutral-700 shrink-0">•</span>
-              <span
-                className="truncate max-w-[130px] sm:max-w-none"
-                title={room.subjectName}
-              >
-                {room.subjectName || "Mapel N/A"}
-              </span>
-
-              {/* Kelas on Mobile (Bisa diklik untuk melihat daftar lengkap) */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowClassesRoom(room);
-                }}
-                className={cn(
-                  "md:hidden inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border shrink-0 cursor-pointer transition-colors active:scale-95",
-                  room.allClasses
-                    ? "bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-900/40"
-                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-emerald-500/50"
-                )}
-                title="Lihat daftar kelas"
-              >
-                <Users className="h-2.5 w-2.5 opacity-70 text-emerald-500" />
-                <span>{meta.classLabel}</span>
-              </button>
+              {room.teacherName && (
+                <>
+                  <span className="text-neutral-300 dark:text-neutral-700 shrink-0">•</span>
+                  <span className="truncate text-neutral-500 dark:text-neutral-400">
+                    {room.teacherName}
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Jadwal on Mobile */}
-            <div className="md:hidden flex items-center gap-1.5 text-[11px] font-mono text-neutral-500 dark:text-neutral-400 flex-wrap">
+            <div className="md:hidden flex items-center gap-1.5 text-[11px] font-mono text-neutral-500 dark:text-neutral-400">
               <Clock className="h-3 w-3 text-neutral-400 shrink-0" />
               <span>{meta.dateText}</span>
               <span className="px-1 py-0.2 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200/60 dark:border-neutral-750 shrink-0">
                 {room.duration}m
               </span>
             </div>
-
-            {/* Bank Soal */}
-            {room.examTitle && (
-              <div className="flex items-center gap-1 text-[11px] text-neutral-400 dark:text-neutral-500 min-w-0">
-                <BookOpen className="h-3 w-3 shrink-0 opacity-70" />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleQuestionsClick(room);
-                  }}
-                  className="truncate hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer"
-                  title={`Buka Bank Soal: ${room.examTitle}`}
-                >
-                  Bank: {room.examTitle}
-                </button>
-              </div>
-            )}
           </div>
         );
       },
@@ -1355,14 +1317,14 @@ const ExamRoomsPage = () => {
     {
       key: "schedule",
       header: "Jadwal & Kelas",
-      className: "hidden md:table-cell min-w-0 w-[240px] xl:w-[260px]",
-      headerClassName: "hidden md:table-cell w-[240px] xl:w-[260px]",
+      className: "hidden md:table-cell w-[35%] min-w-[170px]",
+      headerClassName: "hidden md:table-cell w-[35%] min-w-[170px] whitespace-nowrap",
       render: (room) => {
         const meta = getRoomScheduleMeta(room);
         const classList = meta.classList;
 
         return (
-          <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex flex-col gap-1 min-w-0 py-0.5">
             {/* Baris 1: Status Pill + Kelas Pill + Live Status */}
             <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
               <span
@@ -1478,80 +1440,47 @@ const ExamRoomsPage = () => {
       },
     },
     {
-      key: "rules",
-      header: "Aturan & Soal",
-      className: "hidden lg:table-cell min-w-0 w-[190px] xl:w-[210px]",
-      headerClassName: "hidden lg:table-cell w-[190px] xl:w-[210px]",
-      render: (room) => {
-        return (
-          <div className="flex flex-col gap-1 min-w-0">
-            <div className="flex items-center gap-1.5 flex-nowrap">
-              <span
-                className={cn(
-                  "px-1.5 py-0.5 rounded text-[10px] font-semibold border shrink-0",
-                  getExamTypeColorClass(room.examType || "UMUM")
-                )}
-              >
-                {room.examType || "UMUM"}
-              </span>
-
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700 shrink-0">
-                {room.max_questions && room.max_questions > 0
-                  ? `${room.max_questions} Soal`
-                  : "Semua Soal"}
-              </span>
-            </div>
-
-            <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
-              {room.randomize_questions !== false ? "Acak Soal" : "Urut Standar"}
-              {room.cheat_limit > 0 && ` • Cheat ${room.cheat_limit}x`}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
       key: "actions",
       header: "Aksi",
-      className: "w-24 sm:w-28 text-right shrink-0",
-      headerClassName: "w-24 sm:w-28 text-right shrink-0",
+      className: "w-[15%] min-w-[110px] text-right shrink-0 whitespace-nowrap",
+      headerClassName: "w-[15%] min-w-[110px] text-right shrink-0 whitespace-nowrap",
       align: "right",
       render: (room) => {
         const owner = isOwner(room);
         return (
           <div
-            className="flex justify-end items-center gap-1"
+            className="flex justify-end items-center gap-1.5"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 1. Quick Action Utama: Monitor Live CBT */}
             <button
               type="button"
-              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
               onClick={() => handleMonitorClick(room)}
               title="Monitor Realtime CBT"
             >
-              <Search className="h-3.5 w-3.5" />
+              <Search className="h-4 w-4" />
             </button>
 
             {/* 2. Quick Action Kedua: Penilaian & Rekap Nilai (Tampil di sm+) */}
             <button
               type="button"
-              className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              className="hidden sm:flex h-8 w-8 rounded-lg items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
               onClick={() => navigate(`/admin/penilaian?roomId=${room.id}`)}
               title="Penilaian & Rekap Nilai"
             >
-              <CheckSquare className="h-3.5 w-3.5" />
+              <CheckSquare className="h-4 w-4" />
             </button>
 
-            {/* 3. Dropdown Menu Seragam (Aksi lainnya terpadu di dalam dropdown) */}
+            {/* 3. Dropdown Menu Seragam (Aksi lainnya terpadu di dalam dropdown - UKURAN SAMA PERSIS) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
                   title="Menu Aksi Lainnya"
                 >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
+                  <MoreHorizontal className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">

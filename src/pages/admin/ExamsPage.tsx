@@ -18,6 +18,7 @@ import {
   Search,
   FileText,
   Users,
+  User,
   CheckSquare,
   GitBranch,
   Folder,
@@ -138,7 +139,7 @@ const processLatex = (htmlInput: string) => {
   if (!htmlInput) return htmlInput;
   let result = htmlInput;
   const fixFormula = (f: string) => f.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
-  
+
   result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
     const clean = fixFormula(formula);
     const omml = latexToOmml(clean);
@@ -379,6 +380,7 @@ const ExamsPage = () => {
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState<"all" | "mine">("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState("all");
@@ -451,7 +453,7 @@ const ExamsPage = () => {
     if (!pb) return;
     const unsub = pb.collection('questions').subscribe("*", fetchQuestionCounts);
     return () => {
-      unsub.then(u => u()).catch(() => {});
+      unsub.then(u => u()).catch(() => { });
     };
   }, [pb, fetchQuestionCounts]);
 
@@ -480,6 +482,9 @@ const ExamsPage = () => {
 
   const displayExams = useMemo(() => {
     return tabExams.filter(exam => {
+      if (ownerFilter === "mine" && !isOwner(exam)) {
+        return false;
+      }
       if (subjectFilter !== "all" && exam.subjectId !== subjectFilter) {
         return false;
       }
@@ -507,7 +512,7 @@ const ExamsPage = () => {
       }
       return true;
     });
-  }, [tabExams, subjectFilter, typeFilter, groupFilter, searchQuery, subjects, teachers]);
+  }, [tabExams, ownerFilter, isOwner, subjectFilter, typeFilter, groupFilter, searchQuery, subjects, teachers]);
 
   const filteredExams = displayExams;
 
@@ -600,7 +605,7 @@ const ExamsPage = () => {
     const msg = blockedExams.length > 0
       ? `${validExams.length} bank soal akan diarsipkan (${blockedExams.length} bank soal dilewati karena sedang diujikan aktif). Lanjutkan?`
       : `Apakah Anda yakin ingin mengarsipkan ${validExams.length} bank soal terpilih?`;
-    
+
     showAlert("Arsipkan Massal", msg, "warning", async () => {
       if (!pb) return;
       setBatchProgress({
@@ -682,7 +687,7 @@ const ExamsPage = () => {
     const msg = blockedExams.length > 0
       ? `Hapus PERMANEN ${validExams.length} bank soal beserta seluruh soal di dalamnya? (${blockedExams.length} dilewati karena sedang aktif). Tindakan ini TIDAK DAPAT dikembalikan!`
       : `Hapus PERMANEN ${validExams.length} bank soal beserta seluruh soal di dalamnya? Tindakan ini TIDAK DAPAT dikembalikan!`;
-    
+
     showAlert("Hapus Massal", msg, "danger", async () => {
       if (!pb) return;
       setBatchProgress({
@@ -798,7 +803,7 @@ const ExamsPage = () => {
     const unsub = pb.collection('exam_rooms').subscribe("*", fetchActiveRooms);
 
     return () => {
-      unsub.then(u => u()).catch(() => {});
+      unsub.then(u => u()).catch(() => { });
     };
   }, [pb]);
 
@@ -868,7 +873,7 @@ const ExamsPage = () => {
     const unsub = pb.collection('exams').subscribe("*", fetchExams);
 
     return () => {
-      unsub.then(u => u()).catch(() => {});
+      unsub.then(u => u()).catch(() => { });
     };
   }, [subjects, teachers, role, user, pb, teacherId, terminology.teacher]);
 
@@ -1264,7 +1269,7 @@ const ExamsPage = () => {
           const mappedUrl = `https://local-asset/img_${idx}.png`;
           const mappedObj = { mappedUrl, base64: result.base64, width: result.width, height: result.height };
           imageMapping.set(originalUrl, mappedObj);
-          
+
           const abs = getAbsoluteUrl(originalUrl);
           if (abs) {
             imageMapping.set(abs, mappedObj);
@@ -1344,13 +1349,13 @@ const ExamsPage = () => {
 
         if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah") {
           const correctKeys = correctAnswer.split(/[,\s]+/).filter(Boolean);
-          
+
           for (const letter of ['a', 'b', 'c', 'd', 'e']) {
             const c = opts[letter];
             if (c) {
               const cText = typeof c === 'string' ? c : (c.text || "");
               const cImg = typeof c === 'object' ? c.imageUrl : undefined;
-              
+
               const processedCText = cleanForWord(processHtmlInlineImages(processLatex(cText), getAbsoluteUrl, imageMapping));
               let choiceHtml = `
               <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-left: 25pt; margin-bottom: 1pt; border: none; border-collapse: collapse;">
@@ -1375,7 +1380,7 @@ const ExamsPage = () => {
             }
           }
           html += `<p class="spacer">&nbsp;</p>`;
-          
+
           const ans = Object.entries(opts)
             .filter(([k, v]: any) => v.isCorrect === true || (typeof v === 'object' && v.isCorrect) || correctKeys.includes(k))
             .map(([k]) => k.toUpperCase())
@@ -1568,17 +1573,19 @@ const ExamsPage = () => {
   const neonColumns: NeonTableColumn<ExamData>[] = useMemo(() => [
     {
       key: "title",
-      header: "Judul Bank Soal & Tipe",
-      className: "min-w-0",
+      header: "Judul Bank Soal",
+      className: "w-[55%] min-w-[200px]",
+      headerClassName: "w-[55%] min-w-[200px] whitespace-nowrap",
       render: (exam) => {
         const qCount = questionCounts[exam.id] || 0;
         const subject = subjects.find((s: any) => s.id === exam.subjectId)?.name || (exam as any).subjectName || "-";
 
         return (
           <div className="flex flex-col gap-1 py-0.5 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
               <span
-                className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm leading-tight hover:underline cursor-pointer"
+                className="font-semibold text-neutral-900 dark:text-neutral-100 text-[13px] leading-tight hover:underline cursor-pointer truncate max-w-[240px] sm:max-w-[340px]"
+                title={exam.title}
                 onClick={(e) => {
                   e.stopPropagation();
                   sessionStorage.setItem("activeQuestionsExamId", exam.id);
@@ -1590,26 +1597,14 @@ const ExamsPage = () => {
               <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0", getExamTypeColorClass(exam.examType || "Latihan"))}>
                 {exam.examType || "Latihan"}
               </span>
-              {exam.group_name && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 shrink-0 max-w-[150px] truncate" title={`Group: ${exam.group_name}`}>
-                  <Folder className="h-2.5 w-2.5 shrink-0 text-purple-500" />
-                  <span className="truncate">{exam.group_name}</span>
-                </span>
-              )}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">
-              <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                {qCount} soal
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                {qCount} Butir Soal
               </span>
-              <span className="md:hidden text-neutral-600 dark:text-neutral-300 font-sans">
+              <span className="sm:hidden text-neutral-500 dark:text-neutral-400 font-sans truncate">
                 • {subject}
               </span>
-              {exam.createdAt && (
-                <>
-                  <span>•</span>
-                  <span>{new Date(exam.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
-                </>
-              )}
             </div>
           </div>
         );
@@ -1618,37 +1613,23 @@ const ExamsPage = () => {
     {
       key: "subject",
       header: terminology.subject,
-      className: "hidden md:table-cell w-32",
-      headerClassName: "hidden md:table-cell w-32",
+      className: "hidden sm:table-cell w-[30%] min-w-[150px]",
+      headerClassName: "hidden sm:table-cell w-[30%] min-w-[150px] whitespace-nowrap",
       render: (exam) => {
         const subject = subjects.find((s: any) => s.id === exam.subjectId)?.name || (exam as any).subjectName || "-";
-        return (
-          <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-            {subject}
-          </span>
-        );
-      },
-    },
-    {
-      key: "teacher",
-      header: `${terminology.teacher} Pengampu`,
-      className: "hidden lg:table-cell w-40",
-      headerClassName: "hidden lg:table-cell w-40",
-      render: (exam) => {
         const teacher = teachers.find((t: any) => t.id === exam.teacherId);
-        const name = teacher?.name || (exam as any).teacherName || "-";
-        const initials = teacher?.code || name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase();
+        const teacherName = teacher?.name || (exam as any).teacherName || "";
 
         return (
-          <div className="flex items-center gap-2">
-            <Avatar className="h-6 w-6 border border-neutral-200 dark:border-neutral-800 shrink-0">
-              <AvatarFallback className="bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-[10px] font-bold">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate max-w-[130px]">
-              {name}
+          <div className="flex flex-col gap-0.5 py-0.5 min-w-0">
+            <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 truncate block" title={subject}>
+              {subject}
             </span>
+            {teacherName ? (
+              <span className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate block" title={teacherName}>
+                {teacherName}
+              </span>
+            ) : null}
           </div>
         );
       },
@@ -1656,34 +1637,34 @@ const ExamsPage = () => {
     {
       key: "actions",
       header: "Aksi",
-      className: "w-20 sm:w-28 text-right shrink-0",
-      headerClassName: "w-20 sm:w-28 text-right shrink-0",
+      className: "w-[15%] min-w-[110px] text-right shrink-0 whitespace-nowrap",
+      headerClassName: "w-[15%] min-w-[110px] text-right shrink-0 whitespace-nowrap",
       align: "right",
       render: (exam) => {
         const owner = isOwner(exam);
         return (
-          <div className="flex justify-end items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-end items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
             {/* Coba Simulasi CBT (tampil di sm+) */}
             <button
               type="button"
-              className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              className="hidden sm:flex h-8 w-8 rounded-lg items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
               onClick={() => navigate(`/admin/simulate/${exam.id}`)}
               title="Coba Simulasi Tampilan Siswa"
             >
-              <Eye className="h-3.5 w-3.5" />
+              <Eye className="h-4 w-4" />
             </button>
 
             {/* Kelola Soal (Quick Action Utama) */}
             <button
               type="button"
-              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
               onClick={() => {
                 sessionStorage.setItem("activeQuestionsExamId", exam.id);
                 navigate("/admin/bank-soal/questions");
               }}
               title="Kelola Butir Soal"
             >
-              <BookOpen className="h-3.5 w-3.5" />
+              <BookOpen className="h-4 w-4" />
             </button>
 
             {/* Menu Aksi Tambahan */}
@@ -1691,10 +1672,10 @@ const ExamsPage = () => {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
                   title="Menu Lainnya"
                 >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
+                  <MoreHorizontal className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
@@ -1906,8 +1887,17 @@ const ExamsPage = () => {
               />
 
               <NeonStatCard
-                label="Total Butir Soal"
-                value={Object.values(questionCounts).reduce((a, b) => a + b, 0)}
+                label={activeTab === "arsip" ? "Butir Soal Diarsipkan" : "Total Butir Soal"}
+                value={
+                  activeTab === "arsip"
+                    ? exams.filter(e => e.status === "archive").reduce((sum, e) => sum + (questionCounts[e.id] || 0), 0)
+                    : exams.filter(e => e.status !== "archive").reduce((sum, e) => sum + (questionCounts[e.id] || 0), 0)
+                }
+                subText={
+                  activeTab === "arsip"
+                    ? `Dari ${exams.filter(e => e.status === "archive").length} paket diarsipkan`
+                    : `Dari ${exams.filter(e => e.status !== "archive").length} paket aktif (${exams.reduce((sum, e) => sum + (questionCounts[e.id] || 0), 0)} total semua)`
+                }
                 unit="butir"
                 isLoading={isLoading}
               />
@@ -1919,6 +1909,7 @@ const ExamsPage = () => {
               columns={neonColumns}
               keyExtractor={(e) => e.id}
               compact
+              tableLayout="fixed"
               isLoading={isLoading}
               title="Daftar Master Bank Soal"
               subtitle="Klik baris bank soal untuk melihat inspeksi parameter & aksi cepat di panel sebelah kanan."
@@ -1927,6 +1918,23 @@ const ExamsPage = () => {
               searchPlaceholder="Cari judul ujian, pengampu, mapel, tipe..."
               filterSlot={
                 <div className="flex items-center gap-2 flex-wrap">
+                  {/* Filter Bank Soal Saya untuk Guru */}
+                  {role !== "admin" && (
+                    <button
+                      type="button"
+                      onClick={() => setOwnerFilter((prev) => (prev === "mine" ? "all" : "mine"))}
+                      className={cn(
+                        "h-8 px-2.5 text-xs rounded-md border font-medium flex items-center gap-1.5 transition-colors cursor-pointer",
+                        ownerFilter === "mine"
+                          ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 shadow-2xs font-bold"
+                          : "bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                      )}
+                    >
+                      <User className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>{ownerFilter === "mine" ? "⭐ Bank Soal Saya" : "Semua Bank Soal"}</span>
+                    </button>
+                  )}
+
                   {/* Subject filter */}
                   <select
                     value={subjectFilter}
@@ -2280,10 +2288,10 @@ const ExamsPage = () => {
                     <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <div className="relative">
-                    <select 
+                    <select
                       id="exam-type-select"
-                      value={formValues.examType} 
-                      onChange={(e) => setFormValues({ ...formValues, examType: e.target.value })} 
+                      value={formValues.examType}
+                      onChange={(e) => setFormValues({ ...formValues, examType: e.target.value })}
                       required
                       className="w-full h-10 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs px-3.5 pr-8 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer transition-all"
                     >
@@ -2305,10 +2313,10 @@ const ExamsPage = () => {
                     <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <div className="relative">
-                    <select 
+                    <select
                       id="exam-subject-select"
-                      value={formValues.subjectId} 
-                      onChange={(e) => setFormValues({ ...formValues, subjectId: e.target.value })} 
+                      value={formValues.subjectId}
+                      onChange={(e) => setFormValues({ ...formValues, subjectId: e.target.value })}
                       required
                       className="w-full h-10 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs px-3.5 pr-8 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer transition-all"
                     >
@@ -2330,10 +2338,10 @@ const ExamsPage = () => {
                     <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <div className="relative">
-                    <select 
+                    <select
                       id="exam-teacher-select"
-                      value={formValues.teacherId} 
-                      onChange={(e) => setFormValues({ ...formValues, teacherId: e.target.value })} 
+                      value={formValues.teacherId}
+                      onChange={(e) => setFormValues({ ...formValues, teacherId: e.target.value })}
                       required
                       className="w-full h-10 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs px-3.5 pr-8 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer transition-all"
                     >
@@ -2432,7 +2440,7 @@ const ExamsPage = () => {
                 <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Bank Soal</p>
               </div>
               <div className="bg-neutral-50/80 dark:bg-neutral-900/60 rounded-xl p-3 text-center border border-neutral-200/60 dark:border-neutral-800">
-                <p className="text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400">{Object.values(questionCounts).reduce((a, b) => a + b, 0)}</p>
+                <p className="text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400">{exams.filter(e => e.status !== "archive").reduce((sum, e) => sum + (questionCounts[e.id] || 0), 0)}</p>
                 <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Total Soal</p>
               </div>
               <div className="bg-neutral-50/80 dark:bg-neutral-900/60 rounded-xl p-3 text-center border border-neutral-200/60 dark:border-neutral-800">
@@ -2459,7 +2467,7 @@ const ExamsPage = () => {
                   <div className="space-y-1.5 ml-8.5">
                     {t.exams.map((e, eIdx) => (
                       <div key={eIdx} className="flex items-center gap-2 text-xs">
-                        <span className={`w-1.5 h-1.5 rounded-full ${ e.count > 0 ? "bg-emerald-500" : "bg-amber-400" }`}></span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${e.count > 0 ? "bg-emerald-500" : "bg-amber-400"}`}></span>
                         <span className="text-neutral-600 dark:text-neutral-400 truncate flex-1">{e.title}</span>
                         <span className="text-neutral-500 font-mono text-[11px]">{e.count}</span>
                       </div>
@@ -2503,11 +2511,10 @@ const ExamsPage = () => {
             <Button
               type="button"
               onClick={handleCopyReport}
-              className={`h-8.5 px-4 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${
-                reportCopied
+              className={`h-8.5 px-4 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${reportCopied
                   ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                   : "bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs"
-              }`}
+                }`}
             >
               {reportCopied ? (
                 <><Check className="h-3.5 w-3.5 text-white" /> <span>Tersalin ke Clipboard</span></>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Key, Layers, Target, Info, MoreHorizontal, Filter, RotateCw } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Globe, Key, Layers, Target, Info, MoreHorizontal, Filter, RotateCw } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
@@ -605,6 +605,17 @@ const QuestionsPage = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [isRepoDialogOpen, setIsRepoDialogOpen] = useState(false);
+  const [repoDialogInitialTab, setRepoDialogInitialTab] = useState<"internal" | "wayground">("internal");
+
+  const handleOpenBankSoalSelector = () => {
+    setRepoDialogInitialTab("internal");
+    setIsRepoDialogOpen(true);
+  };
+
+  const handleOpenWaygroundImporter = () => {
+    setRepoDialogInitialTab("wayground");
+    setIsRepoDialogOpen(true);
+  };
 
   // NeonTable Search, Filters & Inspector States
   const [searchQuery, setSearchQuery] = useState("");
@@ -5761,22 +5772,48 @@ const QuestionsPage = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-2rem)] p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
               <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
-                Import & Export
+                Ambil & Salin Soal
               </DropdownMenuLabel>
               {isOwner && (
-                <DropdownMenuItem
-                  onClick={() => document.getElementById("unified-import-input")?.click()}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                >
-                  <Download className="h-3.5 w-3.5 rotate-180 text-blue-600 dark:text-blue-400" />
-                  <div className="flex flex-col">
-                    <span className="font-semibold">Import Soal</span>
-                    <span className="text-[10px] text-neutral-400">Excel (.xlsx), Word (.docx), JSON</span>
-                  </div>
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem
+                    onClick={handleOpenBankSoalSelector}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold">Pilih dari Bank Soal</span>
+                      <span className="text-[10px] text-neutral-400">Salin dari bank soal sekolah / milik sendiri</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleOpenWaygroundImporter}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold">Impor dari Wayground</span>
+                      <span className="text-[10px] text-neutral-400">Ambil dari link Wayground / Quizizz</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => document.getElementById("unified-import-input")?.click()}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <Download className="h-3.5 w-3.5 rotate-180 text-blue-600 dark:text-blue-400" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold">Import File Soal</span>
+                      <span className="text-[10px] text-neutral-400">Excel (.xlsx), Word (.docx), JSON</span>
+                    </div>
+                  </DropdownMenuItem>
+                </>
               )}
               {questions.length > 0 && (
                 <>
+                  <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                  <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                    Export Soal
+                  </DropdownMenuLabel>
                   <DropdownMenuItem
                     onClick={handleExportToWord}
                     className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
@@ -5846,14 +5883,23 @@ const QuestionsPage = () => {
                   <span>Simulasi Tampilan Siswa</span>
                 </DropdownMenuItem>
               )}
-              {role === "admin" && (
-                <DropdownMenuItem
-                  onClick={() => setIsRepoDialogOpen(true)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                >
-                  <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>Bank Repository / Wayground</span>
-                </DropdownMenuItem>
+              {isOwner && (
+                <>
+                  <DropdownMenuItem
+                    onClick={handleOpenBankSoalSelector}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>Pilih dari Bank Soal</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleOpenWaygroundImporter}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                    <span>Impor dari Wayground</span>
+                  </DropdownMenuItem>
+                </>
               )}
               {isOwner && questions.length > 0 && selectedIds.length === 0 && (
                 <>
@@ -5911,8 +5957,32 @@ const QuestionsPage = () => {
                     <span className="text-[10px] text-neutral-400">Editor soal interaktif</span>
                   </div>
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleOpenBankSoalSelector}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                >
+                  <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold">Pilih dari Bank Soal</span>
+                    <span className="text-[10px] text-neutral-400">Salin butir soal dari bank lain / milik sendiri</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleOpenWaygroundImporter}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                >
+                  <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold">Impor dari Wayground</span>
+                    <span className="text-[10px] text-neutral-400">Ambil dari link atau JSON Wayground</span>
+                  </div>
+                </DropdownMenuItem>
                 {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
                   <>
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                      Bantuan AI
+                    </DropdownMenuLabel>
                     <DropdownMenuItem
                       onClick={() => setIsAIChatDrawerOpen(true)}
                       className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
@@ -5947,18 +6017,6 @@ const QuestionsPage = () => {
                       </div>
                     </DropdownMenuItem>
                   </>
-                )}
-                {role === "admin" && (
-                  <DropdownMenuItem
-                    onClick={() => setIsRepoDialogOpen(true)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                  >
-                    <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold">Bank / Wayground</span>
-                      <span className="text-[10px] text-neutral-400">Import soal lama atau Wayground</span>
-                    </div>
-                  </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -6103,7 +6161,50 @@ const QuestionsPage = () => {
             pageSize={10}
             pageSizeOptions={[10, 25, 50, 100]}
             emptyTitle="Belum ada butir soal"
-            emptySubtitle="Klik 'Tambah Soal' atau gunakan 'Opsi Data' untuk mengimpor dari file Word/Excel."
+            emptySubtitle="Pilih salah satu metode di bawah ini untuk mulai mengisi butir soal ke dalam bank soal ini."
+            emptyAction={
+              isOwner ? (
+                <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+                  <NeonButton
+                    variant="primary"
+                    color="brand"
+                    size="sm"
+                    onClick={handleCreateClick}
+                    className="gap-1.5"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Input Manual</span>
+                  </NeonButton>
+                  <NeonButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleOpenBankSoalSelector}
+                    className="gap-1.5"
+                  >
+                    <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>Pilih dari Bank Soal</span>
+                  </NeonButton>
+                  <NeonButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleOpenWaygroundImporter}
+                    className="gap-1.5"
+                  >
+                    <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                    <span>Impor Wayground</span>
+                  </NeonButton>
+                  <NeonButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.getElementById("unified-import-input")?.click()}
+                    className="gap-1.5"
+                  >
+                    <Download className="h-3.5 w-3.5 rotate-180 text-blue-600" />
+                    <span>Import File</span>
+                  </NeonButton>
+                </div>
+              ) : undefined
+            }
           />
         </div>
 
@@ -10096,6 +10197,7 @@ Aturan:
           targetExamId={examId || (exam && exam.id) || ""}
           targetExamTitle={exam?.title || ""}
           onImportQuestions={handleBatchImportQuestions}
+          initialTab={repoDialogInitialTab}
         />
       </div>
     </div>

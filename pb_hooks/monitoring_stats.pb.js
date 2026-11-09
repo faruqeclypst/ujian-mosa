@@ -26,13 +26,18 @@ function msGetAuth(info) {
 
 function msRequireAdminOrTeacher(e) {
     const info = e.requestInfo();
-    const auth = msGetAuth(info);
+    const auth = (typeof msGetAuth === "function" ? msGetAuth : (globalThis.msGetAuth || msGetAuth))(info);
     if (!auth) return null;
     let col = "";
     try { if (auth.collection) col = auth.collection().name; } catch (err) {}
     if (col !== "_superusers" && col !== "users") return null;
     return auth;
 }
+
+try {
+    globalThis.msGetAuth = msGetAuth;
+    globalThis.msRequireAdminOrTeacher = msRequireAdminOrTeacher;
+} catch (_) {}
 
 // ---------------------------------------------------------------------------
 // 1. GET /api/room-stats

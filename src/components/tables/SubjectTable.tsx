@@ -50,7 +50,8 @@ export const SubjectTable = ({
           <span className="sm:hidden">{terminology.subject}</span>
         </span>
       ),
-      className: "min-w-0",
+      className: "w-[60%] min-w-[200px]",
+      headerClassName: "w-[60%] min-w-[200px] whitespace-nowrap",
       render: (subject) => (
         <div className="flex items-center gap-2.5 py-0.5">
           <div className="h-7 w-7 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center shrink-0">
@@ -78,8 +79,8 @@ export const SubjectTable = ({
     {
       key: "status",
       header: "Status",
-      className: "hidden sm:table-cell w-36",
-      headerClassName: "hidden sm:table-cell w-36",
+      className: "hidden sm:table-cell w-[25%] min-w-[120px]",
+      headerClassName: "hidden sm:table-cell w-[25%] min-w-[120px] whitespace-nowrap",
       render: () => (
         <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
           Tersinkron
@@ -89,27 +90,27 @@ export const SubjectTable = ({
     {
       key: "actions",
       header: "Aksi",
-      className: "w-20 text-right shrink-0",
-      headerClassName: "w-20 text-right shrink-0",
+      className: "w-[15%] min-w-[100px] text-right shrink-0 whitespace-nowrap",
+      headerClassName: "w-[15%] min-w-[100px] text-right shrink-0 whitespace-nowrap",
       align: "right",
       render: (subject) => (
         <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <button 
             type="button"
-            className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+            className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
             onClick={() => onEdit(subject)}
             title={`Edit ${terminology.subject}`}
           >
-            <Edit className="h-3.5 w-3.5" />
+            <Edit className="h-4 w-4" />
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                className="h-8 w-8 rounded-lg flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer shrink-0"
                 title="Menu Lainnya"
               >
-                <MoreHorizontal className="h-3.5 w-3.5" />
+                <MoreHorizontal className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
@@ -141,6 +142,7 @@ export const SubjectTable = ({
       columns={columns}
       keyExtractor={(s) => s.id}
       compact
+      tableLayout="fixed"
       selectable
       selectedKeys={selectedIds}
       onSelectionChange={onSelectChange}

@@ -33,6 +33,7 @@ interface StudentProfileDialogProps {
   isOpen: boolean;
   onClose: () => void;
   readOnly?: boolean;
+  initialView?: "view" | "edit" | "password";
   onChangePassword?: () => void;
   onLogout?: () => void;
 }
@@ -63,6 +64,7 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
   isOpen,
   onClose,
   readOnly = false,
+  initialView = "view",
   onChangePassword,
   onLogout,
 }) => {
@@ -72,7 +74,7 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // View mode: 'view' (Flutter profile card) | 'edit' (Form edit biodata) | 'password' (Ganti Password)
-  const [viewMode, setViewMode] = useState<"view" | "edit" | "password">("view");
+  const [viewMode, setViewMode] = useState<"view" | "edit" | "password">(initialView);
 
   // Form states for editing
   const [photoValue, setPhotoValue] = useState<string>("");
@@ -101,9 +103,9 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
       setConfirmPassword("");
       setErrorMessage(null);
       setSuccessMessage(null);
-      setViewMode("view");
+      setViewMode(initialView || "view");
     }
-  }, [isOpen, student]);
+  }, [isOpen, student, initialView]);
 
   // Handle pilih & kompres foto profil
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -249,7 +251,7 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isSaving && !open && onClose()}>
-      <DialogContent className="w-full max-w-md sm:rounded-[2rem] bg-white dark:bg-neutral-850 p-0 border border-neutral-200/80 dark:border-neutral-800 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+      <DialogContent className="w-[94vw] sm:w-[88vw] md:w-full max-w-md sm:max-w-lg md:max-w-xl sm:rounded-[2rem] bg-white dark:bg-neutral-850 p-0 border border-neutral-200/80 dark:border-neutral-800 shadow-2xl overflow-hidden max-h-[92vh] md:max-h-[88vh] flex flex-col mx-auto">
         {/* Hidden File Input */}
         <input
           ref={fileInputRef}
@@ -319,64 +321,65 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
             </div>
           )}
 
-          {/* ── Header Avatar Lingkaran Gaya Flutter ── */}
-          <div className="flex flex-col items-center text-center pt-2">
-            <div className="relative">
-              {/* Lingkaran Avatar */}
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-emerald-100 dark:bg-emerald-950/70 border-4 border-white dark:border-neutral-800 shadow-md flex items-center justify-center overflow-hidden">
-                {photoValue ? (
-                  <img
-                    src={photoValue}
-                    alt={student?.name || "Foto"}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="font-black text-3xl sm:text-4xl text-emerald-600 dark:text-emerald-400 select-none">
-                    {studentInitial}
-                  </span>
+          {/* ── Header Avatar Lingkaran Gaya Flutter / Security Header jika Password ── */}
+          {viewMode === "password" ? (
+            <div className="flex flex-col items-center text-center pt-2 pb-1">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-2">
+                <KeyRound className="w-8 h-8" />
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight">
+                Ubah Password Akun
+              </h3>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                Perbarui password untuk akun {student?.name}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center text-center pt-2">
+              <div className="relative">
+                {/* Lingkaran Avatar */}
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-emerald-100 dark:bg-emerald-950/70 border-4 border-white dark:border-neutral-800 shadow-md flex items-center justify-center overflow-hidden">
+                  {photoValue ? (
+                    <img
+                      src={photoValue}
+                      alt={student?.name || "Foto"}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="font-black text-3xl sm:text-4xl text-emerald-600 dark:text-emerald-400 select-none">
+                      {studentInitial}
+                    </span>
+                  )}
+                </div>
+
+                {/* Tombol Kamera Mengambang (Floating Action Button) */}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingPhoto || isSaving}
+                    title="Ganti Foto Profil"
+                    className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-90 text-white flex items-center justify-center shadow-md transition-transform border-2 border-white dark:border-neutral-800 cursor-pointer"
+                  >
+                    {isUploadingPhoto ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 )}
               </div>
 
-              {/* Tombol Kamera Mengambang (Floating Action Button) */}
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadingPhoto || isSaving}
-                  title="Ganti Foto Profil"
-                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-90 text-white flex items-center justify-center shadow-md transition-transform border-2 border-white dark:border-neutral-800 cursor-pointer"
-                >
-                  {isUploadingPhoto ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Camera className="w-3.5 h-3.5" />
-                  )}
-                </button>
-              )}
+              {/* Nama & Badge Status */}
+              <h3 className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tracking-tight mt-3">
+                {student?.name || "Peserta Didik"}
+              </h3>
+
+              <div className="mt-1.5 inline-flex items-center px-3.5 py-1 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/60 rounded-full text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
+                {terminology.student || "SISWA"} • {student?.className || "Rombel"}
+              </div>
             </div>
-
-            {/* Nama & Badge Status */}
-            <h3 className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tracking-tight mt-3">
-              {student?.name || "Peserta Didik"}
-            </h3>
-
-            <div className="mt-1.5 inline-flex items-center px-3.5 py-1 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/60 rounded-full text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
-              {terminology.student || "SISWA"} • {student?.className || "Rombel"}
-            </div>
-
-            {/* Tombol Hapus Foto (jika ada foto & di view mode) */}
-            {!readOnly && photoValue && viewMode === "view" && (
-              <button
-                type="button"
-                onClick={handleRemovePhoto}
-                disabled={isSaving || isUploadingPhoto}
-                className="mt-2 text-[11px] font-medium text-rose-500 hover:text-rose-600 hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <Trash2 className="w-3 h-3" />
-                <span>Hapus Foto</span>
-              </button>
-            )}
-          </div>
+          )}
 
           {/* ══════════════════════════════════════════════
               MODE 1: TAMPILAN PROFIL (Flutter Info & Actions)
@@ -457,22 +460,18 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
                   </button>
                 )}
 
-                {/* Tombol Pengaturan / Ganti Password */}
+                {/* Tombol Ganti Password */}
                 <button
                   type="button"
                   onClick={() => {
-                    if (onChangePassword) {
-                      onChangePassword();
-                    } else {
-                      setViewMode("password");
-                    }
+                    setViewMode("password");
                   }}
                   className="w-full bg-white dark:bg-neutral-850 border border-neutral-200/90 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 rounded-2xl px-5 py-4 flex items-center justify-between transition-all shadow-2xs group cursor-pointer active:scale-[0.99]"
                 >
                   <div className="flex items-center gap-3.5">
-                    <Settings className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
+                    <KeyRound className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
                     <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-                      Pengaturan
+                      Ganti Password
                     </span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 transition-transform" />

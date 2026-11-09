@@ -612,7 +612,7 @@ const StudentScoresDialog = ({ isOpen, onClose, studentId, studentName }: Studen
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className={cn("bg-card max-h-[80vh] overflow-hidden flex flex-col", detailView ? "max-w-2xl" : "max-w-lg")}>
+      <DialogContent className={cn("bg-card w-[calc(100vw-2rem)] sm:w-[90vw] md:w-full max-h-[85vh] overflow-hidden flex flex-col p-4 sm:p-6", detailView ? "max-w-2xl md:max-w-3xl" : "max-w-lg md:max-w-xl")}>
         {!detailView && (
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
