@@ -68,6 +68,9 @@ export interface NeonTableProps<T> {
   serverSide?: boolean;
   onPageSizeChange?: (size: number) => void;
 
+  // Minimum rows displayed (defaults to 10 to maintain layout balance against tall inspector panels)
+  minRows?: number;
+
   // Compact / Dense layout
   compact?: boolean;
 
@@ -109,6 +112,7 @@ export function NeonTable<T>({
   pageSizeOptions = [10, 25, 50],
   currentPage: controlledPage,
   onPageChange,
+  minRows = 10,
   compact = false,
   tableClassName,
   tableLayout = "fixed",
@@ -152,6 +156,13 @@ export function NeonTable<T>({
     const start = (safePage - 1) * pageSize;
     return data.slice(start, start + pageSize);
   }, [data, pagination, serverSide, safePage, pageSize]);
+
+  // Minimum rows computations (fill up to targetMinRows to maintain layout height balance)
+  const targetMinRows = minRows !== undefined ? minRows : 10;
+  const emptyRowsCount =
+    !isLoading && paginatedData.length > 0 && paginatedData.length < targetMinRows
+      ? targetMinRows - paginatedData.length
+      : 0;
 
   // Selection computations
   const selectableItems = React.useMemo(() => {
@@ -384,7 +395,7 @@ export function NeonTable<T>({
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-850/80">
             {isLoading ? (
               // Skeleton Rows (Accurately mirrors column widths & responsive visibility)
-              Array.from({ length: Math.min(pageSize, 6) }).map((_, rIdx) => (
+              Array.from({ length: Math.min(pageSize, targetMinRows) }).map((_, rIdx) => (
                 <tr key={rIdx} className="animate-pulse">
                   {selectable && (
                     <td
@@ -467,34 +478,110 @@ export function NeonTable<T>({
               </tr>
             ) : (
               // Normal Data Rows
-              paginatedData.map((item, index) => {
-                const key = keyExtractor(item);
-                const isSelected = selectedKeys.includes(key);
-                const isActive = activeKey === key;
-                const isItemCanSelect = isItemSelectable ? isItemSelectable(item) : true;
-                const isExpanded = isRowExpanded ? isRowExpanded(item) : false;
+              <>
+                {paginatedData.map((item, index) => {
+                  const key = keyExtractor(item);
+                  const isSelected = selectedKeys.includes(key);
+                  const isActive = activeKey === key;
+                  const isItemCanSelect = isItemSelectable ? isItemSelectable(item) : true;
+                  const isExpanded = isRowExpanded ? isRowExpanded(item) : false;
 
-                return (
-                  <React.Fragment key={key}>
-                    <tr
-                      id={`row-${key}`}
-                      onClick={() => onRowClick && onRowClick(item)}
-                      className={cn(
-                        "transition-colors group",
-                        onRowClick ? "cursor-pointer" : "",
-                        // Active/Inspected row highlighting (Subtle accent)
-                        isActive
-                          ? "bg-emerald-500/[0.05] dark:bg-emerald-500/[0.09] relative"
-                          : isExpanded
-                          ? "bg-emerald-500/[0.02] dark:bg-emerald-500/[0.05]"
-                          : "hover:bg-neutral-50/80 dark:hover:bg-[#131517]",
-                        // Selected row style
-                        isSelected && !isActive
-                          ? "bg-blue-50/40 dark:bg-blue-950/20"
-                          : ""
+                  return (
+                    <React.Fragment key={key}>
+                      <tr
+                        id={`row-${key}`}
+                        onClick={() => onRowClick && onRowClick(item)}
+                        className={cn(
+                          "transition-colors group",
+                          onRowClick ? "cursor-pointer" : "",
+                          // Active/Inspected row highlighting (Subtle accent)
+                          isActive
+                            ? "bg-emerald-500/[0.05] dark:bg-emerald-500/[0.09] relative"
+                            : isExpanded
+                            ? "bg-emerald-500/[0.02] dark:bg-emerald-500/[0.05]"
+                            : "hover:bg-neutral-50/80 dark:hover:bg-[#131517]",
+                          // Selected row style
+                          isSelected && !isActive
+                            ? "bg-blue-50/40 dark:bg-blue-950/20"
+                            : ""
+                        )}
+                      >
+                        {/* Selection Checkbox */}
+                        {selectable && (
+                          <td
+                            style={{ width: compact ? "36px" : "40px" }}
+                            className={cn(
+                              compact
+                                ? "w-9 px-2 sm:px-2.5 py-2 text-center relative"
+                                : "w-9 sm:w-11 px-2.5 sm:px-3 py-2.5 sm:py-3 text-center relative",
+                              rowVerticalAlign === "top" ? "align-top pt-3 sm:pt-3.5" : "align-middle",
+                              isActive ? "border-l-[3px] border-l-emerald-500" : ""
+                            )}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {isItemCanSelect ? (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onClick={(e) => handleToggleRowSelect(item, index, e)}
+                                onChange={() => {}}
+                                className="h-3.5 w-3.5 rounded border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 accent-neutral-900 dark:accent-neutral-100 cursor-pointer"
+                              />
+                            ) : (
+                              <div className="w-3.5 h-3.5 mx-auto" />
+                            )}
+                          </td>
+                        )}
+
+                        {/* Content Columns */}
+                        {columns.map((col, cIdx) => (
+                          <td
+                            key={col.key}
+                            style={{ width: col.width }}
+                            className={cn(
+                              compact
+                                ? "px-2.5 sm:px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300"
+                                : "px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-neutral-700 dark:text-neutral-300",
+                              col.verticalAlign === "top" || rowVerticalAlign === "top"
+                                ? "align-top pt-2.5 sm:pt-3"
+                                : "align-middle",
+                              !selectable && cIdx === 0 && isActive
+                                ? "border-l-[3px] border-l-emerald-500"
+                                : "",
+                              col.align === "center"
+                                ? "text-center"
+                                : col.align === "right"
+                                ? "text-right"
+                                : "text-left",
+                              col.overflow === "visible" || col.key === "actions" ? "overflow-visible" : "overflow-hidden",
+                              col.className
+                            )}
+                          >
+                            {col.render(item, (safePage - 1) * pageSize + index)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      {/* Expandable Sub-Row (e.g. lembar jawaban siswa) */}
+                      {isExpanded && renderExpandedRow && (
+                        <tr className="bg-neutral-50/50 dark:bg-[#08090a] border-b border-neutral-200 dark:border-neutral-800">
+                          <td colSpan={columns.length + (selectable ? 1 : 0)} className="p-0">
+                            {renderExpandedRow(item, (safePage - 1) * pageSize + index)}
+                          </td>
+                        </tr>
                       )}
+                    </React.Fragment>
+                  );
+                })}
+
+                {/* Filler rows to maintain a consistent 10-row baseline height */}
+                {emptyRowsCount > 0 &&
+                  Array.from({ length: emptyRowsCount }).map((_, emptyIdx) => (
+                    <tr
+                      key={`empty-filler-${emptyIdx}`}
+                      className="pointer-events-none select-none transition-colors border-neutral-100 dark:border-neutral-850/80"
+                      aria-hidden="true"
                     >
-                      {/* Selection Checkbox */}
                       {selectable && (
                         <td
                           style={{ width: compact ? "36px" : "40px" }}
@@ -502,40 +589,23 @@ export function NeonTable<T>({
                             compact
                               ? "w-9 px-2 sm:px-2.5 py-2 text-center relative"
                               : "w-9 sm:w-11 px-2.5 sm:px-3 py-2.5 sm:py-3 text-center relative",
-                            rowVerticalAlign === "top" ? "align-top pt-3 sm:pt-3.5" : "align-middle",
-                            isActive ? "border-l-[3px] border-l-emerald-500" : ""
+                            rowVerticalAlign === "top" ? "align-top pt-3 sm:pt-3.5" : "align-middle"
                           )}
-                          onClick={(e) => e.stopPropagation()}
                         >
-                          {isItemCanSelect ? (
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onClick={(e) => handleToggleRowSelect(item, index, e)}
-                              onChange={() => {}}
-                              className="h-3.5 w-3.5 rounded border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 accent-neutral-900 dark:accent-neutral-100 cursor-pointer"
-                            />
-                          ) : (
-                            <div className="w-3.5 h-3.5 mx-auto" />
-                          )}
+                          <div className={cn("mx-auto invisible", compact ? "h-6 w-3.5" : "h-7 sm:h-8 w-3.5")} />
                         </td>
                       )}
-
-                      {/* Content Columns */}
                       {columns.map((col, cIdx) => (
                         <td
-                          key={col.key}
+                          key={col.key || cIdx}
                           style={{ width: col.width }}
                           className={cn(
                             compact
-                              ? "px-2.5 sm:px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300"
-                              : "px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-neutral-700 dark:text-neutral-300",
+                              ? "px-2.5 sm:px-3 py-2 text-xs"
+                              : "px-3 sm:px-4 py-2.5 sm:py-3 text-xs",
                             col.verticalAlign === "top" || rowVerticalAlign === "top"
                               ? "align-top pt-2.5 sm:pt-3"
                               : "align-middle",
-                            !selectable && cIdx === 0 && isActive
-                              ? "border-l-[3px] border-l-emerald-500"
-                              : "",
                             col.align === "center"
                               ? "text-center"
                               : col.align === "right"
@@ -545,22 +615,14 @@ export function NeonTable<T>({
                             col.className
                           )}
                         >
-                          {col.render(item, (safePage - 1) * pageSize + index)}
+                          <div className={cn("select-none text-transparent invisible pointer-events-none", compact ? "h-6 sm:h-7" : "h-7 sm:h-8")}>
+                            &nbsp;
+                          </div>
                         </td>
                       ))}
                     </tr>
-
-                    {/* Expandable Sub-Row (e.g. lembar jawaban siswa) */}
-                    {isExpanded && renderExpandedRow && (
-                      <tr className="bg-neutral-50/50 dark:bg-[#08090a] border-b border-neutral-200 dark:border-neutral-800">
-                        <td colSpan={columns.length + (selectable ? 1 : 0)} className="p-0">
-                          {renderExpandedRow(item, (safePage - 1) * pageSize + index)}
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })
+                  ))}
+              </>
             )}
           </tbody>
         </table>

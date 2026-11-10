@@ -2035,100 +2035,34 @@ const ExamsPage = () => {
               onSearchChange={setSearchQuery}
               searchPlaceholder="Cari judul ujian, pengampu, mapel, tipe..."
               filterSlot={
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* Segmented Filter Pills: Semua | Soal Saya | MGMP */}
+                <NeonFilterPopover
+                  title="Filter Bank Soal"
+                  activeCount={
+                    (subjectFilter !== "all" ? 1 : 0) +
+                    (typeFilter !== "all" ? 1 : 0) +
+                    (groupFilter !== "all" ? 1 : 0) +
+                    (ownerFilter !== "all" ? 1 : 0)
+                  }
+                  onReset={() => {
+                    setSubjectFilter("all");
+                    setTypeFilter("all");
+                    setGroupFilter("all");
+                    setOwnerFilter("all");
+                  }}
+                >
+                  {/* Filter Kepemilikan & MGMP */}
                   {(role !== "admin" || mySubjectIds.length > 0) && (
-                    <div className="inline-flex items-center p-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-700/60 shadow-2xs">
-                      <button
-                        type="button"
-                        onClick={() => setOwnerFilter("all")}
-                        className={cn(
-                          "px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
-                          ownerFilter === "all"
-                            ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs font-semibold"
-                            : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                        )}
+                    <NeonFilterField label="Kepemilikan">
+                      <NeonFilterSelect
+                        value={ownerFilter}
+                        onChange={(e) => setOwnerFilter(e.target.value as any)}
                       >
-                        <span>Semua</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-200/70 dark:bg-neutral-700/70 text-neutral-600 dark:text-neutral-300">
-                          {tabExams.length}
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setOwnerFilter("mine")}
-                        className={cn(
-                          "px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
-                          ownerFilter === "mine"
-                            ? "bg-white dark:bg-neutral-900 text-emerald-600 dark:text-emerald-400 shadow-xs font-semibold"
-                            : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                        )}
-                      >
-                        <span>Soal Saya</span>
-                        <span className={cn(
-                          "text-[10px] px-1.5 py-0.2 rounded-full",
-                          ownerFilter === "mine"
-                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold"
-                            : "bg-neutral-200/70 dark:bg-neutral-700/70 text-neutral-600 dark:text-neutral-300"
-                        )}>
-                          {myExamsCount}
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setOwnerFilter("mgmp")}
-                        className={cn(
-                          "px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
-                          ownerFilter === "mgmp"
-                            ? "bg-white dark:bg-neutral-900 text-sky-600 dark:text-sky-400 shadow-xs font-semibold"
-                            : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                        )}
-                        title="Bank soal dari rekan guru pengampu mata pelajaran yang sama (MGMP)"
-                      >
-                        <Users className="h-3 w-3" />
-                        <span>MGMP Se-Mapel</span>
-                        <span className={cn(
-                          "text-[10px] px-1.5 py-0.2 rounded-full",
-                          ownerFilter === "mgmp"
-                            ? "bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 font-bold"
-                            : "bg-neutral-200/70 dark:bg-neutral-700/70 text-neutral-600 dark:text-neutral-300"
-                        )}>
-                          {mgmpExamsCount}
-                        </span>
-                      </button>
-                    </div>
+                        <option value="all">Semua Bank Soal ({tabExams.length})</option>
+                        <option value="mine">⭐ Bank Soal Saya Saja ({myExamsCount})</option>
+                        <option value="mgmp">👥 Rekan Se-Mapel / MGMP ({mgmpExamsCount})</option>
+                      </NeonFilterSelect>
+                    </NeonFilterField>
                   )}
-
-                  <NeonFilterPopover
-                    title="Filter Bank Soal"
-                    activeCount={
-                      (subjectFilter !== "all" ? 1 : 0) +
-                      (typeFilter !== "all" ? 1 : 0) +
-                      (groupFilter !== "all" ? 1 : 0) +
-                      (ownerFilter !== "all" ? 1 : 0)
-                    }
-                    onReset={() => {
-                      setSubjectFilter("all");
-                      setTypeFilter("all");
-                      setGroupFilter("all");
-                      setOwnerFilter("all");
-                    }}
-                  >
-                    {/* Filter Bank Soal Saya untuk Guru */}
-                    {role !== "admin" && (
-                      <NeonFilterField label="Kepemilikan">
-                        <NeonFilterSelect
-                          value={ownerFilter}
-                          onChange={(e) => setOwnerFilter(e.target.value as any)}
-                        >
-                          <option value="all">Semua Bank Soal ({tabExams.length})</option>
-                          <option value="mine">⭐ Bank Soal Saya Saja ({myExamsCount})</option>
-                          <option value="mgmp">👥 Rekan Se-Mapel / MGMP ({mgmpExamsCount})</option>
-                        </NeonFilterSelect>
-                      </NeonFilterField>
-                    )}
 
                   {/* Subject filter */}
                   <NeonFilterField label={terminology.subject}>
@@ -2175,8 +2109,7 @@ const ExamsPage = () => {
                     </NeonFilterField>
                   )}
                 </NeonFilterPopover>
-              </div>
-            }
+              }
               selectable={true}
               selectedKeys={selectedIds}
               onSelectionChange={setSelectedIds}
