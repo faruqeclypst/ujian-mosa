@@ -45,7 +45,7 @@ import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage, 
 import { compressImage } from "../../lib/imageCompression";
 import { SharedGalleryModal } from "../../components/dialogs/SharedGalleryModal";
 import { EquationStudioModal } from "../../components/dialogs/EquationStudioModal";
-import { autoFindValidatedImage, insertImageIntoQuestionText } from "../../lib/imageSearch";
+import { insertImageIntoQuestionText } from "../../lib/imageSearch";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
 import { Select } from "../../components/ui/select";
@@ -1382,7 +1382,6 @@ const QuestionsPage = () => {
   const [isExtractingMaterial, setIsExtractingMaterial] = useState(false);
   const [aiObjectives, setAiObjectives] = useState<string[]>([]); // tujuan pembelajaran dari AI
   const [isFetchingObjectives, setIsFetchingObjectives] = useState(false);
-  const [aiAutoFindImages, setAiAutoFindImages] = useState(false);
 
   const toggleTaxonomy = (level: string) => {
     setAiTaxonomy(prev => {
@@ -2161,32 +2160,6 @@ const QuestionsPage = () => {
           imageUrl: q.imageUrl || ""
         };
       });
-
-      // Jika opsi auto cari gambar aktif, cari & validasi gambar edukasi dengan AI (paralel cepat, maks 5 soal)
-      if (aiAutoFindImages) {
-        setAiProgress(92);
-        const targetItems = questionsForReview.slice(0, 5);
-        await Promise.allSettled(
-          targetItems.map(async (qItem, i) => {
-            try {
-              const match = await autoFindValidatedImage(
-                pb,
-                qItem.text,
-                aiTopic,
-                aiSubject || (exam?.subject || ""),
-                Object.values(qItem.choices || {}).map((c: any) => c.text),
-                qItem.correctKey
-              );
-              if (match && match.image?.url) {
-                qItem.text = insertImageIntoQuestionText(qItem.text, match.image.url, match.image.title);
-                (qItem as any).imageUrl = "";
-              }
-            } catch (e) {
-              console.warn("Auto find image notice for item", i, e);
-            }
-          })
-        );
-      }
 
       setBatchQuestions(questionsForReview);
       setIsAIModalOpen(false);
@@ -8613,10 +8586,10 @@ Aturan:
                           setGalleryTarget({ type: "batch", index });
                           setIsGalleryOpen(true);
                         }}
-                        title="Buka galeri sekolah atau cari gambar online dengan AI dan sisipkan ke teks pertanyaan"
+                        title="Buka galeri sekolah atau arsip gambar dan sisipkan ke teks pertanyaan"
                       >
-                        <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                        <span>Sisipkan Gambar (Galeri / Cari AI)</span>
+                        <Image className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                        <span>Sisipkan Gambar (Galeri Sekolah)</span>
                       </button>
                     </div>
                   </div>
@@ -9610,29 +9583,6 @@ Aturan:
                          )}
                       </div>
                     </div>
-
-                    {/* Opsi Cari Gambar Otomatis (Validasi AI) */}
-                    <label className="mt-4 flex items-center justify-between p-3 rounded-xl bg-neutral-50/70 dark:bg-neutral-900/50 border border-neutral-200/80 dark:border-neutral-800 cursor-pointer hover:border-emerald-500/40 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                          <Image className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
-                            Cari Gambar Edukatif <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-[9px] font-bold uppercase tracking-wider">Validasi AI</span>
-                          </p>
-                          <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal">
-                            Cari gambar dari Web Internet & validasi anti-bocor kunci jawaban
-                          </p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={aiAutoFindImages}
-                        onChange={(e) => setAiAutoFindImages(e.target.checked)}
-                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                      />
-                    </label>
                   </div>
 
                   {(aiObjectives.length > 0 || isFetchingObjectives) && (
