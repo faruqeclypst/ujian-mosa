@@ -212,6 +212,13 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "", dis
     if (!html) return "";
     let processed = html;
 
+    // Bersihkan baris kosong / paragraf kosong di awal dan di akhir (dari Quill / Word import)
+    processed = processed
+      .replace(/^(\s*<p[^>]*>(\s*<br\s*\/?>|\s*&nbsp;|\s*)*<\/p>\s*)+/gi, '')
+      .replace(/^(\s*<br\s*\/?>\s*)+/gi, '')
+      .replace(/(\s*<p[^>]*>(\s*<br\s*\/?>|\s*&nbsp;|\s*)*<\/p>\s*)+$/gi, '')
+      .replace(/(\s*<br\s*\/?>\s*)+$/gi, '');
+
     // Remove justify alignment when disableJustify is enabled (e.g. for exam choice options)
     if (disableJustify) {
       processed = processed

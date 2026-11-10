@@ -14,6 +14,7 @@ import {
   Check,
   X,
   Plus,
+  Pencil,
 } from "../../lib/icons/phosphor-bridge";
 
 export interface EquationStudioModalProps {
@@ -35,6 +36,71 @@ interface CategoryGroup {
   name: string;
   icon: any;
   symbols: SymbolItem[];
+}
+
+export interface MathToken {
+  id: number;
+  value: string;
+  start: number;
+  end: number;
+  type: "variable" | "number";
+}
+
+export function extractEditableTokens(latex: string): MathToken[] {
+  const tokens: MathToken[] = [];
+  let i = 0;
+  let id = 0;
+
+  while (i < latex.length) {
+    if (latex[i] === "\\") {
+      let cmd = "";
+      i++;
+      while (i < latex.length && /[a-zA-Z]/.test(latex[i])) {
+        cmd += latex[i];
+        i++;
+      }
+      if (cmd === "begin" || cmd === "end") {
+        while (i < latex.length && latex[i] === " ") i++;
+        if (latex[i] === "{") {
+          while (i < latex.length && latex[i] !== "}") i++;
+          if (latex[i] === "}") i++;
+        }
+      }
+      continue;
+    }
+
+    if (/[0-9]/.test(latex[i])) {
+      const start = i;
+      while (i < latex.length && /[0-9.]/.test(latex[i])) {
+        i++;
+      }
+      tokens.push({
+        id: id++,
+        value: latex.substring(start, i),
+        start,
+        end: i,
+        type: "number",
+      });
+      continue;
+    }
+
+    if (/[a-zA-Z]/.test(latex[i])) {
+      const start = i;
+      tokens.push({
+        id: id++,
+        value: latex[i],
+        start,
+        end: i + 1,
+        type: "variable",
+      });
+      i++;
+      continue;
+    }
+
+    i++;
+  }
+
+  return tokens;
 }
 
 const EQUATION_CATEGORIES: CategoryGroup[] = [
@@ -167,12 +233,22 @@ export const EquationStudioModal: React.FC<EquationStudioModalProps> = ({
   const [isBlock, setIsBlock] = useState(false);
   const [activeCategory, setActiveCategory] = useState("algebra");
   const [copied, setCopied] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Sync initial latex when opening
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewBoxRef = useRef<HTMLDivElement>(null);
+  const popoverInputRef = useRef<HTMLInputElement>(null);
+
+  // State untuk editing token langsung di preview
+  const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
+  const [editSlotValue, setEditSlotValue] = useState("");
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Sync initial latex saat dialog dibuka
   useEffect(() => {
     if (isOpen) {
       setLatex(initialLatex || "");
+      setSelectedTokenId(null);
+      setPopoverPos(null);
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
   }, [isOpen, initialLatex]);
@@ -180,6 +256,14 @@ export const EquationStudioModal: React.FC<EquationStudioModalProps> = ({
   const currentCategory = useMemo(() => {
     return EQUATION_CATEGORIES.find((c) => c.id === activeCategory) || EQUATION_CATEGORIES[0];
   }, [activeCategory]);
+
+  // Ekstraksi token nilai yang dapat diedit langsung
+  const tokens = useMemo(() => extractEditableTokens(latex), [latex]);
+
+  const selectedToken = useMemo(
+    () => tokens.find((t) => t.id === selectedTokenId),
+    [tokens, selectedTokenId]
+  );
 
   const insertSnippet = (snippet: string) => {
     const el = textareaRef.current;
@@ -215,6 +299,60 @@ export const EquationStudioModal: React.FC<EquationStudioModalProps> = ({
     onInsert(latex.trim(), isBlock);
   };
 
+  // Simpan nilai baru token yang diedit dari preview
+  const handleSaveTokenEdit = () => {
+    if (selectedTokenId === null || !selectedToken) return;
+
+    const newLatex =
+      latex.substring(0, selectedToken.start) +
+      editSlotValue +
+      latex.substring(selectedToken.end);
+
+    setLatex(newLatex);
+    setSelectedTokenId(null);
+    setEditSlotValue("");
+    setPopoverPos(null);
+  };
+
+  // Klik langsung pada angka atau variabel di dalam pratinjau KaTeX
+  const handlePreviewClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    // Cari elemen leaf .mord terdekat di dalam KaTeX HTML
+    const leafSpan = target.closest(".mord") as HTMLElement;
+    if (!leafSpan) return;
+
+    const text = leafSpan.textContent?.trim();
+    if (!text) return;
+
+    // Ambil seluruh leaf element .mord di dalam container pratinjau
+    const allLeaves = Array.from(
+      previewBoxRef.current?.querySelectorAll(".katex-html .mord") || []
+    ).filter(
+      (el) => el.textContent && el.textContent.trim().length > 0 && el.children.length === 0
+    );
+
+    const leafIndex = allLeaves.indexOf(leafSpan);
+    const token =
+      leafIndex >= 0 && leafIndex < tokens.length
+        ? tokens[leafIndex]
+        : tokens.find((t) => t.value === text);
+
+    if (token) {
+      setSelectedTokenId(token.id);
+      setEditSlotValue(token.value);
+
+      const containerRect = previewBoxRef.current?.getBoundingClientRect();
+      const spanRect = leafSpan.getBoundingClientRect();
+      if (containerRect) {
+        setPopoverPos({
+          top: spanRect.bottom - containerRect.top + 8,
+          left: Math.max(12, Math.min(containerRect.width - 170, spanRect.left - containerRect.left - 25)),
+        });
+        setTimeout(() => popoverInputRef.current?.focus(), 60);
+      }
+    }
+  };
+
   // Content for preview rendering
   const previewContent = useMemo(() => {
     const clean = latex.trim();
@@ -235,11 +373,11 @@ export const EquationStudioModal: React.FC<EquationStudioModalProps> = ({
               <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
                 <span>Visual Equation Studio</span>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                  KaTeX &amp; LaTeX
+                  KaTeX &amp; Interactive WYSIWYG
                 </span>
               </h3>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                Pilih simbol atau ketik formula eksakta. Hasil visual langsung tampil secara real-time.
+                Pilih simbol atau ketik formula. Nilai pada pratinjau rumus dapat langsung Anda klik untuk diedit.
               </p>
             </div>
           </div>
@@ -320,7 +458,11 @@ export const EquationStudioModal: React.FC<EquationStudioModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLatex("")}
+                  onClick={() => {
+                    setLatex("");
+                    setSelectedTokenId(null);
+                    setPopoverPos(null);
+                  }}
                   disabled={!latex}
                   className="text-[11px] font-medium text-neutral-500 hover:text-red-600 dark:hover:text-red-400 flex items-center gap-1 cursor-pointer disabled:opacity-40"
                 >
@@ -340,12 +482,12 @@ export const EquationStudioModal: React.FC<EquationStudioModalProps> = ({
             />
           </div>
 
-          {/* Live Preview Box */}
+          {/* Live Interactive Preview Box */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-                <span>Pratinjau Hasil Visual (Live KaTeX)</span>
+                <span>Pratinjau Visual (Klik Nilai untuk Edit Langsung)</span>
               </span>
 
               {/* Mode Toggle: Inline vs Display */}
@@ -375,17 +517,141 @@ export const EquationStudioModal: React.FC<EquationStudioModalProps> = ({
               </div>
             </div>
 
-            <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 min-h-[76px] flex items-center justify-center text-center overflow-visible">
+            <div
+              ref={previewBoxRef}
+              className="relative p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 min-h-[88px] flex flex-col items-center justify-center text-center overflow-visible"
+            >
               {previewContent ? (
-                <div className="text-base sm:text-lg text-neutral-900 dark:text-neutral-100 font-serif">
-                  <MathText content={previewContent} />
-                </div>
+                <>
+                  <div
+                    onClick={handlePreviewClick}
+                    className="text-base sm:text-xl text-neutral-900 dark:text-neutral-100 font-serif select-none cursor-pointer py-1 [&_.katex-html_.mord]:transition-all [&_.katex-html_.mord]:rounded-md [&_.katex-html_.mord]:px-0.5 [&_.katex-html_.mord]:cursor-pointer [&_.katex-html_.mord:hover]:bg-emerald-500/20 [&_.katex-html_.mord:hover]:ring-1.5 [&_.katex-html_.mord:hover]:ring-emerald-500"
+                    title="Klik angka atau variabel untuk mengubah nilainya langsung"
+                  >
+                    <MathText content={previewContent} />
+                  </div>
+
+                  {/* Floating Popover Editor saat elemen diklik */}
+                  {selectedToken && popoverPos && (
+                    <div
+                      style={{ top: popoverPos.top, left: popoverPos.left }}
+                      className="absolute z-30 p-1.5 bg-white dark:bg-neutral-900 border-2 border-emerald-500 rounded-xl shadow-2xl flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 pl-1 shrink-0">
+                        Ubah:
+                      </span>
+                      <input
+                        ref={popoverInputRef}
+                        value={editSlotValue}
+                        onChange={(e) => setEditSlotValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveTokenEdit();
+                          if (e.key === "Escape") setSelectedTokenId(null);
+                        }}
+                        className="w-20 h-7 px-2 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-xs font-mono font-bold text-neutral-900 dark:text-white border border-neutral-300 dark:border-neutral-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveTokenEdit}
+                        className="h-7 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer shrink-0"
+                        title="Terapkan Perubahan (Enter)"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTokenId(null)}
+                        className="h-7 w-7 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 flex items-center justify-center cursor-pointer shrink-0"
+                        title="Batal (Esc)"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <span className="text-xs text-neutral-400 dark:text-neutral-500 italic">
                   Ketik atau klik tombol simbol di atas untuk melihat rumus...
                 </span>
               )}
             </div>
+
+            {/* Smart Interactive Value Slots Bar */}
+            {tokens.length > 0 && (
+              <div className="p-2.5 rounded-xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10px] text-emerald-800 dark:text-emerald-300">
+                    <Pencil className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    <span>Slot Nilai Rumus (Klik untuk ubah cepat):</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                    {tokens.length} nilai terdeteksi
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar pt-0.5">
+                  {tokens.map((tok) => {
+                    const isSelected = selectedTokenId === tok.id;
+                    return (
+                      <button
+                        key={tok.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTokenId(tok.id);
+                          setEditSlotValue(tok.value);
+                          setPopoverPos(null);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                          isSelected
+                            ? "bg-emerald-600 text-white shadow-xs scale-105"
+                            : "bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-800 dark:text-neutral-200 hover:border-emerald-500/60 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30"
+                        }`}
+                        title={`Klik untuk mengedit ${tok.type === "number" ? "angka" : "variabel"} "${tok.value}"`}
+                      >
+                        <span className="text-[10px] font-sans font-normal opacity-60">
+                          {tok.type === "number" ? "123" : "xyz"}:
+                        </span>
+                        <span>{tok.value}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Inline Quick Editor saat memilih dari slot bar */}
+                {selectedToken && !popoverPos && (
+                  <div className="pt-2 mt-1 border-t border-emerald-200/60 dark:border-emerald-800/40 flex items-center gap-2">
+                    <span className="text-xs font-medium text-emerald-900 dark:text-emerald-200">
+                      Ubah nilai <strong>"{selectedToken.value}"</strong>:
+                    </span>
+                    <input
+                      autoFocus
+                      value={editSlotValue}
+                      onChange={(e) => setEditSlotValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSaveTokenEdit();
+                        if (e.key === "Escape") setSelectedTokenId(null);
+                      }}
+                      className="w-24 h-7 px-2 rounded-lg bg-white dark:bg-neutral-900 text-xs font-mono font-bold text-neutral-900 dark:text-white border border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveTokenEdit}
+                      className="h-7 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      <span>Terapkan</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTokenId(null)}
+                      className="h-7 px-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-neutral-500 text-xs cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -420,4 +686,3 @@ export const EquationStudioModal: React.FC<EquationStudioModalProps> = ({
 };
 
 export default EquationStudioModal;
-

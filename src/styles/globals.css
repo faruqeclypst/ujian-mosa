@@ -519,6 +519,13 @@ body {
   overflow: visible !important;
 }
 
+.premium-math .html-segment > *:first-child,
+.premium-math .html-segment p:first-child,
+.math-content > *:first-child,
+.math-content p:first-child {
+  margin-top: 0 !important;
+}
+
 /* Ketika ql-editor digunakan di MathText / pratinjau / lembar ujian (bukan editor aktif) */
 .math-content.ql-editor,
 .math-content .ql-editor,
