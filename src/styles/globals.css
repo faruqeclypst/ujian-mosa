@@ -724,20 +724,4 @@ input[type="email"],
   overflow-y: hidden !important;
 }
 
-/* 🎨 Interactive Math Slot in Equation Studio */
-.math-interactive-preview .math-slot {
-  display: inline;
-  cursor: pointer;
-  border-bottom: 2px dashed #10b981;
-  text-underline-offset: 3px;
-  border-radius: 2px;
-  transition: all 0.12s ease;
-}
 
-.math-interactive-preview .math-slot:hover {
-  background-color: rgba(16, 185, 129, 0.20);
-  border-bottom: 2px solid #059669;
-  outline: 2px solid rgba(16, 185, 129, 0.35);
-  outline-offset: 1px;
-  border-radius: 3px;
-}
