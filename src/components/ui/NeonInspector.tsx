@@ -244,7 +244,7 @@ export const InspectorButton: React.FC<InspectorButtonProps> = ({
   type = "button",
   ...props
 }) => {
-  const baseClasses = "w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-xs font-semibold transition-colors shadow-2xs cursor-pointer disabled:opacity-30 disabled:pointer-events-none";
+  const baseClasses = "w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-md text-xs font-semibold transition-colors shadow-2xs cursor-pointer disabled:opacity-30 disabled:pointer-events-none";
 
   const variantClasses = {
     primary: "bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs",
@@ -261,7 +261,7 @@ export const InspectorButton: React.FC<InspectorButtonProps> = ({
       {...props}
     >
       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
-      <span>{children}</span>
+      <span className="truncate">{children}</span>
     </button>
   );
 };

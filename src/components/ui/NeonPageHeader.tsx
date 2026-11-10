@@ -34,11 +34,11 @@ export const NeonPageHeader: React.FC<NeonPageHeaderProps> = ({
     if (!onBack && !backTo) return null;
 
     const buttonClass =
-      "h-8.5 w-8.5 rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 transition-colors shrink-0 cursor-pointer shadow-2xs flex items-center justify-center";
+      "h-9 w-9 shrink-0 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors shadow-2xs flex items-center justify-center cursor-pointer";
 
     if (backTo) {
       return (
-        <Link to={backTo} className={buttonClass} title={backTitle}>
+        <Link to={backTo} className={buttonClass} title={backTitle} aria-label={backTitle}>
           <ArrowLeft className="h-4 w-4" />
         </Link>
       );
@@ -50,6 +50,7 @@ export const NeonPageHeader: React.FC<NeonPageHeaderProps> = ({
         onClick={onBack}
         className={buttonClass}
         title={backTitle}
+        aria-label={backTitle}
       >
         <ArrowLeft className="h-4 w-4" />
       </button>

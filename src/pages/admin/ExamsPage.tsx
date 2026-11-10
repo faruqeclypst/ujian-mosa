@@ -48,6 +48,11 @@ import {
 } from "../../components/ui/dropdown-menu";
 import { NeonTable, type NeonTableColumn } from "../../components/ui/NeonTable";
 import {
+  NeonFilterPopover,
+  NeonFilterField,
+  NeonFilterSelect,
+} from "../../components/ui/NeonFilterPopover";
+import {
   NeonInspector,
   InspectorSection,
   InspectorHeader,
@@ -1917,66 +1922,79 @@ const ExamsPage = () => {
               onSearchChange={setSearchQuery}
               searchPlaceholder="Cari judul ujian, pengampu, mapel, tipe..."
               filterSlot={
-                <div className="flex items-center gap-2 flex-wrap">
+                <NeonFilterPopover
+                  title="Filter Bank Soal"
+                  activeCount={
+                    (subjectFilter !== "all" ? 1 : 0) +
+                    (typeFilter !== "all" ? 1 : 0) +
+                    (groupFilter !== "all" ? 1 : 0) +
+                    (ownerFilter !== "all" ? 1 : 0)
+                  }
+                  onReset={() => {
+                    setSubjectFilter("all");
+                    setTypeFilter("all");
+                    setGroupFilter("all");
+                    setOwnerFilter("all");
+                  }}
+                >
                   {/* Filter Bank Soal Saya untuk Guru */}
                   {role !== "admin" && (
-                    <button
-                      type="button"
-                      onClick={() => setOwnerFilter((prev) => (prev === "mine" ? "all" : "mine"))}
-                      className={cn(
-                        "h-8 px-2.5 text-xs rounded-md border font-medium flex items-center gap-1.5 transition-colors cursor-pointer",
-                        ownerFilter === "mine"
-                          ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 shadow-2xs font-bold"
-                          : "bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                      )}
-                    >
-                      <User className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span>{ownerFilter === "mine" ? "⭐ Bank Soal Saya" : "Semua Bank Soal"}</span>
-                    </button>
+                    <NeonFilterField label="Kepemilikan">
+                      <NeonFilterSelect
+                        value={ownerFilter}
+                        onChange={(e) => setOwnerFilter(e.target.value as any)}
+                      >
+                        <option value="all">Semua Bank Soal</option>
+                        <option value="mine">⭐ Bank Soal Saya Saja</option>
+                      </NeonFilterSelect>
+                    </NeonFilterField>
                   )}
 
                   {/* Subject filter */}
-                  <select
-                    value={subjectFilter}
-                    onChange={(e) => setSubjectFilter(e.target.value)}
-                    className="h-8 text-xs rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 px-2.5 text-neutral-700 dark:text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-400"
-                  >
-                    <option value="all">Semua {terminology.subject}</option>
-                    {subjects.map((s: any) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
+                  <NeonFilterField label={terminology.subject}>
+                    <NeonFilterSelect
+                      value={subjectFilter}
+                      onChange={(e) => setSubjectFilter(e.target.value)}
+                    >
+                      <option value="all">Semua {terminology.subject}</option>
+                      {subjects.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </NeonFilterSelect>
+                  </NeonFilterField>
 
                   {/* Type filter */}
-                  <select
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                    className="h-8 text-xs rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 px-2.5 text-neutral-700 dark:text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-400"
-                  >
-                    <option value="all">Semua Jenis Ujian</option>
-                    <option value="Latihan">Latihan Biasa</option>
-                    <option value="Ulangan">Ulangan Harian</option>
-                    <option value="PTS">Ujian Tengah Semester (PTS)</option>
-                    <option value="PAS">Ujian Akhir Semester (PAS / PAT)</option>
-                    <option value="US">Ujian Sekolah (US)</option>
-                    <option value="Tryout">Tryout</option>
-                  </select>
+                  <NeonFilterField label="Jenis Ujian">
+                    <NeonFilterSelect
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value)}
+                    >
+                      <option value="all">Semua Jenis Ujian</option>
+                      <option value="Latihan">Latihan Biasa</option>
+                      <option value="Ulangan">Ulangan Harian</option>
+                      <option value="PTS">Ujian Tengah Semester (PTS)</option>
+                      <option value="PAS">Ujian Akhir Semester (PAS / PAT)</option>
+                      <option value="US">Ujian Sekolah (US)</option>
+                      <option value="Tryout">Tryout</option>
+                    </NeonFilterSelect>
+                  </NeonFilterField>
 
                   {/* Group filter */}
                   {availableGroups.length > 0 && (
-                    <select
-                      value={groupFilter}
-                      onChange={(e) => setGroupFilter(e.target.value)}
-                      className="h-8 text-xs rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 px-2.5 text-purple-700 dark:text-purple-300 font-medium focus:outline-none focus:ring-1 focus:ring-purple-400"
-                    >
-                      <option value="all">Semua Group</option>
-                      {availableGroups.map((grp) => (
-                        <option key={grp} value={grp}>{grp}</option>
-                      ))}
-                      <option value="__none__">Tanpa Group</option>
-                    </select>
+                    <NeonFilterField label="Group Bank Soal">
+                      <NeonFilterSelect
+                        value={groupFilter}
+                        onChange={(e) => setGroupFilter(e.target.value)}
+                      >
+                        <option value="all">Semua Group</option>
+                        {availableGroups.map((grp) => (
+                          <option key={grp} value={grp}>{grp}</option>
+                        ))}
+                        <option value="__none__">Tanpa Group</option>
+                      </NeonFilterSelect>
+                    </NeonFilterField>
                   )}
-                </div>
+                </NeonFilterPopover>
               }
               selectable={true}
               selectedKeys={selectedIds}
@@ -2120,52 +2138,52 @@ const ExamsPage = () => {
                   </div>
 
                   <InspectorActions>
-                    <InspectorButton
-                      variant="primary"
-                      icon={BookOpen}
-                      onClick={() => {
-                        sessionStorage.setItem("activeQuestionsExamId", inspectedExam.id);
-                        navigate("/admin/bank-soal/questions");
-                      }}
-                    >
-                      Kelola Butir Soal
-                    </InspectorButton>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <InspectorButton
+                        variant="primary"
+                        icon={BookOpen}
+                        onClick={() => {
+                          sessionStorage.setItem("activeQuestionsExamId", inspectedExam.id);
+                          navigate("/admin/bank-soal/questions");
+                        }}
+                        title="Kelola Butir Soal"
+                      >
+                        Kelola
+                      </InspectorButton>
 
-                    <InspectorButton
-                      variant="secondary"
-                      icon={Eye}
-                      onClick={() => navigate(`/admin/simulate/${inspectedExam.id}`)}
-                    >
-                      Simulasi Tampilan Siswa
-                    </InspectorButton>
-
-                    <InspectorButton
-                      variant="secondary"
-                      icon={Download}
-                      onClick={() => handleBatchExport([inspectedExam])}
-                    >
-                      Export Format Word (.doc)
-                    </InspectorButton>
-
-                    {isOwner(inspectedExam) && (
                       <InspectorButton
                         variant="secondary"
-                        icon={Edit}
-                        onClick={() => handleEditClick(inspectedExam)}
+                        icon={Eye}
+                        onClick={() => navigate(`/admin/simulate/${inspectedExam.id}`)}
+                        title="Simulasi Tampilan Siswa"
                       >
-                        Edit Data Bank Soal
+                        Simulasi
                       </InspectorButton>
-                    )}
 
-                    {role === "admin" && (
-                      <InspectorButton
-                        variant="secondary"
-                        icon={Copy}
-                        onClick={() => handleDuplicateExam(inspectedExam)}
-                      >
-                        Duplikat Bank Soal
-                      </InspectorButton>
-                    )}
+                      {isOwner(inspectedExam) && (
+                        <InspectorButton
+                          variant="secondary"
+                          icon={Edit}
+                          onClick={() => handleEditClick(inspectedExam)}
+                          title="Edit Data Bank Soal"
+                          className={role !== "admin" ? "col-span-2" : ""}
+                        >
+                          Edit
+                        </InspectorButton>
+                      )}
+
+                      {role === "admin" && (
+                        <InspectorButton
+                          variant="secondary"
+                          icon={Copy}
+                          onClick={() => handleDuplicateExam(inspectedExam)}
+                          title="Duplikat Bank Soal"
+                          className={!isOwner(inspectedExam) ? "col-span-2" : ""}
+                        >
+                          Duplikat
+                        </InspectorButton>
+                      )}
+                    </div>
                   </InspectorActions>
                 </div>
               ) : (

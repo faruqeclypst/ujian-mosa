@@ -32,6 +32,11 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import {
+  NeonFilterPopover,
+  NeonFilterField,
+  NeonFilterSelect,
+} from "../components/ui/NeonFilterPopover";
+import {
   NeonInspector,
   InspectorSection,
   InspectorHeader,
@@ -1676,22 +1681,26 @@ const StudentsPage = () => {
               activeKey={inspectedStudent?.id}
               onRowClick={(student) => setInspectedStudentId(student.id)}
               filterActions={
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider hidden sm:inline">{terminology.class}:</span>
-                  <select
-                    value={filterClassId}
-                    onChange={(e) => handleFilterClassChange(e.target.value)}
-                    className="h-8 min-w-[140px] text-xs font-medium rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-2.5 py-1 focus:outline-none focus:border-neutral-400 dark:focus:border-neutral-600 text-neutral-700 dark:text-neutral-300 cursor-pointer"
-                  >
-                    <option value="ALL">Semua {terminology.class}</option>
-                    <option value="NONE">Tanpa {terminology.class}</option>
-                    <optgroup label={`Daftar ${terminology.class}`}>
-                      {sortedClasses.map(cls => (
-                        <option key={cls.id} value={cls.id}>{cls.name}</option>
-                      ))}
-                    </optgroup>
-                  </select>
-                </div>
+                <NeonFilterPopover
+                  title={`Filter ${terminology.student}`}
+                  activeCount={filterClassId !== "ALL" ? 1 : 0}
+                  onReset={() => handleFilterClassChange("ALL")}
+                >
+                  <NeonFilterField label={terminology.class}>
+                    <NeonFilterSelect
+                      value={filterClassId}
+                      onChange={(e) => handleFilterClassChange(e.target.value)}
+                    >
+                      <option value="ALL">Semua {terminology.class}</option>
+                      <option value="NONE">Tanpa {terminology.class}</option>
+                      <optgroup label={`Daftar ${terminology.class}`}>
+                        {sortedClasses.map((cls) => (
+                          <option key={cls.id} value={cls.id}>{cls.name}</option>
+                        ))}
+                      </optgroup>
+                    </NeonFilterSelect>
+                  </NeonFilterField>
+                </NeonFilterPopover>
               }
             />
           </div>

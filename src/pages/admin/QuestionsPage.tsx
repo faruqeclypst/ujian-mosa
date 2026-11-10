@@ -12,6 +12,11 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "../../components/ui/too
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
 import { NeonTable, type NeonTableColumn } from "../../components/ui/NeonTable";
 import {
+  NeonFilterPopover,
+  NeonFilterField,
+  NeonFilterSelect,
+} from "../../components/ui/NeonFilterPopover";
+import {
   NeonInspector,
   InspectorSection,
   InspectorHeader,
@@ -5696,8 +5701,10 @@ const QuestionsPage = () => {
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 shrink-0 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900"
+            className="h-9 w-9 shrink-0 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xs cursor-pointer"
             onClick={() => navigate("/admin/bank-soal")}
+            title="Kembali ke Bank Soal"
+            aria-label="Kembali ke Bank Soal"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -6084,32 +6091,43 @@ const QuestionsPage = () => {
             onSearchChange={setSearchQuery}
             searchPlaceholder="Cari pertanyaan, stimulus, kunci..."
             filterSlot={
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Type Filter */}
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  className="h-8 text-xs rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 px-2.5 text-neutral-700 dark:text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-400 cursor-pointer"
+              <div className="flex items-center gap-2">
+                <NeonFilterPopover
+                  title="Filter Butir Soal"
+                  activeCount={(typeFilter !== "all" ? 1 : 0) + (groupFilter !== "all" ? 1 : 0)}
+                  onReset={() => {
+                    setTypeFilter("all");
+                    setGroupFilter("all");
+                  }}
                 >
-                  <option value="all">Semua Tipe Soal</option>
-                  {Object.entries(QUESTION_TYPE_LABELS).map(([val, label]) => (
-                    <option key={val} value={val}>{label}</option>
-                  ))}
-                </select>
+                  {/* Type Filter */}
+                  <NeonFilterField label="Tipe Soal">
+                    <NeonFilterSelect
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value)}
+                    >
+                      <option value="all">Semua Tipe Soal</option>
+                      {Object.entries(QUESTION_TYPE_LABELS).map(([val, label]) => (
+                        <option key={val} value={val}>{label}</option>
+                      ))}
+                    </NeonFilterSelect>
+                  </NeonFilterField>
 
-                {/* Stimulus / Group Filter */}
-                {groupsList.length > 0 && (
-                  <select
-                    value={groupFilter}
-                    onChange={(e) => setGroupFilter(e.target.value)}
-                    className="h-8 text-xs rounded-md bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 px-2.5 text-neutral-700 dark:text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-400 cursor-pointer"
-                  >
-                    <option value="all">Semua Paket Stimulus</option>
-                    {groupsList.map((gid) => (
-                      <option key={gid} value={gid}>Paket {gid}</option>
-                    ))}
-                  </select>
-                )}
+                  {/* Stimulus / Group Filter */}
+                  {groupsList.length > 0 && (
+                    <NeonFilterField label="Paket Stimulus">
+                      <NeonFilterSelect
+                        value={groupFilter}
+                        onChange={(e) => setGroupFilter(e.target.value)}
+                      >
+                        <option value="all">Semua Paket Stimulus</option>
+                        {groupsList.map((gid) => (
+                          <option key={gid} value={gid}>Paket {gid}</option>
+                        ))}
+                      </NeonFilterSelect>
+                    </NeonFilterField>
+                  )}
+                </NeonFilterPopover>
 
                 {/* Toggle Inspector Button */}
                 <InspectorToggle
