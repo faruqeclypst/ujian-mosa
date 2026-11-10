@@ -48,18 +48,6 @@ const PrintExamCardsPage = () => {
               </span>
             </>
           }
-          actions={
-            <div className="flex items-center gap-2">
-              <NeonButton
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/admin/student-credentials")}
-              >
-                <KeyRound className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Kredensial Sesi</span>
-              </NeonButton>
-            </div>
-          }
         />
 
         {/* ── 2. Full-Page Studio Canvas ── */}

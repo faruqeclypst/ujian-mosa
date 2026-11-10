@@ -370,8 +370,10 @@ export const PrintExamCardsDialog = ({
           }
         }
         setQrCodes(prev => ({ ...prev, ...newEntries }));
-        await new Promise(r => setTimeout(r, 60));
       }
+
+      // Tunggu React me-mount print payload DOM (karena isPreparingPrint = true)
+      await new Promise(r => setTimeout(r, 120));
 
       const printArea = document.getElementById("anbk-print-payload-hidden");
     if (!printArea) {
@@ -886,36 +888,37 @@ export const PrintExamCardsDialog = ({
   const studioContent = (
     <div
       className={cn(
-        "flex flex-col overflow-hidden bg-neutral-900 border border-neutral-800",
+        "flex flex-col overflow-hidden bg-white dark:bg-[#0e0f11] border border-neutral-200 dark:border-neutral-800",
         isStandalonePage
-          ? "w-full rounded-2xl shadow-xl min-h-[80vh] h-[calc(100vh-10.5rem)]"
+          ? "w-full rounded-2xl shadow-sm min-h-[80vh] h-[calc(100vh-10.5rem)]"
           : "max-w-7xl w-[98vw] h-[94vh] max-h-[95vh] p-0 shadow-2xl rounded-2xl"
       )}
     >
-      {/* Header Dialog */}
-      <div className="px-5 py-3 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/25">
-              <Printer className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-white leading-tight">
-                  Cetak Kartu Peserta Ujian
-                </h2>
-                <span className="px-2 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
-                  Format Resmi ANBK / CBT
-                </span>
-              </div>
-              <p className="text-[11px] text-neutral-400">
-                Pratinjau lembar cetak A4 presisi siap potong
-              </p>
-            </div>
+      {/* Header Dialog / Studio */}
+      <div className="px-5 py-3.5 bg-white dark:bg-[#0c0d0e] border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+            <Printer className="w-4 h-4" />
           </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-tight">
+                Cetak Kartu Peserta Ujian
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                Format Resmi ANBK / CBT
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+              Pratinjau lembar cetak A4 presisi siap potong
+            </p>
+          </div>
+        </div>
 
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          {!isStandalonePage && (
             <NeonButton
-              variant="secondary"
+              variant="ghost"
               size="xs"
               onClick={onClose}
               className="gap-1"
@@ -923,560 +926,564 @@ export const PrintExamCardsDialog = ({
               <X className="w-3.5 h-3.5" />
               <span>Tutup</span>
             </NeonButton>
-            <NeonButton
-              variant="primary"
-              color="brand"
-              size="sm"
-              onClick={handlePrint}
-              disabled={studentsToPrint.length === 0 || isPreparingPrint}
-              className="gap-1.5 font-bold"
-            >
-              {isPreparingPrint ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Menyiapkan Dokumen...</span>
-                </>
-              ) : (
-                <>
-                  <Printer className="w-4 h-4" />
-                  <span>Cetak Sekarang ({studentsToPrint.length} Siswa)</span>
-                </>
-              )}
-            </NeonButton>
-          </div>
+          )}
+          <NeonButton
+            variant="primary"
+            color="brand"
+            size="sm"
+            onClick={handlePrint}
+            disabled={studentsToPrint.length === 0 || isPreparingPrint}
+            className="gap-1.5 font-bold"
+          >
+            {isPreparingPrint ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Menyiapkan Dokumen...</span>
+              </>
+            ) : (
+              <>
+                <Printer className="w-4 h-4" />
+                <span>Cetak Sekarang ({studentsToPrint.length} Siswa)</span>
+              </>
+            )}
+          </NeonButton>
         </div>
+      </div>
 
-        {/* 2-COLUMN STUDIO LAYOUT */}
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          {/* ======================================================== */}
-          {/* PANEL KIRI: PENGATURAN KARTU (RINGKAS & SIMPEL)           */}
-          {/* ======================================================== */}
-          <div className="w-full lg:w-[320px] xl:w-[340px] flex-shrink-0 bg-neutral-950 border-b lg:border-r lg:border-b-0 border-neutral-800 flex flex-col overflow-y-auto p-4 space-y-3.5 text-xs h-1/2 lg:h-auto">
-            
-            {/* Navigasi Tab Pengaturan: Cepat vs Lanjutan */}
-            <div className="grid grid-cols-2 gap-1 bg-neutral-900 p-1 rounded-lg border border-neutral-800">
-              <button
-                type="button"
-                onClick={() => setActiveTab("quick")}
-                className={`py-1.5 rounded-md font-semibold text-xs transition-colors ${
-                  activeTab === "quick" 
-                    ? "bg-neutral-800 text-white shadow-xs" 
-                    : "text-neutral-400 hover:text-neutral-200"
-                }`}
-              >
-                Pengaturan Utama
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("advanced")}
-                className={`py-1.5 rounded-md font-semibold text-xs transition-colors flex items-center justify-center gap-1 ${
-                  activeTab === "advanced" 
-                    ? "bg-neutral-800 text-white shadow-xs" 
-                    : "text-neutral-400 hover:text-neutral-200"
-                }`}
-              >
-                <SlidersHorizontal className="w-3 h-3" />
-                <span>Kop & TTD</span>
-              </button>
-            </div>
+      {/* 2-COLUMN STUDIO LAYOUT */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* ======================================================== */}
+        {/* PANEL KIRI: PENGATURAN KARTU (RINGKAS & SIMPEL)           */}
+        {/* ======================================================== */}
+        <div className="w-full lg:w-[330px] xl:w-[350px] flex-shrink-0 bg-neutral-50/70 dark:bg-neutral-900/40 border-b lg:border-r lg:border-b-0 border-neutral-200 dark:border-neutral-800 flex flex-col overflow-y-auto p-4 space-y-3.5 text-xs h-1/2 lg:h-auto">
+          
+          {/* Navigasi Tab Pengaturan: Cepat vs Lanjutan */}
+          <div className="grid grid-cols-2 gap-1 bg-neutral-200/60 dark:bg-neutral-800/60 p-1 rounded-xl border border-neutral-200/80 dark:border-neutral-700/60">
+            <button
+              type="button"
+              onClick={() => setActiveTab("quick")}
+              className={`py-1.5 rounded-lg font-semibold text-xs transition-all cursor-pointer ${
+                activeTab === "quick" 
+                  ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs" 
+                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+              }`}
+            >
+              Pengaturan Utama
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("advanced")}
+              className={`py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                activeTab === "advanced" 
+                  ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs" 
+                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+              }`}
+            >
+              <SlidersHorizontal className="w-3 h-3" />
+              <span>Kop & TTD</span>
+            </button>
+          </div>
 
-            {/* TAB 1: PENGATURAN UTAMA (SIMPEL & CEPAT) */}
-            {activeTab === "quick" && (
-              <div className="space-y-3">
-                {/* 1. Target Siswa */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
-                    Target Cetak {terminology.student}
-                  </label>
-                  <Select 
-                    value={printScope} 
-                    onChange={(e) => setPrintScope(e.target.value as any)}
-                    className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
-                  >
-                    {selectedStudentIds.length > 0 && (
-                      <option value="selected">{terminology.student} Terpilih ({selectedStudentIds.length})</option>
-                    )}
-                    {filterClassId !== "ALL" && (
-                      <option value="class">{terminology.class} ({classes.find(c => c.id === filterClassId)?.name || filterClassId})</option>
-                    )}
-                    <option value="all">Semua {terminology.student} ({students.length})</option>
-                  </Select>
-                </div>
-
-                {/* 2. Jumlah Kartu per Lembar A4 */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
-                    Format Kertas A4
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5 bg-neutral-900 p-1 rounded-lg border border-neutral-800">
-                    <button
-                      type="button"
-                      onClick={() => setLayoutMode("4")}
-                      className={`py-1.5 px-2 rounded-md font-bold text-xs transition-colors flex flex-col items-center justify-center ${
-                        layoutMode === "4"
-                          ? "bg-emerald-600 text-white shadow-xs"
-                          : "text-neutral-400 hover:text-neutral-200"
-                      }`}
-                    >
-                      <span>4 Kartu</span>
-                      <span className="text-[9px] font-normal opacity-85">Standar (2×2)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLayoutMode("6")}
-                      className={`py-1.5 px-2 rounded-md font-bold text-xs transition-colors flex flex-col items-center justify-center ${
-                        layoutMode === "6"
-                          ? "bg-emerald-600 text-white shadow-xs"
-                          : "text-neutral-400 hover:text-neutral-200"
-                      }`}
-                    >
-                      <span>6 Kartu</span>
-                      <span className="text-[9px] font-normal opacity-85">Hemat (2×3)</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 3. Judul Ujian */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
-                    Nama Asesmen / Ujian
-                  </label>
-                  <Input
-                    value={examTitle}
-                    onChange={(e) => setExamTitle(e.target.value)}
-                    placeholder="Contoh: ASESMEN SUMATIF SEKOLAH"
-                    className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
-                  />
-                </div>
-
-                {/* 3b. Format Kredensial Login (Sesi Ujian vs Akun Siswa) */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[11px] font-semibold text-neutral-300">
-                      Format Kredensial Login
-                    </label>
-                    <span className="text-[9px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                      {credentialMode === "exam" ? "Anti Lupa Sandi" : "Akun Standar"}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-neutral-900 rounded-lg border border-neutral-800">
-                    <button
-                      type="button"
-                      onClick={() => setCredentialMode("exam")}
-                      className={`h-7 px-2 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        credentialMode === "exam"
-                          ? "bg-indigo-600 text-white shadow-xs"
-                          : "text-neutral-400 hover:text-neutral-200"
-                      }`}
-                    >
-                      <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
-                      <span>Sesi Ujian (TU)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCredentialMode("standard")}
-                      className={`h-7 px-2 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        credentialMode === "standard"
-                          ? "bg-neutral-800 text-neutral-100 shadow-xs border border-neutral-700"
-                          : "text-neutral-400 hover:text-neutral-200"
-                      }`}
-                    >
-                      <KeyRound className="w-3 h-3 shrink-0" />
-                      <span>Akun Siswa</span>
-                    </button>
-                  </div>
-
-                  {credentialMode === "exam" && (
-                    <div className="mt-2 p-2.5 rounded-lg bg-neutral-900/60 border border-neutral-800 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] text-neutral-400">Prefix Username:</span>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            value={examPrefix}
-                            onChange={(e) => setExamPrefix(e.target.value.toUpperCase())}
-                            maxLength={6}
-                            className="h-6 w-16 text-center text-xs font-mono font-bold bg-neutral-950 border-neutral-750 text-indigo-400 uppercase"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] text-neutral-400 pt-1 border-t border-neutral-800">
-                        <span>Tersimpan di Server:</span>
-                        <span className={missingCredsCount === 0 ? "text-emerald-400 font-semibold" : "text-amber-400 font-semibold"}>
-                          {studentsToPrint.length - missingCredsCount} / {studentsToPrint.length} Siswa
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={isGeneratingCreds}
-                        onClick={handleGenerateAndSaveCreds}
-                        className="w-full h-7 px-2 rounded-md text-[11px] font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {isGeneratingCreds ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            <span>Menyimpan ke Server...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-3 h-3 text-amber-300" />
-                            <span>Generate & Simpan ke Server</span>
-                          </>
-                        )}
-                      </button>
-                      {credSaveNotice && (
-                        <div className="text-[10px] text-emerald-400 font-medium text-center">
-                          {credSaveNotice}
-                        </div>
-                      )}
-                    </div>
+          {/* TAB 1: PENGATURAN UTAMA (SIMPEL & CEPAT) */}
+          {activeTab === "quick" && (
+            <div className="space-y-3">
+              {/* 1. Target Siswa */}
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                  Target Cetak {terminology.student}
+                </label>
+                <Select 
+                  value={printScope} 
+                  onChange={(e) => setPrintScope(e.target.value as any)}
+                  className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                >
+                  {selectedStudentIds.length > 0 && (
+                    <option value="selected">{terminology.student} Terpilih ({selectedStudentIds.length})</option>
                   )}
-                </div>
+                  {filterClassId !== "ALL" && (
+                    <option value="class">{terminology.class} ({classes.find(c => c.id === filterClassId)?.name || filterClassId})</option>
+                  )}
+                  <option value="all">Semua {terminology.student} ({students.length})</option>
+                </Select>
+              </div>
 
-                {/* 4. Opsi Tampilkan Password */}
-                <div className="p-2.5 rounded-lg bg-neutral-900/60 border border-neutral-800 flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-semibold text-neutral-200">Tampilkan Password</div>
-                    <div className="text-[10px] text-neutral-400">Tampilkan teks password di kartu</div>
-                  </div>
+              {/* 2. Jumlah Kartu per Lembar A4 */}
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                  Format Kertas A4
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 bg-neutral-200/60 dark:bg-neutral-850/60 p-1 rounded-xl border border-neutral-200 dark:border-neutral-800">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className={`h-6 px-2.5 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors ${
-                      showPassword 
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" 
-                        : "bg-neutral-800 text-neutral-400 border border-neutral-700"
+                    onClick={() => setLayoutMode("4")}
+                    className={`py-1.5 px-2 rounded-lg font-bold text-xs transition-all flex flex-col items-center justify-center cursor-pointer ${
+                      layoutMode === "4"
+                        ? "bg-emerald-600 text-white shadow-2xs"
+                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
                     }`}
                   >
-                    {showPassword ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                    <span>{showPassword ? "Tampil" : "Sensor"}</span>
+                    <span>4 Kartu</span>
+                    <span className="text-[9px] font-normal opacity-85">Standar (2×2)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLayoutMode("6")}
+                    className={`py-1.5 px-2 rounded-lg font-bold text-xs transition-all flex flex-col items-center justify-center cursor-pointer ${
+                      layoutMode === "6"
+                        ? "bg-emerald-600 text-white shadow-2xs"
+                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                    }`}
+                  >
+                    <span>6 Kartu</span>
+                    <span className="text-[9px] font-normal opacity-85">Hemat (2×3)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Judul Ujian */}
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                  Nama Asesmen / Ujian
+                </label>
+                <Input
+                  value={examTitle}
+                  onChange={(e) => setExamTitle(e.target.value)}
+                  placeholder="Contoh: ASESMEN SUMATIF SEKOLAH"
+                  className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                />
+              </div>
+
+              {/* 3b. Format Kredensial Login (Sesi Ujian vs Akun Siswa) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                    Format Kredensial Login
+                  </label>
+                  <span className="text-[9px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                    {credentialMode === "exam" ? "Anti Lupa Sandi" : "Akun Standar"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-neutral-200/60 dark:bg-neutral-850/60 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                  <button
+                    type="button"
+                    onClick={() => setCredentialMode("exam")}
+                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      credentialMode === "exam"
+                        ? "bg-indigo-600 text-white shadow-2xs"
+                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
+                    <span>Sesi Ujian (TU)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCredentialMode("standard")}
+                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      credentialMode === "standard"
+                        ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs border border-neutral-200 dark:border-neutral-700"
+                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                    }`}
+                  >
+                    <KeyRound className="w-3 h-3 shrink-0" />
+                    <span>Akun Siswa</span>
                   </button>
                 </div>
 
-                {/* Ringkasan Cetak */}
-                <div className="p-3 rounded-lg bg-neutral-900/80 border border-neutral-800 text-[11px] text-neutral-400 space-y-1">
-                  <div className="flex justify-between">
-                    <span>Total Siswa:</span>
-                    <strong className="text-neutral-200 font-mono">{studentsToPrint.length}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Kebutuhan Kertas:</span>
-                    <strong className="text-emerald-400 font-mono">{totalPages} Lembar A4</strong>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: PENGATURAN KOP & PENGESAHAN */}
-            {activeTab === "advanced" && (
-              <div className="space-y-3">
-                {/* Tahun Ajaran */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
-                    Tahun Pelajaran
-                  </label>
-                  <Input
-                    value={academicYear}
-                    onChange={(e) => setAcademicYear(e.target.value)}
-                    className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
-                  />
-                </div>
-
-                {/* Logo Kiri & Logo Kanan */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
-                      Logo Kiri
-                    </label>
-                    <Select
-                      value={leftLogoType}
-                      onChange={(e) => setLeftLogoType(e.target.value as any)}
-                      className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
-                    >
-                      <option value="tutwuri">Kemdikbud</option>
-                      <option value="kemenag">Kemenag</option>
-                      <option value="custom">Upload File</option>
-                    </Select>
-                    <input
-                      type="file"
-                      ref={leftFileInputRef}
-                      accept="image/*"
-                      onChange={handleLeftLogoUpload}
-                      className="hidden"
-                    />
-                    {leftLogoType === "custom" && !customLeftLogoUrl && (
-                      <NeonButton
-                        type="button"
-                        variant="secondary"
-                        size="xs"
-                        onClick={() => leftFileInputRef.current?.click()}
-                        className="mt-1 w-full text-[10px]"
-                      >
-                        <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
-                      </NeonButton>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
-                      Logo Kanan
-                    </label>
-                    <Select
-                      value={rightLogoType}
-                      onChange={(e) => setRightLogoType(e.target.value as any)}
-                      className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
-                    >
-                      <option value="school">Logo Sekolah</option>
-                      <option value="custom">Upload File</option>
-                      <option value="none">Tanpa Logo</option>
-                    </Select>
-                    <input
-                      type="file"
-                      ref={rightFileInputRef}
-                      accept="image/*"
-                      onChange={handleRightLogoUpload}
-                      className="hidden"
-                    />
-                    {rightLogoType === "custom" && !customRightLogoUrl && (
-                      <NeonButton
-                        type="button"
-                        variant="secondary"
-                        size="xs"
-                        onClick={() => rightFileInputRef.current?.click()}
-                        className="mt-1 w-full text-[10px]"
-                      >
-                        <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
-                      </NeonButton>
-                    )}
-                  </div>
-                </div>
-
-                {/* Kolom Tambahan */}
-                <div className="p-2.5 rounded-lg bg-neutral-900/60 border border-neutral-800 space-y-2">
-                  <div className="text-[11px] font-semibold text-neutral-300">Kolom Tambahan Biodata</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-neutral-400">Tempat & Tgl Lahir:</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowBirthInfo(!showBirthInfo)}
-                      className={`h-5 px-2 rounded text-[10px] font-semibold transition-colors ${
-                        showBirthInfo ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-neutral-800 text-neutral-400"
-                      }`}
-                    >
-                      {showBirthInfo ? "Aktif" : "Sembunyi"}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-neutral-400">Ruang & Sesi:</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowRoomSession(!showRoomSession)}
-                      className={`h-5 px-2 rounded text-[10px] font-semibold transition-colors ${
-                        showRoomSession ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-neutral-800 text-neutral-400"
-                      }`}
-                    >
-                      {showRoomSession ? "Aktif" : "Sembunyi"}
-                    </button>
-                  </div>
-
-                  {showRoomSession && (
-                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                {credentialMode === "exam" && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-white dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-neutral-500 dark:text-neutral-400">Prefix Username:</span>
                       <Input
-                        value={defaultRoom}
-                        onChange={(e) => setDefaultRoom(e.target.value)}
-                        placeholder="Ruang Default"
-                        className="h-7 text-[11px] bg-neutral-900 border-neutral-750 text-neutral-100"
-                      />
-                      <Input
-                        value={defaultSession}
-                        onChange={(e) => setDefaultSession(e.target.value)}
-                        placeholder="Sesi Default"
-                        className="h-7 text-[11px] bg-neutral-900 border-neutral-750 text-neutral-100"
+                        value={examPrefix}
+                        onChange={(e) => setExamPrefix(e.target.value.toUpperCase())}
+                        maxLength={6}
+                        className="h-6 w-16 text-center text-xs font-mono font-bold bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-indigo-600 dark:text-indigo-400 uppercase rounded"
                       />
                     </div>
+                    <div className="flex items-center justify-between text-[10px] text-neutral-500 dark:text-neutral-400 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                      <span>Tersimpan di Server:</span>
+                      <span className={missingCredsCount === 0 ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-amber-600 dark:text-amber-400 font-semibold"}>
+                        {studentsToPrint.length - missingCredsCount} / {studentsToPrint.length} Siswa
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isGeneratingCreds}
+                      onClick={handleGenerateAndSaveCreds}
+                      className="w-full h-7 px-2 rounded-lg text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isGeneratingCreds ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Menyimpan ke Server...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3 h-3 text-amber-500" />
+                          <span>Generate & Simpan ke Server</span>
+                        </>
+                      )}
+                    </button>
+                    {credSaveNotice && (
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium text-center">
+                        {credSaveNotice}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Opsi Tampilkan Password */}
+              <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Tampilkan Password</div>
+                  <div className="text-[10px] text-neutral-500 dark:text-neutral-400">Tampilkan teks password di kartu</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className={`h-6 px-2.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                    showPassword 
+                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" 
+                      : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
+                  }`}
+                >
+                  {showPassword ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  <span>{showPassword ? "Tampil" : "Sensor"}</span>
+                </button>
+              </div>
+
+              {/* Ringkasan Cetak */}
+              <div className="p-3 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 space-y-1.5 shadow-2xs">
+                <div className="flex justify-between">
+                  <span>Total Siswa:</span>
+                  <strong className="text-neutral-900 dark:text-neutral-100 font-mono font-bold">{studentsToPrint.length}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Kebutuhan Kertas:</span>
+                  <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{totalPages} Lembar A4</strong>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: PENGATURAN KOP & PENGESAHAN */}
+          {activeTab === "advanced" && (
+            <div className="space-y-3">
+              {/* Tahun Ajaran */}
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                  Tahun Pelajaran
+                </label>
+                <Input
+                  value={academicYear}
+                  onChange={(e) => setAcademicYear(e.target.value)}
+                  className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                />
+              </div>
+
+              {/* Logo Kiri & Logo Kanan */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                    Logo Kiri
+                  </label>
+                  <Select
+                    value={leftLogoType}
+                    onChange={(e) => setLeftLogoType(e.target.value as any)}
+                    className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                  >
+                    <option value="tutwuri">Kemdikbud</option>
+                    <option value="kemenag">Kemenag</option>
+                    <option value="custom">Upload File</option>
+                  </Select>
+                  <input
+                    type="file"
+                    ref={leftFileInputRef}
+                    accept="image/*"
+                    onChange={handleLeftLogoUpload}
+                    className="hidden"
+                  />
+                  {leftLogoType === "custom" && !customLeftLogoUrl && (
+                    <NeonButton
+                      type="button"
+                      variant="secondary"
+                      size="xs"
+                      onClick={() => leftFileInputRef.current?.click()}
+                      className="mt-1 w-full text-[10px]"
+                    >
+                      <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
+                    </NeonButton>
                   )}
                 </div>
 
-                {/* Pengesahan & Tanda Tangan */}
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
-                      Kota & Tanggal
-                    </label>
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                    Logo Kanan
+                  </label>
+                  <Select
+                    value={rightLogoType}
+                    onChange={(e) => setRightLogoType(e.target.value as any)}
+                    className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                  >
+                    <option value="school">Logo Sekolah</option>
+                    <option value="custom">Upload File</option>
+                    <option value="none">Tanpa Logo</option>
+                  </Select>
+                  <input
+                    type="file"
+                    ref={rightFileInputRef}
+                    accept="image/*"
+                    onChange={handleRightLogoUpload}
+                    className="hidden"
+                  />
+                  {rightLogoType === "custom" && !customRightLogoUrl && (
+                    <NeonButton
+                      type="button"
+                      variant="secondary"
+                      size="xs"
+                      onClick={() => rightFileInputRef.current?.click()}
+                      className="mt-1 w-full text-[10px]"
+                    >
+                      <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
+                    </NeonButton>
+                  )}
+                </div>
+              </div>
+
+              {/* Kolom Tambahan */}
+              <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 space-y-2">
+                <div className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Kolom Tambahan Biodata</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-neutral-500 dark:text-neutral-400">Tempat & Tgl Lahir:</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowBirthInfo(!showBirthInfo)}
+                    className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
+                      showBirthInfo 
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" 
+                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
+                    }`}
+                  >
+                    {showBirthInfo ? "Aktif" : "Sembunyi"}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-neutral-500 dark:text-neutral-400">Ruang & Sesi:</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowRoomSession(!showRoomSession)}
+                    className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
+                      showRoomSession 
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" 
+                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
+                    }`}
+                  >
+                    {showRoomSession ? "Aktif" : "Sembunyi"}
+                  </button>
+                </div>
+
+                {showRoomSession && (
+                  <div className="grid grid-cols-2 gap-1.5 pt-1">
                     <Input
-                      value={cityDate}
-                      onChange={(e) => setCityDate(e.target.value)}
-                      className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
+                      value={defaultRoom}
+                      onChange={(e) => setDefaultRoom(e.target.value)}
+                      placeholder="Ruang Default"
+                      className="h-7 text-[11px] bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded"
+                    />
+                    <Input
+                      value={defaultSession}
+                      onChange={(e) => setDefaultSession(e.target.value)}
+                      placeholder="Sesi Default"
+                      className="h-7 text-[11px] bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded"
                     />
                   </div>
+                )}
+              </div>
 
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
-                        Jabatan TTD
-                      </label>
-                      <Select
-                        value={signerRole}
-                        onChange={(e) => setSignerRole(e.target.value as any)}
-                        className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
-                      >
-                        <option value="Kepala Sekolah">Kepala Sekolah</option>
-                        <option value="Ketua Panitia">Ketua Panitia</option>
-                        <option value="Proktor">Proktor</option>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
-                        Nama Pejabat
-                      </label>
-                      <Input
-                        value={signerName}
-                        onChange={(e) => setSignerName(e.target.value)}
-                        placeholder="Nama Lengkap"
-                        className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
-                      />
-                    </div>
-                  </div>
+              {/* Pengesahan & Tanda Tangan */}
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                    Kota & Tanggal
+                  </label>
+                  <Input
+                    value={cityDate}
+                    onChange={(e) => setCityDate(e.target.value)}
+                    className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                  />
+                </div>
 
+                <div className="grid grid-cols-2 gap-1.5">
                   <div>
-                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">
-                      NIP Pejabat (Opsional)
+                    <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                      Jabatan TTD
+                    </label>
+                    <Select
+                      value={signerRole}
+                      onChange={(e) => setSignerRole(e.target.value as any)}
+                      className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                    >
+                      <option value="Kepala Sekolah">Kepala Sekolah</option>
+                      <option value="Ketua Panitia">Ketua Panitia</option>
+                      <option value="Proktor">Proktor</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                      Nama Pejabat
                     </label>
                     <Input
-                      value={signerNip}
-                      onChange={(e) => setSignerNip(e.target.value)}
-                      placeholder="NIP. 19..."
-                      className="h-8 text-xs bg-neutral-900 border-neutral-750 text-neutral-100"
+                      value={signerName}
+                      onChange={(e) => setSignerName(e.target.value)}
+                      placeholder="Nama Lengkap"
+                      className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                    NIP Pejabat (Opsional)
+                  </label>
+                  <Input
+                    value={signerNip}
+                    onChange={(e) => setSignerNip(e.target.value)}
+                    placeholder="NIP. 19..."
+                    className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ======================================================== */}
+        {/* PANEL KANAN: KANVAS PRATINJAU LIVE LEMBAR A4              */}
+        {/* ======================================================== */}
+        <div className="flex-1 flex flex-col bg-neutral-100/80 dark:bg-[#121316] overflow-hidden">
+          {/* Toolbar Kanvas Pratinjau (Zoom & Halaman) */}
+          <div className="px-5 py-2.5 bg-white dark:bg-[#0c0d0e] border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0">
+            {/* Info Halaman */}
+            <div className="flex items-center gap-1.5">
+              <NeonButton
+                variant="secondary"
+                size="xs"
+                iconOnly
+                aria-label="Halaman Sebelumnya"
+                disabled={currentPreviewPage <= 0}
+                onClick={() => setCurrentPreviewPage(p => Math.max(0, p - 1))}
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </NeonButton>
+              <span className="text-xs text-neutral-700 dark:text-neutral-300 font-semibold px-1 font-mono">
+                {totalPages > 0 ? currentPreviewPage + 1 : 0} / {totalPages} Lembar
+              </span>
+              <NeonButton
+                variant="secondary"
+                size="xs"
+                iconOnly
+                aria-label="Halaman Berikutnya"
+                disabled={currentPreviewPage >= totalPages - 1}
+                onClick={() => setCurrentPreviewPage(p => Math.min(totalPages - 1, p + 1))}
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </NeonButton>
+            </div>
+
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-1.5">
+              <NeonButton
+                variant="secondary"
+                size="xs"
+                iconOnly
+                aria-label="Perkecil"
+                onClick={() => setPreviewZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(1))))}
+                title="Perkecil"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </NeonButton>
+              <span className="text-xs font-mono text-neutral-700 dark:text-neutral-300 min-w-[38px] text-center font-medium">
+                {Math.round(previewZoom * 100)}%
+              </span>
+              <NeonButton
+                variant="secondary"
+                size="xs"
+                iconOnly
+                aria-label="Perbesar"
+                onClick={() => setPreviewZoom(z => Math.min(1.2, Number((z + 0.1).toFixed(1))))}
+                title="Perbesar"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </NeonButton>
+              <NeonButton
+                variant="ghost"
+                size="xs"
+                onClick={() => setPreviewZoom(0.75)}
+              >
+                Pas Layar
+              </NeonButton>
+            </div>
+          </div>
+
+          {/* Kanvas Pratinjau Lembar Kertas A4 Realistis */}
+          <div className="flex-1 overflow-auto p-6 flex justify-center items-start">
+            {studentsToPrint.length === 0 ? (
+              <div className="m-auto flex flex-col items-center justify-center text-neutral-400 text-center py-20">
+                <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-400 flex items-center justify-center mb-3 shadow-2xs">
+                  <Printer className="w-6 h-6" />
+                </div>
+                <p className="font-bold text-sm text-neutral-800 dark:text-neutral-200">Tidak ada siswa yang dipilih</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Silakan sesuaikan target siswa di panel sebelah kiri.</p>
+              </div>
+            ) : (
+              <div 
+                style={{ 
+                  transform: `scale(${previewZoom})`, 
+                  transformOrigin: "top center",
+                  transition: "transform 0.15s ease-out" 
+                }}
+                className="transition-all"
+              >
+                {/* Tampilan 1 Lembar A4 yang Sedang Aktif di Pratinjau */}
+                {(() => {
+                  const pageStudents = studentsToPrint.slice(
+                    currentPreviewPage * cardsPerPage, 
+                    (currentPreviewPage + 1) * cardsPerPage
+                  );
+
+                  return (
+                    <div 
+                      className="bg-white text-black shadow-xl rounded-none border border-neutral-300"
+                      style={{ 
+                        width: "210mm", 
+                        height: "282mm",
+                        maxHeight: "282mm",
+                        padding: "6mm 6mm",
+                        boxSizing: "border-box",
+                        fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif",
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gridTemplateRows: is4Cards ? "1fr 1fr" : "1fr 1fr 1fr",
+                        gap: "4mm",
+                        backgroundColor: "#ffffff",
+                        overflow: "hidden"
+                      }}
+                    >
+                      {pageStudents.map((st) => renderCardContent(st))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
-
-          {/* ======================================================== */}
-          {/* PANEL KANAN: KANVAS PRATINJAU LIVE LEMBAR A4              */}
-          {/* ======================================================== */}
-          <div className="flex-1 flex flex-col bg-neutral-950 overflow-hidden">
-            {/* Toolbar Kanvas Pratinjau (Zoom & Halaman) */}
-            <div className="px-5 py-2 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between flex-shrink-0">
-              {/* Info Halaman */}
-              <div className="flex items-center gap-1.5">
-                <NeonButton
-                  variant="secondary"
-                  size="xs"
-                  iconOnly
-                  aria-label="Halaman Sebelumnya"
-                  disabled={currentPreviewPage <= 0}
-                  onClick={() => setCurrentPreviewPage(p => Math.max(0, p - 1))}
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </NeonButton>
-                <span className="text-xs text-neutral-300 font-semibold px-1 font-mono">
-                  {totalPages > 0 ? currentPreviewPage + 1 : 0} / {totalPages} Lembar
-                </span>
-                <NeonButton
-                  variant="secondary"
-                  size="xs"
-                  iconOnly
-                  aria-label="Halaman Berikutnya"
-                  disabled={currentPreviewPage >= totalPages - 1}
-                  onClick={() => setCurrentPreviewPage(p => Math.min(totalPages - 1, p + 1))}
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </NeonButton>
-              </div>
-
-              {/* Zoom Controls */}
-              <div className="flex items-center gap-1.5">
-                <NeonButton
-                  variant="secondary"
-                  size="xs"
-                  iconOnly
-                  aria-label="Perkecil"
-                  onClick={() => setPreviewZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(1))))}
-                  title="Perkecil"
-                >
-                  <ZoomOut className="w-3.5 h-3.5" />
-                </NeonButton>
-                <span className="text-xs font-mono text-neutral-300 min-w-[38px] text-center">
-                  {Math.round(previewZoom * 100)}%
-                </span>
-                <NeonButton
-                  variant="secondary"
-                  size="xs"
-                  iconOnly
-                  aria-label="Perbesar"
-                  onClick={() => setPreviewZoom(z => Math.min(1.2, Number((z + 0.1).toFixed(1))))}
-                  title="Perbesar"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                </NeonButton>
-                <NeonButton
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => setPreviewZoom(0.75)}
-                >
-                  Pas Layar
-                </NeonButton>
-              </div>
-            </div>
-
-            {/* Kanvas Pratinjau Lembar Kertas A4 Realistis */}
-            <div className="flex-1 overflow-auto p-6 flex justify-center items-start bg-neutral-900/50">
-              {studentsToPrint.length === 0 ? (
-                <div className="m-auto flex flex-col items-center justify-center text-neutral-400 text-center py-20">
-                  <div className="w-12 h-12 rounded-xl bg-neutral-800 text-neutral-500 flex items-center justify-center mb-3">
-                    <Printer className="w-6 h-6" />
-                  </div>
-                  <p className="font-bold text-sm text-neutral-200">Tidak ada siswa yang dipilih</p>
-                  <p className="text-xs text-neutral-400 mt-1">Silakan sesuaikan target siswa di panel sebelah kiri.</p>
-                </div>
-              ) : (
-                <div 
-                  style={{ 
-                    transform: `scale(${previewZoom})`, 
-                    transformOrigin: "top center",
-                    transition: "transform 0.15s ease-out" 
-                  }}
-                  className="transition-all"
-                >
-                  {/* Tampilan 1 Lembar A4 yang Sedang Aktif di Pratinjau */}
-                  {(() => {
-                    const pageStudents = studentsToPrint.slice(
-                      currentPreviewPage * cardsPerPage, 
-                      (currentPreviewPage + 1) * cardsPerPage
-                    );
-
-                    return (
-                      <div 
-                        className="bg-white text-black shadow-2xl rounded-none border border-neutral-300"
-                        style={{ 
-                          width: "210mm", 
-                          height: "282mm",
-                          maxHeight: "282mm",
-                          padding: "6mm 6mm",
-                          boxSizing: "border-box",
-                          fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif",
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr",
-                          gridTemplateRows: is4Cards ? "1fr 1fr" : "1fr 1fr 1fr",
-                          gap: "4mm",
-                          backgroundColor: "#ffffff",
-                          overflow: "hidden"
-                        }}
-                      >
-                        {pageStudents.map((st) => renderCardContent(st))}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
+      </div>
 
-        {/* PAYLOAD LENGKAP TERSEMBUNYI UNTUK IFRAME CETAK (MENCETAK SELURUH HALAMAN) */}
+      {/* PAYLOAD LENGKAP TERSEMBUNYI UNTUK IFRAME CETAK (HANYA MOUNT SAAT AKAN CETAK) */}
+      {isPreparingPrint && (
         <div id="anbk-print-payload-hidden" style={{ display: "none" }}>
           {Array.from({ length: totalPages }).map((_, pageIdx) => {
             const pageStudents = studentsToPrint.slice(
@@ -1507,7 +1514,8 @@ export const PrintExamCardsDialog = ({
             );
           })}
         </div>
-      </div>
+      )}
+    </div>
   );
 
   if (isStandalonePage) {
@@ -1516,7 +1524,7 @@ export const PrintExamCardsDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-7xl w-[98vw] h-[94vh] max-h-[95vh] p-0 flex flex-col overflow-hidden bg-neutral-900 border border-neutral-800 shadow-2xl rounded-2xl">
+      <DialogContent className="max-w-7xl w-[98vw] h-[94vh] max-h-[95vh] p-0 flex flex-col overflow-hidden bg-white dark:bg-[#0e0f11] border border-neutral-200 dark:border-neutral-800 shadow-2xl rounded-2xl">
         {studioContent}
       </DialogContent>
     </Dialog>

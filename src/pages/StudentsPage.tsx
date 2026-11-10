@@ -1776,30 +1776,28 @@ const StudentsPage = () => {
 
                   <InspectorField label="Kredensial Sesi Ujian" truncate={false}>
                     {inspectedStudent.examUsername && inspectedStudent.examPassword ? (
-                      <div className="flex items-center justify-between text-xs font-mono bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1.5 rounded-lg border border-neutral-200/80 dark:border-neutral-700/80">
-                        <div className="flex items-center gap-2 truncate">
-                          <span className="text-neutral-500 text-[10px] uppercase font-sans font-medium shrink-0">User:</span>
-                          <span className="font-bold text-indigo-600 dark:text-indigo-400 select-all truncate">{inspectedStudent.examUsername}</span>
+                      <div className="space-y-1.5 pt-1 w-full">
+                        <div className="flex items-center justify-between gap-2 text-xs font-mono bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1.5 rounded-lg border border-neutral-200/80 dark:border-neutral-700/80">
+                          <span className="text-neutral-500 text-[10px] uppercase font-sans font-medium tracking-wider shrink-0">User Ujian</span>
+                          <span className="font-bold text-indigo-600 dark:text-indigo-400 select-all tracking-tight truncate">{inspectedStudent.examUsername}</span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/admin/student-credentials?search=${encodeURIComponent(inspectedStudent.nisn || inspectedStudent.name)}`)}
-                          className="text-[10px] text-emerald-600 dark:text-emerald-400 font-sans font-medium underline hover:opacity-80 shrink-0 ml-1 cursor-pointer"
-                          title="Buka Halaman Kredensial"
-                        >
-                          Kelola &rarr;
-                        </button>
+                        <div className="flex items-center justify-between gap-2 text-xs font-mono bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1.5 rounded-lg border border-neutral-200/80 dark:border-neutral-700/80">
+                          <span className="text-neutral-500 text-[10px] uppercase font-sans font-medium tracking-wider shrink-0">Sandi Sesi</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 select-all tracking-wider">{inspectedStudent.examPassword}</span>
+                        </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between text-[11px] text-neutral-400 italic py-0.5">
-                        <span>Belum di-generate</span>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/admin/student-credentials?search=${encodeURIComponent(inspectedStudent.nisn || inspectedStudent.name)}`)}
-                          className="text-[10px] text-emerald-600 dark:text-emerald-400 not-italic font-sans font-medium underline hover:opacity-80 cursor-pointer"
-                        >
-                          Buat Sekarang &rarr;
-                        </button>
+                      <div className="flex items-center justify-between text-[11px] text-neutral-400 italic py-1">
+                        <span>Belum dibuat</span>
+                        {role === "admin" && (
+                          <button
+                            type="button"
+                            onClick={() => handleRegenerateExamCredentials(inspectedStudent)}
+                            className="text-[10px] text-emerald-600 dark:text-emerald-400 not-italic font-sans font-semibold underline hover:opacity-80 cursor-pointer"
+                          >
+                            Buat Sesi &rarr;
+                          </button>
+                        )}
                       </div>
                     )}
                   </InspectorField>
@@ -1816,14 +1814,26 @@ const StudentsPage = () => {
                           Edit
                         </InspectorButton>
                       )}
-                      <InspectorButton
-                        variant="secondary"
-                        icon={KeyRound}
-                        onClick={() => navigate(`/admin/student-credentials?search=${encodeURIComponent(inspectedStudent.nisn || inspectedStudent.name)}`)}
-                        title="Kelola Username & Sandi Sesi Ujian"
-                      >
-                        Kredensial
-                      </InspectorButton>
+                      {role === "admin" && (
+                        <InspectorButton
+                          variant="secondary"
+                          icon={KeyRound}
+                          onClick={() => handleResetPassword(inspectedStudent)}
+                          title={`Reset sandi ${terminology.student.toLowerCase()} ke default`}
+                        >
+                          Reset Sandi
+                        </InspectorButton>
+                      )}
+                      {role === "admin" && (
+                        <InspectorButton
+                          variant="secondary"
+                          icon={Sparkles}
+                          onClick={() => handleRegenerateExamCredentials(inspectedStudent)}
+                          title="Generate / Perbarui Sandi Sesi Ujian"
+                        >
+                          Buat Sesi
+                        </InspectorButton>
+                      )}
                       <InspectorButton
                         variant="secondary"
                         icon={Printer}
@@ -1839,6 +1849,14 @@ const StudentsPage = () => {
                         title="Lihat Rekap Nilai Ujian"
                       >
                         Rekap Nilai
+                      </InspectorButton>
+                      <InspectorButton
+                        variant="secondary"
+                        icon={ClipboardList}
+                        onClick={() => handleViewInterest(inspectedStudent)}
+                        title="Bakat & Minat"
+                      >
+                        Bakat/Minat
                       </InspectorButton>
                       {role === "admin" && (
                         <InspectorButton
