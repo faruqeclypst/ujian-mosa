@@ -171,7 +171,7 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
     setIsUploadingDirect(true);
     try {
       const compressed = await compressImage(file);
-      const schoolFolder = school?.slug || "unknown";
+      const schoolFolder = school?.slug || school?.id || "default";
       const uploaded = await uploadInventoryImage(
         `schools/${schoolFolder}/gallery`,
         compressed

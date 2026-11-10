@@ -8,18 +8,26 @@ import { compressImage } from "./imageCompression";
 
 // Fallback bawaan (sesuai cloudflare-worker/README.md) agar upload tetap jalan
 // walau env lupa di-set saat build. Ini endpoint publik, bukan kredensial.
-// Env tetap diprioritaskan bila di-set.
 const DEFAULT_R2_WORKER_URL = "https://examku-worker.faruq-blogger.workers.dev";
 const DEFAULT_R2_PUBLIC_BASE_URL = "https://assets.examku.my.id";
 
-export const getR2WorkerUrl = (): string =>
-  ((import.meta.env.VITE_R2_WORKER_URL as string | undefined) || DEFAULT_R2_WORKER_URL).replace(/\/$/, "");
+export const getR2WorkerUrl = (): string => {
+  const envUrl = (import.meta.env.VITE_R2_WORKER_URL as string | undefined)?.trim();
+  // ⚠️ PENTING: Jika menunjuk ke r2-delete-worker, paksa fallback ke examku-worker.
+  // r2-delete-worker khusus delete aplikasi lain (tu-mosa) dan akan crash bila menerima upload multipart (insiden 2026-10-08).
+  if (!envUrl || envUrl.includes("r2-delete-worker")) {
+    return DEFAULT_R2_WORKER_URL;
+  }
+  return envUrl.replace(/\/$/, "");
+};
 
-export const getR2PublicBaseUrl = (): string =>
-  ((import.meta.env.VITE_R2_PUBLIC_BASE_URL as string | undefined) || DEFAULT_R2_PUBLIC_BASE_URL).replace(/\/$/, "");
-
-const workerUrl = getR2WorkerUrl();
-const publicBaseUrl = getR2PublicBaseUrl();
+export const getR2PublicBaseUrl = (): string => {
+  const envUrl = (import.meta.env.VITE_R2_PUBLIC_BASE_URL as string | undefined)?.trim();
+  if (!envUrl || envUrl.includes("pub-a1193e163fef41c9afc15d1334b8740b.r2.dev")) {
+    return DEFAULT_R2_PUBLIC_BASE_URL;
+  }
+  return envUrl.replace(/\/$/, "");
+};
 
 export interface UploadResult {
   key: string;
@@ -61,7 +69,10 @@ async function calculateFileHash(file: File): Promise<string> {
 }
 
 async function uploadViaWorker(folder: string, file: File): Promise<UploadResult> {
-  if (!workerUrl) {
+  const activeWorkerUrl = getR2WorkerUrl();
+  const activePublicBaseUrl = getR2PublicBaseUrl();
+
+  if (!activeWorkerUrl) {
     throw new Error("VITE_R2_WORKER_URL is not configured. Cannot upload without a backend worker.");
   }
 
@@ -78,7 +89,7 @@ async function uploadViaWorker(folder: string, file: File): Promise<UploadResult
   formData.append("file", file, `${safeBaseName}.${ext}`);
   formData.append("contentType", file.type || getMimeTypeFromExtension(file.name));
 
-  const response = await fetch(`${workerUrl}/upload`, {
+  const response = await fetch(`${activeWorkerUrl}/upload`, {
     method: "POST",
     body: formData,
   });
@@ -89,7 +100,7 @@ async function uploadViaWorker(folder: string, file: File): Promise<UploadResult
   }
 
   // Selalu konstruksi URL dari VITE_R2_PUBLIC_BASE_URL agar tidak bergantung pada konfigurasi Worker
-  const base = (publicBaseUrl || "").replace(/\/$/, "");
+  const base = (activePublicBaseUrl || "").replace(/\/$/, "");
   const url = base ? `${base}/${key}` : key;
   return { key, url };
 }
@@ -107,9 +118,10 @@ export const isOfflineEnvironment = (): boolean => {
 
 export async function deleteImageFromStorage(key: string): Promise<void> {
   if (isOfflineEnvironment() || !key || key.startsWith("offline-") || key.startsWith("data:")) return;
-  if (!workerUrl) return;
+  const activeWorkerUrl = getR2WorkerUrl();
+  if (!activeWorkerUrl) return;
   try {
-    await fetch(workerUrl, {
+    await fetch(activeWorkerUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key }),
@@ -120,7 +132,8 @@ export async function deleteImageFromStorage(key: string): Promise<void> {
 }
 
 export async function deleteImagesFromStorage(keys: string[]): Promise<void> {
-  if (isOfflineEnvironment() || keys.length === 0 || !workerUrl) return;
+  const activeWorkerUrl = getR2WorkerUrl();
+  if (isOfflineEnvironment() || keys.length === 0 || !activeWorkerUrl) return;
   const filteredKeys = keys.filter(k => k && !k.startsWith("offline-") && !k.startsWith("data:"));
   if (filteredKeys.length === 0) return;
   // Kirim paralel, maksimal 10 sekaligus agar tidak membebani Worker

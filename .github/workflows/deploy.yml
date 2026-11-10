@@ -36,12 +36,12 @@ jobs:
           # VITE_POCKETBASE_URL kini dinamis (otomatis deteksi domain)
           VITE_APP_NAME: "EXAM-AA"
           VITE_AUTH_USERNAME_DOMAIN: "https://assets.alfaruqasri.my.id"
-          VITE_R2_BUCKET: "piket"
+          VITE_R2_BUCKET: "examku"
           VITE_R2_ENDPOINT: "https://fbb45dee06536009648061725236f3d9.r2.cloudflarestorage.com"
-          VITE_R2_PUBLIC_BASE_URL: "https://pub-a1193e163fef41c9afc15d1334b8740b.r2.dev"
+          VITE_R2_PUBLIC_BASE_URL: "https://assets.examku.my.id"
           VITE_R2_ACCESS_KEY_ID: ${{ secrets.VITE_R2_ACCESS_KEY_ID }}
           VITE_R2_SECRET_ACCESS_KEY: ${{ secrets.VITE_R2_SECRET_ACCESS_KEY }}
-          VITE_R2_WORKER_URL: "https://r2-delete-worker.faruq-blogger.workers.dev"
+          VITE_R2_WORKER_URL: "https://examku-worker.faruq-blogger.workers.dev"
           VITE_DISABLE_EXAMBRO_GUARD: "false"
           # ── WAJIB: tanpa ini build produksi jatuh ke fallback
           #    http://127.0.0.1:8090 -> login superadmin pasti gagal (CORS).
