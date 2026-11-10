@@ -477,6 +477,7 @@ export function NeonTable<T>({
                 return (
                   <React.Fragment key={key}>
                     <tr
+                      id={`row-${key}`}
                       onClick={() => onRowClick && onRowClick(item)}
                       className={cn(
                         "transition-colors group",

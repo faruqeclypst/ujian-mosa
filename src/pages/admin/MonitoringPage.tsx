@@ -1795,8 +1795,18 @@ const MonitoringPage = () => {
                             setExpandedstudent(next);
                             if (next && inspectedAttempt && pb) {
                               pb.collection('attempts').getOne(inspectedAttempt.id).then((rec: any) => {
-                                if (rec?.answers) setDetailAnswers((prev: any) => ({ ...prev, [inspectedAttempt.id]: rec.answers }));
+                                if (rec?.answers) {
+                                  let ans = rec.answers;
+                                  if (typeof ans === "string") {
+                                    try { ans = JSON.parse(ans); } catch {}
+                                  }
+                                  setDetailAnswers((prev: any) => ({ ...prev, [inspectedAttempt.id]: ans }));
+                                }
                               }).catch(() => {});
+                              setTimeout(() => {
+                                const el = document.getElementById(`row-${inspectedStudent.id}`);
+                                if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                              }, 100);
                             }
                           }}
                         >

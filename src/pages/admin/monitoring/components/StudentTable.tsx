@@ -36,6 +36,32 @@ import { MathText } from "../../../../components/ui/MathText";
 import { StudentTimer } from "./StudentTimer";
 import { getTargetQuestions, computeQuestionScore, getQuestionDetailInfo, stripHtmlTags } from "../utils/helpers";
 
+const parseAnswersObj = (ans: any): Record<string, any> => {
+  if (!ans) return {};
+  if (typeof ans === "string") {
+    try {
+      const parsed = JSON.parse(ans);
+      return (parsed && typeof parsed === "object") ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return typeof ans === "object" ? ans : {};
+};
+
+const parseOverridesObj = (ovr: any): Record<string, boolean> => {
+  if (!ovr) return {};
+  if (typeof ovr === "string") {
+    try {
+      const parsed = JSON.parse(ovr);
+      return (parsed && typeof parsed === "object") ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return typeof ovr === "object" ? ovr : {};
+};
+
 export interface StudentTableProps {
   students: any[];
   attempts: any[];
@@ -607,9 +633,9 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
         key: "actions",
         header: "Aksi",
         align: "right",
-        width: "60px",
-        className: "w-14 sm:w-[90px] shrink-0",
-        headerClassName: "w-14 sm:w-[90px]",
+        width: "96px",
+        className: "w-24 min-w-[96px] shrink-0 px-2 sm:px-3 text-right",
+        headerClassName: "w-24 min-w-[96px] px-2 sm:px-3 text-right",
         render: (student) => {
           const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
           const isExpanded = expandedstudent === student.id;
@@ -624,31 +650,35 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
                     onClick={() => {
                       const next = isExpanded ? null : student.id;
                       setExpandedstudent(next);
+                      if (setInspectedStudentId) setInspectedStudentId(student.id);
                       if (next && attempt && pb) {
                         pb.collection('attempts').getOne(attempt.id).then((rec: any) => {
-                          if (rec?.answers) setDetailAnswers((prev: any) => ({ ...prev, [attempt.id]: rec.answers }));
+                          if (rec?.answers) {
+                            const ans = parseAnswersObj(rec.answers);
+                            setDetailAnswers((prev: any) => ({ ...prev, [attempt.id]: ans }));
+                          }
                         }).catch(() => {});
                       }
                     }}
                     className={cn(
-                      "h-7 w-7 rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 transition-colors cursor-pointer",
+                      "h-7 w-7 rounded-md border transition-colors cursor-pointer shrink-0",
                       isExpanded
-                        ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5"
-                        : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 shadow-xs"
+                        : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                     )}
                     title={isExpanded ? "Tutup Lembar Jawaban" : "Lihat Lembar Jawaban"}
                   >
-                    {isExpanded ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    {isExpanded ? <EyeOff className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> : <Eye className="h-3.5 w-3.5" />}
                   </Button>
 
                   {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
-                    <div className="relative">
+                    <div className="relative shrink-0">
                       <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => setOpenMenuId(openMenuId === student.id ? null : student.id)}
                         className={cn(
-                          "h-7 w-7 rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 transition-colors cursor-pointer text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800",
+                          "h-7 w-7 rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 transition-colors cursor-pointer text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 shrink-0",
                           openMenuId === student.id && "bg-neutral-100 dark:bg-neutral-800"
                         )}
                         title="Opsi Siswa"
@@ -735,8 +765,22 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
   // 3. Render Expanded Row (Lembar Jawaban Siswa - Neon Style)
   const renderExpandedStudentRow = (student: any) => {
     const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
-    const sisAnswers = (attempt && detailAnswers[attempt.id]) || attempt?.answers || {};
+    const rawAnswers = (attempt && detailAnswers[attempt.id])
+      || attempt?.answers
+      || (student && answersList[student.id])
+      || {};
+    const sisAnswers = parseAnswersObj(rawAnswers);
+    const rawOverrides = attempt?.overrides || (sisAnswers as any)?.__overrides__ || {};
+    const overrides = parseOverridesObj(rawOverrides);
     const targetQuestions = getTargetQuestions(monitorQuestions, sisAnswers, monitorRoom?.max_questions);
+
+    if (!targetQuestions || targetQuestions.length === 0) {
+      return (
+        <div className="p-6 text-center text-xs text-neutral-500 dark:text-neutral-400 bg-neutral-50/60 dark:bg-[#070809]">
+          Belum ada butir soal yang dimuat untuk ruang ujian ini.
+        </div>
+      );
+    }
 
     return (
       <div className="p-4 bg-neutral-50/60 dark:bg-[#070809] border-t border-neutral-200 dark:border-neutral-800/80">
@@ -917,15 +961,20 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
                       if (status === "empty") {
                         return <span className="text-[10px] text-neutral-400 italic">(Belum dijawab)</span>;
                       }
-                      if (typeof ans === "object") {
+                      if (ans && typeof ans === "object") {
                         return Object.entries(ans).map(([k, v]) => `${k}: ${v}`).join(", ");
                       }
-                      const strAns = String(ans).trim();
+                      const strAns = ans !== undefined && ans !== null ? String(ans).trim() : "";
+                      if (!strAns) {
+                        return <span className="text-[10px] text-neutral-400 italic">(Belum dijawab)</span>;
+                      }
                       if (q.choices && q.choices[strAns.toLowerCase()]) {
+                        const choiceObj = q.choices[strAns.toLowerCase()];
+                        const choiceText = (choiceObj && typeof choiceObj === "object") ? (choiceObj.text || "") : String(choiceObj || "");
                         return (
                           <span className="inline-flex items-baseline gap-1">
                             <span>{strAns.toUpperCase()}.</span>
-                            <MathText content={q.choices[strAns.toLowerCase()].text || ""} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" />
+                            <MathText content={choiceText} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" />
                           </span>
                         );
                       }
@@ -1082,7 +1131,26 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
       selectedKeys={selectedStudentIds}
       onSelectionChange={setSelectedStudentIds}
       activeKey={inspectedStudentId ?? undefined}
-      onRowClick={(student) => setInspectedStudentId && setInspectedStudentId(student.id)}
+      onRowClick={(student) => {
+        if (setInspectedStudentId) {
+          if (inspectedStudentId === student.id) {
+            // Klik baris siswa yang sedang aktif untuk toggle buka/tutup lembar jawaban cards
+            const next = expandedstudent === student.id ? null : student.id;
+            setExpandedstudent(next);
+            const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
+            if (next && attempt && pb) {
+              pb.collection('attempts').getOne(attempt.id).then((rec: any) => {
+                if (rec?.answers) {
+                  const ans = parseAnswersObj(rec.answers);
+                  setDetailAnswers((prev: any) => ({ ...prev, [attempt.id]: ans }));
+                }
+              }).catch(() => {});
+            }
+          } else {
+            setInspectedStudentId(student.id);
+          }
+        }
+      }}
       batchActions={
         (role === "admin" || (role === "teacher" && teacherFullAccess)) ? (
           <div className="flex items-center gap-1.5 flex-wrap">
