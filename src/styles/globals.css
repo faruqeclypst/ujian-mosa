@@ -512,45 +512,79 @@ body {
 .premium-math {
   font-size: 1.05em;
   line-height: 1.5;
+  overflow: visible !important;
 }
 
-/* Inline KaTeX — allow horizontal scroll if too wide on mobile */
+.premium-math .html-segment {
+  overflow: visible !important;
+}
+
+/* Ketika ql-editor digunakan di MathText / pratinjau / lembar ujian (bukan editor aktif) */
+.math-content.ql-editor,
+.math-content .ql-editor,
+.math-content {
+  overflow: visible !important;
+}
+
+/* Inline KaTeX */
 .premium-math .katex {
   font-size: 1.15em !important;
   color: inherit;
-  white-space: nowrap;
   max-width: 100%;
+  overflow: visible !important;
 }
 
-/* Wrap inline katex in scrollable container when it overflows */
+/* Inline KaTeX HTML rendering — bebas scrollbar horizontal & vertikal */
 .premium-math .katex-html {
   max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible !important;
   display: inline-block;
   vertical-align: middle;
-  -webkit-overflow-scrolling: touch;
 }
 
-/* Display/block KaTeX */
+/* Display/block KaTeX — tampil rapi & utuh tanpa scrollbar */
 .premium-math .katex-display {
   margin: 0.5em 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible !important;
   padding: 0.25em 0;
-  -webkit-overflow-scrolling: touch;
   max-width: 100%;
 }
 
 .premium-math .katex-display > .katex {
   max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible !important;
 }
 
 /* Fix for small symbols in inline mode when using \displaystyle */
 .premium-math .katex .mtable {
   vertical-align: middle !important;
+  overflow: visible !important;
+}
+
+/* Sembunyikan seluruh scrollbar horizontal dan vertikal di seluruh turunan rumus KaTeX */
+.premium-math,
+.premium-math *,
+.premium-math .katex,
+.premium-math .katex-html,
+.premium-math .katex-display,
+.premium-math .katex-display > .katex,
+.katex,
+.katex * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.premium-math::-webkit-scrollbar,
+.premium-math *::-webkit-scrollbar,
+.premium-math .katex::-webkit-scrollbar,
+.premium-math .katex-html::-webkit-scrollbar,
+.premium-math .katex-display::-webkit-scrollbar,
+.premium-math .katex-display > .katex::-webkit-scrollbar,
+.katex::-webkit-scrollbar,
+.katex *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .dark .premium-math .katex {

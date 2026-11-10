@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Globe, Key, Layers, Target, Info, MoreHorizontal, Filter, RotateCw } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, Function, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Globe, Key, Layers, Target, Info, MoreHorizontal, Filter, RotateCw } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
@@ -44,6 +44,7 @@ import FormField from "../../components/forms/FormField";
 import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage, safeDeleteImage, safeDeleteImages, getR2WorkerUrl, getR2PublicBaseUrl } from "../../lib/storage";
 import { compressImage } from "../../lib/imageCompression";
 import { SharedGalleryModal } from "../../components/dialogs/SharedGalleryModal";
+import { EquationStudioModal } from "../../components/dialogs/EquationStudioModal";
 import { autoFindValidatedImage, insertImageIntoQuestionText } from "../../lib/imageSearch";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
@@ -2577,6 +2578,54 @@ const QuestionsPage = () => {
     setIsPickerOpen(true);
   }, []);
 
+  // ── Visual Equation Studio State & Handlers ──
+  const [equationTarget, setEquationTarget] = useState<{
+    quillInstance: any;
+    quillIndex: number;
+    selectionLength?: number;
+  } | null>(null);
+  const [isEquationModalOpen, setIsEquationModalOpen] = useState(false);
+  const [initialEquationLatex, setInitialEquationLatex] = useState("");
+
+  const formulaHandler = useCallback(function (this: any) {
+    const quill = this.quill;
+    const range = quill.getSelection();
+    const cursorIndex = range ? range.index : quill.getLength();
+    const selectionLength = range ? range.length : 0;
+
+    let selectedText = "";
+    if (range && range.length > 0) {
+      selectedText = quill.getText(range.index, range.length).trim();
+      selectedText = selectedText.replace(/^\$\$?/, "").replace(/\$\$?$/, "").trim();
+    }
+
+    setEquationTarget({
+      quillInstance: quill,
+      quillIndex: cursorIndex,
+      selectionLength,
+    });
+    setInitialEquationLatex(selectedText);
+    setIsEquationModalOpen(true);
+  }, []);
+
+  const handleInsertEquation = useCallback((latex: string, isBlock: boolean) => {
+    if (!equationTarget?.quillInstance) return;
+    const quill = equationTarget.quillInstance;
+    const index = equationTarget.quillIndex;
+    const selectionLength = equationTarget.selectionLength || 0;
+
+    if (selectionLength > 0) {
+      quill.deleteText(index, selectionLength, "user");
+    }
+
+    const wrapped = isBlock ? `\n$$ ${latex} $$\n` : `$ ${latex} $ `;
+    quill.insertText(index, wrapped, "user");
+    quill.setSelection(index + wrapped.length, 0);
+
+    setIsEquationModalOpen(false);
+    setEquationTarget(null);
+  }, [equationTarget]);
+
   const quillModules = useMemo(() => ({
     toolbar: {
       container: [
@@ -2588,7 +2637,8 @@ const QuestionsPage = () => {
         ['image', 'formula', 'code-block', 'clean']
       ],
       handlers: {
-        image: imageHandler
+        image: imageHandler,
+        formula: formulaHandler
       }
     },
     clipboard: {
@@ -2661,7 +2711,7 @@ const QuestionsPage = () => {
       parchment: Quill.import('parchment'),
       modules: ['Resize', 'DisplaySize', 'Toolbar']
     }
-  }), [imageHandler]);
+  }), [imageHandler, formulaHandler]);
 
   const quillModulesChoice = useMemo(() => ({
     toolbar: {
@@ -2671,7 +2721,8 @@ const QuestionsPage = () => {
         ['formula', 'image', 'clean']
       ],
       handlers: {
-        image: imageHandler
+        image: imageHandler,
+        formula: formulaHandler
       }
     },
     clipboard: {
@@ -2723,7 +2774,7 @@ const QuestionsPage = () => {
       parchment: Quill.import('parchment'),
       modules: ['Resize', 'DisplaySize', 'Toolbar']
     }
-  }), [imageHandler]);
+  }), [imageHandler, formulaHandler]);
 
 
 
@@ -6487,6 +6538,21 @@ const QuestionsPage = () => {
                 </button>
               }
             >
+              <div className="pt-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEquationTarget(null);
+                    setInitialEquationLatex("");
+                    setIsEquationModalOpen(true);
+                  }}
+                  className="w-full py-1.5 px-2.5 rounded-lg border border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Function className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Buka Equation Studio</span>
+                </button>
+              </div>
+
               {isGuideOpen && (
                 <div className="pt-1 space-y-1.5 text-[11px] text-neutral-600 dark:text-neutral-400 border-t border-neutral-200/60 dark:border-neutral-800/60">
                   <p><strong className="text-neutral-800 dark:text-neutral-200">Stimulus AKM:</strong> Kelompokkan butir dengan GroupId sama agar berbagi narasi stimulus.</p>
@@ -6989,11 +7055,11 @@ Aturan:
                           </div>
                           <span className="text-xs text-slate-400 italic">Sesuai tampilan ujian siswa</span>
                         </div>
-                        <div className="p-3.5 bg-white dark:bg-slate-950 rounded-lg border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                        <div className="p-3.5 bg-white dark:bg-slate-950 rounded-lg border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-visible">
                           <MathText
                             key={formValues.text}
                             content={formValues.text || '<p class="text-slate-400 italic">Pertanyaan masih kosong...</p>'}
-                            className="text-sm font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200 leading-relaxed"
+                            className="text-sm font-serif ql-editor !p-0 !overflow-visible text-slate-800 dark:text-slate-200 leading-relaxed"
                           />
                         </div>
                       </div>
@@ -9280,6 +9346,18 @@ Aturan:
                 }
           }
         />
+
+        {/* 🧮 Visual Equation Studio Modal */}
+        <EquationStudioModal
+          isOpen={isEquationModalOpen}
+          onClose={() => {
+            setIsEquationModalOpen(false);
+            setEquationTarget(null);
+          }}
+          onInsert={handleInsertEquation}
+          initialLatex={initialEquationLatex}
+        />
+
         <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
           <DialogContent className="max-w-sm bg-card p-4">
             <DialogHeader>

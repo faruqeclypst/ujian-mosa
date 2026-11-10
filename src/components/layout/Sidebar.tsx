@@ -43,6 +43,7 @@ import Logo from "./logo";
 import { useAuth } from "../../context/AuthContext";
 import { useSidebar } from "../../context/SidebarContext";
 import { useTenant } from "../../context/TenantContext";
+import { openCbtConnect } from "../dialogs/CbtConnectModal";
 import { useExamData } from "../../context/ExamDataContext";
 import { masterPb } from "../../lib/pocketbase";
 import { Skeleton } from "../ui/skeleton";
@@ -396,17 +397,18 @@ const Sidebar = () => {
               </div>
             </div>
 
-            {/* Connect Button */}
+            {/* Connect / Portal Siswa Button */}
             <button
               type="button"
               onClick={() => {
+                openCbtConnect();
                 const el = document.getElementById("connect-trigger-btn");
                 if (el) el.click();
               }}
               className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-md transition-colors shadow-2xs cursor-pointer"
             >
               <Zap className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Connect</span>
+              <span>Portal Siswa &amp; QR</span>
             </button>
           </div>
         ) : (
@@ -416,6 +418,7 @@ const Sidebar = () => {
                 <button
                   type="button"
                   onClick={() => {
+                    openCbtConnect();
                     const el = document.getElementById("connect-trigger-btn");
                     if (el) el.click();
                   }}
@@ -425,7 +428,7 @@ const Sidebar = () => {
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">
-                <p className="font-semibold text-xs">Connect — Parameter CBT</p>
+                <p className="font-semibold text-xs">Portal Siswa, QR &amp; Exambro</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -929,13 +932,14 @@ const Sidebar = () => {
               type="button"
               onClick={() => {
                 closeMobile();
+                openCbtConnect();
                 const el = document.getElementById("connect-trigger-btn");
                 if (el) el.click();
               }}
               className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-md transition-colors"
             >
               <Zap className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Connect</span>
+              <span>Portal Siswa &amp; QR</span>
             </button>
           </div>
 

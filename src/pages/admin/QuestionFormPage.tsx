@@ -17,6 +17,7 @@ import FormField from "../../components/forms/FormField";
 import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage, safeDeleteImage, safeDeleteImages, getR2WorkerUrl, getR2PublicBaseUrl } from "../../lib/storage";
 import { compressImage } from "../../lib/imageCompression";
 import { SharedGalleryModal } from "../../components/dialogs/SharedGalleryModal";
+import { EquationStudioModal } from "../../components/dialogs/EquationStudioModal";
 import { insertImageIntoQuestionText } from "../../lib/imageSearch";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
@@ -2371,6 +2372,54 @@ const QuestionFormPage = () => {
     setIsPickerOpen(true);
   }, []);
 
+  // ── Visual Equation Studio State & Handlers ──
+  const [equationTarget, setEquationTarget] = useState<{
+    quillInstance: any;
+    quillIndex: number;
+    selectionLength?: number;
+  } | null>(null);
+  const [isEquationModalOpen, setIsEquationModalOpen] = useState(false);
+  const [initialEquationLatex, setInitialEquationLatex] = useState("");
+
+  const formulaHandler = useCallback(function (this: any) {
+    const quill = this.quill;
+    const range = quill.getSelection();
+    const cursorIndex = range ? range.index : quill.getLength();
+    const selectionLength = range ? range.length : 0;
+
+    let selectedText = "";
+    if (range && range.length > 0) {
+      selectedText = quill.getText(range.index, range.length).trim();
+      selectedText = selectedText.replace(/^\$\$?/, "").replace(/\$\$?$/, "").trim();
+    }
+
+    setEquationTarget({
+      quillInstance: quill,
+      quillIndex: cursorIndex,
+      selectionLength,
+    });
+    setInitialEquationLatex(selectedText);
+    setIsEquationModalOpen(true);
+  }, []);
+
+  const handleInsertEquation = useCallback((latex: string, isBlock: boolean) => {
+    if (!equationTarget?.quillInstance) return;
+    const quill = equationTarget.quillInstance;
+    const index = equationTarget.quillIndex;
+    const selectionLength = equationTarget.selectionLength || 0;
+
+    if (selectionLength > 0) {
+      quill.deleteText(index, selectionLength, "user");
+    }
+
+    const wrapped = isBlock ? `\n$$ ${latex} $$\n` : `$ ${latex} $ `;
+    quill.insertText(index, wrapped, "user");
+    quill.setSelection(index + wrapped.length, 0);
+
+    setIsEquationModalOpen(false);
+    setEquationTarget(null);
+  }, [equationTarget]);
+
   const quillModules = useMemo(() => ({
     toolbar: {
       container: [
@@ -2382,7 +2431,8 @@ const QuestionFormPage = () => {
         ['image', 'formula', 'code-block', 'clean']
       ],
       handlers: {
-        image: imageHandler
+        image: imageHandler,
+        formula: formulaHandler
       }
     },
     clipboard: {
@@ -2455,7 +2505,7 @@ const QuestionFormPage = () => {
       parchment: Quill.import('parchment'),
       modules: ['Resize', 'DisplaySize', 'Toolbar']
     }
-  }), [imageHandler]);
+  }), [imageHandler, formulaHandler]);
 
   const quillModulesChoice = useMemo(() => ({
     toolbar: {
@@ -2465,7 +2515,8 @@ const QuestionFormPage = () => {
         ['formula', 'image', 'clean']
       ],
       handlers: {
-        image: imageHandler
+        image: imageHandler,
+        formula: formulaHandler
       }
     },
     clipboard: {
@@ -2517,7 +2568,7 @@ const QuestionFormPage = () => {
       parchment: Quill.import('parchment'),
       modules: ['Resize', 'DisplaySize', 'Toolbar']
     }
-  }), [imageHandler]);
+  }), [imageHandler, formulaHandler]);
 
 
 
@@ -5758,11 +5809,11 @@ const QuestionFormPage = () => {
                           </div>
                           <span className="text-xs text-slate-400 italic">Sesuai tampilan ujian siswa</span>
                         </div>
-                        <div className="p-3.5 bg-white dark:bg-slate-950 rounded-lg border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                        <div className="p-3.5 bg-white dark:bg-slate-950 rounded-lg border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-visible">
                           <MathText
                             key={formValues.text}
                             content={formValues.text || '<p class="text-slate-400 italic">Pertanyaan masih kosong...</p>'}
-                            className="text-sm font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200 leading-relaxed"
+                            className="text-sm font-serif ql-editor !p-0 !overflow-visible text-slate-800 dark:text-slate-200 leading-relaxed"
                           />
                         </div>
                       </div>
@@ -7197,6 +7248,18 @@ const QuestionFormPage = () => {
                 }
           }
         />
+
+        {/* 🧮 Visual Equation Studio Modal */}
+        <EquationStudioModal
+          isOpen={isEquationModalOpen}
+          onClose={() => {
+            setIsEquationModalOpen(false);
+            setEquationTarget(null);
+          }}
+          onInsert={handleInsertEquation}
+          initialLatex={initialEquationLatex}
+        />
+
         <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
           <DialogContent className="max-w-sm bg-card p-4">
             <DialogHeader>

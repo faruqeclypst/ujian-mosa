@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import QRCode from "qrcode";
-import { 
-  Printer, 
-  Eye, 
-  EyeOff, 
-  Upload, 
-  ChevronLeft, 
-  ChevronRight, 
-  ZoomIn, 
-  ZoomOut, 
+import {
+  Printer,
+  Eye,
+  EyeOff,
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
   SlidersHorizontal,
   X
 } from "lucide-react";
@@ -21,6 +21,7 @@ import type { StudentData, ClassData } from "../../types/exam";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { generateExamUsername, generateExamPassword } from "../../utils/examCredentials";
+import { getStudentPortalOrigin, encodeStudentCardVerifyPayload } from "../../utils/domainHelper";
 import { Sparkles, KeyRound, Check, Loader2 } from "lucide-react";
 
 export interface PrintExamCardsDialogProps {
@@ -55,9 +56,28 @@ export const PrintExamCardsDialog = ({
   const qrCacheRef = useRef<Map<string, string>>(new Map());
 
   const getStudentQrText = (st: StudentData) => {
-    return credentialMode === "exam"
+    const isExamCred = credentialMode === "exam";
+    const username = isExamCred
       ? (st.examUsername || generateExamUsername(st.nisn || (st as any).username || st.id.substring(0, 8), examPrefix))
       : (st.examNumber || (st as any).username || st.nisn);
+
+    const roomVal = st.room || defaultRoom;
+    const sessionVal = st.session || defaultSession;
+
+    const portalOrigin = getStudentPortalOrigin(school?.slug);
+    const token = encodeStudentCardVerifyPayload({
+      id: st.id,
+      u: username,
+      n: st.name || "-",
+      c: st.className || "",
+      en: st.examNumber || "",
+      r: roomVal || "",
+      s: sessionVal || "",
+      slug: school?.slug || "",
+      sn: school?.name || "",
+    });
+
+    return `${portalOrigin}/verifikasi-kartu?code=${encodeURIComponent(token)}`;
   };
 
   // Pengaturan Cepat
@@ -190,7 +210,7 @@ export const PrintExamCardsDialog = ({
           });
           qrCacheRef.current.set(qrText, url);
           entries[st.id] = url;
-        } catch {}
+        } catch { }
       }
       if (isMounted) {
         setQrCodes(prev => ({ ...prev, ...entries }));
@@ -253,7 +273,7 @@ export const PrintExamCardsDialog = ({
   const renderLeftLogoPlaceholder = (heightPx: number) => {
     const widthPx = Math.round(heightPx * 1.05);
     return (
-      <div 
+      <div
         style={{
           width: widthPx + "px",
           height: heightPx + "px",
@@ -270,23 +290,23 @@ export const PrintExamCardsDialog = ({
           flexShrink: 0
         }}
       >
-        <span style={{ 
-          fontSize: is4Cards ? "7px" : "6px", 
-          fontWeight: 800, 
-          letterSpacing: "0.5px", 
-          color: "#334155", 
-          textTransform: "uppercase", 
-          lineHeight: 1 
+        <span style={{
+          fontSize: is4Cards ? "7px" : "6px",
+          fontWeight: 800,
+          letterSpacing: "0.5px",
+          color: "#334155",
+          textTransform: "uppercase",
+          lineHeight: 1
         }}>
           LOGO
         </span>
-        <span style={{ 
-          fontSize: is4Cards ? "6px" : "5px", 
-          fontWeight: 700, 
-          color: "#64748b", 
-          textTransform: "uppercase", 
-          lineHeight: 1, 
-          marginTop: "2px" 
+        <span style={{
+          fontSize: is4Cards ? "6px" : "5px",
+          fontWeight: 700,
+          color: "#64748b",
+          textTransform: "uppercase",
+          lineHeight: 1,
+          marginTop: "2px"
         }}>
           KIRI
         </span>
@@ -298,17 +318,17 @@ export const PrintExamCardsDialog = ({
     if (!showLeftLogo) return null;
     if (customLeftLogoUrl) {
       return (
-        <img 
-          src={customLeftLogoUrl} 
-          alt="Logo Kiri" 
-          style={{ 
-            height: heightPx + 'px', 
-            width: "auto", 
+        <img
+          src={customLeftLogoUrl}
+          alt="Logo Kiri"
+          style={{
+            height: heightPx + 'px',
+            width: "auto",
             maxHeight: heightPx + 'px',
             maxWidth: Math.round(heightPx * 1.35) + 'px',
-            objectFit: "contain", 
-            display: "block" 
-          }} 
+            objectFit: "contain",
+            display: "block"
+          }}
         />
       );
     }
@@ -327,18 +347,18 @@ export const PrintExamCardsDialog = ({
       const schoolLogoUrl = (school as any)?.logo_url || (school as any)?.logo;
       if (schoolLogoUrl && !schoolLogoFailed) {
         return (
-          <img 
-            src={schoolLogoUrl} 
-            alt="Logo Sekolah" 
+          <img
+            src={schoolLogoUrl}
+            alt="Logo Sekolah"
             onError={() => setSchoolLogoFailed(true)}
-            style={{ 
-              height: heightPx + 'px', 
-              width: "auto", 
+            style={{
+              height: heightPx + 'px',
+              width: "auto",
               maxHeight: heightPx + 'px',
               maxWidth: Math.round(heightPx * 1.35) + 'px',
-              objectFit: "contain", 
-              display: "block" 
-            }} 
+              objectFit: "contain",
+              display: "block"
+            }}
           />
         );
       }
@@ -348,17 +368,17 @@ export const PrintExamCardsDialog = ({
     if (type === "custom") {
       if (customUrl) {
         return (
-          <img 
-            src={customUrl} 
-            alt="Logo" 
-            style={{ 
-              height: heightPx + 'px', 
-              width: "auto", 
+          <img
+            src={customUrl}
+            alt="Logo"
+            style={{
+              height: heightPx + 'px',
+              width: "auto",
               maxHeight: heightPx + 'px',
               maxWidth: Math.round(heightPx * 1.35) + 'px',
-              objectFit: "contain", 
-              display: "block" 
-            }} 
+              objectFit: "contain",
+              display: "block"
+            }}
           />
         );
       }
@@ -391,7 +411,7 @@ export const PrintExamCardsDialog = ({
               });
               qrCacheRef.current.set(qrText, url);
               newEntries[st.id] = url;
-            } catch {}
+            } catch { }
           }
         }
         setQrCodes(prev => ({ ...prev, ...newEntries }));
@@ -401,28 +421,28 @@ export const PrintExamCardsDialog = ({
       await new Promise(r => setTimeout(r, 120));
 
       const printArea = document.getElementById("anbk-print-payload-hidden");
-    if (!printArea) {
-      window.print();
-      return;
-    }
+      if (!printArea) {
+        window.print();
+        return;
+      }
 
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    document.body.appendChild(iframe);
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
 
-    const doc = iframe.contentWindow?.document;
-    if (!doc) {
-      window.print();
-      return;
-    }
+      const doc = iframe.contentWindow?.document;
+      if (!doc) {
+        window.print();
+        return;
+      }
 
-    doc.open();
-    doc.write(`
+      doc.open();
+      doc.write(`
       <!DOCTYPE html>
       <html>
         <head>
@@ -488,17 +508,17 @@ export const PrintExamCardsDialog = ({
         </body>
       </html>
     `);
-    doc.close();
+      doc.close();
 
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
       setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 3000);
-    }, 400);
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 3000);
+      }, 400);
     } finally {
       setIsPreparingPrint(false);
     }
@@ -521,11 +541,11 @@ export const PrintExamCardsDialog = ({
 
     const displayPassword = showPassword
       ? (isExamCred
-          ? (student.examPassword || cachedExamPasswords.current[student.id] || "28327*")
-          : (student.password || "12345678"))
+        ? (student.examPassword || cachedExamPasswords.current[student.id] || "28327*")
+        : (student.password || "12345678"))
       : "*********";
     const birthText = formatBirthInfo(student.birthPlace, student.birthDate);
-    
+
     const roomVal = student.room || defaultRoom;
     const sessionVal = student.session || defaultSession;
     const roomSessionDisplay = [roomVal, sessionVal].filter(Boolean).join(" / ");
@@ -540,11 +560,11 @@ export const PrintExamCardsDialog = ({
     const sideColWidth = isAnyLogoVisible ? `${logoSlotWidth}px` : "0px";
 
     return (
-      <div 
+      <div
         key={student.id}
         className="card-item"
-        style={{ 
-          boxSizing: "border-box", 
+        style={{
+          boxSizing: "border-box",
           backgroundColor: "#ffffff",
           color: "#000000",
           fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif",
@@ -561,8 +581,8 @@ export const PrintExamCardsDialog = ({
       >
         {/* 1. KOP KARTU RESMI KEDINASAN (TEKS TENGAH SELALU PERSIS DI TENGAH SECARA MATEMATIS) */}
         <div style={{ marginBottom: is4Cards ? "8px" : "5px" }}>
-          <div 
-            style={{ 
+          <div
+            style={{
               display: "grid",
               gridTemplateColumns: `${sideColWidth} 1fr ${sideColWidth}`,
               alignItems: "stretch",
@@ -574,12 +594,12 @@ export const PrintExamCardsDialog = ({
             }}
           >
             {/* Slot Logo Kiri */}
-            <div 
-              style={{ 
-                width: sideColWidth, 
+            <div
+              style={{
+                width: sideColWidth,
                 height: headerHeight + "px",
-                display: "flex", 
-                alignItems: "center", 
+                display: "flex",
+                alignItems: "center",
                 justifyContent: "flex-start",
                 overflow: "hidden"
               }}
@@ -588,9 +608,9 @@ export const PrintExamCardsDialog = ({
             </div>
 
             {/* Teks Kop Tengah (Selalu di Tengah Persis) */}
-            <div 
-              style={{ 
-                width: "100%", 
+            <div
+              style={{
+                width: "100%",
                 height: headerHeight + "px",
                 display: "flex",
                 flexDirection: "column",
@@ -600,11 +620,11 @@ export const PrintExamCardsDialog = ({
                 overflow: "hidden"
               }}
             >
-              <div style={{ 
-                fontSize: is4Cards ? "11.5px" : "9.5px", 
-                fontWeight: 800, 
-                textTransform: "uppercase", 
-                letterSpacing: "0.5px", 
+              <div style={{
+                fontSize: is4Cards ? "11.5px" : "9.5px",
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
                 color: "#000000",
                 lineHeight: 1,
                 margin: 0,
@@ -612,10 +632,10 @@ export const PrintExamCardsDialog = ({
               }}>
                 KARTU TANDA PESERTA UJIAN
               </div>
-              <div style={{ 
-                fontSize: is4Cards ? "9.5px" : "8px", 
-                fontWeight: 700, 
-                textTransform: "uppercase", 
+              <div style={{
+                fontSize: is4Cards ? "9.5px" : "8px",
+                fontWeight: 700,
+                textTransform: "uppercase",
                 color: "#1e293b",
                 lineHeight: 1,
                 margin: 0,
@@ -623,10 +643,10 @@ export const PrintExamCardsDialog = ({
               }}>
                 {examTitle}
               </div>
-              <div style={{ 
-                fontSize: is4Cards ? "11.5px" : "9.5px", 
-                fontWeight: 800, 
-                textTransform: "uppercase", 
+              <div style={{
+                fontSize: is4Cards ? "11.5px" : "9.5px",
+                fontWeight: 800,
+                textTransform: "uppercase",
                 color: "#000000",
                 lineHeight: 1,
                 margin: 0,
@@ -634,9 +654,9 @@ export const PrintExamCardsDialog = ({
               }}>
                 {school?.name || "SATUAN PENDIDIKAN"}
               </div>
-              <div style={{ 
-                fontSize: is4Cards ? "8.5px" : "7px", 
-                fontWeight: 600, 
+              <div style={{
+                fontSize: is4Cards ? "8.5px" : "7px",
+                fontWeight: 600,
                 color: "#475569",
                 lineHeight: 1,
                 margin: 0,
@@ -647,12 +667,12 @@ export const PrintExamCardsDialog = ({
             </div>
 
             {/* Slot Logo Kanan */}
-            <div 
-              style={{ 
-                width: sideColWidth, 
+            <div
+              style={{
+                width: sideColWidth,
                 height: headerHeight + "px",
-                display: "flex", 
-                alignItems: "center", 
+                display: "flex",
+                alignItems: "center",
                 justifyContent: "flex-end",
                 overflow: "hidden"
               }}
@@ -669,19 +689,19 @@ export const PrintExamCardsDialog = ({
         </div>
 
         {/* 2. BODY ATAS: PASFOTO 3X4 & BIODATA SISWA */}
-        <div 
-          style={{ 
-            display: "flex", 
-            alignItems: "flex-start", 
-            gap: is4Cards ? "12px" : "8px", 
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: is4Cards ? "12px" : "8px",
             marginBottom: is4Cards ? "8px" : "5px"
           }}
         >
           {/* Pasfoto 3x4 Formal */}
-          <div 
-            style={{ 
-              width: is4Cards ? "24mm" : "20mm", 
-              height: is4Cards ? "32mm" : "26mm", 
+          <div
+            style={{
+              width: is4Cards ? "24mm" : "20mm",
+              height: is4Cards ? "32mm" : "26mm",
               border: "1px solid #64748b",
               borderRadius: "0px",
               backgroundColor: "#f8fafc",
@@ -694,10 +714,10 @@ export const PrintExamCardsDialog = ({
             }}
           >
             {student.photo ? (
-              <img 
-                src={student.photo} 
-                alt={student.name} 
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} 
+              <img
+                src={student.photo}
+                alt={student.name}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
               />
             ) : (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2px", textAlign: "center", color: "#94a3b8" }}>
@@ -712,10 +732,10 @@ export const PrintExamCardsDialog = ({
           </div>
 
           {/* Tabel Biodata Siswa */}
-          <table 
-            style={{ 
+          <table
+            style={{
               flex: 1,
-              width: "100%", 
+              width: "100%",
               borderCollapse: "collapse",
               fontSize: is4Cards ? "9.5px" : "8.5px",
               lineHeight: is4Cards ? "1.35" : "1.25"
@@ -802,7 +822,7 @@ export const PrintExamCardsDialog = ({
         </div>
 
         {/* 3. KOTAK KREDENSIAL LOGIN CBT (BERSIH & FORMAL TANPA KOTAK PUTUS-PUTUS) */}
-        <div 
+        <div
           style={{
             border: "1px solid #334155",
             borderRadius: "0px",
@@ -847,33 +867,30 @@ export const PrintExamCardsDialog = ({
           {/* QR Code Login */}
           <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
             {qrCodes[student.id] ? (
-              <img 
-                src={qrCodes[student.id]} 
-                alt="QR Login" 
-                style={{ 
-                  width: is4Cards ? "23mm" : "18mm", 
-                  height: is4Cards ? "23mm" : "18mm", 
-                  display: "block" 
-                }} 
+              <img
+                src={qrCodes[student.id]}
+                alt="QR Login"
+                style={{
+                  width: is4Cards ? "23mm" : "18mm",
+                  height: is4Cards ? "23mm" : "18mm",
+                  display: "block"
+                }}
               />
             ) : (
-              <div 
-                style={{ 
-                  width: is4Cards ? "23mm" : "18mm", 
-                  height: is4Cards ? "23mm" : "18mm", 
+              <div
+                style={{
+                  width: is4Cards ? "23mm" : "18mm",
+                  height: is4Cards ? "23mm" : "18mm",
                   border: "1px solid #cbd5e1"
-                }} 
+                }}
               />
             )}
-            <span style={{ fontSize: "6px", fontWeight: 700, color: "#475569", marginTop: "1px", textTransform: "uppercase" }}>
-              QR Login
-            </span>
           </div>
         </div>
 
         {/* 4. FOOTER: KETENTUAN PESERTA & PENGESAHAN */}
-        <div 
-          style={{ 
+        <div
+          style={{
             borderTop: "1px solid #000000",
             paddingTop: is4Cards ? "5px" : "3px",
             display: "flex",
@@ -984,28 +1001,26 @@ export const PrintExamCardsDialog = ({
         {/* PANEL KIRI: PENGATURAN KARTU (RINGKAS & SIMPEL)           */}
         {/* ======================================================== */}
         <div className="w-full lg:w-[330px] xl:w-[350px] flex-shrink-0 bg-neutral-50/70 dark:bg-neutral-900/40 border-b lg:border-r lg:border-b-0 border-neutral-200 dark:border-neutral-800 flex flex-col overflow-y-auto p-4 space-y-3.5 text-xs h-1/2 lg:h-auto">
-          
+
           {/* Navigasi Tab Pengaturan: Cepat vs Lanjutan */}
           <div className="grid grid-cols-2 gap-1 bg-neutral-200/60 dark:bg-neutral-800/60 p-1 rounded-xl border border-neutral-200/80 dark:border-neutral-700/60">
             <button
               type="button"
               onClick={() => setActiveTab("quick")}
-              className={`py-1.5 rounded-lg font-semibold text-xs transition-all cursor-pointer ${
-                activeTab === "quick" 
-                  ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs" 
+              className={`py-1.5 rounded-lg font-semibold text-xs transition-all cursor-pointer ${activeTab === "quick"
+                  ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs"
                   : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-              }`}
+                }`}
             >
               Pengaturan Utama
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("advanced")}
-              className={`py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                activeTab === "advanced" 
-                  ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs" 
+              className={`py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer ${activeTab === "advanced"
+                  ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs"
                   : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-              }`}
+                }`}
             >
               <SlidersHorizontal className="w-3 h-3" />
               <span>Kop & TTD</span>
@@ -1020,8 +1035,8 @@ export const PrintExamCardsDialog = ({
                 <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                   Target Cetak {terminology.student}
                 </label>
-                <Select 
-                  value={printScope} 
+                <Select
+                  value={printScope}
                   onChange={(e) => setPrintScope(e.target.value as any)}
                   className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
                 >
@@ -1044,11 +1059,10 @@ export const PrintExamCardsDialog = ({
                   <button
                     type="button"
                     onClick={() => setLayoutMode("4")}
-                    className={`py-1.5 px-2 rounded-lg font-bold text-xs transition-all flex flex-col items-center justify-center cursor-pointer ${
-                      layoutMode === "4"
+                    className={`py-1.5 px-2 rounded-lg font-bold text-xs transition-all flex flex-col items-center justify-center cursor-pointer ${layoutMode === "4"
                         ? "bg-emerald-600 text-white shadow-2xs"
                         : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                    }`}
+                      }`}
                   >
                     <span>4 Kartu</span>
                     <span className="text-[9px] font-normal opacity-85">Standar (2×2)</span>
@@ -1056,11 +1070,10 @@ export const PrintExamCardsDialog = ({
                   <button
                     type="button"
                     onClick={() => setLayoutMode("6")}
-                    className={`py-1.5 px-2 rounded-lg font-bold text-xs transition-all flex flex-col items-center justify-center cursor-pointer ${
-                      layoutMode === "6"
+                    className={`py-1.5 px-2 rounded-lg font-bold text-xs transition-all flex flex-col items-center justify-center cursor-pointer ${layoutMode === "6"
                         ? "bg-emerald-600 text-white shadow-2xs"
                         : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                    }`}
+                      }`}
                   >
                     <span>6 Kartu</span>
                     <span className="text-[9px] font-normal opacity-85">Hemat (2×3)</span>
@@ -1095,11 +1108,10 @@ export const PrintExamCardsDialog = ({
                   <button
                     type="button"
                     onClick={() => setCredentialMode("exam")}
-                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      credentialMode === "exam"
+                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${credentialMode === "exam"
                         ? "bg-indigo-600 text-white shadow-2xs"
                         : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                    }`}
+                      }`}
                   >
                     <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
                     <span>Sesi Ujian (TU)</span>
@@ -1107,11 +1119,10 @@ export const PrintExamCardsDialog = ({
                   <button
                     type="button"
                     onClick={() => setCredentialMode("standard")}
-                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      credentialMode === "standard"
+                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${credentialMode === "standard"
                         ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs border border-neutral-200 dark:border-neutral-700"
                         : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                    }`}
+                      }`}
                   >
                     <KeyRound className="w-3 h-3 shrink-0" />
                     <span>Akun Siswa</span>
@@ -1171,11 +1182,10 @@ export const PrintExamCardsDialog = ({
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className={`h-6 px-2.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
-                    showPassword 
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" 
+                  className={`h-6 px-2.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer ${showPassword
+                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
                       : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
-                  }`}
+                    }`}
                 >
                   {showPassword ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                   <span>{showPassword ? "Tampil" : "Sensor"}</span>
@@ -1222,11 +1232,10 @@ export const PrintExamCardsDialog = ({
                     <button
                       type="button"
                       onClick={() => setShowLeftLogo(!showLeftLogo)}
-                      className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
-                        showLeftLogo 
-                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" 
+                      className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${showLeftLogo
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
                           : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
-                      }`}
+                        }`}
                     >
                       {showLeftLogo ? "Aktif" : "Nonaktif"}
                     </button>
@@ -1236,9 +1245,9 @@ export const PrintExamCardsDialog = ({
                     <div className="space-y-1.5 pt-1 border-t border-neutral-100 dark:border-neutral-800">
                       {customLeftLogoUrl ? (
                         <div className="flex items-center gap-2">
-                          <img 
-                            src={customLeftLogoUrl} 
-                            alt="Logo Kiri" 
+                          <img
+                            src={customLeftLogoUrl}
+                            alt="Logo Kiri"
                             className="w-8 h-8 object-contain rounded border border-neutral-200 dark:border-neutral-700 bg-white"
                           />
                           <div className="flex-1 min-w-0 flex flex-col gap-1">
@@ -1309,9 +1318,9 @@ export const PrintExamCardsDialog = ({
                     <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
                       {customRightLogoUrl ? (
                         <div className="flex items-center gap-2">
-                          <img 
-                            src={customRightLogoUrl} 
-                            alt="Logo Kanan" 
+                          <img
+                            src={customRightLogoUrl}
+                            alt="Logo Kanan"
                             className="w-8 h-8 object-contain rounded border border-neutral-200 dark:border-neutral-700 bg-white"
                           />
                           <NeonButton
@@ -1357,11 +1366,10 @@ export const PrintExamCardsDialog = ({
                   <button
                     type="button"
                     onClick={() => setShowBirthInfo(!showBirthInfo)}
-                    className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
-                      showBirthInfo 
-                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" 
+                    className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${showBirthInfo
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
                         : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
-                    }`}
+                      }`}
                   >
                     {showBirthInfo ? "Aktif" : "Sembunyi"}
                   </button>
@@ -1372,11 +1380,10 @@ export const PrintExamCardsDialog = ({
                   <button
                     type="button"
                     onClick={() => setShowRoomSession(!showRoomSession)}
-                    className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
-                      showRoomSession 
-                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" 
+                    className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${showRoomSession
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
                         : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
-                    }`}
+                      }`}
                   >
                     {showRoomSession ? "Aktif" : "Sembunyi"}
                   </button>
@@ -1536,26 +1543,26 @@ export const PrintExamCardsDialog = ({
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Silakan sesuaikan target siswa di panel sebelah kiri.</p>
               </div>
             ) : (
-              <div 
-                style={{ 
-                  transform: `scale(${previewZoom})`, 
+              <div
+                style={{
+                  transform: `scale(${previewZoom})`,
                   transformOrigin: "top center",
-                  transition: "transform 0.15s ease-out" 
+                  transition: "transform 0.15s ease-out"
                 }}
                 className="transition-all"
               >
                 {/* Tampilan 1 Lembar A4 yang Sedang Aktif di Pratinjau */}
                 {(() => {
                   const pageStudents = studentsToPrint.slice(
-                    currentPreviewPage * cardsPerPage, 
+                    currentPreviewPage * cardsPerPage,
                     (currentPreviewPage + 1) * cardsPerPage
                   );
 
                   return (
-                    <div 
+                    <div
                       className="bg-white text-black shadow-xl rounded-none border border-neutral-300"
-                      style={{ 
-                        width: "210mm", 
+                      style={{
+                        width: "210mm",
                         height: "282mm",
                         maxHeight: "282mm",
                         padding: "6mm 6mm",
@@ -1584,16 +1591,16 @@ export const PrintExamCardsDialog = ({
         <div id="anbk-print-payload-hidden" style={{ display: "none" }}>
           {Array.from({ length: totalPages }).map((_, pageIdx) => {
             const pageStudents = studentsToPrint.slice(
-              pageIdx * cardsPerPage, 
+              pageIdx * cardsPerPage,
               (pageIdx + 1) * cardsPerPage
             );
 
             return (
-              <div 
+              <div
                 key={pageIdx}
                 className="a4-page"
-                style={{ 
-                  width: "100%", 
+                style={{
+                  width: "100%",
                   height: "282mm",
                   maxHeight: "282mm",
                   display: "grid",

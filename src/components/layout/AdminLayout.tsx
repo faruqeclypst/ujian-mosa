@@ -10,6 +10,7 @@ import TopNavigation from "./TopNavigation";
 import { useSidebar } from "../../context/SidebarContext";
 import { useTenant } from "../../context/TenantContext";
 import AdminAICopilot from "../copilot/AdminAICopilot";
+import { CbtConnectModal } from "../dialogs/CbtConnectModal";
 
 export interface AdminLayoutProps {
   children?: ReactNode;
@@ -57,6 +58,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
       {/* 🤖 Floating AI Copilot (Kanan Bawah) */}
       <AdminAICopilot />
+
+      {/* ⚡ Global CBT Connect & Portal Siswa Modal */}
+      <CbtConnectModal />
     </div>
     </TooltipProvider>
   );

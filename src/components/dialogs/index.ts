@@ -31,4 +31,10 @@ export * from "./StudentProfileDialog";
 export { AIChatQuestionDrawer } from "./AIChatQuestionDrawer";
 export * from "./AIChatQuestionDrawer";
 
+export { default as CbtConnectModal } from "./CbtConnectModal";
+export * from "./CbtConnectModal";
+
+export { default as EquationStudioModal } from "./EquationStudioModal";
+export * from "./EquationStudioModal";
+
 

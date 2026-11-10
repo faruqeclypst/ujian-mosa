@@ -27,6 +27,7 @@ const StudentDashboardPage = lazy(() => import("./pages/student/StudentDashboard
 const StudentProfilePage = lazy(() => import("./pages/student/StudentProfilePage"));
 const CBTPage = lazy(() => import("./pages/student/CBTPage"));
 const InterestSurveyPage = lazy(() => import("./pages/student/InterestSurveyPage"));
+const VerifyStudentCardPage = lazy(() => import("./pages/student/VerifyStudentCardPage"));
 
 import NotFoundPage from "./pages/NotFoundPage";
 import { SplashScreen } from "@capacitor/splash-screen";
@@ -123,9 +124,10 @@ const SchoolAppContent = () => {
   }, [school]);
 
   const isStudentRoute = location.pathname.startsWith("/exam") || location.pathname.startsWith("/cbt") || location.pathname.startsWith("/minat-bakat");
+  const isPublicRoute = location.pathname.startsWith("/verifikasi-kartu") || location.pathname.startsWith("/verify-card") || location.pathname.startsWith("/unduh") || location.pathname.startsWith("/token-view");
 
-  // Route-aware auth loading: Rute siswa hanya menunggu studentLoading, rute admin hanya menunggu adminLoading
-  const isCurrentAuthLoading = isAdminRoute ? adminLoading : isStudentRoute ? studentLoading : (adminLoading && studentLoading);
+  // Route-aware auth loading: Rute publik tidak perlu menunggu auth, rute siswa hanya menunggu studentLoading, rute admin hanya menunggu adminLoading
+  const isCurrentAuthLoading = isPublicRoute ? false : isAdminRoute ? adminLoading : isStudentRoute ? studentLoading : (adminLoading && studentLoading);
 
   useEffect(() => {
     if (!tenantLoading && !isCurrentAuthLoading) {
@@ -169,7 +171,11 @@ const SchoolAppContent = () => {
               path="/exam"
               element={
                 <ExambroGuard>
-                  {student && student.hasChangedPassword ? <StudentDashboardPage /> : <StudentLoginPage />}
+                  {student && (student.hasChangedPassword || (typeof window !== "undefined" && sessionStorage.getItem("logged_via_exam_credentials") === "true")) ? (
+                    <StudentDashboardPage />
+                  ) : (
+                    <StudentLoginPage />
+                  )}
                 </ExambroGuard>
               }
             />
@@ -257,6 +263,8 @@ const SchoolAppContent = () => {
             <Route path="/token-view" element={<TokenViewPage />} />
             <Route path="/unduh" element={<DownloadAppsPage />} />
             <Route path="/download" element={<Navigate to="/unduh" replace />} />
+            <Route path="/verifikasi-kartu" element={<VerifyStudentCardPage />} />
+            <Route path="/verify-card" element={<Navigate to="/verifikasi-kartu" replace />} />
             {/* Simulasi ujian untuk guru — full-screen seperti CBT siswa, guard di dalam komponen */}
             <Route path="/admin/simulate/:examId" element={<ExamSimulatePage />} />
             <Route path="/auth/google/callback" element={<GoogleAuthCallbackPage />} />

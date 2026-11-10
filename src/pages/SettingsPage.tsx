@@ -353,14 +353,14 @@ const SettingsPage = () => {
     },
     {
       id: "klasifikasi",
-      label: "Klasifikasi",
+      label: "Klasifikasi (UNSTABLE)",
       description: "Mengelompokkan opsi ke wadah kategori yang ditentukan",
       category: "Interaktif",
       icon: LayoutGrid,
     },
     {
       id: "hotspot",
-      label: "Hotspot Gambar",
+      label: "Hotspot Gambar (UNSTABLE)",
       description: "Memilih area koordinat tertentu pada gambar stimulus",
       category: "Visual",
       icon: ImageIcon,
@@ -516,7 +516,7 @@ const SettingsPage = () => {
           if (errData.error?.message) errMsg = errData.error.message;
           else if (errData.error) errMsg = typeof errData.error === 'string' ? errData.error : JSON.stringify(errData.error);
           else if (errData.message) errMsg = errData.message;
-        } catch {}
+        } catch { }
         setRemoteModels([]);
         addToast({
           title: "Endpoint Model Tidak Tersedia",

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { fadeUp } from "../../lib/motion";
 import { Capacitor } from "@capacitor/core";
@@ -14,9 +15,10 @@ import { User, Lock, GraduationCap, School, Eye, EyeOff, Sun, Moon, HardDrive, G
 import { isLocalServer } from "../landing/SelectSchoolPage";
 
 const StudentLoginPage = () => {
-  const { student, loginStudent, changePassword } = useStudentAuth();
+  const { student, loginStudent, logoutStudent, changePassword } = useStudentAuth();
   const { pb, school, setManualSchool, terminology } = useTenant();
   const { actualTheme, toggleTheme } = useTheme();
+  const [searchParams] = useSearchParams();
 
   // Uncontrolled inputs via ref — cegah re-render tiap ketik (lag di mobile)
   const nisnRef = useRef<HTMLInputElement>(null);
@@ -146,6 +148,16 @@ const StudentLoginPage = () => {
 
     fetchSettings();
   }, [pb, school?.name]);
+
+
+  // ── Pre-fill Username dari parameter jika diarahkan dari kartu verifikasi ──
+  useEffect(() => {
+    const paramUser = searchParams.get("u") || searchParams.get("username") || searchParams.get("nisn");
+    if (paramUser && nisnRef.current) {
+      nisnRef.current.value = paramUser.trim();
+      passwordRef.current?.focus();
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -372,7 +384,8 @@ const StudentLoginPage = () => {
                   ) : "Masuk Sekarang"}
                 </Button>
               </div>
-            </form>
+
+              </form>
           </CardContent>
         </Card>
 

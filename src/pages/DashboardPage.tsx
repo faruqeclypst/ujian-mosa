@@ -40,6 +40,7 @@ import { useExamData } from "../context/ExamDataContext";
 import { useToast } from "../components/ui/toast";
 import { APP_DISPLAY_VERSION } from "../utils/version";
 import { getStudentExamUrl } from "../utils/domainHelper";
+import { openCbtConnect } from "../components/dialogs/CbtConnectModal";
 import { Button } from "../components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -101,7 +102,6 @@ export default function DashboardPage() {
   const [attempts, setAttempts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCopiedShare, setIsCopiedShare] = useState(false);
-  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isBranchCollapsed, setIsBranchCollapsed] = useState(false);
@@ -139,13 +139,6 @@ export default function DashboardPage() {
       return "2026-04-20 03:35:56";
     }
   }, [school?.created]);
-
-  // Connect Trigger Listener
-  useEffect(() => {
-    const handleOpenConnect = () => setIsConnectModalOpen(true);
-    window.addEventListener("open-cbt-connect", handleOpenConnect);
-    return () => window.removeEventListener("open-cbt-connect", handleOpenConnect);
-  }, []);
 
   // ── Data Fetching & Subscriptions ──
   useEffect(() => {
@@ -351,7 +344,7 @@ export default function DashboardPage() {
 
   return (
     <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
-      <button id="connect-trigger-btn" onClick={() => setIsConnectModalOpen(true)} className="hidden" aria-hidden="true" tabIndex={-1} />
+      <button id="connect-trigger-btn" onClick={openCbtConnect} className="hidden" aria-hidden="true" tabIndex={-1} />
 
       {/* ── Main Container (3-Column Layout: Left Nav is in AdminLayout, Center Content + Right Sidebar Inspector) ── */}
       <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
@@ -462,7 +455,7 @@ export default function DashboardPage() {
                           type="button"
                           onClick={() => {
                             setIsMoreMenuOpen(false);
-                            setIsConnectModalOpen(true);
+                            openCbtConnect();
                           }}
                           className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 transition-colors cursor-pointer"
                         >
@@ -919,7 +912,7 @@ export default function DashboardPage() {
                 <div className="space-y-1.5 pt-1">
                   <button
                     type="button"
-                    onClick={() => setIsConnectModalOpen(true)}
+                    onClick={openCbtConnect}
                     className="w-full py-1.5 px-2.5 text-xs font-semibold rounded-md border border-emerald-500/80 text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 transition-colors shadow-2xs cursor-pointer"
                   >
                     Buka Parameter Koneksi
@@ -938,119 +931,6 @@ export default function DashboardPage() {
 
         </div>
       </div>
-
-
-      {/* ── Modal: Parameter Koneksi (Connect Dialog with AnimatePresence) ── */}
-      <AnimatePresence>
-        {isConnectModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="w-full max-w-lg rounded-xl border border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-900 p-6 shadow-2xl space-y-5"
-            >
-              <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-md bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                    <Wifi className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-                      Parameter Koneksi Server CBT &amp; {terminology.student}
-                    </h3>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                      Gunakan tautan atau konfigurasi ini untuk siswa dan pengawas ruangan
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsConnectModalOpen(false)}
-                  className="h-7 w-7 rounded-md text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-center cursor-pointer transition-colors"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="space-y-4 text-xs">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                    URL Login {terminology.student} (CBT Web / Exambro Kiosk)
-                  </label>
-                  <div className="flex items-center gap-2 p-2 rounded-md bg-neutral-100 dark:bg-neutral-800 font-mono text-[11px] text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700">
-                    <span className="flex-1 truncate">{studentExamUrl}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(studentExamUrl, "URL Siswa")}
-                      className="p-1 text-neutral-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {universalToken && (
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                      Token Ujian Universal Aktif
-                    </label>
-                    <div className="flex items-center gap-2 p-2.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 font-mono text-sm font-bold">
-                      <span className="flex-1 tracking-widest">{universalToken}</span>
-                      {timeLeft && <span className="text-xs font-normal text-amber-600">Sisa Waktu: {timeLeft}</span>}
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                    Informasi Engine &amp; Status Server
-                  </label>
-                  <div className="p-2.5 rounded-md bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 space-y-1.5">
-                    <div className="flex justify-between">
-                      <span className="text-neutral-500 dark:text-neutral-400">Database Backend:</span>
-                      <span className="font-medium text-neutral-900 dark:text-neutral-100">PocketBase (SQLite WAL Mode)</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-neutral-500 dark:text-neutral-400">Proteksi Navigasi:</span>
-                      <span className="font-medium text-emerald-600 dark:text-emerald-400">Exambro Anti-Curang Aktif</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-neutral-500 dark:text-neutral-400">Latensi Koneksi:</span>
-                      <span className="font-medium text-neutral-900 dark:text-neutral-100">&lt; 2 ms (Sangat Cepat)</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-neutral-500 dark:text-neutral-400">Kapasitas Sesi:</span>
-                      <span className="font-medium text-neutral-900 dark:text-neutral-100">{totalStudents} / {quota} {terminology.student}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsConnectModalOpen(false)}
-                >
-                  Tutup
-                </Button>
-                <Button
-                  variant="neon"
-                  size="sm"
-                  onClick={() => {
-                    setIsConnectModalOpen(false);
-                    navigate("/admin/unduh-aplikasi");
-                  }}
-                >
-                  Unduh Exambro {terminology.student}
-                </Button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
 
       {/* ── Modal: Panduan Pengawas CBT (with AnimatePresence) ── */}

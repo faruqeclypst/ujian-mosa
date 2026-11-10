@@ -858,7 +858,7 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                 <div style={{ fontSize: `${15 * fontSize}px` }}>
                   <MathText
                     content={f.groupText || f.text}
-                    className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
+                    className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 !overflow-visible selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
                   />
                 </div>
 
@@ -874,7 +874,7 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
           <div style={{ fontSize: `${16 * fontSize}px` }}>
             <MathText
               content={question.text}
-              className={`ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-slate-900 dark:[&_strong]:text-white [&_b]:text-slate-900 dark:[&_b]:text-white [&_p]:mb-2.5 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
+              className={`ql-editor !p-0 !overflow-visible font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-slate-900 dark:[&_strong]:text-white [&_b]:text-slate-900 dark:[&_b]:text-white [&_p]:mb-2.5 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
             />
           </div>
 
