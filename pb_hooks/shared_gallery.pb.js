@@ -104,7 +104,7 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                 const tId = r.teacherId || "";
                 const tName = r.teacherName || "Admin / Sistem";
                 const eTitle = r.examTitle || "";
-                const isOwn = (callerRole === "admin") || (callerTeacherId && tId === callerTeacherId);
+                const isOwn = (callerTeacherId && tId === callerTeacherId) || (!tId && (callerRole === "admin" || !callerTeacherId));
                 imageMap[url] = {
                     id: r.id || ("sg_" + i),
                     url: url,
@@ -187,7 +187,7 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                 const tId = q.teacherId || "";
                 const tName = q.teacherName || (tId ? "Guru" : "Admin / Sistem");
                 const eTitle = q.examTitle || "Soal Ujian";
-                const isOwn = (callerRole === "admin") || (callerTeacherId && tId === callerTeacherId);
+                const isOwn = (callerTeacherId && tId === callerTeacherId) || (!tId && (callerRole === "admin" || !callerTeacherId));
 
                 function handleFoundUrl(rawUrl) {
                     if (!rawUrl) return;

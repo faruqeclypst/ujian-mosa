@@ -14,10 +14,12 @@ import HotspotAreaEditor, { type HotspotArea } from "../../components/question-e
 import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
+import { NeonButton } from "../../components/ui/NeonButton";
 import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage, safeDeleteImage, safeDeleteImages, getR2WorkerUrl, getR2PublicBaseUrl } from "../../lib/storage";
 import { compressImage } from "../../lib/imageCompression";
 import { SharedGalleryModal } from "../../components/dialogs/SharedGalleryModal";
 import { EquationStudioModal } from "../../components/dialogs/EquationStudioModal";
+import { AIChatQuestionDrawer } from "../../components/dialogs/AIChatQuestionDrawer";
 import { insertImageIntoQuestionText } from "../../lib/imageSearch";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
@@ -1248,6 +1250,7 @@ const QuestionFormPage = () => {
   };
 
   // AI States
+  const [isAIChatDrawerOpen, setIsAIChatDrawerOpen] = useState(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isAIGenerating, setIsAIGenerating] = useState(false);
   const [isAIGeneratingDirect, setIsAIGeneratingDirect] = useState(false);
@@ -2065,6 +2068,44 @@ const QuestionFormPage = () => {
       stopAIProgress(!isAIGenerating);
       setIsAIGenerating(false);
       aiAbortRef.current = null;
+    }
+  };
+
+  const handleApplyAIQuestions = (generated: any[]) => {
+    if (!generated || generated.length === 0) return;
+    if (generated.length === 1) {
+      const q = generated[0];
+      setFormValues((prev) => ({
+        ...prev,
+        text: q.text || prev.text,
+        type: (q.type as QuestionType) || prev.type,
+        choices: q.choices || prev.choices,
+        answerKey: q.answerKey || q.correctKey || prev.answerKey,
+      }));
+      addToast({
+        type: "success",
+        title: "Soal AI Diterapkan",
+        description: "Konten butir soal dari Asisten Chat AI berhasil disalin ke formulir.",
+      });
+    } else {
+      const questionsForReview = generated.map((q, idx) => ({
+        id: `ai_${Date.now()}_${idx}`,
+        text: q.text || "",
+        type: q.type || "pilihan_ganda",
+        choices: q.choices || {},
+        correctKey: q.correctKey || q.answerKey || "a",
+        answerKey: q.answerKey || q.correctKey || "",
+        groupId: q.groupId || "",
+        groupText: q.groupText || "",
+        isFromAI: true
+      }));
+      setBatchQuestions(questionsForReview);
+      setIsBatchModalOpen(true);
+      addToast({
+        type: "success",
+        title: "Soal Siap Ditinjau",
+        description: `${generated.length} butir soal dari Asisten AI telah masuk ke peninjauan.`,
+      });
     }
   };
   const [batchQuestions, setBatchQuestions] = useState<any[]>([
@@ -5448,6 +5489,21 @@ const QuestionFormPage = () => {
 
           {/* Right: Actions Toolbar */}
           <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            {/* ASISTEN AI CHAT BUTTON - Tersedia untuk SEMUA Guru & Admin */}
+            {(role === "admin" || role === "teacher") && (
+              <NeonButton
+                variant="outline"
+                color="brand"
+                size="sm"
+                onClick={() => setIsAIChatDrawerOpen(true)}
+                className="h-9 gap-1.5"
+                title="Buka Asisten Chat AI untuk membuat atau memperbaiki butir soal"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Chat AI</span>
+              </NeonButton>
+            )}
+
             {/* Preview Toggle Button */}
             <button
               type="button"
@@ -7260,6 +7316,18 @@ const QuestionFormPage = () => {
           }}
           onInsert={handleInsertEquation}
           initialLatex={initialEquationLatex}
+        />
+
+        {/* ASISTEN AI CHAT DRAWER */}
+        <AIChatQuestionDrawer
+          isOpen={isAIChatDrawerOpen}
+          onClose={() => setIsAIChatDrawerOpen(false)}
+          exam={{
+            id: examId || "",
+            name: exam?.title || "Ujian",
+            subject: exam?.subject || "Umum"
+          }}
+          onApplyQuestions={handleApplyAIQuestions}
         />
 
         <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>

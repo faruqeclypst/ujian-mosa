@@ -72,117 +72,171 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
   const [isUploadingDirect, setIsUploadingDirect] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load Galeri saat modal dibuka
+  // Load Galeri saat modal dibuka (menggabungkan server gallery + seluruh butir soal semua guru)
   const loadGallery = async () => {
     if (!pb) return;
     setIsLoadingGallery(true);
     try {
-      const res = await fetch(`${pb.baseUrl}/api/shared-gallery`, {
-        headers: {
-          Authorization: pb.authStore.token ? `Bearer ${pb.authStore.token}` : "",
-        },
-      });
+      const combinedMap: Record<string, SharedGalleryItem> = {};
+      const teacherMap: Record<string, { id: string; name: string; count: number }> = {};
 
-      if (res.ok) {
-        const data = await res.json();
-        const serverImages = data.images || [];
-        setTeachers(data.teachers || []);
+      const myTeacherId = currentUser?.teacherId || "";
+      const isAdmin = currentUser?.role === "admin";
 
-        if (serverImages.length > 0) {
-          setImages(serverImages);
-        } else {
-          // Jika server mengembalikan list kosong, jalankan fallback lokal client-side untuk memindai koleksi soal
-          await loadFallbackLocalGallery();
-        }
-      } else {
-        await loadFallbackLocalGallery();
-      }
-    } catch (err) {
-      console.warn("Gagal mengambil galeri bersama server, beralih ke fallback:", err);
-      await loadFallbackLocalGallery();
-    } finally {
-      setIsLoadingGallery(false);
-    }
-  };
+      // 1. Coba ambil dari endpoint backend /api/shared-gallery jika aktif
+      try {
+        const res = await fetch(`${pb.baseUrl}/api/shared-gallery`, {
+          headers: {
+            Authorization: pb.authStore.token ? `Bearer ${pb.authStore.token}` : "",
+          },
+        });
 
-  // Fallback lokal client-side jika endpoint `/api/shared-gallery` tidak merespon / belum ada data
-  const loadFallbackLocalGallery = async () => {
-    try {
-      const qRes = await pb.collection("questions").getList(1, 150, {
-        sort: "-created",
-      });
-      const localMap: Record<string, SharedGalleryItem> = {};
-      const qItems = qRes.items || [];
-
-      const addUrl = (u?: string, title = "Arsip Soal") => {
-        if (!u) return;
-        const clean = u.trim();
-        if (clean.length < 5) return;
-        if (localMap[clean]) {
-          localMap[clean].count++;
-          return;
-        }
-        localMap[clean] = {
-          id: `fb_${Object.keys(localMap).length}`,
-          url: clean,
-          title: title,
-          teacherId: currentUser?.teacherId || "",
-          teacherName: currentUser?.name || "Guru",
-          examTitle: "Bank Soal",
-          created: new Date().toISOString(),
-          count: 1,
-          isOwn: true,
-          source: "local_cache",
-        };
-      };
-
-      const scanHtml = (str?: string) => {
-        if (!str || !str.includes("<img")) return;
-        const imgRegex = /<img[^>]+src=["']([^"']+)["']/gi;
-        let m;
-        while ((m = imgRegex.exec(str)) !== null) {
-          if (m[1]) addUrl(m[1]);
-        }
-      };
-
-      const scanOptions = (opts?: any) => {
-        if (!opts) return;
-        if (typeof opts === "string") {
-          scanHtml(opts);
-          const urlRegex = /"(?:imageUrl|url|src)"\s*:\s*"([^"]+)"/g;
-          let m;
-          while ((m = urlRegex.exec(opts)) !== null) {
-            if (m[1]) addUrl(m[1]);
-          }
-        } else if (typeof opts === "object") {
-          Object.values(opts).forEach((opt: any) => {
-            if (opt?.imageUrl) addUrl(opt.imageUrl);
-            if (opt?.text) scanHtml(opt.text);
+        if (res.ok) {
+          const data = await res.json();
+          const serverImages: SharedGalleryItem[] = data.images || [];
+          serverImages.forEach((img) => {
+            if (img.url) {
+              const tId = img.teacherId || "";
+              const isOwn = (myTeacherId && tId === myTeacherId) || (!tId && isAdmin);
+              combinedMap[img.url] = {
+                ...img,
+                isOwn: !!isOwn,
+              };
+              if (tId) {
+                if (!teacherMap[tId]) {
+                  teacherMap[tId] = { id: tId, name: img.teacherName || "Guru", count: 0 };
+                }
+                teacherMap[tId].count++;
+              }
+            }
           });
         }
-      };
+      } catch (netErr) {
+        console.warn("Notice: Fetch /api/shared-gallery gagal:", netErr);
+      }
 
-      qItems.forEach((q: any) => {
-        if (q.imageUrl) addUrl(q.imageUrl);
-        scanHtml(q.text);
-        scanHtml(q.groupText);
-        scanOptions(q.options);
-      });
+      // 2. Ambil seluruh butir soal, ujian, dan data guru dari database PocketBase
+      // agar gambar dari SEMUA guru sekolah selalu muncul lengkap
+      try {
+        const [qRes, examsRes, teachersRes] = await Promise.allSettled([
+          pb.collection("questions").getList(1, 200, { sort: "-created" }),
+          pb.collection("exams").getFullList(),
+          pb.collection("teachers").getFullList(),
+        ]);
 
-      // Juga periksa konteks soal saat ini yang sedang aktif diedit di form
-      if (currentQuestionContext) {
-        scanHtml(currentQuestionContext.text);
-        if (Array.isArray(currentQuestionContext.options)) {
-          currentQuestionContext.options.forEach((optText: string) => scanHtml(optText));
+        const examToInfo: Record<string, { title: string; teacherId: string }> = {};
+        if (examsRes.status === "fulfilled" && examsRes.value) {
+          examsRes.value.forEach((ex: any) => {
+            examToInfo[ex.id] = {
+              title: ex.title || "Ujian",
+              teacherId: ex.teacherId || ex.teacherid || "",
+            };
+          });
         }
+
+        const teacherIdToName: Record<string, string> = {};
+        if (teachersRes.status === "fulfilled" && teachersRes.value) {
+          teachersRes.value.forEach((t: any) => {
+            teacherIdToName[t.id] = t.name || t.username || "Guru";
+          });
+        }
+
+        const addLocalUrl = (u?: string, qExamId?: string, customTitle?: string) => {
+          if (!u) return;
+          const clean = u.trim();
+          if (clean.length < 5) return;
+
+          const examInfo = qExamId ? examToInfo[qExamId] : undefined;
+          const tId = examInfo?.teacherId || "";
+          const tName = tId
+            ? teacherIdToName[tId] || "Guru"
+            : (isAdmin ? "Admin / Sistem" : "Guru");
+          const eTitle = examInfo?.title || customTitle || "Bank Soal";
+          const isOwn = (myTeacherId && tId === myTeacherId) || (!tId && isAdmin);
+
+          if (combinedMap[clean]) {
+            combinedMap[clean].count++;
+            if (isOwn) combinedMap[clean].isOwn = true;
+            return;
+          }
+
+          combinedMap[clean] = {
+            id: `qimg_${Object.keys(combinedMap).length}`,
+            url: clean,
+            title: eTitle,
+            teacherId: tId,
+            teacherName: tName,
+            examTitle: eTitle,
+            created: new Date().toISOString(),
+            count: 1,
+            isOwn: !!isOwn,
+            source: "questions",
+          };
+
+          if (tId) {
+            if (!teacherMap[tId]) {
+              teacherMap[tId] = { id: tId, name: tName, count: 0 };
+            }
+            teacherMap[tId].count++;
+          }
+        };
+
+        const scanHtml = (str?: string, examId?: string) => {
+          if (!str || !str.includes("<img")) return;
+          const imgRegex = /<img[^>]+src=["']([^"']+)["']/gi;
+          let m;
+          while ((m = imgRegex.exec(str)) !== null) {
+            if (m[1]) addLocalUrl(m[1], examId);
+          }
+        };
+
+        const scanOptions = (opts?: any, examId?: string) => {
+          if (!opts) return;
+          if (typeof opts === "string") {
+            scanHtml(opts, examId);
+            const urlRegex = /"(?:imageUrl|url|src)"\s*:\s*"([^"]+)"/g;
+            let m;
+            while ((m = urlRegex.exec(opts)) !== null) {
+              if (m[1]) addLocalUrl(m[1], examId);
+            }
+          } else if (typeof opts === "object") {
+            Object.values(opts).forEach((opt: any) => {
+              if (opt?.imageUrl) addLocalUrl(opt.imageUrl, examId);
+              if (opt?.text) scanHtml(opt.text, examId);
+            });
+          }
+        };
+
+        if (qRes.status === "fulfilled" && qRes.value?.items) {
+          qRes.value.items.forEach((q: any) => {
+            if (q.imageUrl) addLocalUrl(q.imageUrl, q.examId);
+            scanHtml(q.text, q.examId);
+            scanHtml(q.groupText, q.examId);
+            scanOptions(q.options, q.examId);
+          });
+        }
+
+        // 3. Scan konteks butir soal saat ini yang sedang aktif diedit di form
+        if (currentQuestionContext) {
+          const curTopic = currentQuestionContext.topic || "Soal Saat Ini";
+          scanHtml(currentQuestionContext.text);
+          if (Array.isArray(currentQuestionContext.options)) {
+            currentQuestionContext.options.forEach((optText: string) => scanHtml(optText));
+          }
+        }
+      } catch (dbErr) {
+        console.warn("Notice: scanning PB collections for gallery:", dbErr);
       }
 
-      const fallbackList = Object.values(localMap);
-      if (fallbackList.length > 0) {
-        setImages(fallbackList);
-      }
-    } catch (e) {
-      console.warn("Fallback lokal galeri notice:", e);
+      const allMergedImages = Object.values(combinedMap);
+      setImages(allMergedImages);
+
+      const mergedTeacherList = Object.values(teacherMap).sort((a, b) => b.count - a.count);
+      setTeachers(mergedTeacherList);
+    } catch (err) {
+      console.warn("Gagal memuat galeri:", err);
+    } finally {
+      setIsLoadingGallery(false);
     }
   };
 

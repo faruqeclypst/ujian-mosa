@@ -5947,8 +5947,8 @@ const QuestionsPage = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* ASISTEN AI CHAT BUTTON */}
-          {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
+          {/* ASISTEN AI CHAT BUTTON - Tersedia untuk SEMUA Guru & Admin */}
+          {(role === "admin" || role === "teacher") && (
             <NeonButton
               variant="outline"
               color="brand"
@@ -6008,7 +6008,7 @@ const QuestionsPage = () => {
                     <span className="text-[10px] text-neutral-400">Ambil dari link atau JSON Wayground</span>
                   </div>
                 </DropdownMenuItem>
-                {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
+                {(role === "admin" || role === "teacher") && (
                   <>
                     <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
                     <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
