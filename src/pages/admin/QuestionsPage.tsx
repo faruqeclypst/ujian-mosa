@@ -6355,15 +6355,20 @@ const QuestionsPage = () => {
 
                   {/* Stimulus Preview (if available) */}
                   {inspectedQuestion.groupText && (
-                    <div className="p-2.5 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 space-y-1 w-full min-w-0 max-w-full overflow-x-hidden break-words">
+                    <div className="p-2.5 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 space-y-1.5 w-full min-w-0 max-w-full overflow-x-hidden break-words">
                       <div className="flex items-center justify-between text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                        <span>Teks Stimulus (AKM)</span>
-                        <span className="font-normal lowercase">wacana terkait</span>
+                        <span className="flex items-center gap-1.5">
+                          <BookOpen className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          <span>Teks Stimulus (AKM)</span>
+                        </span>
+                        <span className="font-normal lowercase text-amber-600/80 dark:text-amber-400/80">wacana terkait</span>
                       </div>
-                      <MathText
-                        content={inspectedQuestion.groupText}
-                        className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed line-clamp-4 overflow-hidden [&_p]:m-0 [&_figure]:m-0 [&_img]:!max-h-36 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1.5 [&_img]:block"
-                      />
+                      <div className="max-h-56 overflow-y-auto pr-1">
+                        <MathText
+                          content={inspectedQuestion.groupText}
+                          className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0 [&_figure]:my-2 [&_img]:!max-h-36 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1.5 [&_img]:block [&_table]:!text-[11px] [&_table]:!my-2 [&_table]:!w-full [&_table]:!border-collapse [&_table]:!table [&_table]:clear-both [&_td]:!p-1.5 [&_td]:!px-2 [&_th]:!p-1.5 [&_th]:!px-2 [&_td]:!text-[11px] [&_th]:!text-[11px] [&_td]:!border [&_td]:!border-amber-300 dark:[&_td]:!border-amber-800/60 [&_th]:!border [&_th]:!border-amber-300 dark:[&_th]:!border-amber-800/60 [&_th]:!bg-amber-100/60 dark:[&_th]:!bg-amber-900/40"
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -6373,7 +6378,7 @@ const QuestionsPage = () => {
                     <div className="mt-1 p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800 w-full min-w-0 max-w-full overflow-x-hidden break-words">
                       <MathText
                         content={inspectedQuestion.text}
-                        className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 break-words w-full max-w-full overflow-x-hidden [&_p]:m-0 [&_figure]:m-0 [&_p]:max-w-full [&_img]:!max-h-48 sm:[&_img]:!max-h-52 [&_img]:!max-w-full [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-2 [&_img]:block [&_table]:!text-xs [&_table]:!my-2 [&_table]:!w-full [&_table]:!border-collapse [&_td]:!p-1.5 [&_td]:!px-2.5 [&_th]:!p-1.5 [&_th]:!px-2.5 [&_td]:!text-xs [&_th]:!text-xs [&_td]:!border [&_td]:!border-neutral-200 dark:[&_td]:!border-neutral-750 [&_th]:!border [&_th]:!border-neutral-200 dark:[&_th]:!border-neutral-750 [&_th]:!bg-neutral-50 dark:[&_th]:!bg-neutral-850 [&_.ql-table-embed]:!my-2 [&_.ql-table-embed]:!p-0 [&_.ql-table-embed]:!border-none [&_.ql-table-embed]:!bg-transparent shadow-2xs"
+                        className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 break-words w-full max-w-full overflow-x-hidden [&_p]:mb-2 [&_p:last-child]:mb-0 [&_figure]:m-0 [&_p]:max-w-full [&_img]:!max-h-48 sm:[&_img]:!max-h-52 [&_img]:!max-w-full [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-2 [&_img]:block [&_table]:!text-xs [&_table]:!my-2 [&_table]:!w-full [&_table]:!border-collapse [&_table]:!table [&_table]:clear-both [&_td]:!p-1.5 [&_td]:!px-2.5 [&_th]:!p-1.5 [&_th]:!px-2.5 [&_td]:!text-xs [&_th]:!text-xs [&_td]:!border [&_td]:!border-neutral-200 dark:[&_td]:!border-neutral-750 [&_th]:!border [&_th]:!border-neutral-200 dark:[&_th]:!border-neutral-750 [&_th]:!bg-neutral-50 dark:[&_th]:!bg-neutral-850 [&_.ql-table-embed]:!my-2 [&_.ql-table-embed]:!p-0 [&_.ql-table-embed]:!border-none [&_.ql-table-embed]:!bg-transparent shadow-2xs"
                       />
                     </div>
                   </div>
@@ -6968,10 +6973,12 @@ Aturan:
                             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                               Pratinjau Literasi Terpilih (Read-Only)
                             </span>
-                            <MathText
-                              content={existingLiteracies[formValues.groupId]}
-                              className="text-xs text-slate-700 dark:text-slate-300 [&_img]:max-w-[40px] line-clamp-3 leading-relaxed"
-                            />
+                            <div className="max-h-36 overflow-y-auto pr-1">
+                              <MathText
+                                content={existingLiteracies[formValues.groupId]}
+                                className="text-xs text-slate-700 dark:text-slate-300 [&_img]:max-w-[40px] leading-relaxed [&_table]:!w-full [&_table]:!table [&_table]:!text-[10px] [&_td]:!p-1 [&_th]:!p-1"
+                              />
+                            </div>
                           </div>
                         )}
                       </div>

@@ -5721,10 +5721,12 @@ const QuestionFormPage = () => {
                             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                               Pratinjau Literasi Terpilih (Read-Only)
                             </span>
-                            <MathText
-                              content={existingLiteracies[formValues.groupId]}
-                              className="text-xs text-slate-700 dark:text-slate-300 [&_img]:max-w-[40px] line-clamp-3 leading-relaxed"
-                            />
+                            <div className="max-h-36 overflow-y-auto pr-1">
+                              <MathText
+                                content={existingLiteracies[formValues.groupId]}
+                                className="text-xs text-slate-700 dark:text-slate-300 [&_img]:max-w-[40px] leading-relaxed [&_table]:!w-full [&_table]:!table [&_table]:!text-[10px] [&_td]:!p-1 [&_th]:!p-1"
+                              />
+                            </div>
                           </div>
                         )}
                       </div>
