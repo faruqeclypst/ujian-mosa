@@ -493,20 +493,28 @@ const ExamsPage = () => {
     return Array.from(set);
   }, [currentTeacher, exams, teacherId, user]);
 
+  // Apakah bank soal ini benar-benar dibuat oleh guru login saat ini
+  const isRealOwner = useCallback((exam: any) => {
+    if (!exam) return false;
+    const examTeacherId = exam.teacherId || exam.teacherid;
+    if (teacherId && examTeacherId === teacherId) return true;
+    if (user?.id && examTeacherId === user.id) return true;
+    return false;
+  }, [teacherId, user?.id]);
+
+  // Hak akses mengelola/mengedit (admin atau pemilik asli atau full access)
   const isOwner = useCallback((exam: any) => {
     if (role === "admin") return true;
     if (teacherFullAccess) return true;
-    if (!teacherId && !user?.id) return false;
-    // Dukung format lama (user?.id) dan baru (teacherId) serta case sensitivity
-    const examTeacherId = exam.teacherId || exam.teacherid;
-    return examTeacherId === teacherId || examTeacherId === user?.id;
-  }, [role, teacherId, user, teacherFullAccess]);
+    return isRealOwner(exam);
+  }, [role, teacherFullAccess, isRealOwner]);
 
   const isMgmpExam = useCallback((exam: any) => {
     if (!exam || !exam.subjectId) return false;
-    if (isOwner(exam)) return false;
+    if (isRealOwner(exam)) return false;
+    if (role === "admin") return false;
     return mySubjectIds.includes(exam.subjectId);
-  }, [isOwner, mySubjectIds]);
+  }, [isRealOwner, role, mySubjectIds]);
 
   const canEditExam = useCallback((exam: any) => {
     if (isOwner(exam)) return true;
@@ -531,8 +539,8 @@ const ExamsPage = () => {
   }, [exams]);
 
   const myExamsCount = useMemo(() => {
-    return tabExams.filter(e => isOwner(e)).length;
-  }, [tabExams, isOwner]);
+    return tabExams.filter(e => isRealOwner(e)).length;
+  }, [tabExams, isRealOwner]);
 
   const mgmpExamsCount = useMemo(() => {
     return tabExams.filter(e => isMgmpExam(e)).length;
@@ -540,7 +548,7 @@ const ExamsPage = () => {
 
   const displayExams = useMemo(() => {
     return tabExams.filter(exam => {
-      if (ownerFilter === "mine" && !isOwner(exam)) {
+      if (ownerFilter === "mine" && !isRealOwner(exam)) {
         return false;
       }
       if (ownerFilter === "mgmp" && !isMgmpExam(exam)) {
@@ -1679,6 +1687,8 @@ const ExamsPage = () => {
       render: (exam) => {
         const qCount = questionCounts[exam.id] || 0;
         const subject = subjects.find((s: any) => s.id === exam.subjectId)?.name || (exam as any).subjectName || "-";
+        const teacherObj = teachers.find((t: any) => t.id === (exam.teacherId || (exam as any).teacherid));
+        const teacherName = teacherObj?.name || (exam as any).teacherName || "rekan guru";
 
         return (
           <div className="flex flex-col gap-1 py-0.5 min-w-0">
@@ -1698,17 +1708,16 @@ const ExamsPage = () => {
                 {exam.examType || "Latihan"}
               </span>
 
-              {/* Status Kepemilikan & MGMP Badges */}
-              {isOwner(exam) ? (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                  Milik Saya
+              {/* Tampilkan badge HANYA jika soal milik orang lain (guru rekan / MGMP), untuk soal milik sendiri TIDAK perlu badge */}
+              {role !== "admin" && !isRealOwner(exam) && (
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 shrink-0 cursor-help transition-colors hover:bg-neutral-200/70 dark:hover:bg-neutral-700/70"
+                  title={`Soal milik ${teacherName}`}
+                >
+                  <Users className="h-3 w-3 text-neutral-400" />
+                  <span>{isMgmpExam(exam) ? "MGMP" : "Soal Rekan"}</span>
                 </span>
-              ) : isMgmpExam(exam) ? (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20 shrink-0" title="Bank soal dari rekan guru pengampu mata pelajaran yang sama">
-                  <Users className="h-3 w-3" />
-                  MGMP
-                </span>
-              ) : null}
+              )}
 
               {exam.is_mgmp_shared && (
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20 shrink-0" title="Kolaborasi Terbuka: Guru se-mapel dapat mengedit & menambah butir soal bersama">
@@ -1879,7 +1888,7 @@ const ExamsPage = () => {
         );
       },
     },
-  ], [questionCounts, subjects, teachers, terminology, isOwner, isMgmpExam, canEditExam, navigate, handleBatchExport, role, handleDuplicateExam, handleEditClick, activeTab, handleArchiveExam, handleRestoreExam, handleDeleteClick]);
+  ], [questionCounts, subjects, teachers, terminology, isOwner, isRealOwner, isMgmpExam, canEditExam, navigate, handleBatchExport, role, handleDuplicateExam, handleEditClick, activeTab, handleArchiveExam, handleRestoreExam, handleDeleteClick]);
 
   return (
     <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
@@ -2252,10 +2261,10 @@ const ExamsPage = () => {
                     <InspectorField
                       label="Status Akses & Kolaborasi"
                       value={
-                        isOwner(inspectedExam) ? (
+                        role === "admin" ? (
                           <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                              Milik Saya
+                            <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                              Akses Penuh Administrator
                             </span>
                             {inspectedExam.is_mgmp_shared && (
                               <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20">
@@ -2263,10 +2272,24 @@ const ExamsPage = () => {
                               </span>
                             )}
                           </div>
-                        ) : isMgmpExam(inspectedExam) ? (
+                        ) : isRealOwner(inspectedExam) ? (
                           <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20">
-                              👥 MGMP Se-Mapel
+                            <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                              Bank Soal Saya
+                            </span>
+                            {inspectedExam.is_mgmp_shared && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20">
+                                🤝 Dibagikan ke MGMP
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span
+                              className="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20 cursor-help"
+                              title={`Soal milik ${teachers.find((t: any) => t.id === (inspectedExam.teacherId || (inspectedExam as any).teacherid))?.name || (inspectedExam as any).teacherName || "rekan guru"}`}
+                            >
+                              👥 Soal milik {teachers.find((t: any) => t.id === (inspectedExam.teacherId || (inspectedExam as any).teacherid))?.name || (inspectedExam as any).teacherName || "Rekan Guru"}
                             </span>
                             {inspectedExam.is_mgmp_shared ? (
                               <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20">
@@ -2274,14 +2297,10 @@ const ExamsPage = () => {
                               </span>
                             ) : (
                               <span className="text-[10px] text-neutral-400">
-                                (Pratinjau / Salin)
+                                (Hanya Baca / Salin)
                               </span>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-neutral-500 text-[11px] block mt-0.5">
-                            Bank Soal Sekolah
-                          </span>
                         )
                       }
                     />

@@ -2960,19 +2960,24 @@ const QuestionsPage = () => {
     return Array.from(set);
   }, [currentTeacher]);
 
+  // Apakah bank soal ini benar-benar dibuat oleh guru login saat ini
+  const isRealOwner = useMemo(() => {
+    if (!exam || (!teacherId && !user?.id)) return false;
+    const examTeacherId = exam.teacherId || exam.teacherid;
+    return examTeacherId === teacherId || examTeacherId === user?.id;
+  }, [exam, teacherId, user]);
+
+  // Hak akses mengelola/mengedit
   const isOwner = useMemo(() => {
     if (role === "admin") return true;
     if (teacherFullAccess) return true;
-    if (!exam || (!teacherId && !user?.id)) return false;
-    // Cek ID Guru (baru) atau ID Akun (lama) dan handle casing
-    const examTeacherId = exam.teacherId || exam.teacherid;
-    return examTeacherId === teacherId || examTeacherId === user?.id;
-  }, [role, exam, teacherId, user, teacherFullAccess]);
+    return isRealOwner;
+  }, [role, teacherFullAccess, isRealOwner]);
 
   const isMgmpExam = useMemo(() => {
-    if (!exam || !exam.subjectId || isOwner) return false;
+    if (!exam || !exam.subjectId || isRealOwner || role === "admin") return false;
     return mySubjectIds.includes(exam.subjectId);
-  }, [exam, isOwner, mySubjectIds]);
+  }, [exam, isRealOwner, role, mySubjectIds]);
 
   const canEdit = useMemo(() => {
     if (isOwner) return true;
@@ -3078,11 +3083,11 @@ const QuestionsPage = () => {
         { id: "s2", text: "", answer: "k2" }
       ],
       klasifikasiShuffle: true,
-    isianRumpangText: "",
-    isianRumpangBlanks: [],
-    hotspotImageUrl: "",
-    hotspotMode: "any",
-    hotspotAreas: []
+      isianRumpangText: "",
+      isianRumpangBlanks: [],
+      hotspotImageUrl: "",
+      hotspotMode: "any",
+      hotspotAreas: []
     });
     setIsLiterasiActive(false);
     setLiterasiMode("select");
@@ -4369,7 +4374,7 @@ const QuestionsPage = () => {
     );
   };
 
-    const neonColumns: NeonTableColumn<QuestionData>[] = useMemo(() => [
+  const neonColumns: NeonTableColumn<QuestionData>[] = useMemo(() => [
     {
       key: "no",
       header: "#",
@@ -5796,134 +5801,317 @@ const QuestionsPage = () => {
 
       <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
         {/* ── 1. Top Bar: Back, Breadcrumbs, Title, Metadata Pills, Top Actions ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-200 dark:border-neutral-800 relative z-30 overflow-visible">
-        <div className="flex items-start sm:items-center gap-3 min-w-0">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 shrink-0 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xs cursor-pointer"
-            onClick={() => navigate("/admin/bank-soal")}
-            title="Kembali ke Bank Soal"
-            aria-label="Kembali ke Bank Soal"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-200 dark:border-neutral-800 relative z-30 overflow-visible">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xs cursor-pointer"
+              onClick={() => navigate("/admin/bank-soal")}
+              title="Kembali ke Bank Soal"
+              aria-label="Kembali ke Bank Soal"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
 
-          <div className="min-w-0 space-y-1">
-            {/* Breadcrumb line */}
-            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 flex-wrap">
-              <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
-                Semua Modul
-              </Link>
-              <span>/</span>
-              <span className="text-neutral-700 dark:text-neutral-300 font-medium">
-                {school?.slug || "modalbangsa"}
-              </span>
-              <span>/</span>
-              <Link to="/admin/bank-soal" className="flex items-center gap-1 hover:text-neutral-800 dark:hover:text-neutral-200 font-medium transition-colors">
-                <BookOpen className="h-3.5 w-3.5 text-neutral-400" />
-                <span>bank-soal</span>
-              </Link>
-              <span>/</span>
-              <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-[200px]">
-                {exam?.title || "Daftar Butir Soal"}
-              </span>
-            </div>
-
-            {/* Title & Primary Type Badge */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-                Kelola Butir Soal
-              </h1>
-
-              {exam?.examType && (
-                <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0", getExamTypeColorClass(exam.examType))}>
-                  {exam.examType}
+            <div className="min-w-0 space-y-1">
+              {/* Breadcrumb line */}
+              <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 flex-wrap">
+                <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
+                  Semua Modul
+                </Link>
+                <span>/</span>
+                <span className="text-neutral-700 dark:text-neutral-300 font-medium">
+                  {school?.slug || "modalbangsa"}
                 </span>
-              )}
-            </div>
-
-            {/* Clean Subtitle Line: Mapel • Guru • Kepemilikan (Simpel & Rapi) */}
-            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 flex-wrap">
-              {exam?.subject && (
-                <span className="font-medium text-neutral-800 dark:text-neutral-200">
-                  {exam.subject}
+                <span>/</span>
+                <Link to="/admin/bank-soal" className="flex items-center gap-1 hover:text-neutral-800 dark:hover:text-neutral-200 font-medium transition-colors">
+                  <BookOpen className="h-3.5 w-3.5 text-neutral-400" />
+                  <span>bank-soal</span>
+                </Link>
+                <span>/</span>
+                <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-[200px]">
+                  {exam?.title || "Daftar Butir Soal"}
                 </span>
-              )}
+              </div>
 
-              {exam?.subject && (exam?.teacherName || isOwner || isMgmpExam) && (
-                <span className="text-neutral-300 dark:text-neutral-600">•</span>
-              )}
+              {/* Title & Primary Type Badge */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                  Kelola Butir Soal
+                </h1>
 
-              {exam?.teacherName && (
-                <span className="text-neutral-600 dark:text-neutral-400">
-                  {exam.teacherName}
-                  {exam.teacherCode && (
-                    <span className="text-neutral-400 font-mono text-[11px] ml-1">({exam.teacherCode})</span>
-                  )}
-                </span>
-              )}
+                {exam?.examType && (
+                  <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0", getExamTypeColorClass(exam.examType))}>
+                    {exam.examType}
+                  </span>
+                )}
+              </div>
 
-              {(isOwner || isMgmpExam || exam?.is_mgmp_shared) && (
-                <span className="text-neutral-300 dark:text-neutral-600">•</span>
-              )}
+              {/* Clean Subtitle Line: Mapel • Guru • Kepemilikan (Simpel & Rapi) */}
+              <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 flex-wrap">
+                {exam?.subject && (
+                  <span className="font-medium text-neutral-800 dark:text-neutral-200">
+                    {exam.subject}
+                  </span>
+                )}
 
-              {isOwner ? (
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                  Milik Saya
-                </span>
-              ) : isMgmpExam ? (
-                <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">
-                  <Users className="h-3 w-3" />
-                  MGMP Se-Mapel
-                </span>
-              ) : null}
+                {exam?.subject && (exam?.teacherName || isOwner || isMgmpExam) && (
+                  <span className="text-neutral-300 dark:text-neutral-600">•</span>
+                )}
 
-              {exam?.is_mgmp_shared && (
-                <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-medium ml-1">
-                  <Share2 className="h-3 w-3" />
-                  Kolaborasi Aktif
-                </span>
-              )}
+                {exam?.teacherName && (
+                  <span className="text-neutral-600 dark:text-neutral-400">
+                    {exam.teacherName}
+                    {exam.teacherCode && (
+                      <span className="text-neutral-400 font-mono text-[11px] ml-1">({exam.teacherCode})</span>
+                    )}
+                  </span>
+                )}
+
+                {/* Tampilkan badge HANYA jika soal milik rekan guru lain, untuk soal sendiri TIDAK perlu badge */}
+                {!isRealOwner && role !== "admin" && (
+                  <>
+                    <span className="text-neutral-300 dark:text-neutral-600">•</span>
+                    <span
+                      className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium cursor-help"
+                      title={`Soal milik ${exam?.teacherName || "rekan guru"}`}
+                    >
+                      <Users className="h-3 w-3" />
+                      {isMgmpExam ? "Soal Rekan (MGMP)" : "Soal Rekan"}
+                    </span>
+                  </>
+                )}
+
+                {exam?.is_mgmp_shared && (
+                  <>
+                    <span className="text-neutral-300 dark:text-neutral-600">•</span>
+                    <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-medium ml-1">
+                      <Share2 className="h-3 w-3" />
+                      Kolaborasi Aktif
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons Top Right */}
-        <div className="flex items-center gap-2 shrink-0 flex-wrap overflow-visible relative z-30">
-          {/* SALIN KE BANK SOAL SAYA (Khusus Guru MGMP yang bukan owner) */}
-          {!isOwner && isMgmpExam && (
-            <NeonButton
-              variant="primary"
-              color="brand"
-              size="sm"
-              onClick={handleDuplicateCurrentExam}
-              loading={isDuplicatingExam}
-              className="h-8 gap-1.5 shadow-sm"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              <span>Salin ke Bank Soal Saya</span>
-            </NeonButton>
-          )}
-
-          {/* OPSI DATA DROPDOWN */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+          {/* Action Buttons Top Right */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap overflow-visible relative z-30">
+            {/* SALIN KE BANK SOAL SAYA (Khusus Guru yang bukan owner) */}
+            {!isRealOwner && role !== "admin" && (
+              <NeonButton
+                variant="primary"
+                color="brand"
+                size="sm"
+                onClick={handleDuplicateCurrentExam}
+                loading={isDuplicatingExam}
+                className="h-8 gap-1.5 shadow-sm"
               >
-                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Opsi Data</span>
-                <ChevronDown className="h-3 w-3 text-neutral-400" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-2rem)] p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
-              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
-                Ambil & Salin Soal
-              </DropdownMenuLabel>
-              {canEdit && (
-                <>
+                <Copy className="h-3.5 w-3.5" />
+                <span>Salin ke Bank Soal Saya</span>
+              </NeonButton>
+            )}
+
+            {/* OPSI DATA DROPDOWN */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Opsi Data</span>
+                  <ChevronDown className="h-3 w-3 text-neutral-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-2rem)] p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                  Ambil & Salin Soal
+                </DropdownMenuLabel>
+                {canEdit && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={handleOpenBankSoalSelector}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      <div className="flex flex-col">
+                        <span className="font-semibold">Pilih dari Bank Soal</span>
+                        <span className="text-[10px] text-neutral-400">Salin dari bank soal sekolah / milik sendiri</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleOpenWaygroundImporter}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                      <div className="flex flex-col">
+                        <span className="font-semibold">Impor dari Wayground</span>
+                        <span className="text-[10px] text-neutral-400">Ambil dari link Wayground / Quizizz</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => document.getElementById("unified-import-input")?.click()}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      <Download className="h-3.5 w-3.5 rotate-180 text-blue-600 dark:text-blue-400" />
+                      <div className="flex flex-col">
+                        <span className="font-semibold">Import File Soal</span>
+                        <span className="text-[10px] text-neutral-400">Excel (.xlsx), Word (.docx), JSON</span>
+                      </div>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {questions.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                      Export Soal
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={handleExportToWord}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>Export ke Word (.docx)</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleExportToJson}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      <FileJson className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      <span>Export ke JSON</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                  Template Format
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => downloadQuestionTemplate()}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                >
+                  <Download className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Template Excel Standard</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => window.open("/templates/Template_Soal_Tabel.docx")}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                >
+                  <FileText className="h-3.5 w-3.5 text-blue-600" />
+                  <span>Template Word Tabel & Literasi</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setIsLiterasiGuideOpen(true)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/40 cursor-pointer"
+                >
+                  <BookOpen className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Panduan Soal Literasi & AKM</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* LAINNYA DROPDOWN */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5 text-neutral-500" />
+                  <span>Lainnya</span>
+                  <ChevronDown className="h-3 w-3 text-neutral-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 max-w-[calc(100vw-2rem)] p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                  Aksi Tambahan
+                </DropdownMenuLabel>
+                {examId && (
+                  <DropdownMenuItem
+                    onClick={() => navigate(`/admin/simulate/${examId}`)}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <Eye className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span>Simulasi Tampilan Siswa</span>
+                  </DropdownMenuItem>
+                )}
+                {canEdit && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={handleOpenBankSoalSelector}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      <span>Pilih dari Bank Soal</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleOpenWaygroundImporter}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>Impor dari Wayground</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {canEdit && questions.length > 0 && selectedIds.length === 0 && (
+                  <>
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                    <DropdownMenuItem
+                      onClick={() => setDeleteAllDialogOpen(true)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                    >
+                      <Trash className="h-3.5 w-3.5" />
+                      <span>Hapus Semua Soal</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* ASISTEN AI CHAT BUTTON - Tersedia untuk SEMUA Guru & Admin */}
+            {(role === "admin" || role === "teacher") && (
+              <NeonButton
+                variant="outline"
+                color="brand"
+                size="sm"
+                onClick={() => setIsAIChatDrawerOpen(true)}
+                className="h-8 gap-1.5"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Chat AI</span>
+              </NeonButton>
+            )}
+
+            {/* TAMBAH SOAL BUTTON / DROPDOWN */}
+            {canEdit && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-md shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Tambah Soal</span>
+                    <ChevronDown className="h-3 w-3 text-white/60 dark:text-neutral-600" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-2rem)] p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                  <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                    Metode Pembuatan
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={handleCreateClick}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 text-blue-600" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold">Input Manual</span>
+                      <span className="text-[10px] text-neutral-400">Editor soal interaktif</span>
+                    </div>
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleOpenBankSoalSelector}
                     className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
@@ -5931,7 +6119,7 @@ const QuestionsPage = () => {
                     <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                     <div className="flex flex-col">
                       <span className="font-semibold">Pilih dari Bank Soal</span>
-                      <span className="text-[10px] text-neutral-400">Salin dari bank soal sekolah / milik sendiri</span>
+                      <span className="text-[10px] text-neutral-400">Salin butir soal dari bank lain / milik sendiri</span>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem
@@ -5941,808 +6129,627 @@ const QuestionsPage = () => {
                     <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
                     <div className="flex flex-col">
                       <span className="font-semibold">Impor dari Wayground</span>
-                      <span className="text-[10px] text-neutral-400">Ambil dari link Wayground / Quizizz</span>
+                      <span className="text-[10px] text-neutral-400">Ambil dari link atau JSON Wayground</span>
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => document.getElementById("unified-import-input")?.click()}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                  >
-                    <Download className="h-3.5 w-3.5 rotate-180 text-blue-600 dark:text-blue-400" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold">Import File Soal</span>
-                      <span className="text-[10px] text-neutral-400">Excel (.xlsx), Word (.docx), JSON</span>
-                    </div>
-                  </DropdownMenuItem>
-                </>
-              )}
-              {questions.length > 0 && (
-                <>
-                  <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-                  <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
-                    Export Soal
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem
-                    onClick={handleExportToWord}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                  >
-                    <FileText className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                    <span>Export ke Word (.docx)</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleExportToJson}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                  >
-                    <FileJson className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                    <span>Export ke JSON</span>
-                  </DropdownMenuItem>
-                </>
-              )}
-              <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
-                Template Format
-              </DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => downloadQuestionTemplate()}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-              >
-                <Download className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Template Excel Standard</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => window.open("/templates/Template_Soal_Tabel.docx")}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-              >
-                <FileText className="h-3.5 w-3.5 text-blue-600" />
-                <span>Template Word Tabel & Literasi</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setIsLiterasiGuideOpen(true)}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/40 cursor-pointer"
-              >
-                <BookOpen className="h-3.5 w-3.5 text-sky-600" />
-                <span>Panduan Soal Literasi & AKM</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* LAINNYA DROPDOWN */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
-              >
-                <MoreHorizontal className="h-3.5 w-3.5 text-neutral-500" />
-                <span>Lainnya</span>
-                <ChevronDown className="h-3 w-3 text-neutral-400" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56 max-w-[calc(100vw-2rem)] p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
-              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
-                Aksi Tambahan
-              </DropdownMenuLabel>
-              {examId && (
-                <DropdownMenuItem
-                  onClick={() => navigate(`/admin/simulate/${examId}`)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                >
-                  <Eye className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                  <span>Simulasi Tampilan Siswa</span>
-                </DropdownMenuItem>
-              )}
-              {canEdit && (
-                <>
-                  <DropdownMenuItem
-                    onClick={handleOpenBankSoalSelector}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                  >
-                    <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                    <span>Pilih dari Bank Soal</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleOpenWaygroundImporter}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                  >
-                    <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                    <span>Impor dari Wayground</span>
-                  </DropdownMenuItem>
-                </>
-              )}
-              {canEdit && questions.length > 0 && selectedIds.length === 0 && (
-                <>
-                  <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-                  <DropdownMenuItem
-                    onClick={() => setDeleteAllDialogOpen(true)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
-                  >
-                    <Trash className="h-3.5 w-3.5" />
-                    <span>Hapus Semua Soal</span>
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* ASISTEN AI CHAT BUTTON - Tersedia untuk SEMUA Guru & Admin */}
-          {(role === "admin" || role === "teacher") && (
-            <NeonButton
-              variant="outline"
-              color="brand"
-              size="sm"
-              onClick={() => setIsAIChatDrawerOpen(true)}
-              className="h-8 gap-1.5"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>Chat AI</span>
-            </NeonButton>
-          )}
-
-          {/* TAMBAH SOAL BUTTON / DROPDOWN */}
-          {canEdit && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-md shadow-xs transition-colors cursor-pointer"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Tambah Soal</span>
-                  <ChevronDown className="h-3 w-3 text-white/60 dark:text-neutral-600" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-2rem)] p-1.5 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
-                <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
-                  Metode Pembuatan
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={handleCreateClick}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                >
-                  <Plus className="h-3.5 w-3.5 text-blue-600" />
-                  <div className="flex flex-col">
-                    <span className="font-semibold">Input Manual</span>
-                    <span className="text-[10px] text-neutral-400">Editor soal interaktif</span>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleOpenBankSoalSelector}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                >
-                  <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                  <div className="flex flex-col">
-                    <span className="font-semibold">Pilih dari Bank Soal</span>
-                    <span className="text-[10px] text-neutral-400">Salin butir soal dari bank lain / milik sendiri</span>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleOpenWaygroundImporter}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                >
-                  <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                  <div className="flex flex-col">
-                    <span className="font-semibold">Impor dari Wayground</span>
-                    <span className="text-[10px] text-neutral-400">Ambil dari link atau JSON Wayground</span>
-                  </div>
-                </DropdownMenuItem>
-                {(role === "admin" || role === "teacher") && (
-                  <>
-                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
-                      Bantuan AI
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onClick={() => setIsAIChatDrawerOpen(true)}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                    >
-                      <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <div className="flex flex-col">
-                        <span className="font-semibold flex items-center gap-1.5">
-                          Asisten Chat AI
-                          <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[9px] font-bold">Chatbot</span>
-                        </span>
-                        <span className="text-[10px] text-neutral-400">Buat soal santai lewat chat prompt</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setIsAIModalOpen(true)}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                    >
-                      <Wand2 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                      <div className="flex flex-col">
-                        <span className="font-semibold">Generator Form AI</span>
-                        <span className="text-[10px] text-neutral-400">Pilih formulir parameter kustom</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setIsAIImportOpen(true)}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                    >
-                      <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <div className="flex flex-col">
-                        <span className="font-semibold">Smart AI Import PDF</span>
-                        <span className="text-[10px] text-neutral-400">Ekstrak soal otomatis dari PDF</span>
-                      </div>
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </div>
-
-      {/* ── MGMP Se-Mapel Info & Collaboration Banner ── */}
-      {!isOwner && isMgmpExam && (
-        <div className={cn(
-          "p-3 sm:p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors shadow-2xs",
-          exam?.is_mgmp_shared
-            ? "bg-indigo-50/70 dark:bg-indigo-950/20 border-indigo-200/80 dark:border-indigo-800/60 text-indigo-950 dark:text-indigo-200"
-            : "bg-sky-50/70 dark:bg-sky-950/20 border-sky-200/80 dark:border-sky-800/60 text-sky-950 dark:text-sky-200"
-        )}>
-          <div className="flex items-start sm:items-center gap-3 min-w-0">
-            <div className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-xl shrink-0 border",
-              exam?.is_mgmp_shared
-                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
-                : "bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-300 border-sky-200 dark:border-sky-800"
-            )}>
-              {exam?.is_mgmp_shared ? <Share2 className="h-4.5 w-4.5" /> : <Users className="h-4.5 w-4.5" />}
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-[13px]">
-                  {exam?.is_mgmp_shared ? "Mode Kolaborasi MGMP Aktif" : "Bank Soal Rekan Guru Se-Mapel (Mode Pratinjau)"}
-                </span>
-                <span className={cn(
-                  "px-2 py-0.2 rounded-full text-[10px] font-semibold border",
-                  exam?.is_mgmp_shared
-                    ? "bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border-indigo-300/60 dark:border-indigo-700"
-                    : "bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border-sky-300/60 dark:border-sky-700"
-                )}>
-                  {exam?.subject || "MGMP"}
-                </span>
-              </div>
-              <p className="text-[11px] opacity-80 mt-0.5 leading-relaxed">
-                {exam?.is_mgmp_shared
-                  ? `Dibuat oleh ${exam?.teacherName || "rekan guru"}. Anda memiliki izin kolaborasi untuk mengedit dan menambah butir soal bersama.`
-                  : `Dibuat oleh ${exam?.teacherName || "rekan guru"}. Anda dapat membaca butir soal ini atau menyalinnya ke koleksi Anda agar bebas diedit.`}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-            <NeonButton
-              variant="primary"
-              color="brand"
-              size="sm"
-              onClick={handleDuplicateCurrentExam}
-              loading={isDuplicatingExam}
-              className="gap-1.5 shadow-xs"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              <span>Salin ke Bank Soal Saya</span>
-            </NeonButton>
-          </div>
-        </div>
-      )}
-
-      {/* ── Signature Neon Horizontal Tabs: Kategori & Filter Cepat ── */}
-      <NeonTabs
-        activeTab={typeFilter}
-        onChange={setTypeFilter}
-        tabs={[
-          {
-            id: "all",
-            label: <><span>Semua</span><span className="hidden sm:inline"> Butir Soal</span></>,
-            icon: Layers,
-            count: questions.length,
-            countFormat: "badge",
-          },
-          {
-            id: "pilihan_ganda",
-            label: "Pilihan Ganda",
-            indicator: true,
-            count: questions.filter(q => (q.type || "pilihan_ganda") === "pilihan_ganda").length,
-            countFormat: "badge",
-          },
-          {
-            id: "complex",
-            label: <><span>Variasi</span><span className="hidden sm:inline"> & Kompleks</span></>,
-            icon: Sparkles,
-            count: questions.filter(q => (q.type || "pilihan_ganda") !== "pilihan_ganda").length,
-            countFormat: "badge",
-          },
-          {
-            id: "image",
-            label: "Soal Bergambar",
-            icon: Image,
-            count: questions.filter(q => q.imageUrl || q.text.includes("<img")).length,
-            countFormat: "badge",
-          },
-          ...(groupsList.length > 0 ? [{
-            id: "stimulus",
-            label: "Paket Stimulus (AKM)",
-            icon: BookOpen,
-            count: `${groupsList.length} paket`,
-            countFormat: "badge" as const,
-          }] : []),
-        ]}
-      />
-
-      {/* ── 2. Main Console: 2-Column Grid (Table + Inspector) ── */}
-      <div className="flex flex-col xl:flex-row items-start gap-4">
-        {/* Left: NeonTable */}
-        <div className="w-full xl:flex-1 min-w-0">
-          <NeonTable<QuestionData>
-            tableLayout="fixed"
-            rowVerticalAlign="top"
-            data={displayQuestions}
-            columns={neonColumns}
-            keyExtractor={(q) => q.id}
-            isLoading={loading}
-            title="Daftar Butir Soal"
-            subtitle="Klik baris soal untuk melihat pratinjau stimulus, gambar, dan kunci di panel detail."
-            searchValue={searchQuery}
-            onSearchChange={setSearchQuery}
-            searchPlaceholder="Cari pertanyaan, stimulus, kunci..."
-            filterSlot={
-              <div className="flex items-center gap-2">
-                <NeonFilterPopover
-                  title="Filter Butir Soal"
-                  activeCount={(typeFilter !== "all" ? 1 : 0) + (groupFilter !== "all" ? 1 : 0)}
-                  onReset={() => {
-                    setTypeFilter("all");
-                    setGroupFilter("all");
-                  }}
-                >
-                  {/* Type Filter */}
-                  <NeonFilterField label="Tipe Soal">
-                    <NeonFilterSelect
-                      value={typeFilter}
-                      onChange={(e) => setTypeFilter(e.target.value)}
-                    >
-                      <option value="all">Semua Tipe Soal</option>
-                      {Object.entries(QUESTION_TYPE_LABELS).map(([val, label]) => (
-                        <option key={val} value={val}>{label}</option>
-                      ))}
-                    </NeonFilterSelect>
-                  </NeonFilterField>
-
-                  {/* Stimulus / Group Filter */}
-                  {groupsList.length > 0 && (
-                    <NeonFilterField label="Paket Stimulus">
-                      <NeonFilterSelect
-                        value={groupFilter}
-                        onChange={(e) => setGroupFilter(e.target.value)}
+                  {(role === "admin" || role === "teacher") && (
+                    <>
+                      <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                      <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
+                        Bantuan AI
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onClick={() => setIsAIChatDrawerOpen(true)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
                       >
-                        <option value="all">Semua Paket Stimulus</option>
-                        {groupsList.map((gid) => (
-                          <option key={gid} value={gid}>Paket {gid}</option>
+                        <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <div className="flex flex-col">
+                          <span className="font-semibold flex items-center gap-1.5">
+                            Asisten Chat AI
+                            <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[9px] font-bold">Chatbot</span>
+                          </span>
+                          <span className="text-[10px] text-neutral-400">Buat soal santai lewat chat prompt</span>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setIsAIModalOpen(true)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                      >
+                        <Wand2 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                        <div className="flex flex-col">
+                          <span className="font-semibold">Generator Form AI</span>
+                          <span className="text-[10px] text-neutral-400">Pilih formulir parameter kustom</span>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setIsAIImportOpen(true)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <div className="flex flex-col">
+                          <span className="font-semibold">Smart AI Import PDF</span>
+                          <span className="text-[10px] text-neutral-400">Ekstrak soal otomatis dari PDF</span>
+                        </div>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
+
+        {/* ── MGMP Se-Mapel Info & Collaboration Banner ── */}
+        {!isRealOwner && role !== "admin" && isMgmpExam && (
+          <div className={cn(
+            "p-3 sm:p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors shadow-2xs",
+            exam?.is_mgmp_shared
+              ? "bg-indigo-50/70 dark:bg-indigo-950/20 border-indigo-200/80 dark:border-indigo-800/60 text-indigo-950 dark:text-indigo-200"
+              : "bg-sky-50/70 dark:bg-sky-950/20 border-sky-200/80 dark:border-sky-800/60 text-sky-950 dark:text-sky-200"
+          )}>
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <div className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-xl shrink-0 border",
+                exam?.is_mgmp_shared
+                  ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
+                  : "bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-300 border-sky-200 dark:border-sky-800"
+              )}>
+                {exam?.is_mgmp_shared ? <Share2 className="h-4.5 w-4.5" /> : <Users className="h-4.5 w-4.5" />}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-[13px]">
+                    {exam?.is_mgmp_shared ? "Mode Kolaborasi MGMP Aktif" : "Bank Soal Rekan Guru Se-Mapel (Mode Pratinjau)"}
+                  </span>
+                  <span className={cn(
+                    "px-2 py-0.2 rounded-full text-[10px] font-semibold border",
+                    exam?.is_mgmp_shared
+                      ? "bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border-indigo-300/60 dark:border-indigo-700"
+                      : "bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border-sky-300/60 dark:border-sky-700"
+                  )}>
+                    {exam?.subject || "MGMP"}
+                  </span>
+                </div>
+                <p className="text-[11px] opacity-80 mt-0.5 leading-relaxed">
+                  {exam?.is_mgmp_shared
+                    ? `Dibuat oleh ${exam?.teacherName || "rekan guru"}. Anda memiliki izin kolaborasi untuk mengedit dan menambah butir soal bersama.`
+                    : `Dibuat oleh ${exam?.teacherName || "rekan guru"}. Anda dapat membaca butir soal ini atau menyalinnya ke koleksi Anda agar bebas diedit.`}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              <NeonButton
+                variant="primary"
+                color="brand"
+                size="sm"
+                onClick={handleDuplicateCurrentExam}
+                loading={isDuplicatingExam}
+                className="gap-1.5 shadow-xs"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                <span>Salin ke Bank Soal Saya</span>
+              </NeonButton>
+            </div>
+          </div>
+        )}
+
+        {/* ── Signature Neon Horizontal Tabs: Kategori & Filter Cepat ── */}
+        <NeonTabs
+          activeTab={typeFilter}
+          onChange={setTypeFilter}
+          tabs={[
+            {
+              id: "all",
+              label: <><span>Semua</span><span className="hidden sm:inline"> Butir Soal</span></>,
+              icon: Layers,
+              count: questions.length,
+              countFormat: "badge",
+            },
+            {
+              id: "pilihan_ganda",
+              label: "Pilihan Ganda",
+              indicator: true,
+              count: questions.filter(q => (q.type || "pilihan_ganda") === "pilihan_ganda").length,
+              countFormat: "badge",
+            },
+            {
+              id: "complex",
+              label: <><span>Variasi</span><span className="hidden sm:inline"> & Kompleks</span></>,
+              icon: Sparkles,
+              count: questions.filter(q => (q.type || "pilihan_ganda") !== "pilihan_ganda").length,
+              countFormat: "badge",
+            },
+            {
+              id: "image",
+              label: "Soal Bergambar",
+              icon: Image,
+              count: questions.filter(q => q.imageUrl || q.text.includes("<img")).length,
+              countFormat: "badge",
+            },
+            ...(groupsList.length > 0 ? [{
+              id: "stimulus",
+              label: "Paket Stimulus (AKM)",
+              icon: BookOpen,
+              count: `${groupsList.length} paket`,
+              countFormat: "badge" as const,
+            }] : []),
+          ]}
+        />
+
+        {/* ── 2. Main Console: 2-Column Grid (Table + Inspector) ── */}
+        <div className="flex flex-col xl:flex-row items-start gap-4">
+          {/* Left: NeonTable */}
+          <div className="w-full xl:flex-1 min-w-0">
+            <NeonTable<QuestionData>
+              tableLayout="fixed"
+              rowVerticalAlign="top"
+              data={displayQuestions}
+              columns={neonColumns}
+              keyExtractor={(q) => q.id}
+              isLoading={loading}
+              title="Daftar Butir Soal"
+              subtitle="Klik baris soal untuk melihat pratinjau stimulus, gambar, dan kunci di panel detail."
+              searchValue={searchQuery}
+              onSearchChange={setSearchQuery}
+              searchPlaceholder="Cari pertanyaan, stimulus, kunci..."
+              filterSlot={
+                <div className="flex items-center gap-2">
+                  <NeonFilterPopover
+                    title="Filter Butir Soal"
+                    activeCount={(typeFilter !== "all" ? 1 : 0) + (groupFilter !== "all" ? 1 : 0)}
+                    onReset={() => {
+                      setTypeFilter("all");
+                      setGroupFilter("all");
+                    }}
+                  >
+                    {/* Type Filter */}
+                    <NeonFilterField label="Tipe Soal">
+                      <NeonFilterSelect
+                        value={typeFilter}
+                        onChange={(e) => setTypeFilter(e.target.value)}
+                      >
+                        <option value="all">Semua Tipe Soal</option>
+                        {Object.entries(QUESTION_TYPE_LABELS).map(([val, label]) => (
+                          <option key={val} value={val}>{label}</option>
                         ))}
                       </NeonFilterSelect>
                     </NeonFilterField>
-                  )}
-                </NeonFilterPopover>
 
-                {/* Toggle Inspector Button */}
-                <InspectorToggle
-                  active={showInspector}
-                  onToggle={() => setShowInspector(!showInspector)}
-                />
-              </div>
-            }
-            selectable={canEdit}
-            selectedKeys={selectedIds}
-            onSelectionChange={setSelectedIds}
-            batchActions={
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
-                  {selectedIds.length} terpilih:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setBulkDeleteDialogOpen(true)}
-                  className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-rose-600 dark:text-rose-400 font-medium hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <Trash className="h-3 w-3" />
-                  <span>Hapus</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExportSelectedToWord}
-                  className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-750 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <FileText className="h-3 w-3" />
-                  <span>Word</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExportSelectedToJson}
-                  className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-750 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <FileJson className="h-3 w-3" />
-                  <span>JSON</span>
-                </button>
-              </div>
-            }
-            activeKey={inspectedQuestion?.id}
-            onRowClick={(q) => {
-              setInspectedQuestionId(q.id);
-              if (!showInspector) setShowInspector(true);
-            }}
-            pagination={true}
-            pageSize={10}
-            pageSizeOptions={[10, 25, 50, 100]}
-            emptyTitle="Belum ada butir soal"
-            emptySubtitle="Pilih salah satu metode di bawah ini untuk mulai mengisi butir soal ke dalam bank soal ini."
-            emptyAction={
-              canEdit ? (
-                <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
-                  <NeonButton
-                    variant="primary"
-                    color="brand"
-                    size="sm"
-                    onClick={handleCreateClick}
-                    className="gap-1.5"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Input Manual</span>
-                  </NeonButton>
-                  <NeonButton
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleOpenBankSoalSelector}
-                    className="gap-1.5"
-                  >
-                    <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                    <span>Pilih dari Bank Soal</span>
-                  </NeonButton>
-                  <NeonButton
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleOpenWaygroundImporter}
-                    className="gap-1.5"
-                  >
-                    <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                    <span>Impor Wayground</span>
-                  </NeonButton>
-                  <NeonButton
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.getElementById("unified-import-input")?.click()}
-                    className="gap-1.5"
-                  >
-                    <Download className="h-3.5 w-3.5 rotate-180 text-blue-600" />
-                    <span>Import File</span>
-                  </NeonButton>
-                </div>
-              ) : isMgmpExam ? (
-                <div className="flex items-center justify-center pt-2">
-                  <NeonButton
-                    variant="primary"
-                    color="brand"
-                    size="sm"
-                    onClick={handleDuplicateCurrentExam}
-                    loading={isDuplicatingExam}
-                    className="gap-1.5 shadow-xs"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>Salin ke Bank Soal Saya</span>
-                  </NeonButton>
-                </div>
-              ) : undefined
-            }
-          />
-        </div>
-
-        {/* Right: Sticky Inspector Panel (Style Parity with ExamRoomsPage) */}
-        {showInspector && (
-          <NeonInspector
-            scrollable
-            widthClassName="w-full xl:w-[360px] 2xl:w-[380px]"
-          >
-            {/* 1. Detail Butir Soal Terpilih (Inspector) */}
-            <InspectorSection>
-              <InspectorHeader
-                title="Detail Butir Soal"
-                icon={FileText}
-                badge={
-                  inspectedQuestion && currentInspectedIndex >= 0
-                    ? `${currentInspectedIndex + 1} / ${targetQuestionsList.length}`
-                    : "Ringkasan"
-                }
-                actions={
-                  <div className="flex items-center gap-0.5 border-l border-neutral-200 dark:border-neutral-800 pl-1.5 ml-0.5">
-                    <button
-                      type="button"
-                      onClick={handlePreviousQuestion}
-                      disabled={!hasPreviousQuestion}
-                      className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
-                      title="Soal Sebelumnya (←)"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNextQuestion}
-                      disabled={!hasNextQuestion}
-                      className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
-                      title="Soal Selanjutnya (→)"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                }
-                onClose={() => setShowInspector(false)}
-              />
-
-              {inspectedQuestion ? (
-                <div className="space-y-2.5 text-xs">
-                  {/* Tipe Soal & Stimulus */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <NeonBadge
-                      variant={(QUESTION_TYPE_BADGE[inspectedQuestion.type || "pilihan_ganda"]?.variant) || "neutral"}
-                      size="xs"
-                    >
-                      {QUESTION_TYPE_LABELS[inspectedQuestion.type || "pilihan_ganda"] || inspectedQuestion.type}
-                    </NeonBadge>
-                    {inspectedQuestion.groupId && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="inline-flex min-w-0 shrink-0">
-                            <NeonBadge
-                              variant="amber"
-                              size="xs"
-                              icon={BookOpen}
-                              className="max-w-[200px] min-w-0 shrink-0 cursor-pointer hover:bg-amber-500/20 transition-colors"
-                            >
-                              <span className="truncate min-w-0">Paket: {inspectedQuestion.groupId}</span>
-                            </NeonBadge>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs max-w-xs space-y-1">
-                          <div className="font-bold text-amber-500 flex items-center gap-1.5">
-                            <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                            <span>Paket Stimulus (AKM)</span>
-                          </div>
-                          <p className="font-mono text-neutral-100 font-semibold break-all">{inspectedQuestion.groupId}</p>
-                        </TooltipContent>
-                      </Tooltip>
+                    {/* Stimulus / Group Filter */}
+                    {groupsList.length > 0 && (
+                      <NeonFilterField label="Paket Stimulus">
+                        <NeonFilterSelect
+                          value={groupFilter}
+                          onChange={(e) => setGroupFilter(e.target.value)}
+                        >
+                          <option value="all">Semua Paket Stimulus</option>
+                          {groupsList.map((gid) => (
+                            <option key={gid} value={gid}>Paket {gid}</option>
+                          ))}
+                        </NeonFilterSelect>
+                      </NeonFilterField>
                     )}
-                  </div>
+                  </NeonFilterPopover>
 
-                  {/* Stimulus Preview (if available) */}
-                  {inspectedQuestion.groupText && (
-                    <div className="p-2.5 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 space-y-1.5 w-full min-w-0 max-w-full overflow-x-hidden break-words">
-                      <div className="flex items-center justify-between text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                        <span className="flex items-center gap-1.5">
-                          <BookOpen className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                          <span>Teks Stimulus (AKM)</span>
-                        </span>
-                        <span className="font-normal lowercase text-amber-600/80 dark:text-amber-400/80">wacana terkait</span>
+                  {/* Toggle Inspector Button */}
+                  <InspectorToggle
+                    active={showInspector}
+                    onToggle={() => setShowInspector(!showInspector)}
+                  />
+                </div>
+              }
+              selectable={canEdit}
+              selectedKeys={selectedIds}
+              onSelectionChange={setSelectedIds}
+              batchActions={
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                    {selectedIds.length} terpilih:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setBulkDeleteDialogOpen(true)}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-rose-600 dark:text-rose-400 font-medium hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Trash className="h-3 w-3" />
+                    <span>Hapus</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportSelectedToWord}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-750 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <FileText className="h-3 w-3" />
+                    <span>Word</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportSelectedToJson}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-750 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <FileJson className="h-3 w-3" />
+                    <span>JSON</span>
+                  </button>
+                </div>
+              }
+              activeKey={inspectedQuestion?.id}
+              onRowClick={(q) => {
+                setInspectedQuestionId(q.id);
+                if (!showInspector) setShowInspector(true);
+              }}
+              pagination={true}
+              pageSize={10}
+              pageSizeOptions={[10, 25, 50, 100]}
+              emptyTitle="Belum ada butir soal"
+              emptySubtitle="Pilih salah satu metode di bawah ini untuk mulai mengisi butir soal ke dalam bank soal ini."
+              emptyAction={
+                canEdit ? (
+                  <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+                    <NeonButton
+                      variant="primary"
+                      color="brand"
+                      size="sm"
+                      onClick={handleCreateClick}
+                      className="gap-1.5"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Input Manual</span>
+                    </NeonButton>
+                    <NeonButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleOpenBankSoalSelector}
+                      className="gap-1.5"
+                    >
+                      <Database className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      <span>Pilih dari Bank Soal</span>
+                    </NeonButton>
+                    <NeonButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleOpenWaygroundImporter}
+                      className="gap-1.5"
+                    >
+                      <Globe className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>Impor Wayground</span>
+                    </NeonButton>
+                    <NeonButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => document.getElementById("unified-import-input")?.click()}
+                      className="gap-1.5"
+                    >
+                      <Download className="h-3.5 w-3.5 rotate-180 text-blue-600" />
+                      <span>Import File</span>
+                    </NeonButton>
+                  </div>
+                ) : isMgmpExam ? (
+                  <div className="flex items-center justify-center pt-2">
+                    <NeonButton
+                      variant="primary"
+                      color="brand"
+                      size="sm"
+                      onClick={handleDuplicateCurrentExam}
+                      loading={isDuplicatingExam}
+                      className="gap-1.5 shadow-xs"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>Salin ke Bank Soal Saya</span>
+                    </NeonButton>
+                  </div>
+                ) : undefined
+              }
+            />
+          </div>
+
+          {/* Right: Sticky Inspector Panel (Style Parity with ExamRoomsPage) */}
+          {showInspector && (
+            <NeonInspector
+              scrollable
+              widthClassName="w-full xl:w-[360px] 2xl:w-[380px]"
+            >
+              {/* 1. Detail Butir Soal Terpilih (Inspector) */}
+              <InspectorSection>
+                <InspectorHeader
+                  title="Detail Butir Soal"
+                  icon={FileText}
+                  badge={
+                    inspectedQuestion && currentInspectedIndex >= 0
+                      ? `${currentInspectedIndex + 1} / ${targetQuestionsList.length}`
+                      : "Ringkasan"
+                  }
+                  actions={
+                    <div className="flex items-center gap-0.5 border-l border-neutral-200 dark:border-neutral-800 pl-1.5 ml-0.5">
+                      <button
+                        type="button"
+                        onClick={handlePreviousQuestion}
+                        disabled={!hasPreviousQuestion}
+                        className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                        title="Soal Sebelumnya (←)"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleNextQuestion}
+                        disabled={!hasNextQuestion}
+                        className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                        title="Soal Selanjutnya (→)"
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  }
+                  onClose={() => setShowInspector(false)}
+                />
+
+                {inspectedQuestion ? (
+                  <div className="space-y-2.5 text-xs">
+                    {/* Tipe Soal & Stimulus */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <NeonBadge
+                        variant={(QUESTION_TYPE_BADGE[inspectedQuestion.type || "pilihan_ganda"]?.variant) || "neutral"}
+                        size="xs"
+                      >
+                        {QUESTION_TYPE_LABELS[inspectedQuestion.type || "pilihan_ganda"] || inspectedQuestion.type}
+                      </NeonBadge>
+                      {inspectedQuestion.groupId && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex min-w-0 shrink-0">
+                              <NeonBadge
+                                variant="amber"
+                                size="xs"
+                                icon={BookOpen}
+                                className="max-w-[200px] min-w-0 shrink-0 cursor-pointer hover:bg-amber-500/20 transition-colors"
+                              >
+                                <span className="truncate min-w-0">Paket: {inspectedQuestion.groupId}</span>
+                              </NeonBadge>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs max-w-xs space-y-1">
+                            <div className="font-bold text-amber-500 flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                              <span>Paket Stimulus (AKM)</span>
+                            </div>
+                            <p className="font-mono text-neutral-100 font-semibold break-all">{inspectedQuestion.groupId}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+
+                    {/* Stimulus Preview (if available) */}
+                    {inspectedQuestion.groupText && (
+                      <div className="p-2.5 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 space-y-1.5 w-full min-w-0 max-w-full overflow-x-hidden break-words">
+                        <div className="flex items-center justify-between text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                          <span className="flex items-center gap-1.5">
+                            <BookOpen className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                            <span>Teks Stimulus (AKM)</span>
+                          </span>
+                          <span className="font-normal lowercase text-amber-600/80 dark:text-amber-400/80">wacana terkait</span>
+                        </div>
+                        <div className="max-h-56 overflow-y-auto pr-1">
+                          <MathText
+                            content={inspectedQuestion.groupText}
+                            className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed [&_p:first-child]:!mt-0 [&_p]:!mt-0 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_figure]:my-2 [&_img]:!max-h-36 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1.5 [&_img]:block [&_table]:!text-[11px] [&_table]:!my-2 [&_table]:!w-full [&_table]:!border-collapse [&_table]:!table [&_table]:clear-both [&_td]:!p-1.5 [&_td]:!px-2 [&_th]:!p-1.5 [&_th]:!px-2 [&_td]:!text-[11px] [&_th]:!text-[11px] [&_td]:!border [&_td]:!border-amber-300 dark:[&_td]:!border-amber-800/60 [&_th]:!border [&_th]:!border-amber-300 dark:[&_th]:!border-amber-800/60 [&_th]:!bg-amber-100/60 dark:[&_th]:!bg-amber-900/40"
+                          />
+                        </div>
                       </div>
-                      <div className="max-h-56 overflow-y-auto pr-1">
+                    )}
+
+                    {/* Question Text */}
+                    <div>
+                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Pertanyaan</div>
+                      <div className="mt-1 p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800 w-full min-w-0 max-w-full overflow-x-hidden break-words">
                         <MathText
-                          content={inspectedQuestion.groupText}
-                          className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed [&_p:first-child]:!mt-0 [&_p]:!mt-0 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_figure]:my-2 [&_img]:!max-h-36 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1.5 [&_img]:block [&_table]:!text-[11px] [&_table]:!my-2 [&_table]:!w-full [&_table]:!border-collapse [&_table]:!table [&_table]:clear-both [&_td]:!p-1.5 [&_td]:!px-2 [&_th]:!p-1.5 [&_th]:!px-2 [&_td]:!text-[11px] [&_th]:!text-[11px] [&_td]:!border [&_td]:!border-amber-300 dark:[&_td]:!border-amber-800/60 [&_th]:!border [&_th]:!border-amber-300 dark:[&_th]:!border-amber-800/60 [&_th]:!bg-amber-100/60 dark:[&_th]:!bg-amber-900/40"
+                          content={inspectedQuestion.text}
+                          className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 break-words w-full max-w-full overflow-x-hidden [&_p:first-child]:!mt-0 [&_p]:!mt-0 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_figure]:m-0 [&_p]:max-w-full [&_img]:!max-h-48 sm:[&_img]:!max-h-52 [&_img]:!max-w-full [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-2 [&_img]:block [&_table]:!text-xs [&_table]:!my-2 [&_table]:!w-full [&_table]:!border-collapse [&_table]:!table [&_table]:clear-both [&_td]:!p-1.5 [&_td]:!px-2.5 [&_th]:!p-1.5 [&_th]:!px-2.5 [&_td]:!text-xs [&_th]:!text-xs [&_td]:!border [&_td]:!border-neutral-200 dark:[&_td]:!border-neutral-750 [&_th]:!border [&_th]:!border-neutral-200 dark:[&_th]:!border-neutral-750 [&_th]:!bg-neutral-50 dark:[&_th]:!bg-neutral-850 [&_.ql-table-embed]:!my-2 [&_.ql-table-embed]:!p-0 [&_.ql-table-embed]:!border-none [&_.ql-table-embed]:!bg-transparent shadow-2xs"
                         />
                       </div>
                     </div>
-                  )}
 
-                  {/* Question Text */}
-                  <div>
-                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Pertanyaan</div>
-                    <div className="mt-1 p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800 w-full min-w-0 max-w-full overflow-x-hidden break-words">
-                      <MathText
-                        content={inspectedQuestion.text}
-                        className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 break-words w-full max-w-full overflow-x-hidden [&_p:first-child]:!mt-0 [&_p]:!mt-0 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_figure]:m-0 [&_p]:max-w-full [&_img]:!max-h-48 sm:[&_img]:!max-h-52 [&_img]:!max-w-full [&_img]:!h-auto [&_img]:mx-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-2 [&_img]:block [&_table]:!text-xs [&_table]:!my-2 [&_table]:!w-full [&_table]:!border-collapse [&_table]:!table [&_table]:clear-both [&_td]:!p-1.5 [&_td]:!px-2.5 [&_th]:!p-1.5 [&_th]:!px-2.5 [&_td]:!text-xs [&_th]:!text-xs [&_td]:!border [&_td]:!border-neutral-200 dark:[&_td]:!border-neutral-750 [&_th]:!border [&_th]:!border-neutral-200 dark:[&_th]:!border-neutral-750 [&_th]:!bg-neutral-50 dark:[&_th]:!bg-neutral-850 [&_.ql-table-embed]:!my-2 [&_.ql-table-embed]:!p-0 [&_.ql-table-embed]:!border-none [&_.ql-table-embed]:!bg-transparent shadow-2xs"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Question Image (if available) */}
-                  {inspectedQuestion.imageUrl && !inspectedQuestion.text?.includes("<img") && (
-                    <div className="rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 p-2 flex justify-center mt-2">
-                      <img
-                        src={inspectedQuestion.imageUrl}
-                        alt="Gambar Soal"
-                        className="max-h-40 max-w-full object-contain rounded-lg"
-                      />
-                    </div>
-                  )}
-
-                  {/* Choices / Answers Preview */}
-                  {(inspectedQuestion.type === "pilihan_ganda" || inspectedQuestion.type === "pilihan_ganda_kompleks") && inspectedQuestion.choices && (
-                    <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
-                      <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
-                        <span>Pilihan Jawaban</span>
-                        <span className="font-mono text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-600 dark:text-neutral-400 font-semibold">
-                          {Object.keys(inspectedQuestion.choices).length} Opsi
-                        </span>
+                    {/* Question Image (if available) */}
+                    {inspectedQuestion.imageUrl && !inspectedQuestion.text?.includes("<img") && (
+                      <div className="rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 p-2 flex justify-center mt-2">
+                        <img
+                          src={inspectedQuestion.imageUrl}
+                          alt="Gambar Soal"
+                          className="max-h-40 max-w-full object-contain rounded-lg"
+                        />
                       </div>
-                      <div className="space-y-2">
-                        {Object.keys(inspectedQuestion.choices).sort().map((key, idx) => {
-                          const choice = inspectedQuestion.choices![key];
-                          const isCorrect = !!choice?.isCorrect;
-                          const letter = /^[a-zA-Z]$/.test(key)
-                            ? key.toUpperCase()
-                            : String.fromCharCode(65 + idx);
+                    )}
 
-                          return (
-                            <div
-                              key={key}
-                              className={cn(
-                                "flex items-start gap-3 p-3 rounded-xl border transition-all text-xs",
-                                isCorrect
-                                  ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500/40 text-emerald-950 dark:text-emerald-100 shadow-2xs"
-                                  : "bg-white dark:bg-neutral-850/60 border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 hover:border-neutral-300 dark:hover:border-neutral-700"
-                              )}
-                            >
-                              {/* Option Letter Badge (A, B, C, D, E) */}
+                    {/* Choices / Answers Preview */}
+                    {(inspectedQuestion.type === "pilihan_ganda" || inspectedQuestion.type === "pilihan_ganda_kompleks") && inspectedQuestion.choices && (
+                      <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                        <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
+                          <span>Pilihan Jawaban</span>
+                          <span className="font-mono text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-600 dark:text-neutral-400 font-semibold">
+                            {Object.keys(inspectedQuestion.choices).length} Opsi
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          {Object.keys(inspectedQuestion.choices).sort().map((key, idx) => {
+                            const choice = inspectedQuestion.choices![key];
+                            const isCorrect = !!choice?.isCorrect;
+                            const letter = /^[a-zA-Z]$/.test(key)
+                              ? key.toUpperCase()
+                              : String.fromCharCode(65 + idx);
+
+                            return (
                               <div
+                                key={key}
                                 className={cn(
-                                  "w-6 h-6 min-w-[24px] rounded-lg flex items-center justify-center font-bold text-xs shrink-0 select-none transition-colors",
+                                  "flex items-start gap-3 p-3 rounded-xl border transition-all text-xs",
                                   isCorrect
-                                    ? "bg-emerald-600 text-white shadow-xs"
-                                    : "bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300"
+                                    ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500/40 text-emerald-950 dark:text-emerald-100 shadow-2xs"
+                                    : "bg-white dark:bg-neutral-850/60 border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 hover:border-neutral-300 dark:hover:border-neutral-700"
                                 )}
                               >
-                                {letter}
-                              </div>
+                                {/* Option Letter Badge (A, B, C, D, E) */}
+                                <div
+                                  className={cn(
+                                    "w-6 h-6 min-w-[24px] rounded-lg flex items-center justify-center font-bold text-xs shrink-0 select-none transition-colors",
+                                    isCorrect
+                                      ? "bg-emerald-600 text-white shadow-xs"
+                                      : "bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300"
+                                  )}
+                                >
+                                  {letter}
+                                </div>
 
-                              {/* Option Content & Image */}
-                              <div className="min-w-0 flex-1 pt-0.5">
-                                <MathText
-                                  content={choice?.text || ""}
-                                  disableJustify={true}
-                                  className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_figure]:m-0 break-words [&_img]:!max-h-24 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1 [&_img]:block"
-                                />
-                                {choice?.imageUrl && (
-                                  <div className="mt-2">
-                                    <img
-                                      src={choice.imageUrl}
-                                      alt={`Opsi ${letter}`}
-                                      className="max-h-24 object-contain rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-1"
-                                    />
-                                  </div>
+                                {/* Option Content & Image */}
+                                <div className="min-w-0 flex-1 pt-0.5">
+                                  <MathText
+                                    content={choice?.text || ""}
+                                    disableJustify={true}
+                                    className="text-xs text-neutral-800 dark:text-neutral-200 font-serif leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_figure]:m-0 break-words [&_img]:!max-h-24 [&_img]:!max-w-full [&_img]:!w-auto [&_img]:!h-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1 [&_img]:block"
+                                  />
+                                  {choice?.imageUrl && (
+                                    <div className="mt-2">
+                                      <img
+                                        src={choice.imageUrl}
+                                        alt={`Opsi ${letter}`}
+                                        className="max-h-24 object-contain rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-1"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* KUNCI Pill Indicator */}
+                                {isCorrect && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider shrink-0 mt-0.5">
+                                    <Check className="w-3 h-3 stroke-[3]" />
+                                    <span>KUNCI</span>
+                                  </span>
                                 )}
                               </div>
-
-                              {/* KUNCI Pill Indicator */}
-                              {isCorrect && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider shrink-0 mt-0.5">
-                                  <Check className="w-3 h-3 stroke-[3]" />
-                                  <span>KUNCI</span>
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Non-MCQ Answer Summary */}
-                  {inspectedQuestion.type !== "pilihan_ganda" && inspectedQuestion.type !== "pilihan_ganda_kompleks" && (
-                    <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800 space-y-1">
-                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Konfigurasi Jawaban</div>
-                      <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800">
-                        {renderQuestionDetails(inspectedQuestion, false)}
+                    {/* Non-MCQ Answer Summary */}
+                    {inspectedQuestion.type !== "pilihan_ganda" && inspectedQuestion.type !== "pilihan_ganda_kompleks" && (
+                      <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800 space-y-1">
+                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Konfigurasi Jawaban</div>
+                        <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800">
+                          {renderQuestionDetails(inspectedQuestion, false)}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Next / Previous Quick Bar */}
-                  <InspectorNav
-                    onPrevious={handlePreviousQuestion}
-                    onNext={handleNextQuestion}
-                    hasPrevious={hasPreviousQuestion}
-                    hasNext={hasNextQuestion}
-                  />
+                    {/* Next / Previous Quick Bar */}
+                    <InspectorNav
+                      onPrevious={handlePreviousQuestion}
+                      onNext={handleNextQuestion}
+                      hasPrevious={hasPreviousQuestion}
+                      hasNext={hasNextQuestion}
+                    />
 
-                  {/* Action Buttons in ExamRoomsPage style */}
-                  <InspectorActions>
-                    <InspectorButton
-                      variant="secondary"
-                      icon={Search}
-                      onClick={() => {
-                        const idx = questions.findIndex(q => q.id === inspectedQuestion.id);
-                        setPreviewIndex(idx >= 0 ? idx : 0);
-                        setPreviewQuestion(inspectedQuestion);
-                        setIsPreviewOpen(true);
-                      }}
-                    >
-                      Pratinjau Soal Lengkap
-                    </InspectorButton>
-
-                    {canEdit ? (
-                      <div className="flex items-center gap-1.5">
-                        <InspectorButton
-                          variant="primary"
-                          icon={Edit}
-                          onClick={() => handleEditClick(inspectedQuestion)}
-                          className="flex-1"
-                        >
-                          Edit Butir Soal
-                        </InspectorButton>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteClick(inspectedQuestion)}
-                          className="flex items-center justify-center p-1.5 rounded-md text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/20 transition-colors cursor-pointer shadow-2xs"
-                          title="Hapus Soal"
-                        >
-                          <Trash className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ) : isMgmpExam ? (
+                    {/* Action Buttons in ExamRoomsPage style */}
+                    <InspectorActions>
                       <InspectorButton
                         variant="secondary"
-                        icon={Copy}
-                        onClick={handleDuplicateCurrentExam}
-                        className="w-full"
+                        icon={Search}
+                        onClick={() => {
+                          const idx = questions.findIndex(q => q.id === inspectedQuestion.id);
+                          setPreviewIndex(idx >= 0 ? idx : 0);
+                          setPreviewQuestion(inspectedQuestion);
+                          setIsPreviewOpen(true);
+                        }}
                       >
-                        Salin ke Bank Soal Saya
+                        Pratinjau Soal Lengkap
                       </InspectorButton>
-                    ) : null}
-                  </InspectorActions>
-                </div>
-              ) : (
-                <InspectorEmpty message="Pilih atau arahkan kursor ke salah satu butir soal di tabel." />
-              )}
-            </InspectorSection>
 
-            {/* 2. Format & Rumus KaTeX Helper Box */}
-            <InspectorCard
-              title="Panduan Format & Rumus"
-              icon={BookOpen}
-              description={
-                <>Ketik rumus matematika diapit tanda <code>\( ... \)</code>, misalnya <code>\( x^2 + y^2 = r^2 \)</code>.</>
-              }
-              actionSlot={
-                <button
-                  type="button"
-                  onClick={() => setIsGuideOpen(!isGuideOpen)}
-                  className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-0.5 cursor-pointer"
-                  title={isGuideOpen ? "Tutup panduan" : "Buka panduan"}
-                >
-                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isGuideOpen && "rotate-180")} />
-                </button>
-              }
-            >
-              <div className="pt-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEquationTarget(null);
-                    setInitialEquationLatex("");
-                    setIsEquationModalOpen(true);
-                  }}
-                  className="w-full py-1.5 px-2.5 rounded-lg border border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                >
-                  <Function className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Buka Equation Studio</span>
-                </button>
-              </div>
+                      {canEdit ? (
+                        <div className="flex items-center gap-1.5">
+                          <InspectorButton
+                            variant="primary"
+                            icon={Edit}
+                            onClick={() => handleEditClick(inspectedQuestion)}
+                            className="flex-1"
+                          >
+                            Edit Butir Soal
+                          </InspectorButton>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(inspectedQuestion)}
+                            className="flex items-center justify-center p-1.5 rounded-md text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/20 transition-colors cursor-pointer shadow-2xs"
+                            title="Hapus Soal"
+                          >
+                            <Trash className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : isMgmpExam ? (
+                        <InspectorButton
+                          variant="secondary"
+                          icon={Copy}
+                          onClick={handleDuplicateCurrentExam}
+                          className="w-full"
+                        >
+                          Salin ke Bank Soal Saya
+                        </InspectorButton>
+                      ) : null}
+                    </InspectorActions>
+                  </div>
+                ) : (
+                  <InspectorEmpty message="Pilih atau arahkan kursor ke salah satu butir soal di tabel." />
+                )}
+              </InspectorSection>
 
-              {isGuideOpen && (
-                <div className="pt-1 space-y-1.5 text-[11px] text-neutral-600 dark:text-neutral-400 border-t border-neutral-200/60 dark:border-neutral-800/60">
-                  <p><strong className="text-neutral-800 dark:text-neutral-200">Stimulus AKM:</strong> Kelompokkan butir dengan GroupId sama agar berbagi narasi stimulus.</p>
+              {/* 2. Format & Rumus KaTeX Helper Box */}
+              <InspectorCard
+                title="Panduan Format & Rumus"
+                icon={BookOpen}
+                description={
+                  <>Ketik rumus matematika diapit tanda <code>\( ... \)</code>, misalnya <code>\( x^2 + y^2 = r^2 \)</code>.</>
+                }
+                actionSlot={
                   <button
                     type="button"
-                    onClick={() => setIsLiterasiGuideOpen(true)}
-                    className="w-full mt-1 py-1 px-2 text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center justify-center gap-1 cursor-pointer"
+                    onClick={() => setIsGuideOpen(!isGuideOpen)}
+                    className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-0.5 cursor-pointer"
+                    title={isGuideOpen ? "Tutup panduan" : "Buka panduan"}
                   >
-                    <BookOpen className="h-3 w-3" />
-                    <span>Buka Panduan Lengkap Literasi</span>
+                    <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isGuideOpen && "rotate-180")} />
+                  </button>
+                }
+              >
+                <div className="pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEquationTarget(null);
+                      setInitialEquationLatex("");
+                      setIsEquationModalOpen(true);
+                    }}
+                    className="w-full py-1.5 px-2.5 rounded-lg border border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <Function className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Buka Equation Studio</span>
                   </button>
                 </div>
-              )}
-            </InspectorCard>
 
-          </NeonInspector>
-        )}
-      </div>
+                {isGuideOpen && (
+                  <div className="pt-1 space-y-1.5 text-[11px] text-neutral-600 dark:text-neutral-400 border-t border-neutral-200/60 dark:border-neutral-800/60">
+                    <p><strong className="text-neutral-800 dark:text-neutral-200">Stimulus AKM:</strong> Kelompokkan butir dengan GroupId sama agar berbagi narasi stimulus.</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsLiterasiGuideOpen(true)}
+                      className="w-full mt-1 py-1 px-2 text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <BookOpen className="h-3 w-3" />
+                      <span>Buka Panduan Lengkap Literasi</span>
+                    </button>
+                  </div>
+                )}
+              </InspectorCard>
+
+            </NeonInspector>
+          )}
+        </div>
       </div>
 
       {/* MODAL PANDUAN LITERASI */}
@@ -6907,8 +6914,8 @@ Aturan:
                   type="button"
                   onClick={() => setShowPreview(!showPreview)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border shadow-xs active:scale-95 ${showPreview
-                      ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/20"
-                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/60"
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/20"
+                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/60"
                     }`}
                   title={showPreview ? "Matikan pratinjau tampilan ujian siswa" : "Aktifkan pratinjau tampilan ujian siswa"}
                 >
@@ -7011,8 +7018,8 @@ Aturan:
                           <span>Paket Stimulus / Literasi</span>
                         </label>
                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${isLiterasiActive
-                            ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800"
-                            : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                          ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800"
+                          : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
                           }`}>
                           {isLiterasiActive ? "TERHUBUNG" : "MANDIRI"}
                         </span>
@@ -7028,8 +7035,8 @@ Aturan:
                           }
                         }}
                         className={`w-full h-11 px-3 rounded-xl border text-left flex items-center justify-between transition-all shadow-xs ${isLiterasiActive
-                            ? "bg-blue-50/90 border-blue-300 dark:bg-blue-950/50 dark:border-blue-800 text-blue-900 dark:text-blue-200"
-                            : "bg-white hover:bg-slate-50 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-750 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                          ? "bg-blue-50/90 border-blue-300 dark:bg-blue-950/50 dark:border-blue-800 text-blue-900 dark:text-blue-200"
+                          : "bg-white hover:bg-slate-50 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-750 dark:border-slate-700 text-slate-700 dark:text-slate-300"
                           }`}
                       >
                         <span className="text-xs font-semibold">
@@ -7289,8 +7296,8 @@ Aturan:
                               setDraggedIndex(null);
                             }}
                             className={`p-3 sm:p-3.5 border rounded-xl transition-all relative ${isCorrect
-                                ? "bg-emerald-50/40 border-emerald-300 dark:bg-emerald-950/20 dark:border-emerald-800/60 shadow-xs"
-                                : "bg-white dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                              ? "bg-emerald-50/40 border-emerald-300 dark:bg-emerald-950/20 dark:border-emerald-800/60 shadow-xs"
+                              : "bg-white dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                               }`}
                           >
                             <div className="flex items-start gap-2.5 sm:gap-3">
@@ -7306,8 +7313,8 @@ Aturan:
                                 </div>
 
                                 <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center transition-colors shadow-2xs ${isCorrect
-                                    ? "bg-emerald-600 text-white shadow-emerald-600/20"
-                                    : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                                  ? "bg-emerald-600 text-white shadow-emerald-600/20"
+                                  : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                                   }`}>
                                   {letter.toUpperCase()}
                                 </div>
@@ -7348,8 +7355,8 @@ Aturan:
                                   type="button"
                                   variant="ghost"
                                   className={`h-9 w-full text-xs font-bold rounded-lg transition-all border flex items-center justify-center gap-1.5 select-none active:scale-95 shadow-xs ${isCorrect
-                                      ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:border-emerald-500 shadow-emerald-500/20"
-                                      : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700 hover:border-emerald-400"
+                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:border-emerald-500 shadow-emerald-500/20"
+                                    : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700 hover:border-emerald-400"
                                     }`}
                                   size="sm"
                                   onClick={() => handleChoiceChange(letter, 'isCorrect', !isCorrect)}
@@ -7372,8 +7379,8 @@ Aturan:
                                 <button
                                   type="button"
                                   className={`h-9 w-full text-xs font-semibold rounded-lg transition-all border flex items-center justify-center gap-1.5 select-none active:scale-95 shadow-xs ${hasImage
-                                      ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60 dark:hover:bg-blue-900/40"
-                                      : "bg-white hover:bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60 dark:hover:bg-blue-900/40"
+                                    : "bg-white hover:bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700"
                                     }`}
                                   onClick={() => {
                                     setGalleryTarget({ type: "choice", letter });
@@ -7461,8 +7468,8 @@ Aturan:
                                   setFormValues(prev => ({ ...prev, statements: updated }));
                                 }}
                                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-xs active:scale-95 flex items-center gap-1.5 ${st.answer === "benar"
-                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:border-emerald-500 shadow-emerald-500/20"
-                                    : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500"
+                                  ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:border-emerald-500 shadow-emerald-500/20"
+                                  : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500"
                                   }`}
                               >
                                 <Check className={`w-3.5 h-3.5 stroke-[2.5] ${st.answer === "benar" ? "text-white" : "text-slate-400 dark:text-slate-500"}`} />
@@ -7477,8 +7484,8 @@ Aturan:
                                   setFormValues(prev => ({ ...prev, statements: updated }));
                                 }}
                                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-xs active:scale-95 flex items-center gap-1.5 ${st.answer === "salah"
-                                    ? "bg-rose-600 hover:bg-rose-700 text-white border-rose-600 dark:bg-rose-600 dark:hover:bg-rose-500 dark:border-rose-500 shadow-rose-500/20"
-                                    : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700 hover:border-rose-400 dark:hover:border-rose-500"
+                                  ? "bg-rose-600 hover:bg-rose-700 text-white border-rose-600 dark:bg-rose-600 dark:hover:bg-rose-500 dark:border-rose-500 shadow-rose-500/20"
+                                  : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700 hover:border-rose-400 dark:hover:border-rose-500"
                                   }`}
                               >
                                 <X className={`w-3.5 h-3.5 stroke-[2.5] ${st.answer === "salah" ? "text-white" : "text-slate-400 dark:text-slate-500"}`} />
@@ -8684,16 +8691,16 @@ Aturan:
                       <span className="font-black text-slate-800 dark:text-slate-100 text-xs uppercase tracking-widest">Unit Soal</span>
                       {q.type && q.type !== "pilihan_ganda" && (
                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${q.type === "pilihan_ganda_kompleks" ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800/40" :
-                            q.type === "benar_salah" ? "bg-green-50 text-green-600 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800/40" :
-                              q.type === "menjodohkan" ? "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800/40" :
-                                q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/40" :
-                                  q.type === "uraian" ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/40" :
-                                    q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800/40" :
-                                      q.type === "matriks" ? "bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800/40" :
+                          q.type === "benar_salah" ? "bg-green-50 text-green-600 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800/40" :
+                            q.type === "menjodohkan" ? "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800/40" :
+                              q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/40" :
+                                q.type === "uraian" ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/40" :
+                                  q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800/40" :
+                                    q.type === "matriks" ? "bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800/40" :
                                       q.type === "klasifikasi" ? "bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-800/40" :
-                                      q.type === "isian_rumpang" ? "bg-lime-50 text-lime-700 border-lime-200 dark:bg-lime-950/30 dark:text-lime-400 dark:border-lime-800/40" :
-                                      q.type === "hotspot" ? "bg-sky-50 text-sky-600 border-sky-200 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-800/40" :
-                                      "bg-cyan-50 text-cyan-600 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-800/40"
+                                        q.type === "isian_rumpang" ? "bg-lime-50 text-lime-700 border-lime-200 dark:bg-lime-950/30 dark:text-lime-400 dark:border-lime-800/40" :
+                                          q.type === "hotspot" ? "bg-sky-50 text-sky-600 border-sky-200 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-800/40" :
+                                            "bg-cyan-50 text-cyan-600 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-800/40"
                           }`}>
                           {q.type === "pilihan_ganda_kompleks" ? "PG Kompleks" :
                             q.type === "benar_salah" ? "Benar/Salah" :
@@ -8821,8 +8828,8 @@ Aturan:
                               <div
                                 key={letter}
                                 className={`group relative flex items-center gap-4 p-3 rounded-2xl border transition-all duration-300 ${isCorrect
-                                    ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-400 shadow-md shadow-emerald-100 dark:shadow-none"
-                                    : "bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                                  ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-400 shadow-md shadow-emerald-100 dark:shadow-none"
+                                  : "bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                                   }`}
                               >
                                 <button
@@ -8840,8 +8847,8 @@ Aturan:
                                     }
                                   }}
                                   className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm transition-all shadow-sm ${isCorrect
-                                      ? "bg-emerald-600 text-white shadow-emerald-200"
-                                      : "bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300"
+                                    ? "bg-emerald-600 text-white shadow-emerald-200"
+                                    : "bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300"
                                     }`}
                                 >
                                   {letter.toUpperCase()}
@@ -9505,19 +9512,19 @@ Aturan:
           currentQuestionContext={
             galleryTarget?.type === "batch" && galleryTarget.index !== undefined && batchQuestions[galleryTarget.index]
               ? {
-                  text: batchQuestions[galleryTarget.index].text,
-                  topic: aiTopic || exam?.title,
-                  subject: aiSubject || exam?.subject,
-                  options: Object.values(batchQuestions[galleryTarget.index].choices || {}).map((c: any) => c.text),
-                  correctAnswer: batchQuestions[galleryTarget.index].correctKey,
-                }
+                text: batchQuestions[galleryTarget.index].text,
+                topic: aiTopic || exam?.title,
+                subject: aiSubject || exam?.subject,
+                options: Object.values(batchQuestions[galleryTarget.index].choices || {}).map((c: any) => c.text),
+                correctAnswer: batchQuestions[galleryTarget.index].correctKey,
+              }
               : {
-                  text: formValues.text,
-                  topic: exam?.title,
-                  subject: exam?.subject,
-                  options: Object.values(formValues.choices || {}).map((c: any) => c.text),
-                  correctAnswer: formValues.answerKey,
-                }
+                text: formValues.text,
+                topic: exam?.title,
+                subject: exam?.subject,
+                options: Object.values(formValues.choices || {}).map((c: any) => c.text),
+                correctAnswer: formValues.answerKey,
+              }
           }
         />
 
@@ -9623,7 +9630,7 @@ Aturan:
 
             <div className="px-6 py-6 max-h-[65vh] overflow-y-auto scrollbar-thin">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
+
                 {/* Kolom Kiri: Konteks & Materi */}
                 <div className="space-y-6">
                   <div>
@@ -9687,7 +9694,7 @@ Aturan:
                           <input type="file" className="hidden" accept=".pdf,.docx,.docm,.pptx,.ppt,.png,.jpg,.jpeg" onChange={handleAIMaterialUpload} disabled={isExtractingMaterial} />
                         </label>
                       )}
-                      
+
                       <div className="relative">
                         <textarea value={aiMaterialText} onChange={(e) => setAiMaterialText(e.target.value.substring(0, 4000))} placeholder="Paste teks materi atau artikel di sini..." className="w-full min-h-[90px] p-3 pb-7 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-xs resize-none text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 transition-all shadow-2xs" />
                         {aiMaterialText && <p className="absolute bottom-2.5 right-3 text-[10px] font-mono text-neutral-400">{aiMaterialText.length}/4000</p>}
@@ -9702,7 +9709,7 @@ Aturan:
                     <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3 flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Format Output
                     </h4>
-                    
+
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Tipe Soal</label>
@@ -9746,35 +9753,35 @@ Aturan:
                         ))}
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                         <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Tingkat Kesulitan</label>
-                         <div className="grid grid-cols-3 gap-1 bg-neutral-100/80 dark:bg-neutral-900/60 p-1 rounded-lg border border-neutral-200/80 dark:border-neutral-800">
-                           {['mudah', 'sedang', 'sulit'].map((d) => (
-                             <button key={d} onClick={() => setAiDifficulty(d)} className={`py-1.5 rounded-md text-xs font-medium capitalize transition-all cursor-pointer ${aiDifficulty === d ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700 shadow-2xs font-bold' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}`}>{d}</button>
-                           ))}
-                         </div>
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Tingkat Kesulitan</label>
+                        <div className="grid grid-cols-3 gap-1 bg-neutral-100/80 dark:bg-neutral-900/60 p-1 rounded-lg border border-neutral-200/80 dark:border-neutral-800">
+                          {['mudah', 'sedang', 'sulit'].map((d) => (
+                            <button key={d} onClick={() => setAiDifficulty(d)} className={`py-1.5 rounded-md text-xs font-medium capitalize transition-all cursor-pointer ${aiDifficulty === d ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700 shadow-2xs font-bold' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}`}>{d}</button>
+                          ))}
+                        </div>
                       </div>
                       <div className="space-y-1.5">
-                         <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
-                            Mode Literasi
-                            <label className="relative inline-flex items-center cursor-pointer">
-                              <input type="checkbox" className="sr-only peer" checked={isAiLiteracy} onChange={(e) => setIsAiLiteracy(e.target.checked)} />
-                              <div className="w-8 h-4.5 bg-neutral-200 rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
-                            </label>
-                         </label>
-                         {isAiLiteracy ? (
-                           <div className="grid grid-cols-3 gap-1 bg-neutral-100/80 dark:bg-neutral-900/60 p-1 rounded-lg border border-neutral-200/80 dark:border-neutral-800 h-[34px]">
-                             {['pendek', 'sedang', 'panjang'].map((len) => (
-                               <button key={len} type="button" onClick={() => setAiPassageLength(len)} className={`rounded-md text-xs font-medium capitalize transition-all cursor-pointer ${aiPassageLength === len ? 'bg-emerald-600 text-white shadow-2xs font-bold' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}`}>{len}</button>
-                             ))}
-                           </div>
-                         ) : (
-                           <div className="h-[34px] flex items-center px-2.5 bg-neutral-50 dark:bg-neutral-900/40 rounded-lg border border-neutral-200/80 dark:border-neutral-800">
-                              <span className="text-xs font-medium text-neutral-500 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Buat Teks Bacaan</span>
-                           </div>
-                         )}
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
+                          Mode Literasi
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" className="sr-only peer" checked={isAiLiteracy} onChange={(e) => setIsAiLiteracy(e.target.checked)} />
+                            <div className="w-8 h-4.5 bg-neutral-200 rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
+                          </label>
+                        </label>
+                        {isAiLiteracy ? (
+                          <div className="grid grid-cols-3 gap-1 bg-neutral-100/80 dark:bg-neutral-900/60 p-1 rounded-lg border border-neutral-200/80 dark:border-neutral-800 h-[34px]">
+                            {['pendek', 'sedang', 'panjang'].map((len) => (
+                              <button key={len} type="button" onClick={() => setAiPassageLength(len)} className={`rounded-md text-xs font-medium capitalize transition-all cursor-pointer ${aiPassageLength === len ? 'bg-emerald-600 text-white shadow-2xs font-bold' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}`}>{len}</button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="h-[34px] flex items-center px-2.5 bg-neutral-50 dark:bg-neutral-900/40 rounded-lg border border-neutral-200/80 dark:border-neutral-800">
+                            <span className="text-xs font-medium text-neutral-500 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Buat Teks Bacaan</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -9783,7 +9790,7 @@ Aturan:
                     <div className="p-3.5 bg-neutral-50/70 dark:bg-neutral-900/50 rounded-xl border border-neutral-200/80 dark:border-neutral-800 shadow-2xs">
                       <div className="flex items-center gap-2 mb-2.5">
                         <div className="w-6 h-6 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                           <Target className="w-3.5 h-3.5" />
+                          <Target className="w-3.5 h-3.5" />
                         </div>
                         <p className="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">Indikator Pembelajaran</p>
                         {isFetchingObjectives && <RefreshCw className="w-3.5 h-3.5 text-neutral-400 animate-spin ml-auto" />}
@@ -9855,7 +9862,7 @@ Aturan:
             </div>
           </DialogContent>
         </Dialog>
-{/* Smart AI Import Dialog */}
+        {/* Smart AI Import Dialog */}
         <Dialog open={isAIImportOpen} onOpenChange={setIsAIImportOpen}>
           <DialogContent className="max-w-4xl bg-white dark:bg-slate-900 max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
             <DialogHeader className="p-6 pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -9888,8 +9895,8 @@ Aturan:
                     <button
                       onClick={() => setImportMode('extract')}
                       className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${importMode === 'extract'
-                          ? "bg-white dark:bg-slate-700 text-emerald-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700"
+                        ? "bg-white dark:bg-slate-700 text-emerald-600 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
                         }`}
                     >
                       Ekstraksi Soal (Detect)
@@ -9897,8 +9904,8 @@ Aturan:
                     <button
                       onClick={() => setImportMode('generate')}
                       className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${importMode === 'generate'
-                          ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700"
+                        ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
                         }`}
                     >
                       Buat dari Materi (Gen)
@@ -9906,8 +9913,8 @@ Aturan:
                     <button
                       onClick={() => setImportMode('json')}
                       className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${importMode === 'json'
-                          ? "bg-white dark:bg-slate-700 text-orange-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700"
+                        ? "bg-white dark:bg-slate-700 text-orange-600 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
                         }`}
                     >
                       Import JSON
@@ -10072,12 +10079,12 @@ Aturan:
                             {/* Type badge */}
                             {q.type && q.type !== "pilihan_ganda" && (
                               <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full border ${q.type === "pilihan_ganda_kompleks" ? "bg-blue-50 text-blue-600 border-blue-200" :
-                                  q.type === "benar_salah" ? "bg-green-50 text-green-600 border-green-200" :
-                                    q.type === "menjodohkan" ? "bg-purple-50 text-purple-600 border-purple-200" :
-                                      q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200" :
-                                        q.type === "uraian" ? "bg-rose-50 text-rose-600 border-rose-200" :
-                                          q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200" :
-                                            "bg-cyan-50 text-cyan-600 border-cyan-200"
+                                q.type === "benar_salah" ? "bg-green-50 text-green-600 border-green-200" :
+                                  q.type === "menjodohkan" ? "bg-purple-50 text-purple-600 border-purple-200" :
+                                    q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200" :
+                                      q.type === "uraian" ? "bg-rose-50 text-rose-600 border-rose-200" :
+                                        q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200" :
+                                          "bg-cyan-50 text-cyan-600 border-cyan-200"
                                 }`}>
                                 {q.type === "pilihan_ganda_kompleks" ? "PG Kompleks" :
                                   q.type === "benar_salah" ? "Benar/Salah" :
@@ -10176,10 +10183,10 @@ Aturan:
                   onClick={handleAIParse}
                   disabled={isParsing || !importText.trim()}
                   className={`w-full h-14 rounded-2xl font-black uppercase text-xs tracking-widest shadow-sm transition-all active:scale-95 ${importMode === 'json'
-                      ? "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-200/50"
-                      : importMode === 'extract'
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200/50"
-                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200/50"
+                    ? "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-200/50"
+                    : importMode === 'extract'
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200/50"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200/50"
                     }`}
                 >
                   {isParsing ? (
