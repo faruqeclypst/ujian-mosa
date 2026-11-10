@@ -126,7 +126,7 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
             console.warn("[SHARED_GALLERY] Query shared_gallery notice:", err);
         }
 
-        // 2. Ambil dari tabel questions & exams & teachers
+        // 2. Ambil dari tabel questions & exams & teachers (termasuk bank soal yang berstatus 'archive')
         try {
             const tplQ = new DynamicModel({
                 id: "",
@@ -136,6 +136,7 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                 options: "",
                 created: "",
                 examTitle: "",
+                examStatus: "",
                 teacherId: "",
                 teacherName: ""
             });
@@ -149,6 +150,7 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                     COALESCE(q.options, '') AS options,
                     COALESCE(q.created, '') AS created,
                     COALESCE(e.title, '') AS examTitle,
+                    COALESCE(e.status, '') AS examStatus,
                     COALESCE(e.teacherId, '') AS teacherId,
                     COALESCE(t.name, 'Admin / Sistem') AS teacherName
                 FROM questions q
@@ -160,7 +162,7 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                    OR q.options LIKE '%<img%'
                    OR q.options LIKE '%data:image%'
                 ORDER BY q.created DESC
-                LIMIT 400
+                LIMIT 1500
             `).all(qRows);
 
             function extractImagesFromHtml(html, cb) {
@@ -187,6 +189,7 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                 const tId = q.teacherId || "";
                 const tName = q.teacherName || (tId ? "Guru" : "Admin / Sistem");
                 const eTitle = q.examTitle || "Soal Ujian";
+                const isArchived = (q.examStatus === "archive");
                 const isOwn = (callerTeacherId && tId === callerTeacherId) || (!tId && (callerRole === "admin" || !callerTeacherId));
 
                 function handleFoundUrl(rawUrl) {
@@ -195,6 +198,7 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                     if (clean.length < 5) return;
                     if (imageMap[clean]) {
                         imageMap[clean].count++;
+                        if (isArchived) imageMap[clean].isArchived = true;
                         return;
                     }
                     imageMap[clean] = {
@@ -207,6 +211,7 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                         created: q.created || "",
                         count: 1,
                         isOwn: !!isOwn,
+                        isArchived: !!isArchived,
                         source: "question"
                     };
                     if (tId) {

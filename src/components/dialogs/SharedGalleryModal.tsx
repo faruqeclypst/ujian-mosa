@@ -35,6 +35,7 @@ export interface SharedGalleryItem {
   count: number;
   isOwn: boolean;
   source?: string;
+  isArchived?: boolean;
 }
 
 export interface SharedGalleryModalProps {
@@ -68,11 +69,12 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
   const [teachers, setTeachers] = useState<Array<{ id: string; name: string; count: number }>>([]);
   const [isLoadingGallery, setIsLoadingGallery] = useState(false);
   const [teacherFilter, setTeacherFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "archive">("all");
   const [gallerySearch, setGallerySearch] = useState<string>("");
   const [isUploadingDirect, setIsUploadingDirect] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load Galeri saat modal dibuka (menggabungkan server gallery + seluruh butir soal semua guru)
+  // Load Galeri saat modal dibuka (menggabungkan server gallery + seluruh butir soal semua guru, termasuk bank soal aktif & arsip)
   const loadGallery = async () => {
     if (!pb) return;
     setIsLoadingGallery(true);
@@ -101,6 +103,7 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
               combinedMap[img.url] = {
                 ...img,
                 isOwn: !!isOwn,
+                isArchived: !!img.isArchived,
               };
               if (tId) {
                 if (!teacherMap[tId]) {
@@ -115,21 +118,26 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
         console.warn("Notice: Fetch /api/shared-gallery gagal:", netErr);
       }
 
-      // 2. Ambil seluruh butir soal, ujian, dan data guru dari database PocketBase
-      // agar gambar dari SEMUA guru sekolah selalu muncul lengkap
+      // 2. Ambil butir soal, ujian, dan data guru dari database PocketBase
+      // Mencakup seluruh paket soal aktif maupun bank soal yang diarsipkan
       try {
         const [qRes, examsRes, teachersRes] = await Promise.allSettled([
-          pb.collection("questions").getList(1, 200, { sort: "-created" }),
-          pb.collection("exams").getFullList(),
-          pb.collection("teachers").getFullList(),
+          pb.collection("questions").getFullList({
+            filter: 'text ~ "<img" || groupText ~ "<img" || options ~ "<img" || options ~ "http" || options ~ "data:image"',
+            sort: "-created",
+            requestKey: null,
+          }).catch(() => pb.collection("questions").getList(1, 500, { sort: "-created", requestKey: null })),
+          pb.collection("exams").getFullList({ requestKey: null }),
+          pb.collection("teachers").getFullList({ requestKey: null }),
         ]);
 
-        const examToInfo: Record<string, { title: string; teacherId: string }> = {};
+        const examToInfo: Record<string, { title: string; teacherId: string; isArchived: boolean }> = {};
         if (examsRes.status === "fulfilled" && examsRes.value) {
           examsRes.value.forEach((ex: any) => {
             examToInfo[ex.id] = {
               title: ex.title || "Ujian",
               teacherId: ex.teacherId || ex.teacherid || "",
+              isArchived: ex.status === "archive",
             };
           });
         }
@@ -148,6 +156,7 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
 
           const examInfo = qExamId ? examToInfo[qExamId] : undefined;
           const tId = examInfo?.teacherId || "";
+          const isArchived = examInfo?.isArchived || false;
           const tName = tId
             ? teacherIdToName[tId] || "Guru"
             : (isAdmin ? "Admin / Sistem" : "Guru");
@@ -157,6 +166,7 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
           if (combinedMap[clean]) {
             combinedMap[clean].count++;
             if (isOwn) combinedMap[clean].isOwn = true;
+            if (isArchived) combinedMap[clean].isArchived = true;
             return;
           }
 
@@ -170,6 +180,7 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
             created: new Date().toISOString(),
             count: 1,
             isOwn: !!isOwn,
+            isArchived: isArchived,
             source: "questions",
           };
 
@@ -207,14 +218,16 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
           }
         };
 
-        if (qRes.status === "fulfilled" && qRes.value?.items) {
-          qRes.value.items.forEach((q: any) => {
-            if (q.imageUrl) addLocalUrl(q.imageUrl, q.examId);
-            scanHtml(q.text, q.examId);
-            scanHtml(q.groupText, q.examId);
-            scanOptions(q.options, q.examId);
-          });
-        }
+        const rawQuestions = qRes.status === "fulfilled"
+          ? (Array.isArray(qRes.value) ? qRes.value : (qRes.value?.items || []))
+          : [];
+
+        rawQuestions.forEach((q: any) => {
+          if (q.imageUrl) addLocalUrl(q.imageUrl, q.examId);
+          scanHtml(q.text, q.examId);
+          scanHtml(q.groupText, q.examId);
+          scanOptions(q.options, q.examId);
+        });
 
         // 3. Scan konteks butir soal saat ini yang sedang aktif diedit di form
         if (currentQuestionContext) {
@@ -246,13 +259,19 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
     }
   }, [isOpen]);
 
-  // Filter gambar sekolah & arsip saya
+  // Filter gambar sekolah, arsip saya, status ujian, & pencarian
   const filteredGalleryImages = useMemo(() => {
     let list = images;
     if (activeTab === "mine") {
       list = list.filter((img) => img.isOwn);
-    } else if (teacherFilter !== "all") {
+    }
+    if (teacherFilter !== "all") {
       list = list.filter((img) => img.teacherId === teacherFilter);
+    }
+    if (statusFilter === "active") {
+      list = list.filter((img) => !img.isArchived);
+    } else if (statusFilter === "archive") {
+      list = list.filter((img) => img.isArchived);
     }
 
     if (gallerySearch.trim()) {
@@ -266,7 +285,7 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
     }
 
     return list;
-  }, [images, activeTab, teacherFilter, gallerySearch]);
+  }, [images, activeTab, teacherFilter, statusFilter, gallerySearch]);
 
   // Handler Upload Langsung ke Galeri Bersama
   const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -467,6 +486,17 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
                   ))}
                 </select>
               )}
+
+              {/* Filter Status: Semua, Aktif, atau Arsip */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="h-9 px-3 rounded-xl text-xs font-medium bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200/80 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 outline-none cursor-pointer focus:ring-1 focus:ring-emerald-500"
+              >
+                <option value="all">Semua Status ({images.length})</option>
+                <option value="active">Soal Aktif ({images.filter(i => !i.isArchived).length})</option>
+                <option value="archive">Soal Diarsipkan ({images.filter(i => i.isArchived).length})</option>
+              </select>
             </div>
 
             <NeonButton
@@ -540,14 +570,19 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
                         </span>
                       </div>
 
-                      {/* Badge Milik Anda */}
-                      {img.isOwn && (
-                        <div className="absolute top-1.5 left-1.5">
+                      {/* Badge Milik Anda & Badge Arsip */}
+                      <div className="absolute top-1.5 left-1.5 flex flex-col gap-1 items-start">
+                        {img.isOwn && (
                           <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-600 text-white shadow-xs">
                             Milik Anda
                           </span>
-                        </div>
-                      )}
+                        )}
+                        {img.isArchived && (
+                          <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-amber-500 text-white shadow-xs">
+                            Arsip
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Info Footer */}
