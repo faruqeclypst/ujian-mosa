@@ -5877,7 +5877,7 @@ const QuestionFormPage = () => {
                           >
                             <div className="flex items-start gap-2.5 sm:gap-3">
                               {/* Drag handle & Letter badge */}
-                              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pt-1">
+                              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pt-1.5">
                                 <div
                                   onMouseEnter={() => setCanDrag(true)}
                                   onMouseLeave={() => setCanDrag(false)}
@@ -5887,9 +5887,9 @@ const QuestionFormPage = () => {
                                   <GripVertical className="h-4 w-4" />
                                 </div>
 
-                                <div className={`w-8.5 h-8.5 rounded-xl font-black text-sm flex items-center justify-center transition-colors ${isCorrect
-                                    ? "bg-emerald-600 text-white shadow-xs"
-                                    : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 shadow-2xs"
+                                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center transition-colors shadow-2xs ${isCorrect
+                                    ? "bg-emerald-600 text-white shadow-emerald-600/20"
+                                    : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
                                   }`}>
                                   {letter.toUpperCase()}
                                 </div>
@@ -5908,28 +5908,28 @@ const QuestionFormPage = () => {
                                   placeholder={`Jawaban opsi ${letter.toUpperCase()} ...`}
                                   modules={quillModulesChoice}
                                   formats={quillFormatsChoice}
-                                  className="[&_.ql-editor]:min-h-[52px] [&_.ql-editor]:py-2.5 [&_.ql-editor]:px-3 [&_.ql-editor]:text-left [&_.ql-editor_p]:!text-left [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-neutral-200 dark:[&_.ql-toolbar]:border-neutral-800 [&_.ql-toolbar]:px-2.5 [&_.ql-toolbar]:py-1 [&_.ql-toolbar]:bg-neutral-50/80 dark:[&_.ql-toolbar]:bg-neutral-800/60 [&_.ql-toolbar]:overflow-x-auto"
+                                  className="[&_.ql-editor]:min-h-[76px] sm:[&_.ql-editor]:min-h-[84px] [&_.ql-editor]:py-3 [&_.ql-editor]:px-3.5 [&_.ql-editor]:text-sm sm:[&_.ql-editor]:text-[15px] [&_.ql-editor]:leading-relaxed [&_.ql-editor]:text-left [&_.ql-editor_p]:!text-left [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-neutral-200 dark:[&_.ql-toolbar]:border-neutral-800 [&_.ql-toolbar]:px-3 [&_.ql-toolbar]:py-1.5 [&_.ql-toolbar]:bg-neutral-50/80 dark:[&_.ql-toolbar]:bg-neutral-800/60 [&_.ql-toolbar]:overflow-x-auto"
                                 />
 
                                 {/* Pratinjau Opsi jika showPreview aktif */}
                                 {showPreview && formValues.choices[letter].text && (
-                                  <div className="p-2.5 bg-neutral-50 dark:bg-neutral-900/60 border-t border-neutral-200 dark:border-neutral-800">
+                                  <div className="p-3 bg-neutral-50 dark:bg-neutral-900/60 border-t border-neutral-200 dark:border-neutral-800">
                                     <MathText
                                       content={autoDetectLatex(formValues.choices[letter].text)}
                                       disableJustify={true}
-                                      className="text-xs font-serif ql-editor !p-0 cbt-choice-text text-left text-neutral-700 dark:text-neutral-300"
+                                      className="text-xs sm:text-sm font-serif ql-editor !p-0 cbt-choice-text text-left text-neutral-700 dark:text-neutral-300"
                                     />
                                   </div>
                                 )}
                               </div>
 
                               {/* Action Buttons: Kunci & Gambar */}
-                              <div className="flex flex-col gap-1.5 shrink-0 w-22 sm:w-24 pt-0.5">
+                              <div className="flex flex-col gap-2 shrink-0 w-24 sm:w-28 pt-0.5">
                                 {/* Baris 1: KUNCI */}
                                 <Button
                                   type="button"
                                   variant="ghost"
-                                  className={`h-8.5 w-full text-xs font-bold rounded-lg transition-all border flex items-center justify-center gap-1.5 select-none active:scale-95 shadow-2xs cursor-pointer ${isCorrect
+                                  className={`h-9 w-full text-xs font-bold rounded-lg transition-all border flex items-center justify-center gap-1.5 select-none active:scale-95 shadow-2xs cursor-pointer ${isCorrect
                                       ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:border-emerald-500 shadow-emerald-500/20"
                                       : "bg-white hover:bg-neutral-100 text-neutral-700 border-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 dark:text-neutral-300 dark:border-neutral-700 hover:border-emerald-400"
                                     }`}
@@ -5953,7 +5953,7 @@ const QuestionFormPage = () => {
                                 {/* Baris 2: GAMBAR */}
                                 <button
                                   type="button"
-                                  className={`h-8.5 w-full text-xs font-semibold rounded-lg transition-all border flex items-center justify-center gap-1.5 select-none active:scale-95 shadow-2xs cursor-pointer ${hasImage
+                                  className={`h-9 w-full text-xs font-semibold rounded-lg transition-all border flex items-center justify-center gap-1.5 select-none active:scale-95 shadow-2xs cursor-pointer ${hasImage
                                       ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60 dark:hover:bg-blue-900/40"
                                       : "bg-white hover:bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 dark:text-neutral-300 dark:border-neutral-700"
                                     }`}

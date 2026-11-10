@@ -7138,8 +7138,8 @@ Aturan:
                                   <GripVertical className="h-4 w-4" />
                                 </div>
 
-                                <div className={`w-8 h-8 rounded-xl font-black text-sm flex items-center justify-center transition-colors ${isCorrect
-                                    ? "bg-emerald-600 text-white shadow-xs"
+                                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center transition-colors shadow-2xs ${isCorrect
+                                    ? "bg-emerald-600 text-white shadow-emerald-600/20"
                                     : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                                   }`}>
                                   {letter.toUpperCase()}
@@ -7159,30 +7159,30 @@ Aturan:
                                   placeholder={`Jawaban opsi ${letter.toUpperCase()} ...`}
                                   modules={quillModulesChoice}
                                   formats={quillFormatsChoice}
-                                  className="[&_.ql-editor]:min-h-[52px] [&_.ql-editor]:py-2 [&_.ql-editor]:text-left [&_.ql-editor_p]:!text-left [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-2 [&_.ql-toolbar]:py-0.5 [&_.ql-toolbar]:bg-slate-50/70 dark:[&_.ql-toolbar]:bg-slate-800/60"
+                                  className="[&_.ql-editor]:min-h-[76px] sm:[&_.ql-editor]:min-h-[84px] [&_.ql-editor]:py-3 [&_.ql-editor]:px-3.5 [&_.ql-editor]:text-sm sm:[&_.ql-editor]:text-[15px] [&_.ql-editor]:leading-relaxed [&_.ql-editor]:text-left [&_.ql-editor_p]:!text-left [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-3 [&_.ql-toolbar]:py-1.5 [&_.ql-toolbar]:bg-slate-50/70 dark:[&_.ql-toolbar]:bg-slate-800/60"
                                 />
 
                                 {/* Pratinjau Opsi jika showPreview aktif */}
                                 {showPreview && formValues.choices[letter].text && (
-                                  <div className="p-2.5 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-800">
+                                  <div className="p-3 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-800">
                                     <MathText
                                       content={autoDetectLatex(formValues.choices[letter].text)}
                                       disableJustify={true}
-                                      className="text-xs font-serif ql-editor !p-0 cbt-choice-text text-left text-slate-700 dark:text-slate-300"
+                                      className="text-xs sm:text-sm font-serif ql-editor !p-0 cbt-choice-text text-left text-slate-700 dark:text-slate-300"
                                     />
                                   </div>
                                 )}
                               </div>
 
-                              {/* 1 Kolom 2 Baris: Kunci di atas, Gambar di bawah (Compact, hemat space) */}
-                              <div className="flex flex-col gap-1.5 shrink-0 w-20 sm:w-22 pt-0.5">
+                              {/* 1 Kolom 2 Baris: Kunci di atas, Gambar di bawah */}
+                              <div className="flex flex-col gap-2 shrink-0 w-24 sm:w-28 pt-0.5">
                                 {/* Baris 1: KUNCI */}
                                 <Button
                                   type="button"
                                   variant="ghost"
-                                  className={`h-8 w-full text-xs font-bold rounded-lg transition-all border flex items-center justify-center gap-1 select-none active:scale-95 shadow-xs ${isCorrect
+                                  className={`h-9 w-full text-xs font-bold rounded-lg transition-all border flex items-center justify-center gap-1.5 select-none active:scale-95 shadow-xs ${isCorrect
                                       ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:border-emerald-500 shadow-emerald-500/20"
-                                      : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700"
+                                      : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700 hover:border-emerald-400"
                                     }`}
                                   size="sm"
                                   onClick={() => handleChoiceChange(letter, 'isCorrect', !isCorrect)}
@@ -7191,7 +7191,7 @@ Aturan:
                                   {isCorrect ? (
                                     <>
                                       <Check className="h-3.5 w-3.5 stroke-[2.5]" />
-                                      <span>Kunci</span>
+                                      <span>KUNCI</span>
                                     </>
                                   ) : (
                                     <>
@@ -7204,7 +7204,7 @@ Aturan:
                                 {/* Baris 2: GAMBAR */}
                                 <button
                                   type="button"
-                                  className={`h-8 w-full text-xs font-semibold rounded-lg transition-all border flex items-center justify-center gap-1 select-none active:scale-95 shadow-xs ${hasImage
+                                  className={`h-9 w-full text-xs font-semibold rounded-lg transition-all border flex items-center justify-center gap-1.5 select-none active:scale-95 shadow-xs ${hasImage
                                       ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60 dark:hover:bg-blue-900/40"
                                       : "bg-white hover:bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-slate-700"
                                     }`}
