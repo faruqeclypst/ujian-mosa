@@ -570,11 +570,11 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
                         </span>
                       </div>
 
-                      {/* Badge Milik Anda & Badge Arsip */}
+                      {/* Badge Milik Saya & Badge Arsip */}
                       <div className="absolute top-1.5 left-1.5 flex flex-col gap-1 items-start">
                         {img.isOwn && (
                           <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-600 text-white shadow-xs">
-                            Milik Anda
+                            Milik Saya
                           </span>
                         )}
                         {img.isArchived && (

@@ -5870,7 +5870,7 @@ const QuestionsPage = () => {
 
               {isOwner ? (
                 <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                  Milik Anda
+                  Milik Saya
                 </span>
               ) : isMgmpExam ? (
                 <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">

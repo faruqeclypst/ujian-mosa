@@ -2255,7 +2255,7 @@ const ExamsPage = () => {
                         isOwner(inspectedExam) ? (
                           <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                             <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                              Milik Anda
+                              Milik Saya
                             </span>
                             {inspectedExam.is_mgmp_shared && (
                               <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20">
