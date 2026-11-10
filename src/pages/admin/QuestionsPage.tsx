@@ -5830,50 +5830,57 @@ const QuestionsPage = () => {
               </span>
             </div>
 
-            {/* Title & Metadata Badges */}
-            <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Title & Primary Type Badge */}
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
                 Kelola Butir Soal
               </h1>
 
               {exam?.examType && (
-                <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-semibold border", getExamTypeColorClass(exam.examType))}>
+                <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0", getExamTypeColorClass(exam.examType))}>
                   {exam.examType}
                 </span>
               )}
+            </div>
 
+            {/* Clean Subtitle Line: Mapel • Guru • Kepemilikan (Simpel & Rapi) */}
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 flex-wrap">
               {exam?.subject && (
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
+                <span className="font-medium text-neutral-800 dark:text-neutral-200">
                   {exam.subject}
                 </span>
               )}
 
-              {(exam?.teacherName || exam?.teacherCode) && (
-                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100/80 dark:bg-neutral-800/80 text-neutral-600 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-700/60">
-                  <Avatar className="h-4 w-4">
-                    <AvatarFallback className="text-[9px] font-bold bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300">
-                      {(exam?.teacherName || "G").slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="truncate max-w-[150px]">{exam.teacherName}</span>
-                  {exam.teacherCode && <span className="font-mono text-[10px] text-neutral-400">({exam.teacherCode})</span>}
-                </div>
+              {exam?.subject && (exam?.teacherName || isOwner || isMgmpExam) && (
+                <span className="text-neutral-300 dark:text-neutral-600">•</span>
               )}
 
-              {/* Ownership & MGMP Status Badges */}
+              {exam?.teacherName && (
+                <span className="text-neutral-600 dark:text-neutral-400">
+                  {exam.teacherName}
+                  {exam.teacherCode && (
+                    <span className="text-neutral-400 font-mono text-[11px] ml-1">({exam.teacherCode})</span>
+                  )}
+                </span>
+              )}
+
+              {(isOwner || isMgmpExam || exam?.is_mgmp_shared) && (
+                <span className="text-neutral-300 dark:text-neutral-600">•</span>
+              )}
+
               {isOwner ? (
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                   Milik Anda
                 </span>
               ) : isMgmpExam ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20" title="Bank soal dari rekan guru mata pelajaran yang sama">
+                <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">
                   <Users className="h-3 w-3" />
                   MGMP Se-Mapel
                 </span>
               ) : null}
 
               {exam?.is_mgmp_shared && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20" title="Kolaborasi Terbuka: Guru se-mapel dapat mengedit & menambah soal">
+                <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-medium ml-1">
                   <Share2 className="h-3 w-3" />
                   Kolaborasi Aktif
                 </span>
