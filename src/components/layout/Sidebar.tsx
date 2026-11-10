@@ -215,6 +215,12 @@ const Sidebar = () => {
       case "/admin/student":
         import("../../pages/StudentsPage");
         break;
+      case "/admin/student-credentials":
+        import("../../pages/admin/StudentCredentialsPage");
+        break;
+      case "/admin/cetak-kartu":
+        import("../../pages/admin/PrintExamCardsPage");
+        break;
       case "/admin/subjects":
         import("../../pages/SubjectsPage");
         break;
@@ -295,6 +301,8 @@ const Sidebar = () => {
     ];
     if (isAdmin) {
       list.push(
+        { to: "/admin/student-credentials", label: "Kredensial Sesi", count: null },
+        { to: "/admin/cetak-kartu", label: "Cetak Kartu Ujian", count: null },
         { to: "/admin/classes", label: terminology.class, count: examData.classes.length },
         { to: "/admin/subjects", label: terminology.subject, count: examData.subjects.length },
         { to: "/admin/teachers", label: terminology.teacher, count: examData.teachers.length },

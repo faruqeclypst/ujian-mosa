@@ -16,19 +16,21 @@ import { Dialog, DialogContent } from "../ui/dialog";
 import { NeonButton } from "../ui/NeonButton";
 import { Input } from "../ui/input";
 import { Select } from "../ui/select";
+import { cn } from "../../lib/utils";
 import type { StudentData, ClassData } from "../../types/exam";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { generateExamUsername, generateExamPassword } from "../../utils/examCredentials";
 import { Sparkles, KeyRound, Check, Loader2 } from "lucide-react";
 
-interface PrintExamCardsDialogProps {
+export interface PrintExamCardsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   students: StudentData[];
   classes: ClassData[];
   selectedStudentIds?: string[];
   filterClassId?: string;
+  isStandalonePage?: boolean;
 }
 
 // Logo Resmi Kemdikbud / Tut Wuri Handayani (Vektor SVG Presisi - Zero Margin Atas Bawah)
@@ -74,6 +76,7 @@ export const PrintExamCardsDialog = ({
   classes,
   selectedStudentIds = [],
   filterClassId = "ALL",
+  isStandalonePage = false,
 }: PrintExamCardsDialogProps) => {
   const { school, terminology } = useTenant();
   const { regenerateExamCredentialsBatch } = useExamData();
@@ -880,11 +883,17 @@ export const PrintExamCardsDialog = ({
     );
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-7xl w-[98vw] h-[94vh] max-h-[95vh] p-0 flex flex-col overflow-hidden bg-neutral-900 border border-neutral-800 shadow-2xl rounded-2xl">
-        {/* Header Dialog */}
-        <div className="px-5 py-3 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between flex-shrink-0">
+  const studioContent = (
+    <div
+      className={cn(
+        "flex flex-col overflow-hidden bg-neutral-900 border border-neutral-800",
+        isStandalonePage
+          ? "w-full rounded-2xl shadow-xl min-h-[80vh] h-[calc(100vh-10.5rem)]"
+          : "max-w-7xl w-[98vw] h-[94vh] max-h-[95vh] p-0 shadow-2xl rounded-2xl"
+      )}
+    >
+      {/* Header Dialog */}
+      <div className="px-5 py-3 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/25">
               <Printer className="w-4 h-4" />
@@ -1498,6 +1507,17 @@ export const PrintExamCardsDialog = ({
             );
           })}
         </div>
+      </div>
+  );
+
+  if (isStandalonePage) {
+    return studioContent;
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-7xl w-[98vw] h-[94vh] max-h-[95vh] p-0 flex flex-col overflow-hidden bg-neutral-900 border border-neutral-800 shadow-2xl rounded-2xl">
+        {studioContent}
       </DialogContent>
     </Dialog>
   );

@@ -93,8 +93,8 @@ export const StudentTable = ({
     { 
       key: "name", 
       header: `Nama ${terminology.student} & Identitas`, 
-      className: "w-[40%] min-w-[200px]",
-      headerClassName: "w-[40%] min-w-[200px] whitespace-nowrap",
+      className: "w-[52%] min-w-[200px]",
+      headerClassName: "w-[52%] min-w-[200px] whitespace-nowrap",
       render: (student) => {
         const initials = (student.name || "S").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
         return (
@@ -141,8 +141,8 @@ export const StudentTable = ({
     { 
       key: "classId", 
       header: terminology.class, 
-      className: "hidden sm:table-cell w-[22%] min-w-[120px]",
-      headerClassName: "hidden sm:table-cell w-[22%] min-w-[120px] whitespace-nowrap",
+      className: "hidden sm:table-cell w-[26%] min-w-[120px]",
+      headerClassName: "hidden sm:table-cell w-[26%] min-w-[120px] whitespace-nowrap",
       render: (student) => {
         const cls = classes.find(c => c.id === student.classId);
         const clsName = cls?.name || (student.classId === "ALUMNI" ? "Alumni" : `Tanpa ${terminology.class}`);
@@ -173,37 +173,10 @@ export const StudentTable = ({
       )
     },
     {
-      key: "hasChangedPassword",
-      header: "Password",
-      className: "hidden lg:table-cell w-[14%] min-w-[90px]",
-      headerClassName: "hidden lg:table-cell w-[14%] min-w-[90px] whitespace-nowrap",
-      render: (student) => {
-        const hasChanged = student.hasChangedPassword;
-        const isResetReq = !!student.resetRequested;
-        return (
-          <div className="flex items-center">
-            {isResetReq ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 animate-pulse">
-                Minta Reset
-              </span>
-            ) : hasChanged ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                Diubah
-              </span>
-            ) : (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                Default
-              </span>
-            )}
-          </div>
-        );
-      }
-    },
-    {
       key: "actions",
       header: "Aksi",
-      className: "w-[14%] min-w-[100px] text-right shrink-0 whitespace-nowrap",
-      headerClassName: "w-[14%] min-w-[100px] text-right shrink-0 whitespace-nowrap",
+      className: "w-[12%] min-w-[80px] text-right shrink-0 whitespace-nowrap",
+      headerClassName: "w-[12%] min-w-[80px] text-right shrink-0 whitespace-nowrap",
       align: "right",
       render: (student) => {
         if (customActions) return customActions(student);
@@ -220,17 +193,6 @@ export const StudentTable = ({
               </button>
             )}
 
-            {role === "admin" && onResetPassword && (
-              <button 
-                type="button"
-                className="hidden sm:flex h-8 w-8 rounded-lg items-center justify-center border transition-colors shadow-2xs cursor-pointer bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 shrink-0"
-                onClick={() => onResetPassword(student)}
-                title={`Reset Password ${terminology.student}`}
-              >
-                <KeyRound className="h-4 w-4" />
-              </button>
-            )}
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -240,7 +202,7 @@ export const StudentTable = ({
                 >
                   <MoreHorizontal className="h-4 w-4" />
                   {student.resetRequested && (
-                    <span className="sm:hidden absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 animate-pulse border border-white dark:border-neutral-900" />
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 animate-pulse border border-white dark:border-neutral-900" />
                   )}
                 </button>
               </DropdownMenuTrigger>
@@ -248,7 +210,7 @@ export const StudentTable = ({
                 {role === "admin" && onResetPassword && (
                   <DropdownMenuItem
                     onClick={() => onResetPassword(student)}
-                    className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
+                    className="text-xs cursor-pointer gap-2 py-1.5"
                   >
                     <KeyRound className="h-3.5 w-3.5 text-amber-500" />
                     <span>Reset Password</span>
@@ -311,7 +273,7 @@ export const StudentTable = ({
         );
       }
     }
-  ], [terminology, classes, role, customActions, onPrintExamCard, onViewScores, onViewInterest, onEdit, onResetPassword, onDelete]);
+  ], [terminology, classes, role, customActions, onPrintExamCard, onRegenerateExamCredentials, onViewScores, onViewInterest, onEdit, onResetPassword, onDelete]);
 
   return (
     <NeonTable<StudentData>

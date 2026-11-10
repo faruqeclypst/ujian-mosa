@@ -40,6 +40,8 @@ const TeachersPage = lazy(() => import("./pages/TeachersPage"));
 const SubjectsPage = lazy(() => import("./pages/SubjectsPage"));
 const ClassesPage = lazy(() => import("./pages/ClassesPage"));
 const StudentsPage = lazy(() => import("./pages/StudentsPage"));
+const StudentCredentialsPage = lazy(() => import("./pages/admin/StudentCredentialsPage"));
+const PrintExamCardsPage = lazy(() => import("./pages/admin/PrintExamCardsPage"));
 const AlumniPage = lazy(() => import("./pages/AlumniPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
@@ -228,6 +230,8 @@ const SchoolAppContent = () => {
               <Route path="subjects" element={<AdminOnlyRoute><SubjectsPage /></AdminOnlyRoute>} />
               <Route path="teachers" element={<AdminOnlyRoute><TeachersPage /></AdminOnlyRoute>} />
               <Route path="student" element={<StudentsPage />} />
+              <Route path="student-credentials" element={<StudentCredentialsPage />} />
+              <Route path="cetak-kartu" element={<PrintExamCardsPage />} />
               <Route path="alumni" element={<AdminOnlyRoute><AlumniPage /></AdminOnlyRoute>} />
               <Route path="classes" element={<AdminOnlyRoute><ClassesPage /></AdminOnlyRoute>} />
               <Route path="kelola-akun" element={<AdminOnlyRoute><UsersPage /></AdminOnlyRoute>} />
