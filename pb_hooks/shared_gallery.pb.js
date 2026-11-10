@@ -131,10 +131,9 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
             const tplQ = new DynamicModel({
                 id: "",
                 examId: "",
-                imageUrl: "",
                 text: "",
+                groupText: "",
                 options: "",
-                choices: "",
                 created: "",
                 examTitle: "",
                 teacherId: "",
@@ -145,10 +144,9 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                 SELECT 
                     q.id,
                     COALESCE(q.examId, '') AS examId,
-                    COALESCE(q.imageUrl, '') AS imageUrl,
                     COALESCE(q.text, '') AS text,
+                    COALESCE(q.groupText, '') AS groupText,
                     COALESCE(q.options, '') AS options,
-                    COALESCE(q.choices, '') AS choices,
                     COALESCE(q.created, '') AS created,
                     COALESCE(e.title, '') AS examTitle,
                     COALESCE(e.teacherId, '') AS teacherId,
@@ -156,12 +154,11 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                 FROM questions q
                 LEFT JOIN exams e ON q.examId = e.id
                 LEFT JOIN teachers t ON e.teacherId = t.id
-                WHERE q.imageUrl != '' 
-                   OR q.text LIKE '%<img%' 
-                   OR q.options LIKE '%imageUrl%' 
-                   OR q.choices LIKE '%imageUrl%'
-                   OR q.options LIKE '%<img%' 
-                   OR q.choices LIKE '%<img%'
+                WHERE q.text LIKE '%<img%' 
+                   OR q.groupText LIKE '%<img%'
+                   OR q.options LIKE '%http%'
+                   OR q.options LIKE '%<img%'
+                   OR q.options LIKE '%data:image%'
                 ORDER BY q.created DESC
                 LIMIT 400
             `).all(qRows);
@@ -177,7 +174,7 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
 
             function extractImagesFromJson(jsonStr, cb) {
                 if (!jsonStr) return;
-                const reImg = /"imageUrl"\s*:\s*"([^"]+)"/g;
+                const reImg = /"(?:imageUrl|url|src)"\s*:\s*"([^"]+)"/g;
                 let m;
                 while ((m = reImg.exec(jsonStr)) !== null) {
                     if (m[1]) cb(m[1]);
@@ -218,10 +215,9 @@ routerAdd("GET", "/api/shared-gallery", (c) => {
                     }
                 }
 
-                if (q.imageUrl) handleFoundUrl(q.imageUrl);
                 extractImagesFromHtml(q.text, handleFoundUrl);
+                extractImagesFromHtml(q.groupText, handleFoundUrl);
                 extractImagesFromJson(q.options, handleFoundUrl);
-                extractImagesFromJson(q.choices, handleFoundUrl);
             }
         } catch (err) {
             console.warn("[SHARED_GALLERY] Query questions notice:", err);

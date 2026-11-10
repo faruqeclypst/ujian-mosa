@@ -58,6 +58,7 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
   onSelectImage,
   pb,
   school,
+  currentQuestionContext,
   currentUser,
 }) => {
   const [activeTab, setActiveTab] = useState<"school" | "mine">("school");
@@ -84,8 +85,15 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        setImages(data.images || []);
+        const serverImages = data.images || [];
         setTeachers(data.teachers || []);
+
+        if (serverImages.length > 0) {
+          setImages(serverImages);
+        } else {
+          // Jika server mengembalikan list kosong, jalankan fallback lokal client-side untuk memindai koleksi soal
+          await loadFallbackLocalGallery();
+        }
       } else {
         await loadFallbackLocalGallery();
       }
@@ -97,41 +105,84 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
     }
   };
 
-  // Fallback lokal client-side jika endpoint `/api/shared-gallery` tidak merespon
+  // Fallback lokal client-side jika endpoint `/api/shared-gallery` tidak merespon / belum ada data
   const loadFallbackLocalGallery = async () => {
     try {
-      const qRes = await pb.collection("questions").getList(1, 100, {
+      const qRes = await pb.collection("questions").getList(1, 150, {
         sort: "-created",
       });
       const localMap: Record<string, SharedGalleryItem> = {};
       const qItems = qRes.items || [];
 
-      qItems.forEach((q: any) => {
-        const addUrl = (u?: string) => {
-          if (!u || u.length < 5 || localMap[u]) return;
-          localMap[u] = {
-            id: `fb_${q.id}_${Object.keys(localMap).length}`,
-            url: u,
-            title: "Arsip Soal",
-            teacherId: currentUser?.teacherId || "",
-            teacherName: currentUser?.name || "Guru",
-            examTitle: "Bank Soal",
-            created: q.created || "",
-            count: 1,
-            isOwn: true,
-          };
-        };
-
-        if (q.imageUrl) addUrl(q.imageUrl);
-        if (q.text && q.text.includes("<img")) {
-          const match = q.text.match(/<img[^>]+src=["']([^"']+)["']/i);
-          if (match && match[1]) addUrl(match[1]);
+      const addUrl = (u?: string, title = "Arsip Soal") => {
+        if (!u) return;
+        const clean = u.trim();
+        if (clean.length < 5) return;
+        if (localMap[clean]) {
+          localMap[clean].count++;
+          return;
         }
+        localMap[clean] = {
+          id: `fb_${Object.keys(localMap).length}`,
+          url: clean,
+          title: title,
+          teacherId: currentUser?.teacherId || "",
+          teacherName: currentUser?.name || "Guru",
+          examTitle: "Bank Soal",
+          created: new Date().toISOString(),
+          count: 1,
+          isOwn: true,
+          source: "local_cache",
+        };
+      };
+
+      const scanHtml = (str?: string) => {
+        if (!str || !str.includes("<img")) return;
+        const imgRegex = /<img[^>]+src=["']([^"']+)["']/gi;
+        let m;
+        while ((m = imgRegex.exec(str)) !== null) {
+          if (m[1]) addUrl(m[1]);
+        }
+      };
+
+      const scanOptions = (opts?: any) => {
+        if (!opts) return;
+        if (typeof opts === "string") {
+          scanHtml(opts);
+          const urlRegex = /"(?:imageUrl|url|src)"\s*:\s*"([^"]+)"/g;
+          let m;
+          while ((m = urlRegex.exec(opts)) !== null) {
+            if (m[1]) addUrl(m[1]);
+          }
+        } else if (typeof opts === "object") {
+          Object.values(opts).forEach((opt: any) => {
+            if (opt?.imageUrl) addUrl(opt.imageUrl);
+            if (opt?.text) scanHtml(opt.text);
+          });
+        }
+      };
+
+      qItems.forEach((q: any) => {
+        if (q.imageUrl) addUrl(q.imageUrl);
+        scanHtml(q.text);
+        scanHtml(q.groupText);
+        scanOptions(q.options);
       });
 
-      setImages(Object.values(localMap));
+      // Juga periksa konteks soal saat ini yang sedang aktif diedit di form
+      if (currentQuestionContext) {
+        scanHtml(currentQuestionContext.text);
+        if (Array.isArray(currentQuestionContext.options)) {
+          currentQuestionContext.options.forEach((optText: string) => scanHtml(optText));
+        }
+      }
+
+      const fallbackList = Object.values(localMap);
+      if (fallbackList.length > 0) {
+        setImages(fallbackList);
+      }
     } catch (e) {
-      console.warn("Fallback lokal galeri juga gagal:", e);
+      console.warn("Fallback lokal galeri notice:", e);
     }
   };
 
@@ -170,37 +221,73 @@ export const SharedGalleryModal: React.FC<SharedGalleryModalProps> = ({
 
     setIsUploadingDirect(true);
     try {
-      const compressed = await compressImage(file);
-      const schoolFolder = school?.slug || school?.id || "default";
-      const uploaded = await uploadInventoryImage(
-        `schools/${schoolFolder}/gallery`,
-        compressed
-      );
-
+      let fileToUpload: File = file;
       try {
-        await fetch(`${pb.baseUrl}/api/shared-gallery`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: pb.authStore.token ? `Bearer ${pb.authStore.token}` : "",
-          },
-          body: JSON.stringify({
-            url: uploaded.url,
-            title: file.name.replace(/\.[^/.]+$/, ""),
-            examTitle: "Unggahan Galeri",
-            teacherName: currentUser?.name || "Guru",
-            teacherId: currentUser?.teacherId || "",
-          }),
-        });
-      } catch (postErr) {
-        console.warn("Notice: gagal POST shared_gallery:", postErr);
+        fileToUpload = await compressImage(file);
+      } catch {
+        fileToUpload = file;
       }
 
-      await loadGallery();
-      onSelectImage(uploaded.url);
-      onClose();
+      const schoolFolder = school?.slug || school?.id || "default";
+      let finalUrl = "";
+
+      // 1. Coba upload via Cloudflare R2 Worker
+      try {
+        const uploaded = await uploadInventoryImage(
+          `schools/${schoolFolder}/gallery`,
+          fileToUpload
+        );
+        finalUrl = uploaded.url;
+
+        // Catat metadata ke backend shared_gallery jika aktif
+        try {
+          await fetch(`${pb.baseUrl}/api/shared-gallery`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: pb.authStore.token ? `Bearer ${pb.authStore.token}` : "",
+            },
+            body: JSON.stringify({
+              url: finalUrl,
+              title: file.name.replace(/\.[^/.]+$/, ""),
+              examTitle: "Unggahan Galeri",
+              teacherName: currentUser?.name || "Guru",
+              teacherId: currentUser?.teacherId || "",
+            }),
+          });
+        } catch (_) {}
+      } catch (uploadErr) {
+        console.warn("Upload ke worker gagal, beralih ke fallback Base64 DataURL (sama seperti ReactQuill):", uploadErr);
+        // Fallback langsung ke Data URL seperti ReactQuill agar user TIDAK PERNAH terblokir
+        finalUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(fileToUpload);
+        });
+      }
+
+      if (finalUrl) {
+        const newItem: SharedGalleryItem = {
+          id: `upload_${Date.now()}`,
+          url: finalUrl,
+          title: file.name.replace(/\.[^/.]+$/, ""),
+          teacherId: currentUser?.teacherId || "",
+          teacherName: currentUser?.name || "Guru",
+          examTitle: "Unggahan Galeri",
+          created: new Date().toISOString(),
+          count: 1,
+          isOwn: true,
+          source: "direct_upload",
+        };
+
+        setImages((prev) => [newItem, ...prev.filter((i) => i.url !== finalUrl)]);
+
+        onSelectImage(finalUrl);
+        onClose();
+      }
     } catch (err: any) {
-      alert("Gagal mengunggah gambar ke galeri: " + (err.message || ""));
+      alert("Gagal memproses gambar: " + (err.message || ""));
     } finally {
       setIsUploadingDirect(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
