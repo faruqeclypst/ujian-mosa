@@ -33,42 +33,6 @@ export interface PrintExamCardsDialogProps {
   isStandalonePage?: boolean;
 }
 
-// Logo Resmi Kemdikbud / Tut Wuri Handayani (Vektor SVG Presisi - Zero Margin Atas Bawah)
-const TutWuriHandayaniLogo = ({ height = 54 }: { height?: number }) => (
-  <svg 
-    viewBox="8 4 84 85" 
-    style={{ height: height + 'px', width: Math.round(height * (84/85)) + 'px', display: 'block' }} 
-    fill="none" 
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <polygon points="50,5 92,35 77,88 23,88 8,35" fill="#00529C" stroke="#FFD700" strokeWidth="2.5" />
-    <polygon points="50,9 88,37 74,84 26,84 12,37" fill="#005AA9" />
-    <path d="M26 62 C 32 46, 42 42, 50 56 C 58 42, 68 46, 74 62 C 65 60, 56 65, 50 75 C 44 65, 35 60, 26 62 Z" fill="#FFFFFF" />
-    <path d="M32 68 Q 50 71 50 78 Q 50 71 68 68 Q 50 63 32 68 Z" fill="#FFD700" />
-    <path d="M50 22 C 53 30, 60 34, 55 42 C 53 45, 49 46, 47 43 C 44 38, 47 32, 50 22 Z" fill="#FF3B30" />
-    <path d="M50 28 C 51 33, 55 36, 53 40 C 51 42, 49 42, 48 40 C 47 37, 49 34, 50 28 Z" fill="#FFCC00" />
-    <circle cx="50" cy="53" r="2.5" fill="#FFD700" />
-  </svg>
-);
-
-// Logo Kementerian Agama (Vektor SVG - Zero Margin Atas Bawah)
-const KemenagLogo = ({ height = 54 }: { height?: number }) => (
-  <svg 
-    viewBox="7 3 86 87" 
-    style={{ height: height + 'px', width: Math.round(height * (86/87)) + 'px', display: 'block' }} 
-    fill="none" 
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <polygon points="50,4 93,35 77,89 23,89 7,35" fill="#1B5E20" stroke="#FFD700" strokeWidth="2.5" />
-    <circle cx="50" cy="50" r="32" fill="#2E7D32" stroke="#FFD700" strokeWidth="1.5" />
-    <rect x="47" y="28" width="6" height="34" fill="#FFD700" />
-    <line x1="30" y1="36" x2="70" y2="36" stroke="#FFD700" strokeWidth="3" />
-    <polygon points="30,36 24,50 36,50" fill="#FFD700" />
-    <polygon points="70,36 64,50 76,50" fill="#FFD700" />
-    <path d="M35 62 Q 50 66 50 72 Q 50 66 65 62 Q 50 58 35 62 Z" fill="#FFFFFF" />
-  </svg>
-);
-
 export const PrintExamCardsDialog = ({
   isOpen,
   onClose,
@@ -130,9 +94,9 @@ export const PrintExamCardsDialog = ({
   const [showBirthInfo, setShowBirthInfo] = useState(false);
 
   // Logo Kiri & Logo Kanan
-  const [leftLogoType, setLeftLogoType] = useState<"tutwuri" | "kemenag" | "school" | "custom" | "none">("tutwuri");
+  const [showLeftLogo, setShowLeftLogo] = useState(true);
   const [customLeftLogoUrl, setCustomLeftLogoUrl] = useState<string>("");
-  const [rightLogoType, setRightLogoType] = useState<"school" | "tutwuri" | "kemenag" | "custom" | "none">("school");
+  const [rightLogoType, setRightLogoType] = useState<"school" | "custom" | "none">("school");
   const [customRightLogoUrl, setCustomRightLogoUrl] = useState<string>("");
   const [schoolLogoFailed, setSchoolLogoFailed] = useState(false);
 
@@ -244,7 +208,7 @@ export const PrintExamCardsDialog = ({
     const reader = new FileReader();
     reader.onload = (re) => {
       setCustomLeftLogoUrl(re.target?.result as string);
-      setLeftLogoType("custom");
+      setShowLeftLogo(true);
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -285,9 +249,75 @@ export const PrintExamCardsDialog = ({
     return place || dateStr || "";
   };
 
-  // Render Logo Presisi yang Menempel Rata Atas & Bawah Teks Kop
+  // Render Placeholder Logo Kiri jika belum ada gambar yang di-upload
+  const renderLeftLogoPlaceholder = (heightPx: number) => {
+    const widthPx = Math.round(heightPx * 1.05);
+    return (
+      <div 
+        style={{
+          width: widthPx + "px",
+          height: heightPx + "px",
+          border: "1px dashed #64748b",
+          borderRadius: "2px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#f8fafc",
+          boxSizing: "border-box",
+          overflow: "hidden",
+          padding: "2px",
+          flexShrink: 0
+        }}
+      >
+        <span style={{ 
+          fontSize: is4Cards ? "7px" : "6px", 
+          fontWeight: 800, 
+          letterSpacing: "0.5px", 
+          color: "#334155", 
+          textTransform: "uppercase", 
+          lineHeight: 1 
+        }}>
+          LOGO
+        </span>
+        <span style={{ 
+          fontSize: is4Cards ? "6px" : "5px", 
+          fontWeight: 700, 
+          color: "#64748b", 
+          textTransform: "uppercase", 
+          lineHeight: 1, 
+          marginTop: "2px" 
+        }}>
+          KIRI
+        </span>
+      </div>
+    );
+  };
+
+  const renderLeftLogoNode = (heightPx: number) => {
+    if (!showLeftLogo) return null;
+    if (customLeftLogoUrl) {
+      return (
+        <img 
+          src={customLeftLogoUrl} 
+          alt="Logo Kiri" 
+          style={{ 
+            height: heightPx + 'px', 
+            width: "auto", 
+            maxHeight: heightPx + 'px',
+            maxWidth: Math.round(heightPx * 1.35) + 'px',
+            objectFit: "contain", 
+            display: "block" 
+          }} 
+        />
+      );
+    }
+    return renderLeftLogoPlaceholder(heightPx);
+  };
+
+  // Render Logo Kanan Presisi
   const renderLogoNode = (
-    type: "tutwuri" | "kemenag" | "school" | "custom" | "none",
+    type: "school" | "custom" | "none",
     customUrl: string,
     heightPx: number
   ) => {
@@ -335,12 +365,7 @@ export const PrintExamCardsDialog = ({
       return null;
     }
 
-    if (type === "kemenag") {
-      return <KemenagLogo height={heightPx} />;
-    }
-
-    // Default: tutwuri (Kemdikbud)
-    return <TutWuriHandayaniLogo height={heightPx} />;
+    return null;
   };
 
   // 🖨️ FUNGSI CETAK BULLETPROOF VIA ISOLATED IFRAME
@@ -506,10 +531,13 @@ export const PrintExamCardsDialog = ({
     const roomSessionDisplay = [roomVal, sessionVal].filter(Boolean).join(" / ");
 
     const headerHeight = is4Cards ? 54 : 44;
-    const leftLogoNode = renderLogoNode(leftLogoType, customLeftLogoUrl, headerHeight);
+    const logoSlotWidth = is4Cards ? 56 : 46;
+    const leftLogoNode = renderLeftLogoNode(headerHeight);
     const rightLogoNode = renderLogoNode(rightLogoType, customRightLogoUrl, headerHeight);
-    const hasLeft = leftLogoNode !== null;
-    const hasRight = rightLogoNode !== null;
+    const hasLeft = showLeftLogo && Boolean(leftLogoNode);
+    const hasRight = rightLogoType !== "none" && Boolean(rightLogoNode);
+    const isAnyLogoVisible = hasLeft || hasRight;
+    const sideColWidth = isAnyLogoVisible ? `${logoSlotWidth}px` : "0px";
 
     return (
       <div 
@@ -531,43 +559,44 @@ export const PrintExamCardsDialog = ({
           overflow: "hidden"
         }}
       >
-        {/* 1. KOP KARTU RESMI KEDINASAN (UKURAN LOGO PRESISI SAMA DENGAN ATAS & BAWAH TEKS) */}
+        {/* 1. KOP KARTU RESMI KEDINASAN (TEKS TENGAH SELALU PERSIS DI TENGAH SECARA MATEMATIS) */}
         <div style={{ marginBottom: is4Cards ? "8px" : "5px" }}>
           <div 
             style={{ 
-              display: "flex",
+              display: "grid",
+              gridTemplateColumns: `${sideColWidth} 1fr ${sideColWidth}`,
               alignItems: "stretch",
-              justifyContent: "space-between",
-              gap: is4Cards ? "10px" : "8px",
+              gap: isAnyLogoVisible ? (is4Cards ? "8px" : "6px") : "0px",
               height: headerHeight + "px",
-              minHeight: headerHeight + "px"
+              minHeight: headerHeight + "px",
+              width: "100%",
+              boxSizing: "border-box"
             }}
           >
-            {/* Logo Kiri */}
-            {hasLeft && (
-              <div 
-                style={{ 
-                  flexShrink: 0, 
-                  height: headerHeight + "px",
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center" 
-                }}
-              >
-                {leftLogoNode}
-              </div>
-            )}
-
-            {/* Teks Kop (Sejajar Atas & Bawah Bersama Logo) */}
+            {/* Slot Logo Kiri */}
             <div 
               style={{ 
-                flex: 1, 
+                width: sideColWidth, 
+                height: headerHeight + "px",
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "flex-start",
+                overflow: "hidden"
+              }}
+            >
+              {hasLeft ? leftLogoNode : null}
+            </div>
+
+            {/* Teks Kop Tengah (Selalu di Tengah Persis) */}
+            <div 
+              style={{ 
+                width: "100%", 
                 height: headerHeight + "px",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
-                textAlign: (hasLeft && hasRight) ? "center" : (hasLeft && !hasRight) ? "left" : (!hasLeft && hasRight) ? "right" : "center",
-                padding: (hasLeft && hasRight) ? "0 4px" : "0",
+                textAlign: "center",
+                padding: "0 2px",
                 overflow: "hidden"
               }}
             >
@@ -617,20 +646,19 @@ export const PrintExamCardsDialog = ({
               </div>
             </div>
 
-            {/* Logo Kanan */}
-            {hasRight && (
-              <div 
-                style={{ 
-                  flexShrink: 0, 
-                  height: headerHeight + "px",
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center" 
-                }}
-              >
-                {rightLogoNode}
-              </div>
-            )}
+            {/* Slot Logo Kanan */}
+            <div 
+              style={{ 
+                width: sideColWidth, 
+                height: headerHeight + "px",
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "flex-end",
+                overflow: "hidden"
+              }}
+            >
+              {hasRight ? rightLogoNode : null}
+            </div>
           </div>
 
           {/* Garis Kop Ganda Kedinasan */}
@@ -1184,53 +1212,133 @@ export const PrintExamCardsDialog = ({
               </div>
 
               {/* Logo Kiri & Logo Kanan */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-                    Logo Kiri
-                  </label>
-                  <Select
-                    value={leftLogoType}
-                    onChange={(e) => setLeftLogoType(e.target.value as any)}
-                    className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
-                  >
-                    <option value="tutwuri">Kemdikbud</option>
-                    <option value="kemenag">Kemenag</option>
-                    <option value="custom">Upload File</option>
-                  </Select>
-                  <input
-                    type="file"
-                    ref={leftFileInputRef}
-                    accept="image/*"
-                    onChange={handleLeftLogoUpload}
-                    className="hidden"
-                  />
-                  {leftLogoType === "custom" && !customLeftLogoUrl && (
-                    <NeonButton
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* 1. Pengaturan Logo Kiri */}
+                <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
+                      Logo Kiri
+                    </label>
+                    <button
                       type="button"
-                      variant="secondary"
-                      size="xs"
-                      onClick={() => leftFileInputRef.current?.click()}
-                      className="mt-1 w-full text-[10px]"
+                      onClick={() => setShowLeftLogo(!showLeftLogo)}
+                      className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
+                        showLeftLogo 
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" 
+                          : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
+                      }`}
                     >
-                      <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
-                    </NeonButton>
+                      {showLeftLogo ? "Aktif" : "Nonaktif"}
+                    </button>
+                  </div>
+
+                  {showLeftLogo && (
+                    <div className="space-y-1.5 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                      {customLeftLogoUrl ? (
+                        <div className="flex items-center gap-2">
+                          <img 
+                            src={customLeftLogoUrl} 
+                            alt="Logo Kiri" 
+                            className="w-8 h-8 object-contain rounded border border-neutral-200 dark:border-neutral-700 bg-white"
+                          />
+                          <div className="flex-1 min-w-0 flex flex-col gap-1">
+                            <NeonButton
+                              type="button"
+                              variant="secondary"
+                              size="xs"
+                              onClick={() => leftFileInputRef.current?.click()}
+                              className="text-[10px] h-6 py-0"
+                            >
+                              Ganti
+                            </NeonButton>
+                            <button
+                              type="button"
+                              onClick={() => setCustomLeftLogoUrl("")}
+                              className="text-[10px] text-rose-600 dark:text-rose-400 hover:underline text-left cursor-pointer"
+                            >
+                              Pakai Placeholder
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                            Mode: <span className="font-semibold text-neutral-700 dark:text-neutral-300">Placeholder Aktif</span>
+                          </div>
+                          <NeonButton
+                            type="button"
+                            variant="secondary"
+                            size="xs"
+                            onClick={() => leftFileInputRef.current?.click()}
+                            className="w-full text-[10px] h-7 gap-1"
+                          >
+                            <Upload className="w-3 h-3" />
+                            <span>Unggah Logo</span>
+                          </NeonButton>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        ref={leftFileInputRef}
+                        accept="image/*"
+                        onChange={handleLeftLogoUpload}
+                        className="hidden"
+                      />
+                    </div>
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-                    Logo Kanan
-                  </label>
-                  <Select
-                    value={rightLogoType}
-                    onChange={(e) => setRightLogoType(e.target.value as any)}
-                    className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
-                  >
-                    <option value="school">Logo Sekolah</option>
-                    <option value="custom">Upload File</option>
-                    <option value="none">Tanpa Logo</option>
-                  </Select>
+                {/* 2. Pengaturan Logo Kanan */}
+                <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
+                      Logo Kanan
+                    </label>
+                    <Select
+                      value={rightLogoType}
+                      onChange={(e) => setRightLogoType(e.target.value as any)}
+                      className="h-6 text-[10px] bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-md py-0 px-1.5"
+                    >
+                      <option value="school">Sekolah</option>
+                      <option value="custom">Upload</option>
+                      <option value="none">Nonaktif</option>
+                    </Select>
+                  </div>
+
+                  {rightLogoType === "custom" && (
+                    <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                      {customRightLogoUrl ? (
+                        <div className="flex items-center gap-2">
+                          <img 
+                            src={customRightLogoUrl} 
+                            alt="Logo Kanan" 
+                            className="w-8 h-8 object-contain rounded border border-neutral-200 dark:border-neutral-700 bg-white"
+                          />
+                          <NeonButton
+                            type="button"
+                            variant="secondary"
+                            size="xs"
+                            onClick={() => rightFileInputRef.current?.click()}
+                            className="text-[10px] h-6 py-0 flex-1"
+                          >
+                            Ganti
+                          </NeonButton>
+                        </div>
+                      ) : (
+                        <NeonButton
+                          type="button"
+                          variant="secondary"
+                          size="xs"
+                          onClick={() => rightFileInputRef.current?.click()}
+                          className="w-full text-[10px] h-7 gap-1"
+                        >
+                          <Upload className="w-3 h-3" />
+                          <span>Unggah Gambar</span>
+                        </NeonButton>
+                      )}
+                    </div>
+                  )}
+
                   <input
                     type="file"
                     ref={rightFileInputRef}
@@ -1238,17 +1346,6 @@ export const PrintExamCardsDialog = ({
                     onChange={handleRightLogoUpload}
                     className="hidden"
                   />
-                  {rightLogoType === "custom" && !customRightLogoUrl && (
-                    <NeonButton
-                      type="button"
-                      variant="secondary"
-                      size="xs"
-                      onClick={() => rightFileInputRef.current?.click()}
-                      className="mt-1 w-full text-[10px]"
-                    >
-                      <Upload className="w-3 h-3 mr-1" /> Pilih Gambar
-                    </NeonButton>
-                  )}
                 </div>
               </div>
 
