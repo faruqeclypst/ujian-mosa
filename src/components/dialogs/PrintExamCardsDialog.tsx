@@ -10,7 +10,17 @@ import {
   ZoomIn,
   ZoomOut,
   SlidersHorizontal,
-  X
+  X,
+  LayoutGrid,
+  Layers,
+  Users,
+  CheckCircle2,
+  Calendar,
+  Building,
+  Sparkles,
+  KeyRound,
+  Check,
+  Loader2
 } from "lucide-react";
 import { Dialog, DialogContent } from "../ui/dialog";
 import { NeonButton } from "../ui/NeonButton";
@@ -22,7 +32,6 @@ import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { generateExamUsername, generateExamPassword } from "../../utils/examCredentials";
 import { getStudentPortalOrigin, encodeStudentCardVerifyPayload } from "../../utils/domainHelper";
-import { Sparkles, KeyRound, Check, Loader2 } from "lucide-react";
 
 export interface PrintExamCardsDialogProps {
   isOpen: boolean;
@@ -939,23 +948,23 @@ export const PrintExamCardsDialog = ({
           : "max-w-7xl w-[98vw] h-[94vh] max-h-[95vh] p-0 shadow-2xl rounded-2xl"
       )}
     >
-      {/* Header Dialog / Studio */}
-      <div className="px-5 py-3.5 bg-white dark:bg-[#0c0d0e] border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0">
+      {/* Header Dialog / Studio Toolbar */}
+      <div className="px-5 py-3 bg-white dark:bg-[#0c0d0e] border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
             <Printer className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-tight">
-                Cetak Kartu Peserta Ujian
+                {isStandalonePage ? "Studio Cetak Kartu Peserta" : "Cetak Kartu Peserta Ujian"}
               </h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
                 Format Resmi ANBK / CBT
               </span>
             </div>
             <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-              Pratinjau lembar cetak A4 presisi siap potong
+              Pratinjau lembar cetak A4 presisi siap potong • {totalPages} Lembar ({studentsToPrint.length} Siswa)
             </p>
           </div>
         </div>
@@ -978,7 +987,7 @@ export const PrintExamCardsDialog = ({
             size="sm"
             onClick={handlePrint}
             disabled={studentsToPrint.length === 0 || isPreparingPrint}
-            className="gap-1.5 font-bold"
+            className="gap-1.5 font-bold shadow-xs"
           >
             {isPreparingPrint ? (
               <>
@@ -1000,45 +1009,53 @@ export const PrintExamCardsDialog = ({
         {/* ======================================================== */}
         {/* PANEL KIRI: PENGATURAN KARTU (RINGKAS & SIMPEL)           */}
         {/* ======================================================== */}
-        <div className="w-full lg:w-[330px] xl:w-[350px] flex-shrink-0 bg-neutral-50/70 dark:bg-neutral-900/40 border-b lg:border-r lg:border-b-0 border-neutral-200 dark:border-neutral-800 flex flex-col overflow-y-auto p-4 space-y-3.5 text-xs h-1/2 lg:h-auto">
+        <div className="w-full lg:w-[350px] xl:w-[370px] flex-shrink-0 bg-neutral-50/70 dark:bg-neutral-900/40 border-b lg:border-r lg:border-b-0 border-neutral-200 dark:border-neutral-800 flex flex-col overflow-y-auto p-4 space-y-4 text-xs h-1/2 lg:h-auto">
 
-          {/* Navigasi Tab Pengaturan: Cepat vs Lanjutan */}
-          <div className="grid grid-cols-2 gap-1 bg-neutral-200/60 dark:bg-neutral-800/60 p-1 rounded-xl border border-neutral-200/80 dark:border-neutral-700/60">
+          {/* Navigasi Tab Pengaturan: Format & Akun vs Kop & TTD */}
+          <div className="grid grid-cols-2 gap-1 bg-neutral-200/70 dark:bg-neutral-800/70 p-1 rounded-xl border border-neutral-200/80 dark:border-neutral-700/60 shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab("quick")}
-              className={`py-1.5 rounded-lg font-semibold text-xs transition-all cursor-pointer ${activeTab === "quick"
-                  ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs"
+              className={cn(
+                "py-2 px-2.5 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                activeTab === "quick"
+                  ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs font-bold"
                   : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                }`}
+              )}
             >
-              Pengaturan Utama
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Format & Akun</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("advanced")}
-              className={`py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer ${activeTab === "advanced"
-                  ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs"
+              className={cn(
+                "py-2 px-2.5 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                activeTab === "advanced"
+                  ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs font-bold"
                   : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                }`}
+              )}
             >
-              <SlidersHorizontal className="w-3 h-3" />
+              <SlidersHorizontal className="w-3.5 h-3.5" />
               <span>Kop & TTD</span>
             </button>
           </div>
 
           {/* TAB 1: PENGATURAN UTAMA (SIMPEL & CEPAT) */}
           {activeTab === "quick" && (
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               {/* 1. Target Siswa */}
-              <div>
-                <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-                  Target Cetak {terminology.student}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
+                  <span>Target Cetak {terminology.student}</span>
+                  <span className="text-[10px] font-mono text-neutral-400 font-normal">
+                    {studentsToPrint.length} Siswa Terpilih
+                  </span>
                 </label>
                 <Select
                   value={printScope}
                   onChange={(e) => setPrintScope(e.target.value as any)}
-                  className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                  className="h-9 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-lg shadow-2xs font-medium cursor-pointer"
                 >
                   {selectedStudentIds.length > 0 && (
                     <option value="selected">{terminology.student} Terpilih ({selectedStudentIds.length})</option>
@@ -1050,68 +1067,101 @@ export const PrintExamCardsDialog = ({
                 </Select>
               </div>
 
-              {/* 2. Jumlah Kartu per Lembar A4 */}
-              <div>
-                <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+              {/* 2. Format Kertas A4 (Interactive Visual Cards) */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
                   Format Kertas A4
                 </label>
-                <div className="grid grid-cols-2 gap-1.5 bg-neutral-200/60 dark:bg-neutral-850/60 p-1 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                <div className="grid grid-cols-2 gap-2">
+                  {/* 4 Kartu (2x2) */}
                   <button
                     type="button"
                     onClick={() => setLayoutMode("4")}
-                    className={`py-1.5 px-2 rounded-lg font-bold text-xs transition-all flex flex-col items-center justify-center cursor-pointer ${layoutMode === "4"
-                        ? "bg-emerald-600 text-white shadow-2xs"
-                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                      }`}
+                    className={cn(
+                      "p-2.5 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between h-[68px]",
+                      layoutMode === "4"
+                        ? "border-emerald-500 bg-emerald-500/10 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500"
+                        : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850/60 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 text-neutral-700 dark:text-neutral-300"
+                    )}
                   >
-                    <span>4 Kartu</span>
-                    <span className="text-[9px] font-normal opacity-85">Standar (2×2)</span>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1.5">
+                        <LayoutGrid className={cn("w-4 h-4", layoutMode === "4" ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-400")} />
+                        <span className="font-bold text-xs">4 Kartu</span>
+                      </div>
+                      {layoutMode === "4" && (
+                        <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                      Standar (2×2) • Lega
+                    </div>
                   </button>
+
+                  {/* 6 Kartu (2x3) */}
                   <button
                     type="button"
                     onClick={() => setLayoutMode("6")}
-                    className={`py-1.5 px-2 rounded-lg font-bold text-xs transition-all flex flex-col items-center justify-center cursor-pointer ${layoutMode === "6"
-                        ? "bg-emerald-600 text-white shadow-2xs"
-                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                      }`}
+                    className={cn(
+                      "p-2.5 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between h-[68px]",
+                      layoutMode === "6"
+                        ? "border-emerald-500 bg-emerald-500/10 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500"
+                        : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850/60 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 text-neutral-700 dark:text-neutral-300"
+                    )}
                   >
-                    <span>6 Kartu</span>
-                    <span className="text-[9px] font-normal opacity-85">Hemat (2×3)</span>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1.5">
+                        <Layers className={cn("w-4 h-4", layoutMode === "6" ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-400")} />
+                        <span className="font-bold text-xs">6 Kartu</span>
+                      </div>
+                      {layoutMode === "6" && (
+                        <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                      Hemat (2×3) • Irit Kertas
+                    </div>
                   </button>
                 </div>
               </div>
 
               {/* 3. Judul Ujian */}
-              <div>
-                <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
                   Nama Asesmen / Ujian
                 </label>
                 <Input
                   value={examTitle}
                   onChange={(e) => setExamTitle(e.target.value)}
                   placeholder="Contoh: ASESMEN SUMATIF SEKOLAH"
-                  className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                  className="h-8.5 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-lg shadow-2xs font-semibold uppercase"
                 />
               </div>
-
-              {/* 3b. Format Kredensial Login (Sesi Ujian vs Akun Siswa) */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+              {/* 4. Format Kredensial Login (Sesi Ujian vs Akun Siswa) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
                     Format Kredensial Login
                   </label>
-                  <span className="text-[9px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                     {credentialMode === "exam" ? "Anti Lupa Sandi" : "Akun Standar"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-1.5 p-1 bg-neutral-200/60 dark:bg-neutral-850/60 rounded-xl border border-neutral-200 dark:border-neutral-800">
+
+                <div className="grid grid-cols-2 gap-1 bg-neutral-200/70 dark:bg-neutral-800/70 p-1 rounded-xl border border-neutral-200/80 dark:border-neutral-700/60">
                   <button
                     type="button"
                     onClick={() => setCredentialMode("exam")}
-                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${credentialMode === "exam"
-                        ? "bg-indigo-600 text-white shadow-2xs"
+                    className={cn(
+                      "h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                      credentialMode === "exam"
+                        ? "bg-indigo-600 text-white shadow-2xs font-bold"
                         : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                      }`}
+                    )}
                   >
                     <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
                     <span>Sesi Ujian (TU)</span>
@@ -1119,10 +1169,12 @@ export const PrintExamCardsDialog = ({
                   <button
                     type="button"
                     onClick={() => setCredentialMode("standard")}
-                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${credentialMode === "standard"
-                        ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs border border-neutral-200 dark:border-neutral-700"
+                    className={cn(
+                      "h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                      credentialMode === "standard"
+                        ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs font-bold"
                         : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                      }`}
+                    )}
                   >
                     <KeyRound className="w-3 h-3 shrink-0" />
                     <span>Akun Siswa</span>
@@ -1130,19 +1182,26 @@ export const PrintExamCardsDialog = ({
                 </div>
 
                 {credentialMode === "exam" && (
-                  <div className="mt-2 p-2.5 rounded-xl bg-white dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 space-y-2">
+                  <div className="p-3 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5 shadow-2xs">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] text-neutral-500 dark:text-neutral-400">Prefix Username:</span>
+                      <div className="space-y-0.5">
+                        <span className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Prefix Username:</span>
+                        <p className="text-[10px] text-neutral-400">Awalan username sesi</p>
+                      </div>
                       <Input
                         value={examPrefix}
                         onChange={(e) => setExamPrefix(e.target.value.toUpperCase())}
                         maxLength={6}
-                        className="h-6 w-16 text-center text-xs font-mono font-bold bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-indigo-600 dark:text-indigo-400 uppercase rounded"
+                        className="h-7 w-16 text-center text-xs font-mono font-bold bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-indigo-600 dark:text-indigo-400 uppercase rounded-md"
                       />
                     </div>
-                    <div className="flex items-center justify-between text-[10px] text-neutral-500 dark:text-neutral-400 pt-1 border-t border-neutral-100 dark:border-neutral-800">
-                      <span>Tersimpan di Server:</span>
-                      <span className={missingCredsCount === 0 ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-amber-600 dark:text-amber-400 font-semibold"}>
+                    <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
+                      <span className="text-neutral-500 dark:text-neutral-400">Status Server:</span>
+                      <span className={cn(
+                        "font-mono font-bold text-xs flex items-center gap-1",
+                        missingCredsCount === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                      )}>
+                        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", missingCredsCount === 0 ? "bg-emerald-500" : "bg-amber-500")} />
                         {studentsToPrint.length - missingCredsCount} / {studentsToPrint.length} Siswa
                       </span>
                     </div>
@@ -1150,16 +1209,16 @@ export const PrintExamCardsDialog = ({
                       type="button"
                       disabled={isGeneratingCreds}
                       onClick={handleGenerateAndSaveCreds}
-                      className="w-full h-7 px-2 rounded-lg text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="w-full h-7.5 px-2.5 rounded-lg text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {isGeneratingCreds ? (
                         <>
-                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           <span>Menyimpan ke Server...</span>
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-3 h-3 text-amber-500" />
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                           <span>Generate & Simpan ke Server</span>
                         </>
                       )}
@@ -1173,34 +1232,40 @@ export const PrintExamCardsDialog = ({
                 )}
               </div>
 
-              {/* 4. Opsi Tampilkan Password */}
-              <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
+              {/* 5. Opsi Tampilkan Password */}
+              <div className="p-3 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 flex items-center justify-between shadow-2xs">
                 <div>
-                  <div className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Tampilkan Password</div>
-                  <div className="text-[10px] text-neutral-500 dark:text-neutral-400">Tampilkan teks password di kartu</div>
+                  <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200">Tampilkan Password</div>
+                  <div className="text-[10px] text-neutral-500 dark:text-neutral-400">Cetak teks kata sandi di kartu</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className={`h-6 px-2.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer ${showPassword
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                  className={cn(
+                    "h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer",
+                    showPassword
+                      ? "bg-emerald-600 text-white shadow-2xs font-bold"
                       : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
-                    }`}
+                  )}
                 >
-                  {showPassword ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  {showPassword ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                   <span>{showPassword ? "Tampil" : "Sensor"}</span>
                 </button>
               </div>
 
-              {/* Ringkasan Cetak */}
-              <div className="p-3 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 space-y-1.5 shadow-2xs">
-                <div className="flex justify-between">
-                  <span>Total Siswa:</span>
-                  <strong className="text-neutral-900 dark:text-neutral-100 font-mono font-bold">{studentsToPrint.length}</strong>
+              {/* 6. Ringkasan Cetak */}
+              <div className="p-3.5 rounded-xl bg-neutral-100/90 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 space-y-2 shadow-2xs">
+                <div className="flex justify-between items-center">
+                  <span>Total Kartu:</span>
+                  <strong className="text-neutral-900 dark:text-neutral-100 font-mono font-bold text-xs">{studentsToPrint.length} Siswa</strong>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span>Kebutuhan Kertas:</span>
-                  <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{totalPages} Lembar A4</strong>
+                  <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold text-sm">{totalPages} Lembar A4</strong>
+                </div>
+                <div className="flex justify-between items-center text-[10px] text-neutral-400 pt-1 border-t border-neutral-200 dark:border-neutral-800">
+                  <span>Tata Letak:</span>
+                  <span className="font-semibold text-neutral-700 dark:text-neutral-300">{layoutMode === "4" ? "4 Kartu (2×2)" : "6 Kartu (2×3)"}</span>
                 </div>
               </div>
             </div>
@@ -1208,34 +1273,39 @@ export const PrintExamCardsDialog = ({
 
           {/* TAB 2: PENGATURAN KOP & PENGESAHAN */}
           {activeTab === "advanced" && (
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               {/* Tahun Ajaran */}
-              <div>
-                <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
                   Tahun Pelajaran
                 </label>
-                <Input
-                  value={academicYear}
-                  onChange={(e) => setAcademicYear(e.target.value)}
-                  className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
-                />
+                <div className="relative">
+                  <Input
+                    value={academicYear}
+                    onChange={(e) => setAcademicYear(e.target.value)}
+                    className="h-8.5 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-lg shadow-2xs pl-8 font-medium"
+                  />
+                  <Calendar className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                </div>
               </div>
 
               {/* Logo Kiri & Logo Kanan */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2">
                 {/* 1. Pengaturan Logo Kiri */}
-                <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 space-y-2">
+                <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 space-y-2 shadow-2xs">
                   <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
+                    <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
                       Logo Kiri
                     </label>
                     <button
                       type="button"
                       onClick={() => setShowLeftLogo(!showLeftLogo)}
-                      className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${showLeftLogo
+                      className={cn(
+                        "h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer",
+                        showLeftLogo
                           ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-                          : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
-                        }`}
+                          : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200 dark:border-neutral-700"
+                      )}
                     >
                       {showLeftLogo ? "Aktif" : "Nonaktif"}
                     </button>
@@ -1248,7 +1318,7 @@ export const PrintExamCardsDialog = ({
                           <img
                             src={customLeftLogoUrl}
                             alt="Logo Kiri"
-                            className="w-8 h-8 object-contain rounded border border-neutral-200 dark:border-neutral-700 bg-white"
+                            className="w-8 h-8 object-contain rounded border border-neutral-200 dark:border-neutral-700 bg-white shrink-0"
                           />
                           <div className="flex-1 min-w-0 flex flex-col gap-1">
                             <NeonButton
@@ -1265,14 +1335,14 @@ export const PrintExamCardsDialog = ({
                               onClick={() => setCustomLeftLogoUrl("")}
                               className="text-[10px] text-rose-600 dark:text-rose-400 hover:underline text-left cursor-pointer"
                             >
-                              Pakai Placeholder
+                              Pakai Default
                             </button>
                           </div>
                         </div>
                       ) : (
                         <div className="space-y-1.5">
                           <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                            Mode: <span className="font-semibold text-neutral-700 dark:text-neutral-300">Placeholder Aktif</span>
+                            Mode: <span className="font-semibold text-neutral-700 dark:text-neutral-300">Placeholder</span>
                           </div>
                           <NeonButton
                             type="button"
@@ -1298,15 +1368,15 @@ export const PrintExamCardsDialog = ({
                 </div>
 
                 {/* 2. Pengaturan Logo Kanan */}
-                <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 space-y-2">
+                <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 space-y-2 shadow-2xs">
                   <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
+                    <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
                       Logo Kanan
                     </label>
                     <Select
                       value={rightLogoType}
                       onChange={(e) => setRightLogoType(e.target.value as any)}
-                      className="h-6 text-[10px] bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-md py-0 px-1.5"
+                      className="h-5 text-[10px] bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-md py-0 px-1 font-semibold"
                     >
                       <option value="school">Sekolah</option>
                       <option value="custom">Upload</option>
@@ -1321,7 +1391,7 @@ export const PrintExamCardsDialog = ({
                           <img
                             src={customRightLogoUrl}
                             alt="Logo Kanan"
-                            className="w-8 h-8 object-contain rounded border border-neutral-200 dark:border-neutral-700 bg-white"
+                            className="w-8 h-8 object-contain rounded border border-neutral-200 dark:border-neutral-700 bg-white shrink-0"
                           />
                           <NeonButton
                             type="button"
@@ -1358,77 +1428,82 @@ export const PrintExamCardsDialog = ({
                 </div>
               </div>
 
-              {/* Kolom Tambahan */}
-              <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/60 border border-neutral-200 dark:border-neutral-800 space-y-2">
-                <div className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Kolom Tambahan Biodata</div>
+              {/* Kolom Tambahan Biodata */}
+              <div className="p-3 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5 shadow-2xs">
+                <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">Kolom Tambahan Biodata</div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-neutral-500 dark:text-neutral-400">Tempat & Tgl Lahir:</span>
+                  <span className="text-[11px] text-neutral-600 dark:text-neutral-400">Tempat & Tanggal Lahir</span>
                   <button
                     type="button"
                     onClick={() => setShowBirthInfo(!showBirthInfo)}
-                    className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${showBirthInfo
+                    className={cn(
+                      "h-5 px-2.5 rounded-md text-[10px] font-semibold transition-colors cursor-pointer",
+                      showBirthInfo
                         ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
-                      }`}
+                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200 dark:border-neutral-700"
+                    )}
                   >
                     {showBirthInfo ? "Aktif" : "Sembunyi"}
                   </button>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-neutral-500 dark:text-neutral-400">Ruang & Sesi:</span>
+                  <span className="text-[11px] text-neutral-600 dark:text-neutral-400">Ruang & Sesi Ujian</span>
                   <button
                     type="button"
                     onClick={() => setShowRoomSession(!showRoomSession)}
-                    className={`h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${showRoomSession
+                    className={cn(
+                      "h-5 px-2.5 rounded-md text-[10px] font-semibold transition-colors cursor-pointer",
+                      showRoomSession
                         ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700"
-                      }`}
+                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200 dark:border-neutral-700"
+                    )}
                   >
                     {showRoomSession ? "Aktif" : "Sembunyi"}
                   </button>
                 </div>
 
                 {showRoomSession && (
-                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
                     <Input
                       value={defaultRoom}
                       onChange={(e) => setDefaultRoom(e.target.value)}
                       placeholder="Ruang Default"
-                      className="h-7 text-[11px] bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded"
+                      className="h-7.5 text-[11px] bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-md"
                     />
                     <Input
                       value={defaultSession}
                       onChange={(e) => setDefaultSession(e.target.value)}
                       placeholder="Sesi Default"
-                      className="h-7 text-[11px] bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded"
+                      className="h-7.5 text-[11px] bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-md"
                     />
                   </div>
                 )}
               </div>
 
               {/* Pengesahan & Tanda Tangan */}
-              <div className="space-y-2">
+              <div className="p-3 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5 shadow-2xs">
+                <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">Pengesahan & Tanda Tangan</div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                  <label className="block text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 mb-1">
                     Kota & Tanggal
                   </label>
                   <Input
                     value={cityDate}
                     onChange={(e) => setCityDate(e.target.value)}
-                    className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                    className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-md"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-1.5">
                   <div>
-                    <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                    <label className="block text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 mb-1">
                       Jabatan TTD
                     </label>
                     <Select
                       value={signerRole}
                       onChange={(e) => setSignerRole(e.target.value as any)}
-                      className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                      className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-md font-medium"
                     >
                       <option value="Kepala Sekolah">Kepala Sekolah</option>
                       <option value="Ketua Panitia">Ketua Panitia</option>
@@ -1436,27 +1511,27 @@ export const PrintExamCardsDialog = ({
                     </Select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                    <label className="block text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 mb-1">
                       Nama Pejabat
                     </label>
                     <Input
                       value={signerName}
                       onChange={(e) => setSignerName(e.target.value)}
                       placeholder="Nama Lengkap"
-                      className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                      className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-md"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                  <label className="block text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 mb-1">
                     NIP Pejabat (Opsional)
                   </label>
                   <Input
                     value={signerNip}
                     onChange={(e) => setSignerNip(e.target.value)}
                     placeholder="NIP. 19..."
-                    className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-lg"
+                    className="h-8 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-md"
                   />
                 </div>
               </div>
