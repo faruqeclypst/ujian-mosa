@@ -68,8 +68,6 @@ import {
   InspectorHeader,
   InspectorField,
   InspectorGrid,
-  InspectorActions,
-  InspectorButton,
   InspectorCard,
   InspectorEmpty,
 } from "../../components/ui/NeonInspector";
@@ -1811,130 +1809,6 @@ const MonitoringPage = () => {
                       </div>
                     </div>
                   </InspectorGrid>
-
-                  {/* Quick Actions (Rapi & Simpel) */}
-                  <InspectorActions divided className="space-y-2">
-                    {inspectedAttempt ? (
-                      <>
-                        {/* 1. Main Action: Buka / Tutup Lembar Jawaban */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = expandedstudent === inspectedStudent.id ? null : inspectedStudent.id;
-                            setExpandedstudent(next);
-                            if (next && inspectedAttempt && pb) {
-                              pb.collection('attempts').getOne(inspectedAttempt.id).then((rec: any) => {
-                                if (rec?.answers) {
-                                  let ans = rec.answers;
-                                  if (typeof ans === "string") {
-                                    try { ans = JSON.parse(ans); } catch {}
-                                  }
-                                  setDetailAnswers((prev: any) => ({ ...prev, [inspectedAttempt.id]: ans }));
-                                }
-                              }).catch(() => {});
-                              setTimeout(() => {
-                                const el = document.getElementById(`row-${inspectedStudent.id}`);
-                                if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                              }, 100);
-                            }
-                          }}
-                          className={cn(
-                            "w-full inline-flex items-center justify-center gap-2 h-8.5 px-3 rounded-md text-xs font-semibold transition-all shadow-2xs cursor-pointer",
-                            expandedstudent === inspectedStudent.id
-                              ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90"
-                              : "bg-emerald-600 hover:bg-emerald-500 text-white active:bg-emerald-700"
-                          )}
-                        >
-                          {expandedstudent === inspectedStudent.id ? (
-                            <>
-                              <EyeOff className="h-3.5 w-3.5 shrink-0" />
-                              <span>Tutup Lembar Jawaban</span>
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="h-3.5 w-3.5 shrink-0" />
-                              <span>Lihat Lembar Jawaban</span>
-                            </>
-                          )}
-                        </button>
-
-                        {/* 2. Secondary Actions Grid */}
-                        <div className={cn(
-                          "grid gap-1.5",
-                          (inspectedAttempt?.status === "ongoing" ||
-                           inspectedAttempt?.status === "LOCKED" ||
-                           inspectedAttempt?.status === "finished" ||
-                           inspectedAttempt?.status === "submitted" ||
-                           inspectedAttempt?.status === "graded")
-                            ? "grid-cols-2"
-                            : "grid-cols-1"
-                        )}>
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/admin/penilaian/${inspectedStudent.id}?roomId=${roomId || ""}`)}
-                            className="inline-flex items-center justify-center gap-1.5 h-8 px-2 text-xs font-medium rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 transition-colors shadow-2xs cursor-pointer truncate"
-                            title="Buka Lembar Penilaian & Koreksi Siswa"
-                          >
-                            <FileText className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
-                            <span className="truncate">Detail Nilai</span>
-                          </button>
-
-                          {inspectedAttempt?.status === "ongoing" && (
-                            <button
-                              type="button"
-                              onClick={() => handleForceSubmitStudent(inspectedAttempt.id)}
-                              className="inline-flex items-center justify-center gap-1.5 h-8 px-2 text-xs font-medium rounded-md border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 transition-colors shadow-2xs cursor-pointer truncate"
-                              title="Paksa Selesaikan Ujian Siswa Ini"
-                            >
-                              <Zap className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                              <span className="truncate">Paksa Selesai</span>
-                            </button>
-                          )}
-
-                          {inspectedAttempt?.status === "LOCKED" && (
-                            <button
-                              type="button"
-                              onClick={() => handleUnlockStudent(inspectedAttempt.id)}
-                              className="inline-flex items-center justify-center gap-1.5 h-8 px-2 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-2xs cursor-pointer truncate"
-                              title="Buka Kunci Sesi Siswa"
-                            >
-                              <Unlock className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">Buka Kunci</span>
-                            </button>
-                          )}
-
-                          {(inspectedAttempt?.status === "finished" || inspectedAttempt?.status === "submitted" || inspectedAttempt?.status === "graded") && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenReopenDialog(inspectedAttempt, inspectedStudent.name)}
-                              className="inline-flex items-center justify-center gap-1.5 h-8 px-2 text-xs font-medium rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 transition-colors shadow-2xs cursor-pointer truncate"
-                              title="Buka Kembali Ujian Siswa"
-                            >
-                              <RotateCcw className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                              <span className="truncate">Buka Ujian</span>
-                            </button>
-                          )}
-                        </div>
-
-                        {/* 3. Subtle Reset Action */}
-                        <div className="pt-0.5 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleResetSession(inspectedAttempt.id, inspectedStudent.id)}
-                            className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
-                            title="Hapus sesi pengerjaan siswa ini"
-                          >
-                            <RotateCcw className="h-3 w-3" />
-                            <span>Reset Sesi Siswa</span>
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="p-2.5 rounded-md bg-neutral-100/60 dark:bg-neutral-850/60 border border-neutral-200/60 dark:border-neutral-800 text-center text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
-                        Peserta belum login / memulai ujian
-                      </div>
-                    )}
-                  </InspectorActions>
                 </div>
               ) : (
                 <InspectorEmpty message="Pilih salah satu siswa pada tabel untuk melihat inspeksi live." />
