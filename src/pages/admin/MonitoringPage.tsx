@@ -27,7 +27,8 @@ import {
   SlidersHorizontal,
   CheckSquare,
   FileText,
-  GitBranch
+  GitBranch,
+  Unlock
 } from "lucide-react";
 import { Sparkles, RotateCcw, Copy, Check, Pencil, ClipboardPaste, Zap, BarChart2, ExternalLink } from "lucide-react";
 import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
@@ -38,7 +39,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator
+  DropdownMenuSeparator,
+  DropdownMenuLabel
 } from "../../components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
@@ -1382,117 +1384,144 @@ const MonitoringPage = () => {
           }
           actions={
             <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-            {/* 0. Ganti Ruang Button */}
-            <button
-              type="button"
-              onClick={handleSwitchRoom}
-              className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
-              title="Ganti Ruangan yang Dimonitor"
-            >
-              <GitBranch className="h-3.5 w-3.5 text-neutral-500" />
-              <span>Ganti Ruang</span>
-            </button>
+              {/* 1. Ganti Ruang Button */}
+              <button
+                type="button"
+                onClick={handleSwitchRoom}
+                className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+                title="Ganti Ruangan yang Dimonitor"
+              >
+                <GitBranch className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
+                <span>Ganti Ruang</span>
+              </button>
 
-            {/* 1. Penilaian Button (Direct Access) */}
-            <button
-              type="button"
-              onClick={() => navigate(`/admin/penilaian?roomId=${roomId || ""}`)}
-              className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
-              title="Buka Lembar Penilaian & Koreksi Nilai Ruangan"
-            >
-              <CheckSquare className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>Penilaian</span>
-            </button>
-
-            {/* 2. Analisis Butir Button (Direct Access) */}
-            <button
-              type="button"
-              onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${roomId || ""}&examId=${monitorRoom?.examId || ""}`)}
-              className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
-              title="Buka Analisis Butir Soal & Rekap Nilai Ruangan"
-            >
-              <BarChart2 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-              <span>Analisis Butir</span>
-            </button>
-
-            {/* 2. Laporan Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Laporan</span>
-                  <ChevronDown className="h-3 w-3 text-neutral-400" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer">
-                  <Download className="h-3.5 w-3.5 mr-2 text-emerald-600" /> Rekap Nilai Excel (.xlsx)
-                </DropdownMenuItem>
-                {monitorQuestions.some((q: any) => q.type === "uraian") && (
-                  <DropdownMenuItem onClick={handleExportEssayExcel} className="cursor-pointer">
-                    <BookOpen className="h-3.5 w-3.5 mr-2 text-blue-600" /> Jawaban Essay Excel (.xlsx)
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${roomId || ""}&examId=${monitorRoom?.examId || ""}`)} className="cursor-pointer">
-                  <BarChart2 className="h-3.5 w-3.5 mr-2 text-purple-600" /> Analisis Butir Soal
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate(`/admin/penilaian?roomId=${roomId || ""}`)} className="cursor-pointer">
-                  <CheckSquare className="h-3.5 w-3.5 mr-2 text-indigo-600" /> Lembar Penilaian & Rekap
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleCopyBelumUjian} className="cursor-pointer">
-                  <Copy className="h-3.5 w-3.5 mr-2 text-neutral-500" /> Salin Siswa Belum Ujian
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* 2. Aksi Massal Dropdown */}
-            {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
+              {/* 2. Laporan & Analisis Dropdown (Menggabungkan Penilaian, Analisis Butir & Ekspor Excel) */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-md shadow-xs transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+                    title="Buka Lembar Penilaian, Analisis Butir, atau Ekspor Nilai"
                   >
-                    <span>Aksi Massal</span>
-                    <ChevronDown className="h-3 w-3 text-neutral-400" />
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>Laporan & Analisis</span>
+                    <ChevronDown className="h-3 w-3 text-neutral-400 shrink-0" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={handleOpenReopenAllFinishedDialog} className="cursor-pointer">
-                    <RotateCcw className="h-3.5 w-3.5 mr-2 text-emerald-600" /> Buka Semua Selesai
+                <DropdownMenuContent align="end" className="w-56 p-1.5">
+                  <DropdownMenuLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                    Hasil & Penilaian
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={() => navigate(`/admin/penilaian?roomId=${roomId || ""}`)}
+                    className="cursor-pointer gap-2 py-1.5 text-xs font-medium"
+                  >
+                    <CheckSquare className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                    <span>Lembar Penilaian & Rekap</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleForceSubmitAll} className="cursor-pointer text-rose-600 focus:text-rose-600">
-                    <div className="h-1.5 w-1.5 rounded-full bg-rose-500 mr-2" /> Force Submit Semua
+                  <DropdownMenuItem
+                    onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${roomId || ""}&examId=${monitorRoom?.examId || ""}`)}
+                    className="cursor-pointer gap-2 py-1.5 text-xs font-medium"
+                  >
+                    <BarChart2 className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                    <span>Analisis Butir Soal</span>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleResetAllSessions} className="cursor-pointer text-rose-600 focus:text-rose-600">
-                    <div className="h-1.5 w-1.5 rounded-full bg-rose-500 mr-2" /> Reset Sesi Semua
+
+                  <DropdownMenuSeparator className="my-1 bg-neutral-100 dark:bg-neutral-800" />
+
+                  <DropdownMenuLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                    Ekspor Berkas
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={handleExportExcel}
+                    className="cursor-pointer gap-2 py-1.5 text-xs font-medium"
+                  >
+                    <Download className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <span>Rekap Nilai Excel (.xlsx)</span>
+                  </DropdownMenuItem>
+                  {monitorQuestions.some((q: any) => q.type === "uraian") && (
+                    <DropdownMenuItem
+                      onClick={handleExportEssayExcel}
+                      className="cursor-pointer gap-2 py-1.5 text-xs font-medium"
+                    >
+                      <BookOpen className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                      <span>Jawaban Esai Excel (.xlsx)</span>
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuSeparator className="my-1 bg-neutral-100 dark:bg-neutral-800" />
+
+                  <DropdownMenuItem
+                    onClick={handleCopyBelumUjian}
+                    className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-300"
+                  >
+                    <Copy className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
+                    <span>Salin Siswa Belum Ujian</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
 
-            {/* 3. Interactive Sync Pill (Click to Refresh) */}
-            <button
-              type="button"
-              onClick={() => handleTriggerManualRefresh()}
-              disabled={isMonitorRefreshing}
-              className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs font-mono rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
-              title="Klik untuk segarkan data sekarang"
-            >
-              <RefreshCw className={cn("h-3 w-3", isMonitorRefreshing ? "animate-spin text-emerald-500" : "text-emerald-500")} />
-              <span className="font-sans font-medium text-neutral-500">Sync</span>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                {isLoading ? "--" : `${monitorTimeLeft}s`}
-              </span>
-            </button>
-          </div>
-        }
-      />
+              {/* 3. Aksi Massal Dropdown */}
+              {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-md shadow-xs transition-colors cursor-pointer"
+                      title="Menu Aksi Serentak ke Seluruh Siswa"
+                    >
+                      <SlidersHorizontal className="h-3.5 w-3.5 text-white/90 shrink-0" />
+                      <span>Aksi Massal</span>
+                      <ChevronDown className="h-3 w-3 text-white/80 shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 p-1.5">
+                    <DropdownMenuLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                      Aksi Serentak
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={handleOpenReopenAllFinishedDialog}
+                      className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 focus:text-emerald-700"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <span>Buka Semua Selesai</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleForceSubmitAll}
+                      className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 focus:text-amber-700"
+                    >
+                      <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                      <span>Force Submit Semua</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="my-1 bg-neutral-100 dark:bg-neutral-800" />
+                    <DropdownMenuItem
+                      onClick={handleResetAllSessions}
+                      className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-rose-600 focus:text-rose-600"
+                    >
+                      <div className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0" />
+                      <span>Reset Sesi Semua</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
+              {/* 4. Interactive Sync Pill (Click to Refresh) */}
+              <button
+                type="button"
+                onClick={() => handleTriggerManualRefresh()}
+                disabled={isMonitorRefreshing}
+                className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs font-mono rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                title="Klik untuk segarkan data sekarang"
+              >
+                <RefreshCw className={cn("h-3 w-3 shrink-0", isMonitorRefreshing ? "animate-spin text-emerald-500" : "text-emerald-500")} />
+                <span className="font-sans font-medium text-neutral-500">Sync</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  {isLoading ? "--" : `${monitorTimeLeft}s`}
+                </span>
+              </button>
+            </div>
+          }
+        />
 
         {/* ═══════════════════════════════════════════════════════════════
             2. TWO-COLUMN GRID (Content + Inspector)
@@ -1783,13 +1812,13 @@ const MonitoringPage = () => {
                     </div>
                   </InspectorGrid>
 
-                  {/* Quick Actions */}
-                  <InspectorActions>
+                  {/* Quick Actions (Rapi & Simpel) */}
+                  <InspectorActions divided className="space-y-2">
                     {inspectedAttempt ? (
                       <>
-                        <InspectorButton
-                          variant="primary"
-                          icon={expandedstudent === inspectedStudent.id ? EyeOff : Eye}
+                        {/* 1. Main Action: Buka / Tutup Lembar Jawaban */}
+                        <button
+                          type="button"
                           onClick={() => {
                             const next = expandedstudent === inspectedStudent.id ? null : inspectedStudent.id;
                             setExpandedstudent(next);
@@ -1809,54 +1838,96 @@ const MonitoringPage = () => {
                               }, 100);
                             }
                           }}
+                          className={cn(
+                            "w-full inline-flex items-center justify-center gap-2 h-8.5 px-3 rounded-md text-xs font-semibold transition-all shadow-2xs cursor-pointer",
+                            expandedstudent === inspectedStudent.id
+                              ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90"
+                              : "bg-emerald-600 hover:bg-emerald-500 text-white active:bg-emerald-700"
+                          )}
                         >
-                          {expandedstudent === inspectedStudent.id ? "Tutup Lembar Jawaban" : "Buka Lembar Jawaban"}
-                        </InspectorButton>
+                          {expandedstudent === inspectedStudent.id ? (
+                            <>
+                              <EyeOff className="h-3.5 w-3.5 shrink-0" />
+                              <span>Tutup Lembar Jawaban</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-3.5 w-3.5 shrink-0" />
+                              <span>Lihat Lembar Jawaban</span>
+                            </>
+                          )}
+                        </button>
 
-                        <InspectorButton
-                          variant="secondary"
-                          icon={FileText}
-                          onClick={() => navigate(`/admin/penilaian/${inspectedStudent.id}?roomId=${roomId || ""}`)}
-                        >
-                          Buka Detail Penilaian Siswa
-                        </InspectorButton>
-
-                        {inspectedAttempt?.status === "LOCKED" && (
-                          <InspectorButton
-                            variant="success"
-                            onClick={() => handleUnlockStudent(inspectedAttempt.id)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                        {/* 2. Secondary Actions Grid */}
+                        <div className={cn(
+                          "grid gap-1.5",
+                          (inspectedAttempt?.status === "ongoing" ||
+                           inspectedAttempt?.status === "LOCKED" ||
+                           inspectedAttempt?.status === "finished" ||
+                           inspectedAttempt?.status === "submitted" ||
+                           inspectedAttempt?.status === "graded")
+                            ? "grid-cols-2"
+                            : "grid-cols-1"
+                        )}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/admin/penilaian/${inspectedStudent.id}?roomId=${roomId || ""}`)}
+                            className="inline-flex items-center justify-center gap-1.5 h-8 px-2 text-xs font-medium rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 transition-colors shadow-2xs cursor-pointer truncate"
+                            title="Buka Lembar Penilaian & Koreksi Siswa"
                           >
-                            Buka Kunci Sesi Siswa
-                          </InspectorButton>
-                        )}
+                            <FileText className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
+                            <span className="truncate">Detail Nilai</span>
+                          </button>
 
-                        {inspectedAttempt?.status === "ongoing" && (
-                          <InspectorButton
-                            variant="danger"
-                            onClick={() => handleForceSubmitStudent(inspectedAttempt.id)}
+                          {inspectedAttempt?.status === "ongoing" && (
+                            <button
+                              type="button"
+                              onClick={() => handleForceSubmitStudent(inspectedAttempt.id)}
+                              className="inline-flex items-center justify-center gap-1.5 h-8 px-2 text-xs font-medium rounded-md border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 transition-colors shadow-2xs cursor-pointer truncate"
+                              title="Paksa Selesaikan Ujian Siswa Ini"
+                            >
+                              <Zap className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                              <span className="truncate">Paksa Selesai</span>
+                            </button>
+                          )}
+
+                          {inspectedAttempt?.status === "LOCKED" && (
+                            <button
+                              type="button"
+                              onClick={() => handleUnlockStudent(inspectedAttempt.id)}
+                              className="inline-flex items-center justify-center gap-1.5 h-8 px-2 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-2xs cursor-pointer truncate"
+                              title="Buka Kunci Sesi Siswa"
+                            >
+                              <Unlock className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">Buka Kunci</span>
+                            </button>
+                          )}
+
+                          {(inspectedAttempt?.status === "finished" || inspectedAttempt?.status === "submitted" || inspectedAttempt?.status === "graded") && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReopenDialog(inspectedAttempt, inspectedStudent.name)}
+                              className="inline-flex items-center justify-center gap-1.5 h-8 px-2 text-xs font-medium rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 transition-colors shadow-2xs cursor-pointer truncate"
+                              title="Buka Kembali Ujian Siswa"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">Buka Ujian</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* 3. Subtle Reset Action */}
+                        <div className="pt-0.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleResetSession(inspectedAttempt.id, inspectedStudent.id)}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
+                            title="Hapus sesi pengerjaan siswa ini"
                           >
-                            Paksa Selesaikan (Force Submit)
-                          </InspectorButton>
-                        )}
-
-                        {(inspectedAttempt?.status === "finished" || inspectedAttempt?.status === "submitted" || inspectedAttempt?.status === "graded") && (
-                          <InspectorButton
-                            variant="success"
-                            icon={RotateCcw}
-                            onClick={() => handleOpenReopenDialog(inspectedAttempt, inspectedStudent.name)}
-                          >
-                            Buka Kembali (Jadikan Ongoing)
-                          </InspectorButton>
-                        )}
-
-                        <InspectorButton
-                          variant="ghost"
-                          onClick={() => handleResetSession(inspectedAttempt.id, inspectedStudent.id)}
-                          className="py-1 text-[11px] font-medium text-neutral-500 hover:text-rose-600"
-                        >
-                          Reset Sesi Pengerjaan
-                        </InspectorButton>
+                            <RotateCcw className="h-3 w-3" />
+                            <span>Reset Sesi Siswa</span>
+                          </button>
+                        </div>
                       </>
                     ) : (
                       <div className="p-2.5 rounded-md bg-neutral-100/60 dark:bg-neutral-850/60 border border-neutral-200/60 dark:border-neutral-800 text-center text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
