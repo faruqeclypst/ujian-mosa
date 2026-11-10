@@ -2758,14 +2758,40 @@ const QuestionFormPage = () => {
     init();
   }, [examId, subjects, teachers, loadQuestions]);
 
+  const currentTeacher = useMemo(() => {
+    if (!teachers || teachers.length === 0) return null;
+    return teachers.find((t: any) => t.id === teacherId || t.id === user?.id || (user?.email && t.email === user.email));
+  }, [teachers, teacherId, user]);
+
+  const mySubjectIds = useMemo(() => {
+    const set = new Set<string>();
+    if (currentTeacher?.subjects && Array.isArray(currentTeacher.subjects)) {
+      currentTeacher.subjects.forEach((s: string) => {
+        if (s) set.add(s);
+      });
+    }
+    return Array.from(set);
+  }, [currentTeacher]);
+
   const isOwner = useMemo(() => {
     if (role === "admin") return true;
     if (teacherFullAccess) return true;
-    if (!exam || !teacherId) return false;
+    if (!exam || (!teacherId && !user?.id)) return false;
     // Cek ID Guru (baru) atau ID Akun (lama) dan handle casing
     const examTeacherId = exam.teacherId || exam.teacherid;
     return examTeacherId === teacherId || examTeacherId === user?.id;
   }, [role, exam, teacherId, user, teacherFullAccess]);
+
+  const isMgmpExam = useMemo(() => {
+    if (!exam || !exam.subjectId || isOwner) return false;
+    return mySubjectIds.includes(exam.subjectId);
+  }, [exam, isOwner, mySubjectIds]);
+
+  const canEdit = useMemo(() => {
+    if (isOwner) return true;
+    if (Boolean(exam?.is_mgmp_shared) && isMgmpExam) return true;
+    return false;
+  }, [isOwner, exam?.is_mgmp_shared, isMgmpExam]);
 
 
   const handleCreateClick = () => {

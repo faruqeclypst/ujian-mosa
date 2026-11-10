@@ -23,9 +23,11 @@ import {
   GitBranch,
   Folder,
   Layers,
+  Share2,
 } from "lucide-react";
 import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
+import { NeonSwitch } from "../../components/ui/NeonSwitch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Progress } from "../../components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -83,6 +85,7 @@ export interface ExamData {
   examType?: string;
   status?: "archive" | null;
   group_name?: string;
+  is_mgmp_shared?: boolean;
 }
 
 export const getExamTypeColorClass = (type: string) => {
@@ -374,7 +377,14 @@ const ExamsPage = () => {
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedExam, setSelectedExam] = useState<ExamData | null>(null);
   const [activeExamIds, setActiveExamIds] = useState<string[]>(() => examsCache?.activeExamIds || []);
-  const [formValues, setFormValues] = useState({ title: "", subjectId: "", teacherId: "", examType: "Latihan", group_name: "" });
+  const [formValues, setFormValues] = useState({
+    title: "",
+    subjectId: "",
+    teacherId: "",
+    examType: "Latihan",
+    group_name: "",
+    is_mgmp_shared: false,
+  });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
@@ -385,7 +395,7 @@ const ExamsPage = () => {
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState<"all" | "mine">("all");
+  const [ownerFilter, setOwnerFilter] = useState<"all" | "mine" | "mgmp">("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState("all");
@@ -462,14 +472,49 @@ const ExamsPage = () => {
     };
   }, [pb, fetchQuestionCounts]);
 
+  const currentTeacher = useMemo(() => {
+    if (!teachers || teachers.length === 0) return null;
+    return teachers.find((t: any) => t.id === teacherId || t.id === user?.id || (user?.email && t.email === user.email));
+  }, [teachers, teacherId, user]);
+
+  const mySubjectIds = useMemo(() => {
+    const set = new Set<string>();
+    if (currentTeacher?.subjects && Array.isArray(currentTeacher.subjects)) {
+      currentTeacher.subjects.forEach((s: string) => {
+        if (s) set.add(s);
+      });
+    }
+    exams.forEach(e => {
+      const examTeacherId = e.teacherId || e.teacherid;
+      if ((examTeacherId === teacherId || examTeacherId === user?.id) && e.subjectId) {
+        set.add(e.subjectId);
+      }
+    });
+    return Array.from(set);
+  }, [currentTeacher, exams, teacherId, user]);
+
   const isOwner = useCallback((exam: any) => {
     if (role === "admin") return true;
     if (teacherFullAccess) return true;
-    if (!teacherId) return false;
+    if (!teacherId && !user?.id) return false;
     // Dukung format lama (user?.id) dan baru (teacherId) serta case sensitivity
     const examTeacherId = exam.teacherId || exam.teacherid;
     return examTeacherId === teacherId || examTeacherId === user?.id;
   }, [role, teacherId, user, teacherFullAccess]);
+
+  const isMgmpExam = useCallback((exam: any) => {
+    if (!exam || !exam.subjectId) return false;
+    if (isOwner(exam)) return false;
+    return mySubjectIds.includes(exam.subjectId);
+  }, [isOwner, mySubjectIds]);
+
+  const canEditExam = useCallback((exam: any) => {
+    if (isOwner(exam)) return true;
+    if (Boolean(exam.is_mgmp_shared) && mySubjectIds.includes(exam.subjectId)) {
+      return true;
+    }
+    return false;
+  }, [isOwner, mySubjectIds]);
 
   const tabExams = useMemo(() => {
     return exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
@@ -485,9 +530,20 @@ const ExamsPage = () => {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [exams]);
 
+  const myExamsCount = useMemo(() => {
+    return tabExams.filter(e => isOwner(e)).length;
+  }, [tabExams, isOwner]);
+
+  const mgmpExamsCount = useMemo(() => {
+    return tabExams.filter(e => isMgmpExam(e)).length;
+  }, [tabExams, isMgmpExam]);
+
   const displayExams = useMemo(() => {
     return tabExams.filter(exam => {
       if (ownerFilter === "mine" && !isOwner(exam)) {
+        return false;
+      }
+      if (ownerFilter === "mgmp" && !isMgmpExam(exam)) {
         return false;
       }
       if (subjectFilter !== "all" && exam.subjectId !== subjectFilter) {
@@ -517,7 +573,7 @@ const ExamsPage = () => {
       }
       return true;
     });
-  }, [tabExams, ownerFilter, isOwner, subjectFilter, typeFilter, groupFilter, searchQuery, subjects, teachers]);
+  }, [tabExams, ownerFilter, isOwner, isMgmpExam, subjectFilter, typeFilter, groupFilter, searchQuery, subjects, teachers]);
 
   const filteredExams = displayExams;
 
@@ -835,6 +891,7 @@ const ExamsPage = () => {
           const sId = exam.subjectId || (exam as any).subjectid;
           const tId = exam.teacherId || (exam as any).teacherid;
           const type = exam.examType || (exam as any).examtype || "Latihan";
+          const isMgmpShared = Boolean(exam.is_mgmp_shared ?? (exam as any).is_mgmp_shared);
 
           const subjectObj = exam.expand?.subjectId || subjects.find((s: any) => s.id === sId);
           const teacherObj = exam.expand?.teacherId || teachers.find((t: any) => t.id === tId);
@@ -846,6 +903,7 @@ const ExamsPage = () => {
             subjectId: sId,
             teacherId: tId,
             examType: type,
+            is_mgmp_shared: isMgmpShared,
             subjectName: subjectObj ? subjectObj.name : "Mapel Tidak Ditemukan",
             teacherName: teacherObj ? teacherObj.name : `${terminology.teacher} Tidak Ditemukan`,
           };
@@ -887,30 +945,39 @@ const ExamsPage = () => {
     setSelectedExam(null);
     setFormValues({
       title: "",
-      subjectId: "",
-      teacherId: role === "admin" ? "" : (teacherId || ""),
+      subjectId: mySubjectIds[0] || "",
+      teacherId: role === "admin" ? "" : (teacherId || user?.id || ""),
       examType: "Latihan",
       group_name: "",
+      is_mgmp_shared: false,
     });
     setIsDialogOpen(true);
   };
 
   const handleDuplicateExam = (exam: ExamData) => {
+    const mine = isOwner(exam);
+    const targetTitle = mine ? `(Salinan) ${exam.title}` : `${exam.title} (Salinan Saya)`;
+    const teacherAuthor = teachers.find((t: any) => t.id === exam.teacherId)?.name || "rekan guru";
+
     setConfirmDialog({
       isOpen: true,
-      title: "Duplikat Bank Soal",
-      description: `Apakah Anda yakin ingin menduplikasi "${exam.title}" beserta semua soalnya?`,
+      title: mine ? "Duplikat Bank Soal" : "Salin ke Bank Soal Saya",
+      description: mine
+        ? `Apakah Anda yakin ingin menduplikasi "${exam.title}" beserta semua soalnya?`
+        : `Salin bank soal "${exam.title}" karya ${teacherAuthor} ke koleksi Anda? Anda akan menjadi pemilik salinan ini dan memiliki akses penuh untuk mengeditnya.`,
       type: "info",
-      confirmLabel: "Duplikat",
+      confirmLabel: mine ? "Duplikat" : "Salin ke Koleksi Saya",
       onConfirm: async () => {
         if (!pb) return;
         try {
+          const newTeacherId = (role !== "admin" && (teacherId || user?.id)) ? (teacherId || user?.id) : exam.teacherId;
           const newExam = await pb.collection('exams').create({
-            title: `(Salinan) ${exam.title}`,
+            title: targetTitle,
             subjectId: exam.subjectId,
-            teacherId: exam.teacherId,
+            teacherId: newTeacherId,
             examType: exam.examType || "Latihan",
             group_name: exam.group_name || "",
+            is_mgmp_shared: false,
           });
 
           const questions = await pb.collection('questions').getFullList({
@@ -925,9 +992,13 @@ const ExamsPage = () => {
             });
           }
 
-          addToast({ type: "success", title: "Berhasil", description: `Bank soal berhasil diduplikasi (${questions.length} soal).` });
+          addToast({
+            type: "success",
+            title: "Berhasil Menyalin Bank Soal",
+            description: `Bank soal "${targetTitle}" berhasil disalin ke koleksi Anda (${questions.length} butir soal).`
+          });
         } catch (error) {
-          addToast({ type: "error", title: "Gagal", description: "Gagal menduplikasi bank soal." });
+          addToast({ type: "error", title: "Gagal", description: "Gagal menyalin bank soal." });
         }
       }
     });
@@ -942,6 +1013,7 @@ const ExamsPage = () => {
       teacherId: exam.teacherId || "",
       examType: exam.examType || "Latihan",
       group_name: exam.group_name || "",
+      is_mgmp_shared: Boolean(exam.is_mgmp_shared),
     });
     setIsDialogOpen(true);
   };
@@ -1014,14 +1086,37 @@ const ExamsPage = () => {
     e.preventDefault();
     if (!pb) return;
     try {
-      const payload = {
+      const payload: any = {
         ...formValues,
         group_name: (formValues.group_name || "").trim(),
+        is_mgmp_shared: Boolean(formValues.is_mgmp_shared),
       };
+      if (role !== "admin" && !payload.teacherId) {
+        payload.teacherId = teacherId || user?.id || "";
+      }
+
       if (dialogMode === "edit" && selectedExam) {
-        await pb.collection('exams').update(selectedExam.id, payload);
+        try {
+          await pb.collection('exams').update(selectedExam.id, payload);
+        } catch (err: any) {
+          if (err?.message?.includes("is_mgmp_shared") || err?.data?.data?.is_mgmp_shared) {
+            delete payload.is_mgmp_shared;
+            await pb.collection('exams').update(selectedExam.id, payload);
+          } else {
+            throw err;
+          }
+        }
       } else {
-        await pb.collection('exams').create(payload);
+        try {
+          await pb.collection('exams').create(payload);
+        } catch (err: any) {
+          if (err?.message?.includes("is_mgmp_shared") || err?.data?.data?.is_mgmp_shared) {
+            delete payload.is_mgmp_shared;
+            await pb.collection('exams').create(payload);
+          } else {
+            throw err;
+          }
+        }
       }
       setIsDialogOpen(false);
     } catch (error) {
@@ -1602,6 +1697,25 @@ const ExamsPage = () => {
               <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0", getExamTypeColorClass(exam.examType || "Latihan"))}>
                 {exam.examType || "Latihan"}
               </span>
+
+              {/* Status Kepemilikan & MGMP Badges */}
+              {isOwner(exam) ? (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                  Milik Saya
+                </span>
+              ) : isMgmpExam(exam) ? (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20 shrink-0" title="Bank soal dari rekan guru pengampu mata pelajaran yang sama">
+                  <Users className="h-3 w-3" />
+                  MGMP
+                </span>
+              ) : null}
+
+              {exam.is_mgmp_shared && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20 shrink-0" title="Kolaborasi Terbuka: Guru se-mapel dapat mengedit & menambah butir soal bersama">
+                  <Share2 className="h-3 w-3" />
+                  Kolaborasi
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">
               <span className="font-semibold text-emerald-600 dark:text-emerald-400">
@@ -1701,7 +1815,7 @@ const ExamsPage = () => {
                   <BookOpen className="h-3.5 w-3.5 text-emerald-500" />
                   <span>Kelola Butir Soal</span>
                 </DropdownMenuItem>
-                {owner && (
+                {canEditExam(exam) && (
                   <DropdownMenuItem
                     onClick={() => handleEditClick(exam)}
                     className="text-xs cursor-pointer gap-2 py-1.5"
@@ -1719,15 +1833,14 @@ const ExamsPage = () => {
                   <span>Export Word (.doc)</span>
                 </DropdownMenuItem>
 
-                {role === "admin" && (
-                  <DropdownMenuItem
-                    onClick={() => handleDuplicateExam(exam)}
-                    className="text-xs cursor-pointer gap-2 py-1.5"
-                  >
-                    <Copy className="h-3.5 w-3.5 text-neutral-500" />
-                    <span>Duplikat Bank Soal</span>
-                  </DropdownMenuItem>
-                )}
+                {/* Duplikat / Salin Bank Soal - Tersedia untuk Admin dan Guru (termasuk MGMP) */}
+                <DropdownMenuItem
+                  onClick={() => handleDuplicateExam(exam)}
+                  className="text-xs cursor-pointer gap-2 py-1.5"
+                >
+                  <Copy className="h-3.5 w-3.5 text-neutral-500" />
+                  <span>{isOwner(exam) ? "Duplikat Bank Soal" : "Salin ke Bank Soal Saya"}</span>
+                </DropdownMenuItem>
 
                 {owner && (
                   <>
@@ -1766,7 +1879,7 @@ const ExamsPage = () => {
         );
       },
     },
-  ], [questionCounts, subjects, teachers, terminology, isOwner, navigate, handleBatchExport, role, handleDuplicateExam, handleEditClick, activeTab, handleArchiveExam, handleRestoreExam, handleDeleteClick]);
+  ], [questionCounts, subjects, teachers, terminology, isOwner, isMgmpExam, canEditExam, navigate, handleBatchExport, role, handleDuplicateExam, handleEditClick, activeTab, handleArchiveExam, handleRestoreExam, handleDeleteClick]);
 
   return (
     <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
@@ -1922,33 +2035,100 @@ const ExamsPage = () => {
               onSearchChange={setSearchQuery}
               searchPlaceholder="Cari judul ujian, pengampu, mapel, tipe..."
               filterSlot={
-                <NeonFilterPopover
-                  title="Filter Bank Soal"
-                  activeCount={
-                    (subjectFilter !== "all" ? 1 : 0) +
-                    (typeFilter !== "all" ? 1 : 0) +
-                    (groupFilter !== "all" ? 1 : 0) +
-                    (ownerFilter !== "all" ? 1 : 0)
-                  }
-                  onReset={() => {
-                    setSubjectFilter("all");
-                    setTypeFilter("all");
-                    setGroupFilter("all");
-                    setOwnerFilter("all");
-                  }}
-                >
-                  {/* Filter Bank Soal Saya untuk Guru */}
-                  {role !== "admin" && (
-                    <NeonFilterField label="Kepemilikan">
-                      <NeonFilterSelect
-                        value={ownerFilter}
-                        onChange={(e) => setOwnerFilter(e.target.value as any)}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Segmented Filter Pills: Semua | Soal Saya | MGMP */}
+                  {(role !== "admin" || mySubjectIds.length > 0) && (
+                    <div className="inline-flex items-center p-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-700/60 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setOwnerFilter("all")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
+                          ownerFilter === "all"
+                            ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs font-semibold"
+                            : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                        )}
                       >
-                        <option value="all">Semua Bank Soal</option>
-                        <option value="mine">⭐ Bank Soal Saya Saja</option>
-                      </NeonFilterSelect>
-                    </NeonFilterField>
+                        <span>Semua</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-200/70 dark:bg-neutral-700/70 text-neutral-600 dark:text-neutral-300">
+                          {tabExams.length}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setOwnerFilter("mine")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
+                          ownerFilter === "mine"
+                            ? "bg-white dark:bg-neutral-900 text-emerald-600 dark:text-emerald-400 shadow-xs font-semibold"
+                            : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                        )}
+                      >
+                        <span>Soal Saya</span>
+                        <span className={cn(
+                          "text-[10px] px-1.5 py-0.2 rounded-full",
+                          ownerFilter === "mine"
+                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold"
+                            : "bg-neutral-200/70 dark:bg-neutral-700/70 text-neutral-600 dark:text-neutral-300"
+                        )}>
+                          {myExamsCount}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setOwnerFilter("mgmp")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
+                          ownerFilter === "mgmp"
+                            ? "bg-white dark:bg-neutral-900 text-sky-600 dark:text-sky-400 shadow-xs font-semibold"
+                            : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                        )}
+                        title="Bank soal dari rekan guru pengampu mata pelajaran yang sama (MGMP)"
+                      >
+                        <Users className="h-3 w-3" />
+                        <span>MGMP Se-Mapel</span>
+                        <span className={cn(
+                          "text-[10px] px-1.5 py-0.2 rounded-full",
+                          ownerFilter === "mgmp"
+                            ? "bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 font-bold"
+                            : "bg-neutral-200/70 dark:bg-neutral-700/70 text-neutral-600 dark:text-neutral-300"
+                        )}>
+                          {mgmpExamsCount}
+                        </span>
+                      </button>
+                    </div>
                   )}
+
+                  <NeonFilterPopover
+                    title="Filter Bank Soal"
+                    activeCount={
+                      (subjectFilter !== "all" ? 1 : 0) +
+                      (typeFilter !== "all" ? 1 : 0) +
+                      (groupFilter !== "all" ? 1 : 0) +
+                      (ownerFilter !== "all" ? 1 : 0)
+                    }
+                    onReset={() => {
+                      setSubjectFilter("all");
+                      setTypeFilter("all");
+                      setGroupFilter("all");
+                      setOwnerFilter("all");
+                    }}
+                  >
+                    {/* Filter Bank Soal Saya untuk Guru */}
+                    {role !== "admin" && (
+                      <NeonFilterField label="Kepemilikan">
+                        <NeonFilterSelect
+                          value={ownerFilter}
+                          onChange={(e) => setOwnerFilter(e.target.value as any)}
+                        >
+                          <option value="all">Semua Bank Soal ({tabExams.length})</option>
+                          <option value="mine">⭐ Bank Soal Saya Saja ({myExamsCount})</option>
+                          <option value="mgmp">👥 Rekan Se-Mapel / MGMP ({mgmpExamsCount})</option>
+                        </NeonFilterSelect>
+                      </NeonFilterField>
+                    )}
 
                   {/* Subject filter */}
                   <NeonFilterField label={terminology.subject}>
@@ -1995,7 +2175,8 @@ const ExamsPage = () => {
                     </NeonFilterField>
                   )}
                 </NeonFilterPopover>
-              }
+              </div>
+            }
               selectable={true}
               selectedKeys={selectedIds}
               onSelectionChange={setSelectedIds}
@@ -2077,8 +2258,16 @@ const ExamsPage = () => {
               pagination={true}
               pageSize={10}
               pageSizeOptions={[10, 25, 50]}
-              emptyTitle={`Belum ada bank soal ${activeTab}`}
-              emptySubtitle="Mulai dengan membuat paket bank soal baru menggunakan tombol di atas."
+              emptyTitle={
+                ownerFilter === "mgmp"
+                  ? "Belum Ada Bank Soal Rekan Se-Mapel"
+                  : `Belum ada bank soal ${activeTab}`
+              }
+              emptySubtitle={
+                ownerFilter === "mgmp"
+                  ? "Bank soal dari rekan guru yang mengajar mata pelajaran yang sama (MGMP) akan ditampilkan di sini."
+                  : "Mulai dengan membuat paket bank soal baru menggunakan tombol di atas."
+              }
             />
           </div>
 
@@ -2126,7 +2315,44 @@ const ExamsPage = () => {
                     value={inspectedExam.group_name || "Tanpa Group"}
                   />
 
-                  <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                  <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800 space-y-2">
+                    <InspectorField
+                      label="Status Akses & Kolaborasi"
+                      value={
+                        isOwner(inspectedExam) ? (
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                              Milik Anda
+                            </span>
+                            {inspectedExam.is_mgmp_shared && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20">
+                                🤝 Dibagikan ke MGMP
+                              </span>
+                            )}
+                          </div>
+                        ) : isMgmpExam(inspectedExam) ? (
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20">
+                              👥 MGMP Se-Mapel
+                            </span>
+                            {inspectedExam.is_mgmp_shared ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20">
+                                🤝 Kolaborasi Terbuka
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-neutral-400">
+                                (Pratinjau / Salin)
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-neutral-500 text-[11px] block mt-0.5">
+                            Bank Soal Sekolah
+                          </span>
+                        )
+                      }
+                    />
+
                     <InspectorField
                       label="Total Butir Soal"
                       value={
@@ -2160,29 +2386,27 @@ const ExamsPage = () => {
                         Simulasi
                       </InspectorButton>
 
-                      {isOwner(inspectedExam) && (
+                      {canEditExam(inspectedExam) && (
                         <InspectorButton
                           variant="secondary"
                           icon={Edit}
                           onClick={() => handleEditClick(inspectedExam)}
                           title="Edit Data Bank Soal"
-                          className={role !== "admin" ? "col-span-2" : ""}
+                          className={role !== "admin" && !isOwner(inspectedExam) ? "col-span-1" : ""}
                         >
                           Edit
                         </InspectorButton>
                       )}
 
-                      {role === "admin" && (
-                        <InspectorButton
-                          variant="secondary"
-                          icon={Copy}
-                          onClick={() => handleDuplicateExam(inspectedExam)}
-                          title="Duplikat Bank Soal"
-                          className={!isOwner(inspectedExam) ? "col-span-2" : ""}
-                        >
-                          Duplikat
-                        </InspectorButton>
-                      )}
+                      <InspectorButton
+                        variant="secondary"
+                        icon={Copy}
+                        onClick={() => handleDuplicateExam(inspectedExam)}
+                        title={isOwner(inspectedExam) ? "Duplikat Bank Soal" : "Salin ke Bank Soal Saya"}
+                        className={!canEditExam(inspectedExam) ? "col-span-2" : ""}
+                      >
+                        {isOwner(inspectedExam) ? "Duplikat" : "Salin ke Koleksi"}
+                      </InspectorButton>
                     </div>
                   </InspectorActions>
                 </div>
@@ -2372,6 +2596,38 @@ const ExamsPage = () => {
                   </div>
                 </div>
               )}
+
+              {/* Kolaborasi MGMP Se-Mapel Switch */}
+              <div className="rounded-xl border border-neutral-200/90 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/40 p-3.5 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 shrink-0">
+                      <Users className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <label htmlFor="exam-mgmp-switch" className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 cursor-pointer block">
+                        Kolaborasi MGMP (Guru Se-Mapel)
+                      </label>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                        Izinkan rekan guru yang mengajar mapel ini ikut mengedit & menambah butir soal
+                      </p>
+                    </div>
+                  </div>
+                  <NeonSwitch
+                    id="exam-mgmp-switch"
+                    checked={Boolean(formValues.is_mgmp_shared)}
+                    onChange={(checked) => setFormValues(prev => ({ ...prev, is_mgmp_shared: checked }))}
+                    size="sm"
+                    variant="emerald"
+                  />
+                </div>
+                {formValues.is_mgmp_shared && (
+                  <div className="text-[11px] text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/30 p-2 rounded-lg border border-emerald-500/20 flex items-center gap-1.5">
+                    <Check className="h-3 w-3 shrink-0" />
+                    <span>Kolaborasi aktif: Rekan guru se-mapel dapat menambah, mengedit, dan melengkapi butir soal di paket ini.</span>
+                  </div>
+                )}
+              </div>
 
               {/* Tips Callout */}
               <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 p-3.5 flex items-start gap-2.5 text-xs text-neutral-600 dark:text-neutral-400">

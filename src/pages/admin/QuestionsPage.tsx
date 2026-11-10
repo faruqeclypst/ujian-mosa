@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, Function, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Globe, Key, Layers, Target, Info, MoreHorizontal, Filter, RotateCw } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, Function, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Globe, Key, Layers, Target, Info, MoreHorizontal, Filter, RotateCw, Users, Share2 } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
@@ -2945,15 +2945,91 @@ const QuestionsPage = () => {
     init();
   }, [examId, pb, loadQuestions]);
 
+  const currentTeacher = useMemo(() => {
+    if (!teachers || teachers.length === 0) return null;
+    return teachers.find((t: any) => t.id === teacherId || t.id === user?.id || (user?.email && t.email === user.email));
+  }, [teachers, teacherId, user]);
+
+  const mySubjectIds = useMemo(() => {
+    const set = new Set<string>();
+    if (currentTeacher?.subjects && Array.isArray(currentTeacher.subjects)) {
+      currentTeacher.subjects.forEach((s: string) => {
+        if (s) set.add(s);
+      });
+    }
+    return Array.from(set);
+  }, [currentTeacher]);
+
   const isOwner = useMemo(() => {
     if (role === "admin") return true;
     if (teacherFullAccess) return true;
-    if (!exam || !teacherId) return false;
+    if (!exam || (!teacherId && !user?.id)) return false;
     // Cek ID Guru (baru) atau ID Akun (lama) dan handle casing
     const examTeacherId = exam.teacherId || exam.teacherid;
     return examTeacherId === teacherId || examTeacherId === user?.id;
   }, [role, exam, teacherId, user, teacherFullAccess]);
 
+  const isMgmpExam = useMemo(() => {
+    if (!exam || !exam.subjectId || isOwner) return false;
+    return mySubjectIds.includes(exam.subjectId);
+  }, [exam, isOwner, mySubjectIds]);
+
+  const canEdit = useMemo(() => {
+    if (isOwner) return true;
+    if (Boolean(exam?.is_mgmp_shared) && isMgmpExam) return true;
+    return false;
+  }, [isOwner, exam?.is_mgmp_shared, isMgmpExam]);
+
+  const [isDuplicatingExam, setIsDuplicatingExam] = useState(false);
+
+  const handleDuplicateCurrentExam = async () => {
+    if (!exam || !pb) return;
+    const isMine = isOwner;
+    const targetTitle = isMine ? `(Salinan) ${exam.title}` : `${exam.title} (Salinan Saya)`;
+
+    showAlert(
+      isMine ? "Duplikat Bank Soal" : "Salin ke Bank Soal Saya",
+      isMine
+        ? `Apakah Anda yakin ingin menduplikasi bank soal "${exam.title}" beserta seluruh (${questions.length}) butir soalnya?`
+        : `Salin bank soal "${exam.title}" karya ${exam.teacherName || "rekan guru"} ke koleksi Anda? Anda akan menjadi pemilik penuh salinan ini dan bebas mengedit serta menggunakannya di Ruang Ujian.`,
+      "info",
+      async () => {
+        try {
+          setIsDuplicatingExam(true);
+          const newTeacherId = (role !== "admin" && (teacherId || user?.id)) ? (teacherId || user?.id) : exam.teacherId;
+          const newExam = await pb.collection('exams').create({
+            title: targetTitle,
+            subjectId: exam.subjectId,
+            teacherId: newTeacherId,
+            examType: exam.examType || "Latihan",
+            group_name: exam.group_name || "",
+            is_mgmp_shared: false,
+          });
+
+          for (const q of questions) {
+            const { id, created, updated, collectionId, collectionName, ...rest } = q as any;
+            await pb.collection('questions').create({
+              ...rest,
+              examId: newExam.id,
+            });
+          }
+
+          addToast({
+            type: "success",
+            title: "Berhasil Menyalin Bank Soal",
+            description: `Bank soal "${targetTitle}" berhasil disalin beserta ${questions.length} butir soal.`
+          });
+
+          sessionStorage.setItem("activeQuestionsExamId", newExam.id);
+          window.location.href = `/admin/bank-soal/questions`;
+        } catch (err: any) {
+          showAlert("Gagal", err?.message || "Gagal menyalin bank soal.", "danger");
+        } finally {
+          setIsDuplicatingExam(false);
+        }
+      }
+    );
+  };
 
   const handleCreateClick = () => {
     // Navigasi ke halaman form (bukan modal lagi)
@@ -4437,7 +4513,7 @@ const QuestionsPage = () => {
             </button>
 
             {/* Quick Action: Edit (sm+) */}
-            {isOwner && (
+            {canEdit && (
               <button
                 type="button"
                 className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors shadow-2xs cursor-pointer shrink-0"
@@ -4471,7 +4547,7 @@ const QuestionsPage = () => {
                   <Search className="h-3.5 w-3.5 text-neutral-500" />
                   <span>Pratinjau Soal</span>
                 </DropdownMenuItem>
-                {isOwner && (
+                {canEdit && (
                   <>
                     <DropdownMenuItem
                       onClick={() => handleEditClick(item)}
@@ -4496,7 +4572,7 @@ const QuestionsPage = () => {
         );
       }
     }
-  ], [questions, isOwner]);
+  ], [questions, isOwner, canEdit]);
 
   const columns = neonColumns;
 
@@ -5783,12 +5859,46 @@ const QuestionsPage = () => {
                   {exam.teacherCode && <span className="font-mono text-[10px] text-neutral-400">({exam.teacherCode})</span>}
                 </div>
               )}
+
+              {/* Ownership & MGMP Status Badges */}
+              {isOwner ? (
+                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                  Milik Anda
+                </span>
+              ) : isMgmpExam ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20" title="Bank soal dari rekan guru mata pelajaran yang sama">
+                  <Users className="h-3 w-3" />
+                  MGMP Se-Mapel
+                </span>
+              ) : null}
+
+              {exam?.is_mgmp_shared && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20" title="Kolaborasi Terbuka: Guru se-mapel dapat mengedit & menambah soal">
+                  <Share2 className="h-3 w-3" />
+                  Kolaborasi Aktif
+                </span>
+              )}
             </div>
           </div>
         </div>
 
         {/* Action Buttons Top Right */}
         <div className="flex items-center gap-2 shrink-0 flex-wrap overflow-visible relative z-30">
+          {/* SALIN KE BANK SOAL SAYA (Khusus Guru MGMP yang bukan owner) */}
+          {!isOwner && isMgmpExam && (
+            <NeonButton
+              variant="primary"
+              color="brand"
+              size="sm"
+              onClick={handleDuplicateCurrentExam}
+              loading={isDuplicatingExam}
+              className="h-8 gap-1.5 shadow-sm"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              <span>Salin ke Bank Soal Saya</span>
+            </NeonButton>
+          )}
+
           {/* OPSI DATA DROPDOWN */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -5805,7 +5915,7 @@ const QuestionsPage = () => {
               <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2 py-1">
                 Ambil & Salin Soal
               </DropdownMenuLabel>
-              {isOwner && (
+              {canEdit && (
                 <>
                   <DropdownMenuItem
                     onClick={handleOpenBankSoalSelector}
@@ -5914,7 +6024,7 @@ const QuestionsPage = () => {
                   <span>Simulasi Tampilan Siswa</span>
                 </DropdownMenuItem>
               )}
-              {isOwner && (
+              {canEdit && (
                 <>
                   <DropdownMenuItem
                     onClick={handleOpenBankSoalSelector}
@@ -5932,7 +6042,7 @@ const QuestionsPage = () => {
                   </DropdownMenuItem>
                 </>
               )}
-              {isOwner && questions.length > 0 && selectedIds.length === 0 && (
+              {canEdit && questions.length > 0 && selectedIds.length === 0 && (
                 <>
                   <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
                   <DropdownMenuItem
@@ -5962,7 +6072,7 @@ const QuestionsPage = () => {
           )}
 
           {/* TAMBAH SOAL BUTTON / DROPDOWN */}
-          {isOwner && (
+          {canEdit && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -6054,6 +6164,60 @@ const QuestionsPage = () => {
           )}
         </div>
       </div>
+
+      {/* ── MGMP Se-Mapel Info & Collaboration Banner ── */}
+      {!isOwner && isMgmpExam && (
+        <div className={cn(
+          "p-3 sm:p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors shadow-2xs",
+          exam?.is_mgmp_shared
+            ? "bg-indigo-50/70 dark:bg-indigo-950/20 border-indigo-200/80 dark:border-indigo-800/60 text-indigo-950 dark:text-indigo-200"
+            : "bg-sky-50/70 dark:bg-sky-950/20 border-sky-200/80 dark:border-sky-800/60 text-sky-950 dark:text-sky-200"
+        )}>
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <div className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-xl shrink-0 border",
+              exam?.is_mgmp_shared
+                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
+                : "bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-300 border-sky-200 dark:border-sky-800"
+            )}>
+              {exam?.is_mgmp_shared ? <Share2 className="h-4.5 w-4.5" /> : <Users className="h-4.5 w-4.5" />}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-[13px]">
+                  {exam?.is_mgmp_shared ? "Mode Kolaborasi MGMP Aktif" : "Bank Soal Rekan Guru Se-Mapel (Mode Pratinjau)"}
+                </span>
+                <span className={cn(
+                  "px-2 py-0.2 rounded-full text-[10px] font-semibold border",
+                  exam?.is_mgmp_shared
+                    ? "bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border-indigo-300/60 dark:border-indigo-700"
+                    : "bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border-sky-300/60 dark:border-sky-700"
+                )}>
+                  {exam?.subject || "MGMP"}
+                </span>
+              </div>
+              <p className="text-[11px] opacity-80 mt-0.5 leading-relaxed">
+                {exam?.is_mgmp_shared
+                  ? `Dibuat oleh ${exam?.teacherName || "rekan guru"}. Anda memiliki izin kolaborasi untuk mengedit dan menambah butir soal bersama.`
+                  : `Dibuat oleh ${exam?.teacherName || "rekan guru"}. Anda dapat membaca butir soal ini atau menyalinnya ke koleksi Anda agar bebas diedit.`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            <NeonButton
+              variant="primary"
+              color="brand"
+              size="sm"
+              onClick={handleDuplicateCurrentExam}
+              loading={isDuplicatingExam}
+              className="gap-1.5 shadow-xs"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              <span>Salin ke Bank Soal Saya</span>
+            </NeonButton>
+          </div>
+        </div>
+      )}
 
       {/* ── Signature Neon Horizontal Tabs: Kategori & Filter Cepat ── */}
       <NeonTabs
@@ -6160,7 +6324,7 @@ const QuestionsPage = () => {
                 />
               </div>
             }
-            selectable={isOwner}
+            selectable={canEdit}
             selectedKeys={selectedIds}
             onSelectionChange={setSelectedIds}
             batchActions={
@@ -6205,7 +6369,7 @@ const QuestionsPage = () => {
             emptyTitle="Belum ada butir soal"
             emptySubtitle="Pilih salah satu metode di bawah ini untuk mulai mengisi butir soal ke dalam bank soal ini."
             emptyAction={
-              isOwner ? (
+              canEdit ? (
                 <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
                   <NeonButton
                     variant="primary"
@@ -6243,6 +6407,20 @@ const QuestionsPage = () => {
                   >
                     <Download className="h-3.5 w-3.5 rotate-180 text-blue-600" />
                     <span>Import File</span>
+                  </NeonButton>
+                </div>
+              ) : isMgmpExam ? (
+                <div className="flex items-center justify-center pt-2">
+                  <NeonButton
+                    variant="primary"
+                    color="brand"
+                    size="sm"
+                    onClick={handleDuplicateCurrentExam}
+                    loading={isDuplicatingExam}
+                    className="gap-1.5 shadow-xs"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    <span>Salin ke Bank Soal Saya</span>
                   </NeonButton>
                 </div>
               ) : undefined
@@ -6471,7 +6649,7 @@ const QuestionsPage = () => {
                       Pratinjau Soal Lengkap
                     </InspectorButton>
 
-                    {isOwner && (
+                    {canEdit ? (
                       <div className="flex items-center gap-1.5">
                         <InspectorButton
                           variant="primary"
@@ -6490,7 +6668,16 @@ const QuestionsPage = () => {
                           <Trash className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                    )}
+                    ) : isMgmpExam ? (
+                      <InspectorButton
+                        variant="secondary"
+                        icon={Copy}
+                        onClick={handleDuplicateCurrentExam}
+                        className="w-full"
+                      >
+                        Salin ke Bank Soal Saya
+                      </InspectorButton>
+                    ) : null}
                   </InspectorActions>
                 </div>
               ) : (
