@@ -651,6 +651,67 @@ const ExamsPage = () => {
     setConfirmDialog({ isOpen: true, title, description, type, confirmLabel: "OK", onConfirm: onConfirm || (() => { }) });
   };
 
+  const fetchExams = useCallback(async () => {
+    if (!pb) return;
+
+    try {
+      const [loaded, counts] = await Promise.all([
+        pb.collection('exams').getFullList({
+          sort: '-created',
+          expand: 'teacherId,subjectId'
+        }),
+        pb.send("/api/exam-question-counts", {}).catch(() => null)
+      ]);
+
+      if (counts && typeof counts === 'object') {
+        setQuestionCounts(counts);
+      }
+
+      const mapped = loaded.map((exam) => {
+        // Handle possible lowercase field names from PocketBase
+        const sId = exam.subjectId || (exam as any).subjectid;
+        const tId = exam.teacherId || (exam as any).teacherid;
+        const type = exam.examType || (exam as any).examtype || "Latihan";
+        const isMgmpShared = Boolean(exam.is_mgmp_shared ?? (exam as any).is_mgmp_shared);
+
+        const subjectObj = exam.expand?.subjectId || subjects.find((s: any) => s.id === sId);
+        const teacherObj = exam.expand?.teacherId || teachers.find((t: any) => t.id === tId);
+
+        const { id, ...rest } = exam;
+        return {
+          id,
+          ...rest,
+          subjectId: sId,
+          teacherId: tId,
+          examType: type,
+          is_mgmp_shared: isMgmpShared,
+          subjectName: subjectObj ? subjectObj.name : "Mapel Tidak Ditemukan",
+          teacherName: teacherObj ? teacherObj.name : `${terminology.teacher} Tidak Ditemukan`,
+        };
+      });
+
+      // Filter role jika bukan admin
+      if (role !== "admin" && teacherId) {
+        mapped.sort((a, b) => {
+          const isAOwner = (a as any).teacherId === teacherId ? 1 : 0;
+          const isBOwner = (b as any).teacherId === teacherId ? 1 : 0;
+          return isBOwner - isAOwner;
+        });
+      }
+
+      setExams(mapped);
+      setLoading(false);
+      examsCache = {
+        exams: mapped,
+        questionCounts: counts && typeof counts === 'object' ? counts : (examsCache?.questionCounts || {}),
+        activeExamIds: examsCache?.activeExamIds || [],
+      };
+    } catch (e) {
+      console.error("Gagal load data ujian:", e);
+      setLoading(false);
+    }
+  }, [pb, subjects, teachers, role, teacherId, terminology.teacher]);
+
   const handleBatchArchive = async () => {
     if (selectedIds.length === 0) return;
     if (!pb) return;
@@ -685,14 +746,36 @@ const ExamsPage = () => {
         title: "Arsipkan Bank Soal Massal"
       });
       try {
-        for (let i = 0; i < validExams.length; i++) {
-          await pb.collection('exams').update(validExams[i], { status: "archive" });
-          setBatchProgress(prev => ({
-            ...prev,
-            current: i + 1,
-            message: `Mengarsipkan (${i + 1}/${validExams.length})`
-          }));
+        let useFast = false;
+        try {
+          const res: any = await pb.send("/api/fast-exams/archive", {
+            method: "POST",
+            body: { examIds: validExams }
+          });
+          if (res && res.ok) {
+            useFast = true;
+          }
+        } catch (fastErr) {
+          console.warn("[FAST_EXAMS] Fallback to standard update:", fastErr);
         }
+
+        if (!useFast) {
+          for (let i = 0; i < validExams.length; i++) {
+            await pb.collection('exams').update(validExams[i], { status: "archive" });
+            setBatchProgress(prev => ({
+              ...prev,
+              current: i + 1,
+              message: `Mengarsipkan (${i + 1}/${validExams.length})`
+            }));
+          }
+        } else {
+          setExams(prev => prev.map(e => validExams.includes(e.id) ? { ...e, status: "archive" } : e));
+          if (examsCache) {
+            examsCache.exams = examsCache.exams.map(e => validExams.includes(e.id) ? { ...e, status: "archive" } : e);
+          }
+          fetchExams();
+        }
+
         showAlert("Berhasil", `${validExams.length} bank soal berhasil diarsipkan.`, "success");
         setSelectedIds([]);
       } catch (e: any) {
@@ -715,14 +798,36 @@ const ExamsPage = () => {
         title: "Pulihkan Bank Soal Massal"
       });
       try {
-        for (let i = 0; i < selectedIds.length; i++) {
-          await pb.collection('exams').update(selectedIds[i], { status: null });
-          setBatchProgress(prev => ({
-            ...prev,
-            current: i + 1,
-            message: `Memulihkan (${i + 1}/${selectedIds.length})`
-          }));
+        let useFast = false;
+        try {
+          const res: any = await pb.send("/api/fast-exams/restore", {
+            method: "POST",
+            body: { examIds: selectedIds }
+          });
+          if (res && res.ok) {
+            useFast = true;
+          }
+        } catch (fastErr) {
+          console.warn("[FAST_EXAMS] Fallback to standard update:", fastErr);
         }
+
+        if (!useFast) {
+          for (let i = 0; i < selectedIds.length; i++) {
+            await pb.collection('exams').update(selectedIds[i], { status: null });
+            setBatchProgress(prev => ({
+              ...prev,
+              current: i + 1,
+              message: `Memulihkan (${i + 1}/${selectedIds.length})`
+            }));
+          }
+        } else {
+          setExams(prev => prev.map(e => selectedIds.includes(e.id) ? { ...e, status: "" } : e));
+          if (examsCache) {
+            examsCache.exams = examsCache.exams.map(e => selectedIds.includes(e.id) ? { ...e, status: "" } : e);
+          }
+          fetchExams();
+        }
+
         showAlert("Berhasil", `${selectedIds.length} bank soal berhasil dipulihkan.`, "success");
         setSelectedIds([]);
       } catch (e: any) {
@@ -767,25 +872,47 @@ const ExamsPage = () => {
         title: "Hapus Bank Soal Massal"
       });
       try {
-        for (let i = 0; i < validExams.length; i++) {
-          const examId = validExams[i];
-          try {
-            const questions = await pb.collection('questions').getFullList({
-              filter: `examId = "${examId}"`
-            });
-            for (const q of questions) {
-              await pb.collection('questions').delete(q.id);
-            }
-            await pb.collection('exams').delete(examId);
-          } catch (err) {
-            console.error(`Gagal menghapus exam ${examId}:`, err);
+        let useFast = false;
+        try {
+          const res: any = await pb.send("/api/fast-exams/delete", {
+            method: "POST",
+            body: { examIds: validExams }
+          });
+          if (res && res.ok) {
+            useFast = true;
           }
-          setBatchProgress(prev => ({
-            ...prev,
-            current: i + 1,
-            message: `Menghapus (${i + 1}/${validExams.length})`
-          }));
+        } catch (fastErr) {
+          console.warn("[FAST_EXAMS] Fallback to standard delete:", fastErr);
         }
+
+        if (!useFast) {
+          for (let i = 0; i < validExams.length; i++) {
+            const examId = validExams[i];
+            try {
+              const questions = await pb.collection('questions').getFullList({
+                filter: `examId = "${examId}"`
+              });
+              for (const q of questions) {
+                await pb.collection('questions').delete(q.id);
+              }
+              await pb.collection('exams').delete(examId);
+            } catch (err) {
+              console.error(`Gagal menghapus exam ${examId}:`, err);
+            }
+            setBatchProgress(prev => ({
+              ...prev,
+              current: i + 1,
+              message: `Menghapus (${i + 1}/${validExams.length})`
+            }));
+          }
+        } else {
+          setExams(prev => prev.filter(e => !validExams.includes(e.id)));
+          if (examsCache) {
+            examsCache.exams = examsCache.exams.filter(e => !validExams.includes(e.id));
+          }
+          fetchExams();
+        }
+
         showAlert("Berhasil", `${validExams.length} bank soal berhasil dihapus permanen.`, "success");
         setSelectedIds([]);
       } catch (e: any) {
@@ -824,7 +951,24 @@ const ExamsPage = () => {
       onConfirm: async () => {
         if (!pb) return;
         try {
-          await pb.collection('exams').update(exam.id, { status: "archive" });
+          let useFast = false;
+          try {
+            const res: any = await pb.send("/api/fast-exams/archive", {
+              method: "POST",
+              body: { examIds: [exam.id] }
+            });
+            if (res && res.ok) useFast = true;
+          } catch (_) { }
+
+          if (!useFast) {
+            await pb.collection('exams').update(exam.id, { status: "archive" });
+          } else {
+            setExams(prev => prev.map(e => e.id === exam.id ? { ...e, status: "archive" } : e));
+            if (examsCache) {
+              examsCache.exams = examsCache.exams.map(e => e.id === exam.id ? { ...e, status: "archive" } : e);
+            }
+            fetchExams();
+          }
         } catch (e) {
           showAlert("Gagal", "Gagal mengarsipkan bank soal.", "danger");
         }
@@ -842,7 +986,24 @@ const ExamsPage = () => {
       onConfirm: async () => {
         if (!pb) return;
         try {
-          await pb.collection('exams').update(exam.id, { status: null });
+          let useFast = false;
+          try {
+            const res: any = await pb.send("/api/fast-exams/restore", {
+              method: "POST",
+              body: { examIds: [exam.id] }
+            });
+            if (res && res.ok) useFast = true;
+          } catch (_) { }
+
+          if (!useFast) {
+            await pb.collection('exams').update(exam.id, { status: null });
+          } else {
+            setExams(prev => prev.map(e => e.id === exam.id ? { ...e, status: "" } : e));
+            if (examsCache) {
+              examsCache.exams = examsCache.exams.map(e => e.id === exam.id ? { ...e, status: "" } : e);
+            }
+            fetchExams();
+          }
         } catch (e) {
           showAlert("Gagal", "Gagal memulihkan bank soal.", "danger");
         }
@@ -878,67 +1039,6 @@ const ExamsPage = () => {
 
   // Sync exams data
   useEffect(() => {
-    const fetchExams = async () => {
-      if (!pb) return;
-
-      try {
-        const [loaded, counts] = await Promise.all([
-          pb.collection('exams').getFullList({
-            sort: '-created',
-            expand: 'teacherId,subjectId'
-          }),
-          pb.send("/api/exam-question-counts", {}).catch(() => null)
-        ]);
-
-        if (counts && typeof counts === 'object') {
-          setQuestionCounts(counts);
-        }
-
-        const mapped = loaded.map((exam) => {
-          // Handle possible lowercase field names from PocketBase
-          const sId = exam.subjectId || (exam as any).subjectid;
-          const tId = exam.teacherId || (exam as any).teacherid;
-          const type = exam.examType || (exam as any).examtype || "Latihan";
-          const isMgmpShared = Boolean(exam.is_mgmp_shared ?? (exam as any).is_mgmp_shared);
-
-          const subjectObj = exam.expand?.subjectId || subjects.find((s: any) => s.id === sId);
-          const teacherObj = exam.expand?.teacherId || teachers.find((t: any) => t.id === tId);
-
-          const { id, ...rest } = exam;
-          return {
-            id,
-            ...rest,
-            subjectId: sId,
-            teacherId: tId,
-            examType: type,
-            is_mgmp_shared: isMgmpShared,
-            subjectName: subjectObj ? subjectObj.name : "Mapel Tidak Ditemukan",
-            teacherName: teacherObj ? teacherObj.name : `${terminology.teacher} Tidak Ditemukan`,
-          };
-        });
-
-        // Filter role jika bukan admin
-        if (role !== "admin" && teacherId) {
-          mapped.sort((a, b) => {
-            const isAOwner = (a as any).teacherId === teacherId ? 1 : 0;
-            const isBOwner = (b as any).teacherId === teacherId ? 1 : 0;
-            return isBOwner - isAOwner;
-          });
-        }
-
-        setExams(mapped);
-        setLoading(false);
-        examsCache = {
-          exams: mapped,
-          questionCounts: counts && typeof counts === 'object' ? counts : (examsCache?.questionCounts || {}),
-          activeExamIds: examsCache?.activeExamIds || [],
-        };
-      } catch (e) {
-        console.error("Gagal load data ujian:", e);
-        setLoading(false);
-      }
-    };
-
     fetchExams();
     if (!pb) return;
     const unsub = pb.collection('exams').subscribe("*", fetchExams);
@@ -946,7 +1046,7 @@ const ExamsPage = () => {
     return () => {
       unsub.then(u => u()).catch(() => { });
     };
-  }, [subjects, teachers, role, user, pb, teacherId, terminology.teacher]);
+  }, [fetchExams, pb]);
 
   const handleCreateClick = () => {
     setDialogMode("create");
@@ -1136,19 +1236,34 @@ const ExamsPage = () => {
     if (!examToDelete || !pb) return;
     setIsDeleting(true);
     try {
-      // 1. Hapus soal terkait (opsional jika menggunakan Relasi cascade di PB)
-      // Namun di PocketBase v0.23, penghapusan record yang di-relasi-kan tidak otomatis hapus record-nya
-      // Kecuali diatur di API Rules. Mari kita hapus satu-satu untuk amannya:
-      const questions = await pb.collection('questions').getFullList({
-        filter: `examId = "${examToDelete.id}"`
-      });
-
-      for (const q of questions) {
-        await pb.collection('questions').delete(q.id);
+      let useFast = false;
+      try {
+        const res: any = await pb.send("/api/fast-exams/delete", {
+          method: "POST",
+          body: { examIds: [examToDelete.id] }
+        });
+        if (res && res.ok) useFast = true;
+      } catch (fastErr) {
+        console.warn("[FAST_EXAMS] Fallback to standard delete:", fastErr);
       }
 
-      // 2. Hapus examnya
-      await pb.collection('exams').delete(examToDelete.id);
+      if (!useFast) {
+        const questions = await pb.collection('questions').getFullList({
+          filter: `examId = "${examToDelete.id}"`
+        });
+
+        for (const q of questions) {
+          await pb.collection('questions').delete(q.id);
+        }
+
+        await pb.collection('exams').delete(examToDelete.id);
+      } else {
+        setExams(prev => prev.filter(e => e.id !== examToDelete.id));
+        if (examsCache) {
+          examsCache.exams = examsCache.exams.filter(e => e.id !== examToDelete.id);
+        }
+        fetchExams();
+      }
     } catch (error) {
       showAlert("Gagal", "Gagal menghapus bank soal.", "danger");
     } finally {

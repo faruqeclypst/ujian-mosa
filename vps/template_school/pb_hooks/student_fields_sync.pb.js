@@ -99,6 +99,17 @@ onBootstrap((e) => {
                 $app.save(exCol);
                 console.log("[SCHEMA_SYNC] Ensured group_name field in exams collection");
             }
+
+            // Auto-ensure is_mgmp_shared in exams
+            try { db.newQuery("ALTER TABLE exams ADD COLUMN is_mgmp_shared BOOLEAN DEFAULT 0").execute(); } catch (_) {}
+            if (exCol && !exCol.fields.getByName("is_mgmp_shared")) {
+                const bf = new BoolField();
+                bf.name = "is_mgmp_shared";
+                bf.required = false;
+                exCol.fields.add(bf);
+                $app.save(exCol);
+                console.log("[SCHEMA_SYNC] Ensured is_mgmp_shared field in exams collection");
+            }
         } catch (errGroup) {
             // Notice only
         }
