@@ -18,6 +18,15 @@ export default defineConfig({
         changeOrigin: true,
         secure: false, // Tambahkan ini untuk mengabaikan kendala SSL Node
         rewrite: (path) => path.replace(/^\/r2-proxy/, '')
+      },
+      '/api-quiz': {
+        target: 'https://wayground.com',
+        changeOrigin: true,
+        secure: false,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        rewrite: (path) => path.replace(/^\/api-quiz/, '/api/main/quiz')
       }
     }
   }

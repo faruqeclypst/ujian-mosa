@@ -223,6 +223,37 @@ const TopNavigation = () => {
     }
   };
 
+  const userSubtitle = useMemo(() => {
+    if (role === "admin") return user?.email || "Administrator";
+    const t = teachers.find(
+      (item) =>
+        item.id === (user as any)?.teacherId ||
+        item.id === user?.id ||
+        (user?.email && item.email && item.email.toLowerCase() === user.email.toLowerCase()) ||
+        (user?.name && item.name && item.name.toLowerCase() === user.name.toLowerCase())
+    );
+    const rawSubs: any = t?.subjects;
+    if (rawSubs) {
+      let subjectList: string[] = [];
+      if (Array.isArray(rawSubs)) {
+        subjectList = rawSubs;
+      } else if (typeof rawSubs === "string") {
+        try {
+          const parsed = JSON.parse(rawSubs);
+          if (Array.isArray(parsed)) subjectList = parsed;
+          else if (rawSubs.trim()) subjectList = [rawSubs];
+        } catch {
+          if (rawSubs.trim()) subjectList = [rawSubs];
+        }
+      }
+      const valid = subjectList.map((s) => String(s || "").trim()).filter(Boolean);
+      if (valid.length > 0) {
+        return valid.join(", ");
+      }
+    }
+    return user?.email || "";
+  }, [role, teachers, user]);
+
   const resetRequests = useMemo(() => {
     return (students || []).filter((s) => !!s.resetRequested);
   }, [students]);
@@ -654,8 +685,11 @@ const TopNavigation = () => {
                       {role || "admin"}
                     </span>
                   </div>
-                  <p className="truncate text-[11px] font-mono text-neutral-500 dark:text-neutral-400 mt-0.5">
-                    {teachers.find(t => t.id === (user as any)?.teacherId)?.subjects || user?.email || ""}
+                  <p
+                    className="truncate text-[11px] font-mono text-neutral-500 dark:text-neutral-400 mt-0.5"
+                    title={userSubtitle}
+                  >
+                    {userSubtitle}
                   </p>
                 </div>
               </div>

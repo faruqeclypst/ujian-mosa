@@ -1,4 +1,4 @@
-<!-- antislop:start -->
+  <!-- antislop:start -->
 ## antislop
 For UI, copy, people, mobile layout, or code comments work, load the antislop skill for the task:
 - Core filter, always on: `antislop`

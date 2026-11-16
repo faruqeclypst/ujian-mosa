@@ -24,6 +24,7 @@ import {
   Folder,
   Layers,
   Share2,
+  Lightbulb,
 } from "lucide-react";
 import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
@@ -481,36 +482,69 @@ const ExamsPage = () => {
 
   const currentTeacher = useMemo(() => {
     if (!teachers || teachers.length === 0) return null;
-    return teachers.find((t: any) => t.id === teacherId || t.id === user?.id || (user?.email && t.email === user.email));
+    return teachers.find(
+      (t: any) =>
+        (teacherId && t.id === teacherId) ||
+        (user?.id && t.id === user.id) ||
+        ((user as any)?.teacherId && t.id === (user as any).teacherId) ||
+        (user?.email && t.email && t.email.toLowerCase() === user.email.toLowerCase()) ||
+        (user?.name && t.name && t.name.toLowerCase() === user.name.toLowerCase()) ||
+        ((user as any)?.username && t.username && t.username.toLowerCase() === (user as any).username.toLowerCase())
+    );
   }, [teachers, teacherId, user]);
+
+  // Mata Pelajaran yang di-setting oleh Admin untuk Guru ini
+  const teacherAssignedSubjects = useMemo(() => {
+    if (role === "admin") return subjects;
+
+    if (!currentTeacher || !currentTeacher.subjects) {
+      return [];
+    }
+
+    let rawList: string[] = [];
+    if (Array.isArray(currentTeacher.subjects)) {
+      rawList = currentTeacher.subjects;
+    } else if (typeof currentTeacher.subjects === "string") {
+      try {
+        const parsed = JSON.parse(currentTeacher.subjects);
+        if (Array.isArray(parsed)) rawList = parsed;
+        else rawList = [currentTeacher.subjects];
+      } catch {
+        rawList = [currentTeacher.subjects];
+      }
+    }
+
+    if (rawList.length === 0) return [];
+
+    const normalizedAssigned = rawList.map((s: string) => String(s || "").trim().toLowerCase());
+    return subjects.filter((sub: any) => {
+      const subId = String(sub.id || "").toLowerCase();
+      const subName = String(sub.name || "").trim().toLowerCase();
+      return normalizedAssigned.includes(subId) || normalizedAssigned.includes(subName);
+    });
+  }, [role, subjects, currentTeacher]);
 
   const mySubjectIds = useMemo(() => {
     const set = new Set<string>();
-    if (currentTeacher?.subjects && Array.isArray(currentTeacher.subjects)) {
-      currentTeacher.subjects.forEach((s: string) => {
-        if (!s) return;
-        const sTrim = String(s).trim();
-        set.add(sTrim);
-        // Map ke ID jika s adalah Nama, atau map ke Nama jika s adalah ID
-        const matched = subjects.find(
-          (sub: any) => sub.id === sTrim || (sub.name && sub.name.toLowerCase() === sTrim.toLowerCase())
-        );
-        if (matched) {
-          set.add(matched.id);
-          if (matched.name) set.add(matched.name.toLowerCase());
-        }
-      });
-    }
-    exams.forEach(e => {
-      const examTeacherId = e.teacherId || e.teacherid;
-      if ((examTeacherId === teacherId || examTeacherId === user?.id) && e.subjectId) {
-        set.add(e.subjectId);
-        const sub = subjects.find((s: any) => s.id === e.subjectId);
-        if (sub?.name) set.add(sub.name.toLowerCase());
-      }
+    // Hanya ambil dari mapel yang disetting admin untuk guru ini
+    teacherAssignedSubjects.forEach((sub: any) => {
+      if (sub.id) set.add(sub.id);
+      if (sub.name) set.add(sub.name.toLowerCase());
     });
     return Array.from(set);
-  }, [currentTeacher, exams, teacherId, user, subjects]);
+  }, [teacherAssignedSubjects]);
+
+  // Daftar mapel untuk form modal Tambah/Edit (role guru hanya melihat mapel miliknya)
+  const availableSubjectsForForm = useMemo(() => {
+    if (role === "admin") return subjects;
+    const list = [...teacherAssignedSubjects];
+    // Jika sedang mode edit dan bank soal memiliki mapel sebelumnya, sertakan agar tidak hilang
+    if (formValues.subjectId && !list.some((s: any) => s.id === formValues.subjectId)) {
+      const existingSub = subjects.find((s: any) => s.id === formValues.subjectId);
+      if (existingSub) list.unshift(existingSub);
+    }
+    return list;
+  }, [role, subjects, teacherAssignedSubjects, formValues.subjectId]);
 
   // Apakah bank soal ini benar-benar dibuat oleh guru login saat ini
   const isRealOwner = useCallback((exam: any) => {
@@ -1071,9 +1105,12 @@ const ExamsPage = () => {
   const handleCreateClick = () => {
     setDialogMode("create");
     setSelectedExam(null);
+    const defaultSubjectId = (role !== "admin" && teacherAssignedSubjects.length > 0)
+      ? teacherAssignedSubjects[0].id
+      : "";
     setFormValues({
       title: "",
-      subjectId: mySubjectIds[0] || "",
+      subjectId: defaultSubjectId,
       teacherId: role === "admin" ? "" : (teacherId || user?.id || ""),
       examType: "Latihan",
       group_name: "",
@@ -2250,53 +2287,53 @@ const ExamsPage = () => {
                       </NeonFilterField>
                     )}
 
-                  {/* Subject filter */}
-                  <NeonFilterField label={terminology.subject}>
-                    <NeonFilterSelect
-                      value={subjectFilter}
-                      onChange={(e) => setSubjectFilter(e.target.value)}
-                    >
-                      <option value="all">Semua {terminology.subject}</option>
-                      {subjects.map((s: any) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </NeonFilterSelect>
-                  </NeonFilterField>
-
-                  {/* Type filter */}
-                  <NeonFilterField label="Jenis Ujian">
-                    <NeonFilterSelect
-                      value={typeFilter}
-                      onChange={(e) => setTypeFilter(e.target.value)}
-                    >
-                      <option value="all">Semua Jenis Ujian</option>
-                      <option value="Latihan">Latihan Biasa</option>
-                      <option value="Ulangan">Ulangan Harian</option>
-                      <option value="PTS">Ujian Tengah Semester (PTS)</option>
-                      <option value="PAS">Ujian Akhir Semester (PAS / PAT)</option>
-                      <option value="US">Ujian Sekolah (US)</option>
-                      <option value="Tryout">Tryout</option>
-                    </NeonFilterSelect>
-                  </NeonFilterField>
-
-                  {/* Group filter */}
-                  {availableGroups.length > 0 && (
-                    <NeonFilterField label="Group Bank Soal">
+                    {/* Subject filter */}
+                    <NeonFilterField label={terminology.subject}>
                       <NeonFilterSelect
-                        value={groupFilter}
-                        onChange={(e) => setGroupFilter(e.target.value)}
+                        value={subjectFilter}
+                        onChange={(e) => setSubjectFilter(e.target.value)}
                       >
-                        <option value="all">Semua Group</option>
-                        {availableGroups.map((grp) => (
-                          <option key={grp} value={grp}>{grp}</option>
+                        <option value="all">Semua {terminology.subject}</option>
+                        {(role === "admin" ? subjects : teacherAssignedSubjects).map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
-                        <option value="__none__">Tanpa Group</option>
                       </NeonFilterSelect>
                     </NeonFilterField>
-                  )}
-                </NeonFilterPopover>
-              </>
-            }
+
+                    {/* Type filter */}
+                    <NeonFilterField label="Jenis Ujian">
+                      <NeonFilterSelect
+                        value={typeFilter}
+                        onChange={(e) => setTypeFilter(e.target.value)}
+                      >
+                        <option value="all">Semua Jenis Ujian</option>
+                        <option value="Latihan">Latihan Biasa</option>
+                        <option value="Ulangan">Ulangan Harian</option>
+                        <option value="PTS">Ujian Tengah Semester (PTS)</option>
+                        <option value="PAS">Ujian Akhir Semester (PAS / PAT)</option>
+                        <option value="US">Ujian Sekolah (US)</option>
+                        <option value="Tryout">Tryout</option>
+                      </NeonFilterSelect>
+                    </NeonFilterField>
+
+                    {/* Group filter */}
+                    {availableGroups.length > 0 && (
+                      <NeonFilterField label="Group Bank Soal">
+                        <NeonFilterSelect
+                          value={groupFilter}
+                          onChange={(e) => setGroupFilter(e.target.value)}
+                        >
+                          <option value="all">Semua Group</option>
+                          {availableGroups.map((grp) => (
+                            <option key={grp} value={grp}>{grp}</option>
+                          ))}
+                          <option value="__none__">Tanpa Group</option>
+                        </NeonFilterSelect>
+                      </NeonFilterField>
+                    )}
+                  </NeonFilterPopover>
+                </>
+              }
               selectable={true}
               selectedKeys={selectedIds}
               onSelectionChange={setSelectedIds}
@@ -2570,8 +2607,8 @@ const ExamsPage = () => {
           {/* Header Dialog */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 shrink-0 pr-12">
             <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-2xs shrink-0">
-                <BookOpen className="h-4.5 w-4.5" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                <BookOpen className="h-4 w-4" />
               </span>
               <div>
                 <div className="flex items-center gap-2">
@@ -2690,15 +2727,25 @@ const ExamsPage = () => {
                       value={formValues.subjectId}
                       onChange={(e) => setFormValues({ ...formValues, subjectId: e.target.value })}
                       required
-                      className="w-full h-10 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs px-3.5 pr-8 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer transition-all"
+                      disabled={role !== "admin" && availableSubjectsForForm.length === 0}
+                      className="w-full h-10 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs px-3.5 pr-8 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      <option value="">-- Pilih {terminology.subject} --</option>
-                      {subjects.map((s: any) => (
+                      <option value="">
+                        {role !== "admin" && availableSubjectsForForm.length === 0
+                          ? `-- Belum ada ${terminology.subject} yang disetting admin --`
+                          : `-- Pilih ${terminology.subject} --`}
+                      </option>
+                      {availableSubjectsForForm.map((s: any) => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
                   </div>
+                  {role !== "admin" && availableSubjectsForForm.length === 0 && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-tight">
+                      Perhatian: Belum ada {terminology.subject.toLowerCase()} yang diatur Admin untuk akun Anda. Hubungi Admin sekolah untuk menambahkan mata pelajaran.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -2730,8 +2777,8 @@ const ExamsPage = () => {
               {/* Kolaborasi MGMP Se-Mapel Switch */}
               <div className="rounded-xl border border-neutral-200/90 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/40 p-3.5 space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                       <Users className="h-4 w-4" />
                     </span>
                     <div>
@@ -2760,11 +2807,11 @@ const ExamsPage = () => {
               </div>
 
               {/* Tips Callout */}
-              <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 p-3.5 flex items-start gap-2.5 text-xs text-neutral-600 dark:text-neutral-400">
-                <span className="h-5 w-5 rounded-md bg-neutral-200/60 dark:bg-neutral-800 flex items-center justify-center shrink-0 text-neutral-500 mt-0.5">
-                  <FileText className="h-3 w-3" />
+              <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 p-3.5 flex items-start gap-3 text-xs text-neutral-600 dark:text-neutral-400">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                  <Lightbulb className="h-4 w-4" />
                 </span>
-                <div className="leading-relaxed text-[11px]">
+                <div className="leading-relaxed text-[11px] pt-0.5">
                   <span className="font-semibold text-neutral-800 dark:text-neutral-200">Tips:</span> Bank Soal berfungsi sebagai master induk soal CBT. Setelah disimpan, Anda dapat langsung mengimpor dari Word, mengetik manual butir soal, atau menghubungkannya ke Ruang Ujian.
                 </div>
               </div>
@@ -2782,7 +2829,8 @@ const ExamsPage = () => {
               </Button>
               <Button
                 type="submit"
-                className="h-8.5 px-4 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                disabled={role !== "admin" && availableSubjectsForForm.length === 0}
+                className="h-8.5 px-4 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check className="h-3.5 w-3.5" />
                 <span>{dialogMode === "edit" ? "Perbarui Bank Soal" : "Simpan Bank Soal"}</span>
@@ -2822,8 +2870,8 @@ const ExamsPage = () => {
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 shrink-0 pr-12">
             <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-2xs shrink-0">
-                <ClipboardList className="h-4.5 w-4.5" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                <ClipboardList className="h-4 w-4" />
               </span>
               <div>
                 <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
@@ -2916,8 +2964,8 @@ const ExamsPage = () => {
               type="button"
               onClick={handleCopyReport}
               className={`h-8.5 px-4 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${reportCopied
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                  : "bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs"
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                : "bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs"
                 }`}
             >
               {reportCopied ? (
@@ -2942,8 +2990,8 @@ const ExamsPage = () => {
       <Dialog open={batchGroupDialogOpen} onOpenChange={setBatchGroupDialogOpen}>
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] bg-white dark:bg-[#0c0d0e] rounded-2xl overflow-hidden p-0 border border-neutral-200/90 dark:border-neutral-800 shadow-2xl dark:shadow-[0_0_50px_rgba(16,185,129,0.08)]">
           <div className="px-5 py-4 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-[#111214] flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
-              <Folder className="h-4.5 w-4.5" />
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Folder className="h-4 w-4" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">

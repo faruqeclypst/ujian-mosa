@@ -6,6 +6,11 @@ const config: Config = {
   content: ["./index.html", "./src/**/*.{ts,tsx,jsx,js}"],
   theme: {
     extend: {
+      spacing: {
+        "4.5": "1.125rem",
+        "7.5": "1.875rem",
+        "8.5": "2.125rem",
+      },
       fontFamily: {
         sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
         display: ["Outfit", "sans-serif"],
