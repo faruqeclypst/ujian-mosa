@@ -20,6 +20,7 @@ import {
   normalizePlanKey,
   PLAN_PRICING,
   PlanKey,
+  fetchAndApplyPricing,
 } from "../../utils/pricingHelper";
 import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
 import { isTopupInvoice } from "../../utils/subscriptionHelper";
@@ -116,6 +117,7 @@ const POPULAR_BANKS = [
 
 const SchoolInvoicePage = () => {
   const { school, refreshSchool } = useTenant();
+  const [activePricing, setActivePricing] = useState(() => ({ ...PLAN_PRICING }));
   const [banks, setBanks] = useState<{bank_name: string, bank_code: string, account_number: string, account_name: string}[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -174,7 +176,12 @@ const SchoolInvoicePage = () => {
     }
   }, [school]);
 
-  useEffect(() => { loadInvoices(); }, [loadInvoices]);
+  useEffect(() => {
+    fetchAndApplyPricing(masterPb).then((p) => {
+      setActivePricing({ ...p });
+    });
+    loadInvoices();
+  }, [loadInvoices]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -867,7 +874,7 @@ const SchoolInvoicePage = () => {
                     <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200">Pilih Paket Layanan</label>
                     <div className="grid grid-cols-3 gap-2">
                       {(["basic", "pro", "ultimate"] as const).map(planKey => {
-                        const detail = PLAN_PRICING[planKey];
+                        const detail = activePricing[planKey] || PLAN_PRICING[planKey];
                         const p = { key: planKey, label: detail.label.replace("Paket ", ""), note: `Maks. ${detail.quota} Siswa` };
                         const monthly = detail.monthlyRate;
                         return (
@@ -945,7 +952,7 @@ const SchoolInvoicePage = () => {
                     <div>
                       <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Estimasi Tagihan</p>
                       <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
-                        {PLAN_PRICING[selectedPlan as keyof typeof PLAN_PRICING]?.label || selectedPlan} · {selectedDuration} bulan
+                        {(activePricing[selectedPlan as keyof typeof activePricing]?.label || PLAN_PRICING[selectedPlan as keyof typeof PLAN_PRICING]?.label || selectedPlan)} · {selectedDuration} bulan
                       </p>
                     </div>
                     <p className="text-base font-mono font-bold text-emerald-600 dark:text-emerald-400">

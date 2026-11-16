@@ -28,123 +28,94 @@ import { getSchoolDomain, getDomainSuffix } from "../../utils/domainHelper";
 import { SchoolNpsnSearch } from "../../components/common/SchoolNpsnSearch";
 import { formatSchoolAddress, generateSlugFromName } from "../../utils/sekolahApiHelper";
 
-const formatRupiah = (num: number) => {
-  return "Rp " + num.toLocaleString("id-ID");
-};
-
-interface PlanPricingConfig {
-  monthlyRate: number;
-  fixed: {
-    "1 Bulan": { total: string; detail: string };
-    "6 Bulan": { total: string; detail: string };
-    "1 Tahun": { total: string; detail: string };
-  };
-}
-
-const PLAN_RATES: Record<string, PlanPricingConfig> = {
-  basic: {
-    monthlyRate: 380000,
-    fixed: {
-      "1 Bulan": { total: "Rp 380.000", detail: "Tarif bulanan fleksibel" },
-      "6 Bulan": { total: "Rp 2.100.000", detail: "Hemat 12% (1 Semester)" },
-      "1 Tahun": { total: "Rp 3.840.000", detail: "Hemat 20% (12 Bulan)" },
-    },
-  },
-  pro: {
-    monthlyRate: 760000,
-    fixed: {
-      "1 Bulan": { total: "Rp 760.000", detail: "Tarif bulanan fleksibel" },
-      "6 Bulan": { total: "Rp 4.200.000", detail: "Hemat 12% (1 Semester)" },
-      "1 Tahun": { total: "Rp 7.680.000", detail: "Hemat 20% (12 Bulan)" },
-    },
-  },
-  ultimate: {
-    monthlyRate: 1235000,
-    fixed: {
-      "1 Bulan": { total: "Rp 1.235.000", detail: "Tarif bulanan fleksibel" },
-      "6 Bulan": { total: "Rp 6.840.000", detail: "Hemat 12% (1 Semester)" },
-      "1 Tahun": { total: "Rp 12.480.000", detail: "Hemat 20% (12 Bulan)" },
-    },
-  },
-  "Paket Berkembang": {
-    monthlyRate: 380000,
-    fixed: {
-      "1 Bulan": { total: "Rp 380.000", detail: "Tarif bulanan fleksibel" },
-      "6 Bulan": { total: "Rp 2.100.000", detail: "Hemat 12% (1 Semester)" },
-      "1 Tahun": { total: "Rp 3.840.000", detail: "Hemat 20% (12 Bulan)" },
-    },
-  },
-  "Paket Lanjutan": {
-    monthlyRate: 760000,
-    fixed: {
-      "1 Bulan": { total: "Rp 760.000", detail: "Tarif bulanan fleksibel" },
-      "6 Bulan": { total: "Rp 4.200.000", detail: "Hemat 12% (1 Semester)" },
-      "1 Tahun": { total: "Rp 7.680.000", detail: "Hemat 20% (12 Bulan)" },
-    },
-  },
-  "Paket Premium": {
-    monthlyRate: 1235000,
-    fixed: {
-      "1 Bulan": { total: "Rp 1.235.000", detail: "Tarif bulanan fleksibel" },
-      "6 Bulan": { total: "Rp 6.840.000", detail: "Hemat 12% (1 Semester)" },
-      "1 Tahun": { total: "Rp 12.480.000", detail: "Hemat 20% (12 Bulan)" },
-    },
-  },
-};
-
-const PLAN_LABELS: Record<string, string> = {
-  free: "Free Trial",
-  basic: "Paket Berkembang",
-  pro: "Paket Lanjutan",
-  ultimate: "Paket Premium",
-  "Paket Berkembang": "Paket Berkembang",
-  "Paket Lanjutan": "Paket Lanjutan",
-  "Paket Premium": "Paket Premium",
-};
+import {
+  PLAN_PRICING,
+  fetchAndApplyPricing,
+  calculatePlanInvoice,
+  formatRupiah,
+  normalizePlanKey,
+} from "../../utils/pricingHelper";
 
 const getPricingEstimate = (
   planName: string,
   mode: "1 Bulan" | "6 Bulan" | "1 Tahun" | "custom",
-  months: number
+  months: number,
+  pricingData: typeof PLAN_PRICING
 ) => {
-  const plan = PLAN_RATES[planName];
-  if (!plan) return null;
+  const planKey = normalizePlanKey(planName);
+  if (planKey === "free") return null;
+  const detail = pricingData[planKey] || PLAN_PRICING[planKey];
+  if (!detail) return null;
 
-  if (mode !== "custom") {
-    const fixedInfo = plan.fixed[mode];
-    if (fixedInfo) {
-      return {
-        total: fixedInfo.total,
-        period: mode,
-        detail: fixedInfo.detail,
-      };
-    }
+  const baseMonthly = detail.rates[1] || detail.monthlyRate;
+
+  if (mode === "1 Bulan") {
+    return {
+      total: formatRupiah(detail.rates[1] || baseMonthly),
+      period: "1 Bulan",
+      detail: "Tarif bulanan fleksibel",
+    };
   }
 
-  // Jika custom bulan bernilai 6 bulan, harga sama dengan paket 6 bulannya (hemat 12%)
-  if (months === 6) {
+  if (mode === "6 Bulan") {
+    const normal6 = baseMonthly * 6;
+    const diff = normal6 - detail.rates[6];
+    const pct = normal6 > 0 && diff > 0 ? Math.round((diff / normal6) * 100) : 0;
     return {
-      total: plan.fixed["6 Bulan"].total,
+      total: formatRupiah(detail.rates[6]),
       period: "6 Bulan",
-      detail: "Sama dengan tarif Paket 6 Bulan (Hemat 12% / 1 Semester)",
+      detail: pct > 0 ? `Hemat ${pct}% (1 Semester)` : "Paket 1 Semester",
     };
   }
 
-  // Jika custom bulan bernilai 12 bulan, harga sama dengan paket 1 tahun
-  if (months === 12) {
+  if (mode === "1 Tahun") {
+    const normal12 = baseMonthly * 12;
+    const diff = normal12 - detail.rates[12];
+    const pct = normal12 > 0 && diff > 0 ? Math.round((diff / normal12) * 100) : 0;
     return {
-      total: plan.fixed["1 Tahun"].total,
+      total: formatRupiah(detail.rates[12]),
       period: "12 Bulan (1 Tahun)",
-      detail: "Sama dengan tarif Paket 1 Tahun (Hemat 20%)",
+      detail: pct > 0 ? `Hemat ${pct}% (12 Bulan)` : "Paket 1 Tahun",
     };
   }
 
-  // Perhitungan custom bulan: flat sesuai tarif bulanan
-  const totalAmount = plan.monthlyRate * months;
+  // Custom months
+  if (months === 6) {
+    const normal6 = baseMonthly * 6;
+    const diff = normal6 - detail.rates[6];
+    const pct = normal6 > 0 && diff > 0 ? Math.round((diff / normal6) * 100) : 0;
+    return {
+      total: formatRupiah(detail.rates[6]),
+      period: "6 Bulan",
+      detail: pct > 0 ? `Sama dengan tarif Paket 6 Bulan (Hemat ${pct}% / 1 Semester)` : "Sama dengan tarif Paket 6 Bulan",
+    };
+  }
+
+  if (months === 12) {
+    const normal12 = baseMonthly * 12;
+    const diff = normal12 - detail.rates[12];
+    const pct = normal12 > 0 && diff > 0 ? Math.round((diff / normal12) * 100) : 0;
+    return {
+      total: formatRupiah(detail.rates[12]),
+      period: "12 Bulan (1 Tahun)",
+      detail: pct > 0 ? `Sama dengan tarif Paket 1 Tahun (Hemat ${pct}%)` : "Sama dengan tarif Paket 1 Tahun",
+    };
+  }
+
+  const specialRate = detail.rates[months as keyof typeof detail.rates];
+  if (specialRate) {
+    return {
+      total: formatRupiah(specialRate),
+      period: `${months} Bulan`,
+      detail: `${months} × ${formatRupiah(baseMonthly)} / bln (Paket Khusus ${months} Bulan)`,
+    };
+  }
+
+  const totalAmount = baseMonthly * months;
   return {
     total: formatRupiah(totalAmount),
     period: `${months} Bulan`,
-    detail: `${months} × ${formatRupiah(plan.monthlyRate)} / bln (Tarif flat bulanan)`,
+    detail: `${months} × ${formatRupiah(baseMonthly)} / bln (Tarif flat bulanan)`,
   };
 };
 
@@ -154,6 +125,20 @@ const RegisterSchoolPage = () => {
   const [step, setStep] = useState<"form" | "success">("form");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [activePricing, setActivePricing] = useState(() => ({ ...PLAN_PRICING }));
+
+  useEffect(() => {
+    fetchAndApplyPricing(masterPb).then((p) => {
+      setActivePricing({ ...p });
+    });
+  }, []);
+
+  const getPlanLabel = (plan: string) => {
+    const k = normalizePlanKey(plan);
+    if (k === "free") return "Free Trial";
+    return activePricing[k]?.label || (k === "basic" ? "Paket Berkembang" : k === "pro" ? "Paket Lanjutan" : "Paket Premium");
+  };
 
   const [durationMode, setDurationMode] = useState<"1 Bulan" | "6 Bulan" | "1 Tahun" | "custom">("1 Tahun");
   const [customMonths, setCustomMonths] = useState<number>(2);
@@ -298,7 +283,7 @@ const RegisterSchoolPage = () => {
     }
   };
 
-  const pricingEstimate = getPricingEstimate(form.plan, durationMode, customMonths);
+  const pricingEstimate = getPricingEstimate(form.plan, durationMode, customMonths, activePricing);
 
   // SUCCESS STATE
   if (step === "success") {
@@ -339,7 +324,7 @@ const RegisterSchoolPage = () => {
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Paket & Durasi</p>
               <div className="flex items-center gap-1.5 text-slate-800 font-bold text-xs truncate">
                 <Clock size={13} className="shrink-0 text-blue-600" />
-                <span className="truncate">{isTrial ? "Free Trial (14 Hari)" : `${PLAN_LABELS[form.plan] || form.plan} (${form.duration})`}</span>
+                <span className="truncate">{isTrial ? "Free Trial (14 Hari)" : `${getPlanLabel(form.plan)} (${form.duration})`}</span>
               </div>
             </div>
             <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 text-left col-span-2">
@@ -497,9 +482,9 @@ const RegisterSchoolPage = () => {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
                     {[
                       { key: "free", name: "Free Trial", quota: "50 Siswa", subtitle: "Uji Coba 14 Hari", icon: Clock, color: "emerald", isTrial: true },
-                      { key: "basic", name: "Paket Berkembang", quota: "250 Siswa", subtitle: "Sekolah Standar", icon: Zap, color: "blue", isTrial: false },
-                      { key: "pro", name: "Paket Lanjutan", quota: "500 Siswa", subtitle: "Sekolah Menengah", icon: ShieldCheck, color: "amber", isTrial: false },
-                      { key: "ultimate", name: "Paket Premium", quota: "1000 Siswa", subtitle: "Sekolah Besar", icon: Sparkles, color: "purple", isTrial: false },
+                      { key: "basic", name: activePricing.basic.label || "Paket Berkembang", quota: `Maks. ${activePricing.basic.quota} Siswa`, subtitle: "Sekolah Standar", icon: Zap, color: "blue", isTrial: false },
+                      { key: "pro", name: activePricing.pro.label || "Paket Lanjutan", quota: `Maks. ${activePricing.pro.quota} Siswa`, subtitle: "Sekolah Menengah", icon: ShieldCheck, color: "amber", isTrial: false },
+                      { key: "ultimate", name: activePricing.ultimate.label || "Paket Premium", quota: `Maks. ${activePricing.ultimate.quota} Siswa`, subtitle: "Sekolah Besar", icon: Sparkles, color: "purple", isTrial: false },
                     ].map((p) => {
                       const isSelected = form.plan === p.key;
                       return (
@@ -550,42 +535,51 @@ const RegisterSchoolPage = () => {
 
                       {/* 4 Duration Buttons: 1 Bulan, 6 Bulan, 1 Tahun, Custom Bulan */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                        {[
-                          { label: "1 Bulan", mode: "1 Bulan" as const, sub: "Fleksibel" },
-                          { label: "6 Bulan", mode: "6 Bulan" as const, sub: "1 Semester", badge: "Hemat 12%" },
-                          { label: "1 Tahun", mode: "1 Tahun" as const, sub: "12 Bulan", badge: "Disarankan" },
-                          { label: "Custom Bulan", mode: "custom" as const, sub: "Atur Sendiri", badge: "Kustom" },
-                        ].map((d) => {
-                          const isSelected = durationMode === d.mode;
-                          return (
-                            <button
-                              key={d.mode}
-                              type="button"
-                              onClick={() => handleDurationSelect(d.mode)}
-                              className={cn(
-                                "p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center relative cursor-pointer min-h-[66px]",
-                                isSelected
-                                  ? "bg-blue-50 border-blue-600 text-blue-700 ring-2 ring-blue-600/20 shadow-xs"
-                                  : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50"
-                              )}
-                            >
-                              {d.badge && (
-                                <span className={cn(
-                                  "text-[8px] font-black uppercase tracking-wider mb-1 px-1.5 py-0.5 rounded",
-                                  d.mode === "1 Tahun"
-                                    ? "bg-blue-100 text-blue-700"
-                                    : d.mode === "6 Bulan"
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-amber-100 text-amber-800"
-                                )}>
-                                  {d.badge}
-                                </span>
-                              )}
-                              <span className="text-xs font-extrabold">{d.label}</span>
-                              <span className="text-[10px] font-medium text-slate-400 mt-0.5">{d.sub}</span>
-                            </button>
-                          );
-                        })}
+                        {(() => {
+                          const curPlan = activePricing[normalizePlanKey(form.plan)] || activePricing.basic;
+                          const baseRate = curPlan.rates[1] || curPlan.monthlyRate || 0;
+                          const s6Rate = curPlan.rates[6] || 0;
+                          const s12Rate = curPlan.rates[12] || 0;
+                          const semDisc = baseRate > 0 && s6Rate < baseRate * 6 ? Math.round(((baseRate * 6 - s6Rate) / (baseRate * 6)) * 100) : 0;
+                          const yearDisc = baseRate > 0 && s12Rate < baseRate * 12 ? Math.round(((baseRate * 12 - s12Rate) / (baseRate * 12)) * 100) : 0;
+
+                          return [
+                            { label: "1 Bulan", mode: "1 Bulan" as const, sub: "Fleksibel" },
+                            { label: "6 Bulan", mode: "6 Bulan" as const, sub: "1 Semester", badge: semDisc > 0 ? `Hemat ${semDisc}%` : undefined },
+                            { label: "1 Tahun", mode: "1 Tahun" as const, sub: "12 Bulan", badge: yearDisc > 0 ? `Hemat ${yearDisc}%` : "Disarankan" },
+                            { label: "Custom Bulan", mode: "custom" as const, sub: "Atur Sendiri", badge: "Kustom" },
+                          ].map((d) => {
+                            const isSelected = durationMode === d.mode;
+                            return (
+                              <button
+                                key={d.mode}
+                                type="button"
+                                onClick={() => handleDurationSelect(d.mode)}
+                                className={cn(
+                                  "p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center relative cursor-pointer min-h-[66px]",
+                                  isSelected
+                                    ? "bg-blue-50 border-blue-600 text-blue-700 ring-2 ring-blue-600/20 shadow-xs"
+                                    : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50"
+                                )}
+                              >
+                                {d.badge && (
+                                  <span className={cn(
+                                    "text-[8px] font-black uppercase tracking-wider mb-1 px-1.5 py-0.5 rounded",
+                                    d.mode === "1 Tahun"
+                                      ? "bg-blue-100 text-blue-700"
+                                      : d.mode === "6 Bulan"
+                                        ? "bg-emerald-100 text-emerald-700"
+                                        : "bg-amber-100 text-amber-800"
+                                  )}>
+                                    {d.badge}
+                                  </span>
+                                )}
+                                <span className="text-xs font-extrabold">{d.label}</span>
+                                <span className="text-[10px] font-medium text-slate-400 mt-0.5">{d.sub}</span>
+                              </button>
+                            );
+                          });
+                        })()}
                       </div>
 
                       {/* Box Custom Bulan */}
@@ -598,7 +592,7 @@ const RegisterSchoolPage = () => {
                                 <span className="text-xs font-bold text-slate-900">Atur Durasi Kustom</span>
                               </div>
                               <p className="text-[11px] text-slate-500 mt-0.5">
-                                Tarif flat bulanan {PLAN_LABELS[form.plan] || form.plan} (khusus durasi 6 bulan otomatis menggunakan harga hemat semester).
+                                Tarif flat bulanan {getPlanLabel(form.plan)} (khusus durasi 6 bulan otomatis menggunakan harga hemat semester).
                               </p>
                             </div>
 

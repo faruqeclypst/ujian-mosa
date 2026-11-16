@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { UserCircle, KeyRound, Save, CheckCircle, AlertCircle, Shield, Smartphone, Cloud, RefreshCw, Database, Server, Check, Landmark, Sparkles } from "lucide-react";
+import { UserCircle, KeyRound, Save, CheckCircle, AlertCircle, Shield, Smartphone, Cloud, RefreshCw, Database, Server, Check, Landmark, Sparkles, Tag } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
 import { BankAccountsSettings } from "../../components/admin/BankAccountsSettings";
+import { PricingSettings } from "../../components/admin/PricingSettings";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
 import { APP_VERSION, APP_DISPLAY_VERSION, APP_BUILD_CODE } from "../../utils/version";
 
-type Section = "profile" | "password" | "apk" | "media" | "bank";
+type Section = "profile" | "password" | "pricing" | "bank" | "apk" | "media";
 
 const SuperAdminSettingsPage = () => {
   const navigate = useNavigate();
@@ -195,6 +196,7 @@ const SuperAdminSettingsPage = () => {
   const sideNavItems: { key: Section; label: string; icon: any }[] = [
     { key: "profile", label: "Profil Pribadi", icon: UserCircle },
     { key: "password", label: "Ganti Kata Sandi", icon: KeyRound },
+    { key: "pricing", label: "Tarif & Paket Layanan", icon: Tag },
     { key: "bank", label: "Rekening Bank", icon: Landmark },
     { key: "apk", label: "Versi APK Siswa", icon: Smartphone },
     { key: "media", label: "Penyimpanan Media", icon: Cloud },
@@ -598,6 +600,11 @@ const SuperAdminSettingsPage = () => {
                 </div>
               </form>
             </div>
+          )}
+
+          {/* Pricing Plans Section */}
+          {activeSection === "pricing" && (
+            <PricingSettings />
           )}
 
           {/* Bank Accounts Section */}

@@ -15,6 +15,7 @@ import {
   normalizePlanKey,
   PLAN_PRICING,
   PlanKey,
+  fetchAndApplyPricing,
 } from "../../utils/pricingHelper";
 import { upgradeSchoolFromInvoice, calculateTopup, isTopupInvoice } from "../../utils/subscriptionHelper";
 import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
@@ -340,6 +341,7 @@ const SuperAdminInvoicePage = () => {
       } catch (err) {
         console.warn("Sesi superadmin belum bisa diperbarui:", err);
       }
+      await fetchAndApplyPricing(masterPb);
       await loadSchools();
       await migrateLocalInvoices();
       await loadInvoices();

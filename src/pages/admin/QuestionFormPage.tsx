@@ -2767,11 +2767,20 @@ const QuestionFormPage = () => {
     const set = new Set<string>();
     if (currentTeacher?.subjects && Array.isArray(currentTeacher.subjects)) {
       currentTeacher.subjects.forEach((s: string) => {
-        if (s) set.add(s);
+        if (!s) return;
+        const sTrim = String(s).trim();
+        set.add(sTrim);
+        const matched = subjects.find(
+          (sub: any) => sub.id === sTrim || (sub.name && sub.name.toLowerCase() === sTrim.toLowerCase())
+        );
+        if (matched) {
+          set.add(matched.id);
+          if (matched.name) set.add(matched.name.toLowerCase());
+        }
       });
     }
     return Array.from(set);
-  }, [currentTeacher]);
+  }, [currentTeacher, subjects]);
 
   const isOwner = useMemo(() => {
     if (role === "admin") return true;
@@ -2784,8 +2793,9 @@ const QuestionFormPage = () => {
 
   const isMgmpExam = useMemo(() => {
     if (!exam || !exam.subjectId || isOwner) return false;
-    return mySubjectIds.includes(exam.subjectId);
-  }, [exam, isOwner, mySubjectIds]);
+    const subName = (exam.subjectName || exam.subject || subjects.find((s: any) => s.id === exam.subjectId)?.name || "").toLowerCase();
+    return mySubjectIds.includes(exam.subjectId) || (Boolean(subName) && mySubjectIds.includes(subName));
+  }, [exam, isOwner, mySubjectIds, subjects]);
 
   const canEdit = useMemo(() => {
     if (isOwner) return true;

@@ -1,7 +1,7 @@
 // ============================================================
 // Sumber Tunggal Kebenaran (Single Source of Truth)
 // Harga Paket, Kuota Siswa, dan Kalkulasi Invoice EXAMKU
-// Sesuai dengan harga yang tertera di Landing Page & Pendaftaran
+// Mendukung konfigurasi tarif dinamis dari Master PocketBase (app_settings)
 // ============================================================
 
 export type PlanKey = "free" | "basic" | "pro" | "ultimate";
@@ -21,7 +21,7 @@ export interface PlanPricingDetail {
   };
 }
 
-export const PLAN_PRICING: Record<PlanKey, PlanPricingDetail> = {
+export const DEFAULT_PLAN_PRICING: Record<PlanKey, PlanPricingDetail> = {
   free: {
     key: "free",
     label: "Free Trial",
@@ -41,13 +41,13 @@ export const PLAN_PRICING: Record<PlanKey, PlanPricingDetail> = {
     label: "Paket Berkembang",
     name: "Paket Berkembang (250 Siswa)",
     quota: 250,
-    monthlyRate: 380000,
+    monthlyRate: 500000,
     rates: {
-      1: 380000,
-      2: 760000,
-      3: 1140000,
-      6: 2100000,
-      12: 3840000,
+      1: 500000,
+      2: 1000000,
+      3: 1500000,
+      6: 2750000,
+      12: 5000000,
     },
   },
   pro: {
@@ -55,13 +55,13 @@ export const PLAN_PRICING: Record<PlanKey, PlanPricingDetail> = {
     label: "Paket Lanjutan",
     name: "Paket Lanjutan (500 Siswa)",
     quota: 500,
-    monthlyRate: 760000,
+    monthlyRate: 850000,
     rates: {
-      1: 760000,
-      2: 1520000,
-      3: 2280000,
-      6: 4200000,
-      12: 7680000,
+      1: 850000,
+      2: 1700000,
+      3: 2550000,
+      6: 4680000,
+      12: 8500000,
     },
   },
   ultimate: {
@@ -69,15 +69,84 @@ export const PLAN_PRICING: Record<PlanKey, PlanPricingDetail> = {
     label: "Paket Premium",
     name: "Paket Premium (1000 Siswa)",
     quota: 1000,
-    monthlyRate: 1235000,
+    monthlyRate: 1500000,
     rates: {
-      1: 1235000,
-      2: 2470000,
-      3: 3705000,
-      6: 6840000,
-      12: 12480000,
+      1: 1500000,
+      2: 3000000,
+      3: 4500000,
+      6: 8250000,
+      12: 15000000,
     },
   },
+};
+
+const PRICING_STORAGE_KEY = "examku_custom_pricing";
+
+const getInitialPricing = (): Record<PlanKey, PlanPricingDetail> => {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const raw = localStorage.getItem(PRICING_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && parsed.basic && parsed.pro && parsed.ultimate) {
+          return {
+            free: DEFAULT_PLAN_PRICING.free,
+            basic: { ...DEFAULT_PLAN_PRICING.basic, ...parsed.basic },
+            pro: { ...DEFAULT_PLAN_PRICING.pro, ...parsed.pro },
+            ultimate: { ...DEFAULT_PLAN_PRICING.ultimate, ...parsed.ultimate },
+          };
+        }
+      }
+    }
+  } catch {}
+  return JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICING));
+};
+
+export const PLAN_PRICING: Record<PlanKey, PlanPricingDetail> = getInitialPricing();
+
+export const applyDynamicPricing = (customPlans?: any): Record<PlanKey, PlanPricingDetail> => {
+  if (!customPlans || typeof customPlans !== "object") {
+    Object.assign(PLAN_PRICING, JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICING)));
+    try {
+      if (typeof window !== "undefined") localStorage.removeItem(PRICING_STORAGE_KEY);
+    } catch {}
+    return PLAN_PRICING;
+  }
+
+  const updated: Record<PlanKey, PlanPricingDetail> = {
+    free: DEFAULT_PLAN_PRICING.free,
+    basic: { ...DEFAULT_PLAN_PRICING.basic, ...(customPlans.basic || {}) },
+    pro: { ...DEFAULT_PLAN_PRICING.pro, ...(customPlans.pro || {}) },
+    ultimate: { ...DEFAULT_PLAN_PRICING.ultimate, ...(customPlans.ultimate || {}) },
+  };
+
+  // Mutasi in-place agar referensi impor di seluruh modul langsung terbarui
+  Object.assign(PLAN_PRICING, updated);
+
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify(updated));
+    }
+  } catch {}
+
+  return PLAN_PRICING;
+};
+
+export const fetchAndApplyPricing = async (masterPbInstance: any): Promise<Record<PlanKey, PlanPricingDetail>> => {
+  if (!masterPbInstance) return PLAN_PRICING;
+  try {
+    const records = await masterPbInstance.collection("app_settings").getFullList({ limit: 1 });
+    if (records.length > 0 && records[0].pricing_plans) {
+      let plans = records[0].pricing_plans;
+      if (typeof plans === "string") {
+        try { plans = JSON.parse(plans); } catch {}
+      }
+      return applyDynamicPricing(plans);
+    }
+  } catch (err) {
+    console.warn("Gagal fetch pricing dari app_settings Master PB:", err);
+  }
+  return PLAN_PRICING;
 };
 
 export const normalizePlanKey = (raw?: string): PlanKey => {
@@ -93,16 +162,12 @@ export const normalizePlanKey = (raw?: string): PlanKey => {
 // Aturan durasi langganan EXAMKU: bulan kalender (standar SaaS).
 // 1 bulan = 1 bulan kalender (mis. 8 Okt -> 8 Nov),
 // 12 bulan (1 tahun) = 12 bulan kalender penuh, tanggal ke tanggal.
-// Keamanan data tidak bergantung pada satuan ini: migrasi darurat
-// H-3 + backup harian melindungi data apa pun periodenya.
 // ============================================================
 export const addBillingPeriod = (from: Date, months: number): Date => {
   const m = Math.max(1, Math.round(Number(months) || 1));
   const d = new Date(from);
   const day = d.getDate();
   d.setMonth(d.getMonth() + m);
-  // Jepit ke akhir bulan bila tanggal asal tak ada di bulan tujuan
-  // (mis. 31 Jan + 1 bulan -> 28/29 Feb, bukan 2/3 Mar) — standar SaaS.
   if (d.getDate() < day) {
     d.setDate(0);
   }
@@ -125,7 +190,7 @@ export const calculatePlanInvoice = (plan: string, durationMonths: number = 1): 
   quota: number;
 } => {
   const planKey = normalizePlanKey(plan);
-  const detail = PLAN_PRICING[planKey];
+  const detail = PLAN_PRICING[planKey] || DEFAULT_PLAN_PRICING[planKey];
   const months = Math.max(1, Math.round(Number(durationMonths) || 1));
 
   if (planKey === "free") {

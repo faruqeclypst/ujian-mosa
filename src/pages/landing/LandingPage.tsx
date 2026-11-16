@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { fadeUp } from "../../lib/motion";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { getDomainSuffix } from "../../utils/domainHelper";
+import { masterPb } from "../../lib/pocketbase";
+import { PLAN_PRICING, fetchAndApplyPricing } from "../../utils/pricingHelper";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -21,6 +23,27 @@ const LandingPage = () => {
   const [faqSearchQuery, setFaqSearchQuery] = useState<string>("");
   const [showAllFaqs, setShowAllFaqs] = useState(false);
   const [billingCycle, setBillingCycle] = useState<"1bulan" | "2bulan" | "3bulan" | "semester" | "tahunan">("1bulan");
+  const [activePricing, setActivePricing] = useState(() => ({ ...PLAN_PRICING }));
+
+  useEffect(() => {
+    fetchAndApplyPricing(masterPb).then((p) => {
+      setActivePricing({ ...p });
+    });
+  }, []);
+
+  const semesterDiscountPct = useMemo(() => {
+    const base = activePricing.basic.rates[1] || activePricing.basic.monthlyRate || 0;
+    const s6 = activePricing.basic.rates[6] || 0;
+    const normal = base * 6;
+    return normal > 0 && s6 < normal ? Math.round(((normal - s6) / normal) * 100) : 12;
+  }, [activePricing]);
+
+  const yearDiscountPct = useMemo(() => {
+    const base = activePricing.basic.rates[1] || activePricing.basic.monthlyRate || 0;
+    const s12 = activePricing.basic.rates[12] || 0;
+    const normal = base * 12;
+    return normal > 0 && s12 < normal ? Math.round(((normal - s12) / normal) * 100) : 20;
+  }, [activePricing]);
 
   // Interactive Gallery State
   const [activeSlide, setActiveSlide] = useState(0);
@@ -266,164 +289,198 @@ const LandingPage = () => {
     }
   ];
 
-  const plans = [
-    {
-      name: "Paket Berkembang",
-      quota: "Maks. 250 Siswa",
-      desc: "Pilihan pas untuk SD, SMP, & bimbingan belajar",
-      highlight: false,
-      cta: "Pilih Paket Berkembang",
-      pricing: {
-        "1bulan": {
-          price: "380.000",
-          oldPrice: "400.000",
-          period: "/ bulan",
-          discountBadge: "1 Bulan",
-          subtext: "Dibayar bulanan fleksibel"
+  const plans = useMemo(() => {
+    const formatNumber = (num: number) => num.toLocaleString("id-ID");
+
+    return [
+      {
+        name: activePricing.basic.label || "Paket Berkembang",
+        quota: `Maks. ${activePricing.basic.quota} Siswa`,
+        desc: "Pilihan pas untuk SD, SMP, & bimbingan belajar",
+        highlight: false,
+        cta: `Pilih ${activePricing.basic.label || "Paket Berkembang"}`,
+        pricing: {
+          "1bulan": {
+            price: formatNumber(activePricing.basic.rates[1] || activePricing.basic.monthlyRate),
+            oldPrice: formatNumber(Math.round(((activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 1.05) / 10000) * 10000),
+            period: "/ bulan",
+            discountBadge: "1 Bulan",
+            subtext: "Dibayar bulanan fleksibel",
+          },
+          "2bulan": {
+            price: formatNumber(activePricing.basic.rates[2] || (activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 2),
+            oldPrice: formatNumber(Math.round(((activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 2 * 1.05) / 10000) * 10000),
+            period: "/ 2 bulan",
+            discountBadge: "Kustom 2 Bulan",
+            subtext: `2 × Rp ${formatNumber(activePricing.basic.rates[1] || activePricing.basic.monthlyRate)} / bulan`,
+          },
+          "3bulan": {
+            price: formatNumber(activePricing.basic.rates[3] || (activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 3),
+            oldPrice: formatNumber(Math.round(((activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 3 * 1.05) / 10000) * 10000),
+            period: "/ 3 bulan",
+            discountBadge: "Kustom 3 Bulan",
+            subtext: `3 × Rp ${formatNumber(activePricing.basic.rates[1] || activePricing.basic.monthlyRate)} / bulan`,
+          },
+          semester: {
+            price: formatNumber(activePricing.basic.rates[6]),
+            oldPrice: formatNumber((activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 6),
+            period: "/ 6 bulan",
+            discountBadge: (() => {
+              const normal = (activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 6;
+              const diff = normal - activePricing.basic.rates[6];
+              const pct = normal > 0 && diff > 0 ? Math.round((diff / normal) * 100) : 0;
+              return pct > 0 ? `Hemat ${pct}%` : "1 Semester";
+            })(),
+            subtext: `Setara Rp ${formatNumber(Math.round(activePricing.basic.rates[6] / 6))} / bulan`,
+          },
+          tahunan: {
+            price: formatNumber(activePricing.basic.rates[12]),
+            oldPrice: formatNumber((activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 12),
+            period: "/ tahun",
+            discountBadge: (() => {
+              const normal = (activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 12;
+              const diff = normal - activePricing.basic.rates[12];
+              const pct = normal > 0 && diff > 0 ? Math.round((diff / normal) * 100) : 0;
+              return pct > 0 ? `Hemat ${pct}%` : "12 Bulan";
+            })(),
+            subtext: `Setara Rp ${formatNumber(Math.round(activePricing.basic.rates[12] / 12))} / bulan`,
+          },
         },
-        "2bulan": {
-          price: "760.000",
-          oldPrice: "800.000",
-          period: "/ 2 bulan",
-          discountBadge: "Kustom 2 Bulan",
-          subtext: "2 × Rp 380.000 / bulan"
-        },
-        "3bulan": {
-          price: "1.140.000",
-          oldPrice: "1.200.000",
-          period: "/ 3 bulan",
-          discountBadge: "Kustom 3 Bulan",
-          subtext: "3 × Rp 380.000 / bulan"
-        },
-        semester: {
-          price: "2.100.000",
-          oldPrice: "2.400.000",
-          period: "/ 6 bulan",
-          discountBadge: "Hemat 12%",
-          subtext: "Setara Rp 350.000 / bulan"
-        },
-        tahunan: {
-          price: "3.840.000",
-          oldPrice: "4.800.000",
-          period: "/ tahun",
-          discountBadge: "Hemat 20%",
-          subtext: "Setara Rp 320.000 / bulan"
-        }
+        features: [
+          "Akses Jaringan CDN & Ujian Anti-Lag",
+          "APK Kiosk & Alarm HP Berbunyi Otomatis",
+          "8 Tipe Soal Ujian Lengkap",
+          "Import Word, Excel & Generator AI",
+          "Papan Pantau Pengawas Real-Time",
+          "Pendampingan Teknis via WhatsApp",
+        ],
       },
-      features: [
-        "Akses Jaringan CDN & Ujian Anti-Lag",
-        "APK Kiosk & Alarm HP Berbunyi Otomatis",
-        "8 Tipe Soal Ujian Lengkap",
-        "Import Word, Excel & Generator AI",
-        "Papan Pantau Pengawas Real-Time",
-        "Pendampingan Teknis via WhatsApp"
-      ],
-    },
-    {
-      name: "Paket Lanjutan",
-      quota: "Maks. 500 Siswa",
-      desc: "Standar favorit untuk SMP & SMA/SMK",
-      highlight: true,
-      cta: "Pilih Paket Lanjutan",
-      pricing: {
-        "1bulan": {
-          price: "760.000",
-          oldPrice: "800.000",
-          period: "/ bulan",
-          discountBadge: "1 Bulan",
-          subtext: "Dibayar bulanan fleksibel"
+      {
+        name: activePricing.pro.label || "Paket Lanjutan",
+        quota: `Maks. ${activePricing.pro.quota} Siswa`,
+        desc: "Standar favorit untuk SMP & SMA/SMK",
+        highlight: true,
+        cta: `Pilih ${activePricing.pro.label || "Paket Lanjutan"}`,
+        pricing: {
+          "1bulan": {
+            price: formatNumber(activePricing.pro.rates[1] || activePricing.pro.monthlyRate),
+            oldPrice: formatNumber(Math.round(((activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 1.05) / 10000) * 10000),
+            period: "/ bulan",
+            discountBadge: "1 Bulan",
+            subtext: "Dibayar bulanan fleksibel",
+          },
+          "2bulan": {
+            price: formatNumber(activePricing.pro.rates[2] || (activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 2),
+            oldPrice: formatNumber(Math.round(((activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 2 * 1.05) / 10000) * 10000),
+            period: "/ 2 bulan",
+            discountBadge: "Kustom 2 Bulan",
+            subtext: `2 × Rp ${formatNumber(activePricing.pro.rates[1] || activePricing.pro.monthlyRate)} / bulan`,
+          },
+          "3bulan": {
+            price: formatNumber(activePricing.pro.rates[3] || (activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 3),
+            oldPrice: formatNumber(Math.round(((activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 3 * 1.05) / 10000) * 10000),
+            period: "/ 3 bulan",
+            discountBadge: "Kustom 3 Bulan",
+            subtext: `3 × Rp ${formatNumber(activePricing.pro.rates[1] || activePricing.pro.monthlyRate)} / bulan`,
+          },
+          semester: {
+            price: formatNumber(activePricing.pro.rates[6]),
+            oldPrice: formatNumber((activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 6),
+            period: "/ 6 bulan",
+            discountBadge: (() => {
+              const normal = (activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 6;
+              const diff = normal - activePricing.pro.rates[6];
+              const pct = normal > 0 && diff > 0 ? Math.round((diff / normal) * 100) : 0;
+              return pct > 0 ? `Hemat ${pct}%` : "1 Semester";
+            })(),
+            subtext: `Setara Rp ${formatNumber(Math.round(activePricing.pro.rates[6] / 6))} / bulan`,
+          },
+          tahunan: {
+            price: formatNumber(activePricing.pro.rates[12]),
+            oldPrice: formatNumber((activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 12),
+            period: "/ tahun",
+            discountBadge: (() => {
+              const normal = (activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 12;
+              const diff = normal - activePricing.pro.rates[12];
+              const pct = normal > 0 && diff > 0 ? Math.round((diff / normal) * 100) : 0;
+              return pct > 0 ? `Hemat ${pct}%` : "12 Bulan";
+            })(),
+            subtext: `Setara Rp ${formatNumber(Math.round(activePricing.pro.rates[12] / 12))} / bulan`,
+          },
         },
-        "2bulan": {
-          price: "1.520.000",
-          oldPrice: "1.600.000",
-          period: "/ 2 bulan",
-          discountBadge: "Kustom 2 Bulan",
-          subtext: "2 × Rp 760.000 / bulan"
-        },
-        "3bulan": {
-          price: "2.280.000",
-          oldPrice: "2.400.000",
-          period: "/ 3 bulan",
-          discountBadge: "Kustom 3 Bulan",
-          subtext: "3 × Rp 760.000 / bulan"
-        },
-        semester: {
-          price: "4.200.000",
-          oldPrice: "4.800.000",
-          period: "/ 6 bulan",
-          discountBadge: "Hemat 12%",
-          subtext: "Setara Rp 700.000 / bulan"
-        },
-        tahunan: {
-          price: "7.680.000",
-          oldPrice: "9.600.000",
-          period: "/ tahun",
-          discountBadge: "Hemat 20%",
-          subtext: "Setara Rp 640.000 / bulan"
-        }
+        features: [
+          "Semua fitur di Paket Berkembang",
+          "Kapasitas 500 Siswa Serentak",
+          "Server Prioritas Anti-Lag",
+          "Subdomain Resmi (sekolah.examku.my.id)",
+          "Analisis Butir Soal & Ekspor Nilai",
+          "Sesi Panduan Guru & Admin via Zoom",
+        ],
       },
-      features: [
-        "Semua fitur di Paket Berkembang",
-        "Kapasitas 500 Siswa Serentak",
-        "Server Prioritas Anti-Lag",
-        "Subdomain Resmi (sekolah.examku.my.id)",
-        "Analisis Butir Soal & Ekspor Nilai",
-        "Sesi Panduan Guru & Admin via Zoom"
-      ],
-    },
-    {
-      name: "Paket Premium",
-      quota: "Maks. 1.000 Siswa",
-      desc: "Untuk sekolah besar, yayasan, & perguruan tinggi",
-      highlight: false,
-      cta: "Pilih Paket Premium",
-      pricing: {
-        "1bulan": {
-          price: "1.235.000",
-          oldPrice: "1.300.000",
-          period: "/ bulan",
-          discountBadge: "1 Bulan",
-          subtext: "Dibayar bulanan fleksibel"
+      {
+        name: activePricing.ultimate.label || "Paket Premium",
+        quota: `Maks. ${activePricing.ultimate.quota} Siswa`,
+        desc: "Untuk sekolah besar, yayasan, & perguruan tinggi",
+        highlight: false,
+        cta: `Pilih ${activePricing.ultimate.label || "Paket Premium"}`,
+        pricing: {
+          "1bulan": {
+            price: formatNumber(activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate),
+            oldPrice: formatNumber(Math.round(((activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 1.05) / 10000) * 10000),
+            period: "/ bulan",
+            discountBadge: "1 Bulan",
+            subtext: "Dibayar bulanan fleksibel",
+          },
+          "2bulan": {
+            price: formatNumber(activePricing.ultimate.rates[2] || (activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 2),
+            oldPrice: formatNumber(Math.round(((activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 2 * 1.05) / 10000) * 10000),
+            period: "/ 2 bulan",
+            discountBadge: "Kustom 2 Bulan",
+            subtext: `2 × Rp ${formatNumber(activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate)} / bulan`,
+          },
+          "3bulan": {
+            price: formatNumber(activePricing.ultimate.rates[3] || (activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 3),
+            oldPrice: formatNumber(Math.round(((activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 3 * 1.05) / 10000) * 10000),
+            period: "/ 3 bulan",
+            discountBadge: "Kustom 3 Bulan",
+            subtext: `3 × Rp ${formatNumber(activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate)} / bulan`,
+          },
+          semester: {
+            price: formatNumber(activePricing.ultimate.rates[6]),
+            oldPrice: formatNumber((activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 6),
+            period: "/ 6 bulan",
+            discountBadge: (() => {
+              const normal = (activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 6;
+              const diff = normal - activePricing.ultimate.rates[6];
+              const pct = normal > 0 && diff > 0 ? Math.round((diff / normal) * 100) : 0;
+              return pct > 0 ? `Hemat ${pct}%` : "1 Semester";
+            })(),
+            subtext: `Setara Rp ${formatNumber(Math.round(activePricing.ultimate.rates[6] / 6))} / bulan`,
+          },
+          tahunan: {
+            price: formatNumber(activePricing.ultimate.rates[12]),
+            oldPrice: formatNumber((activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 12),
+            period: "/ tahun",
+            discountBadge: (() => {
+              const normal = (activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 12;
+              const diff = normal - activePricing.ultimate.rates[12];
+              const pct = normal > 0 && diff > 0 ? Math.round((diff / normal) * 100) : 0;
+              return pct > 0 ? `Hemat ${pct}%` : "12 Bulan";
+            })(),
+            subtext: `Setara Rp ${formatNumber(Math.round(activePricing.ultimate.rates[12] / 12))} / bulan`,
+          },
         },
-        "2bulan": {
-          price: "2.470.000",
-          oldPrice: "2.600.000",
-          period: "/ 2 bulan",
-          discountBadge: "Kustom 2 Bulan",
-          subtext: "2 × Rp 1.235.000 / bulan"
-        },
-        "3bulan": {
-          price: "3.705.000",
-          oldPrice: "3.900.000",
-          period: "/ 3 bulan",
-          discountBadge: "Kustom 3 Bulan",
-          subtext: "3 × Rp 1.235.000 / bulan"
-        },
-        semester: {
-          price: "6.840.000",
-          oldPrice: "7.800.000",
-          period: "/ 6 bulan",
-          discountBadge: "Hemat 12%",
-          subtext: "Setara Rp 1.140.000 / bulan"
-        },
-        tahunan: {
-          price: "12.480.000",
-          oldPrice: "15.600.000",
-          period: "/ tahun",
-          discountBadge: "Hemat 20%",
-          subtext: "Setara Rp 1.040.000 / bulan"
-        }
+        features: [
+          "Semua fitur di Paket Lanjutan",
+          "Kapasitas 1.000 Siswa Serentak",
+          "Resource Server Prioritas Khusus",
+          "Dukungan Custom Domain Sekolah",
+          "Bank Soal Kolaborasi Antar Guru",
+          "Pendampingan Teknis Siaga Saat Ujian",
+        ],
       },
-      features: [
-        "Semua fitur di Paket Lanjutan",
-        "Kapasitas 1.000 Siswa Serentak",
-        "Resource Server Prioritas Khusus",
-        "Dukungan Custom Domain Sekolah",
-        "Bank Soal Kolaborasi Antar Guru",
-        "Pendampingan Teknis Siaga Saat Ujian"
-      ],
-    },
-  ];
+    ];
+  }, [activePricing]);
 
   const faqs = [
     {
@@ -1189,8 +1246,8 @@ const LandingPage = () => {
             <div className="w-full max-w-xl grid grid-cols-3 p-1 sm:p-1.5 bg-slate-200/80 backdrop-blur-xs rounded-2xl border border-slate-300/80 shadow-inner gap-1">
               {[
                 { id: "1bulan", label: "1 Bulan", sub: "Fleksibel" },
-                { id: "semester", label: "6 Bulan", sub: "1 Semester", badge: "Hemat 12%" },
-                { id: "tahunan", label: "1 Tahun", sub: "12 Bulan", badge: "Hemat 20%" },
+                { id: "semester", label: "6 Bulan", sub: "1 Semester", badge: semesterDiscountPct > 0 ? `Hemat ${semesterDiscountPct}%` : undefined },
+                { id: "tahunan", label: "1 Tahun", sub: "12 Bulan", badge: yearDiscountPct > 0 ? `Hemat ${yearDiscountPct}%` : undefined },
               ].map(tab => (
                 <button
                   key={tab.id}

@@ -173,3 +173,4 @@ routerAdd("POST", "/api/fast-exams/{action}", (c) => {
         return c.json(400, { ok: false, error: err.message || String(err) });
     }
 });
+

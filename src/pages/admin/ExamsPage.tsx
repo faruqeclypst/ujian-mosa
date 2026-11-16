@@ -393,9 +393,16 @@ const ExamsPage = () => {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
 
-  // Filter & Search states
+  // Filter & Search states (default: guru hanya tampilkan milik sendiri)
   const [searchQuery, setSearchQuery] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState<"all" | "mine" | "mgmp">("all");
+  const [ownerFilter, setOwnerFilter] = useState<"all" | "mine" | "mgmp">(() => (role === "admin" ? "all" : "mine"));
+
+  // Pastikan role guru selalu default ke "mine" (milik sendiri) saat sesi termuat
+  useEffect(() => {
+    if (role && role !== "admin") {
+      setOwnerFilter((prev) => (prev === "all" ? "mine" : prev));
+    }
+  }, [role]);
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState("all");
@@ -481,17 +488,29 @@ const ExamsPage = () => {
     const set = new Set<string>();
     if (currentTeacher?.subjects && Array.isArray(currentTeacher.subjects)) {
       currentTeacher.subjects.forEach((s: string) => {
-        if (s) set.add(s);
+        if (!s) return;
+        const sTrim = String(s).trim();
+        set.add(sTrim);
+        // Map ke ID jika s adalah Nama, atau map ke Nama jika s adalah ID
+        const matched = subjects.find(
+          (sub: any) => sub.id === sTrim || (sub.name && sub.name.toLowerCase() === sTrim.toLowerCase())
+        );
+        if (matched) {
+          set.add(matched.id);
+          if (matched.name) set.add(matched.name.toLowerCase());
+        }
       });
     }
     exams.forEach(e => {
       const examTeacherId = e.teacherId || e.teacherid;
       if ((examTeacherId === teacherId || examTeacherId === user?.id) && e.subjectId) {
         set.add(e.subjectId);
+        const sub = subjects.find((s: any) => s.id === e.subjectId);
+        if (sub?.name) set.add(sub.name.toLowerCase());
       }
     });
     return Array.from(set);
-  }, [currentTeacher, exams, teacherId, user]);
+  }, [currentTeacher, exams, teacherId, user, subjects]);
 
   // Apakah bank soal ini benar-benar dibuat oleh guru login saat ini
   const isRealOwner = useCallback((exam: any) => {
@@ -513,16 +532,17 @@ const ExamsPage = () => {
     if (!exam || !exam.subjectId) return false;
     if (isRealOwner(exam)) return false;
     if (role === "admin") return false;
-    return mySubjectIds.includes(exam.subjectId);
-  }, [isRealOwner, role, mySubjectIds]);
+    const subName = (exam.subjectName || subjects.find((s: any) => s.id === exam.subjectId)?.name || "").toLowerCase();
+    return mySubjectIds.includes(exam.subjectId) || (Boolean(subName) && mySubjectIds.includes(subName));
+  }, [isRealOwner, role, mySubjectIds, subjects]);
 
   const canEditExam = useCallback((exam: any) => {
     if (isOwner(exam)) return true;
-    if (Boolean(exam.is_mgmp_shared) && mySubjectIds.includes(exam.subjectId)) {
+    if (Boolean(exam.is_mgmp_shared) && isMgmpExam(exam)) {
       return true;
     }
     return false;
-  }, [isOwner, mySubjectIds]);
+  }, [isOwner, isMgmpExam]);
 
   const tabExams = useMemo(() => {
     return exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
@@ -2159,34 +2179,76 @@ const ExamsPage = () => {
               onSearchChange={setSearchQuery}
               searchPlaceholder="Cari judul ujian, pengampu, mapel, tipe..."
               filterSlot={
-                <NeonFilterPopover
-                  title="Filter Bank Soal"
-                  activeCount={
-                    (subjectFilter !== "all" ? 1 : 0) +
-                    (typeFilter !== "all" ? 1 : 0) +
-                    (groupFilter !== "all" ? 1 : 0) +
-                    (ownerFilter !== "all" ? 1 : 0)
-                  }
-                  onReset={() => {
-                    setSubjectFilter("all");
-                    setTypeFilter("all");
-                    setGroupFilter("all");
-                    setOwnerFilter("all");
-                  }}
-                >
-                  {/* Filter Kepemilikan & MGMP */}
-                  {(role !== "admin" || mySubjectIds.length > 0) && (
-                    <NeonFilterField label="Kepemilikan">
-                      <NeonFilterSelect
-                        value={ownerFilter}
-                        onChange={(e) => setOwnerFilter(e.target.value as any)}
+                <>
+                  {role !== "admin" && (
+                    <div className="inline-flex items-center p-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/80 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setOwnerFilter("mine")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                          ownerFilter === "mine"
+                            ? "bg-white dark:bg-neutral-700 text-emerald-700 dark:text-emerald-400 shadow-2xs font-bold"
+                            : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                        )}
                       >
-                        <option value="all">Semua Bank Soal ({tabExams.length})</option>
-                        <option value="mine">⭐ Bank Soal Saya Saja ({myExamsCount})</option>
-                        <option value="mgmp">👥 Rekan Se-Mapel / MGMP ({mgmpExamsCount})</option>
-                      </NeonFilterSelect>
-                    </NeonFilterField>
+                        Milik Saya ({myExamsCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOwnerFilter("mgmp")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                          ownerFilter === "mgmp"
+                            ? "bg-white dark:bg-neutral-700 text-blue-700 dark:text-blue-400 shadow-2xs font-bold"
+                            : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                        )}
+                      >
+                        MGMP ({mgmpExamsCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOwnerFilter("all")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                          ownerFilter === "all"
+                            ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-2xs font-bold"
+                            : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                        )}
+                      >
+                        Semua ({tabExams.length})
+                      </button>
+                    </div>
                   )}
+
+                  <NeonFilterPopover
+                    title="Filter Bank Soal"
+                    activeCount={
+                      (subjectFilter !== "all" ? 1 : 0) +
+                      (typeFilter !== "all" ? 1 : 0) +
+                      (groupFilter !== "all" ? 1 : 0) +
+                      (ownerFilter !== (role === "admin" ? "all" : "mine") ? 1 : 0)
+                    }
+                    onReset={() => {
+                      setSubjectFilter("all");
+                      setTypeFilter("all");
+                      setGroupFilter("all");
+                      setOwnerFilter(role === "admin" ? "all" : "mine");
+                    }}
+                  >
+                    {/* Filter Kepemilikan & MGMP */}
+                    {(role !== "admin" || mySubjectIds.length > 0) && (
+                      <NeonFilterField label="Kepemilikan">
+                        <NeonFilterSelect
+                          value={ownerFilter}
+                          onChange={(e) => setOwnerFilter(e.target.value as any)}
+                        >
+                          <option value="mine">⭐ Bank Soal Saya Saja ({myExamsCount})</option>
+                          <option value="mgmp">👥 Rekan Se-Mapel / MGMP ({mgmpExamsCount})</option>
+                          <option value="all">Semua Bank Soal ({tabExams.length})</option>
+                        </NeonFilterSelect>
+                      </NeonFilterField>
+                    )}
 
                   {/* Subject filter */}
                   <NeonFilterField label={terminology.subject}>
@@ -2233,7 +2295,8 @@ const ExamsPage = () => {
                     </NeonFilterField>
                   )}
                 </NeonFilterPopover>
-              }
+              </>
+            }
               selectable={true}
               selectedKeys={selectedIds}
               onSelectionChange={setSelectedIds}

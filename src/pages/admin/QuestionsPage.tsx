@@ -2960,11 +2960,20 @@ const QuestionsPage = () => {
     const set = new Set<string>();
     if (currentTeacher?.subjects && Array.isArray(currentTeacher.subjects)) {
       currentTeacher.subjects.forEach((s: string) => {
-        if (s) set.add(s);
+        if (!s) return;
+        const sTrim = String(s).trim();
+        set.add(sTrim);
+        const matched = subjects.find(
+          (sub: any) => sub.id === sTrim || (sub.name && sub.name.toLowerCase() === sTrim.toLowerCase())
+        );
+        if (matched) {
+          set.add(matched.id);
+          if (matched.name) set.add(matched.name.toLowerCase());
+        }
       });
     }
     return Array.from(set);
-  }, [currentTeacher]);
+  }, [currentTeacher, subjects]);
 
   // Apakah bank soal ini benar-benar dibuat oleh guru login saat ini
   const isRealOwner = useMemo(() => {
@@ -2982,8 +2991,9 @@ const QuestionsPage = () => {
 
   const isMgmpExam = useMemo(() => {
     if (!exam || !exam.subjectId || isRealOwner || role === "admin") return false;
-    return mySubjectIds.includes(exam.subjectId);
-  }, [exam, isRealOwner, role, mySubjectIds]);
+    const subName = (exam.subjectName || exam.subject || subjects.find((s: any) => s.id === exam.subjectId)?.name || "").toLowerCase();
+    return mySubjectIds.includes(exam.subjectId) || (Boolean(subName) && mySubjectIds.includes(subName));
+  }, [exam, isRealOwner, role, mySubjectIds, subjects]);
 
   const canEdit = useMemo(() => {
     if (isOwner) return true;

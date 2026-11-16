@@ -102,13 +102,56 @@ onBootstrap((e) => {
 
             // Auto-ensure is_mgmp_shared in exams
             try { db.newQuery("ALTER TABLE exams ADD COLUMN is_mgmp_shared BOOLEAN DEFAULT 0").execute(); } catch (_) {}
-            if (exCol && !exCol.fields.getByName("is_mgmp_shared")) {
-                const bf = new BoolField();
-                bf.name = "is_mgmp_shared";
-                bf.required = false;
-                exCol.fields.add(bf);
-                $app.save(exCol);
-                console.log("[SCHEMA_SYNC] Ensured is_mgmp_shared field in exams collection");
+            if (exCol) {
+                let modEx = false;
+                if (!exCol.fields.getByName("is_mgmp_shared")) {
+                    const bf = new BoolField();
+                    bf.name = "is_mgmp_shared";
+                    bf.required = false;
+                    exCol.fields.add(bf);
+                    modEx = true;
+                }
+                const targetExList = '@request.auth.role = "admin" || @request.auth.role = "teacher" || teacherId = @request.auth.teacherId || @request.auth.collectionName = "students"';
+                const targetExView = '@request.auth.role = "admin" || @request.auth.role = "teacher" || teacherId = @request.auth.teacherId || @request.auth.collectionName = "students"';
+                const targetExUp = '@request.auth.role = "admin" || teacherId = @request.auth.teacherId || (is_mgmp_shared = true && @request.auth.role = "teacher")';
+                if (exCol.listRule !== targetExList) { exCol.listRule = targetExList; modEx = true; }
+                if (exCol.viewRule !== targetExView) { exCol.viewRule = targetExView; modEx = true; }
+                if (exCol.updateRule !== targetExUp) { exCol.updateRule = targetExUp; modEx = true; }
+
+                if (modEx) {
+                    try {
+                        $app.save(exCol);
+                        console.log("[SCHEMA_SYNC] Ensured is_mgmp_shared and rules in exams collection");
+                    } catch (eSave) {
+                        db.newQuery("UPDATE _collections SET listRule = {:l}, viewRule = {:v}, updateRule = {:u} WHERE name = 'exams'")
+                            .bind({ l: targetExList, v: targetExView, u: targetExUp }).execute();
+                    }
+                }
+            }
+
+            // Auto-ensure MGMP rules in questions
+            const qCol = $app.findCollectionByNameOrId("questions");
+            if (qCol) {
+                let modQ = false;
+                const targetQList = '@request.auth.collectionName = "students" || @request.auth.role = "admin" || @request.auth.role = "teacher" || examId.teacherId = @request.auth.teacherId';
+                const targetQView = '@request.auth.collectionName = "students" || @request.auth.role = "admin" || @request.auth.role = "teacher" || examId.teacherId = @request.auth.teacherId';
+                const targetQCreate = '@request.auth.role = "admin" || examId.teacherId = @request.auth.teacherId || (examId.is_mgmp_shared = true && @request.auth.role = "teacher")';
+                const targetQUpdate = '@request.auth.role = "admin" || examId.teacherId = @request.auth.teacherId || (examId.is_mgmp_shared = true && @request.auth.role = "teacher")';
+                const targetQDelete = '@request.auth.role = "admin" || examId.teacherId = @request.auth.teacherId || (examId.is_mgmp_shared = true && @request.auth.role = "teacher")';
+                if (qCol.listRule !== targetQList) { qCol.listRule = targetQList; modQ = true; }
+                if (qCol.viewRule !== targetQView) { qCol.viewRule = targetQView; modQ = true; }
+                if (qCol.createRule !== targetQCreate) { qCol.createRule = targetQCreate; modQ = true; }
+                if (qCol.updateRule !== targetQUpdate) { qCol.updateRule = targetQUpdate; modQ = true; }
+                if (qCol.deleteRule !== targetQDelete) { qCol.deleteRule = targetQDelete; modQ = true; }
+                if (modQ) {
+                    try {
+                        $app.save(qCol);
+                        console.log("[SCHEMA_SYNC] Ensured MGMP collaboration rules in questions collection");
+                    } catch (eSaveQ) {
+                        db.newQuery("UPDATE _collections SET listRule = {:l}, viewRule = {:v}, createRule = {:c}, updateRule = {:u}, deleteRule = {:d} WHERE name = 'questions'")
+                            .bind({ l: targetQList, v: targetQView, c: targetQCreate, u: targetQUpdate, d: targetQDelete }).execute();
+                    }
+                }
             }
         } catch (errGroup) {
             // Notice only
