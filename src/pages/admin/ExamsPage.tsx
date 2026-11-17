@@ -7,7 +7,6 @@ import {
   Archive,
   RotateCw,
   Copy,
-  ClipboardList,
   Download,
   Loader2,
   X,
@@ -391,8 +390,6 @@ const ExamsPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
   const [questionCounts, setQuestionCounts] = useState<Record<string, number>>(() => examsCache?.questionCounts || {});
-  const [isReportOpen, setIsReportOpen] = useState(false);
-  const [reportCopied, setReportCopied] = useState(false);
 
   // Filter & Search states (default: guru hanya tampilkan milik sendiri)
   const [searchQuery, setSearchQuery] = useState("");
@@ -1338,102 +1335,6 @@ const ExamsPage = () => {
     }
   });
 
-  // === LAPORAN PROGRESS GURU ===
-  const reportData = useMemo(() => {
-    const activeExams = exams.filter(e => e.status !== "archive");
-    const teacherMap: Record<string, { name: string; exams: { title: string; subject: string; count: number; type: string }[]; totalQuestions: number }> = {};
-
-    activeExams.forEach(exam => {
-      const tId = exam.teacherId;
-      const teacher = teachers.find((t: any) => t.id === tId);
-      const subject = subjects.find((s: any) => s.id === exam.subjectId);
-      const qCount = questionCounts[exam.id] || 0;
-
-      if (!teacherMap[tId]) {
-        teacherMap[tId] = { name: teacher?.name || "Tidak Diketahui", exams: [], totalQuestions: 0 };
-      }
-      teacherMap[tId].exams.push({ title: exam.title, subject: subject?.name || "-", count: qCount, type: exam.examType || "-" });
-      teacherMap[tId].totalQuestions += qCount;
-    });
-
-    return Object.values(teacherMap).sort((a, b) => b.totalQuestions - a.totalQuestions);
-  }, [exams, teachers, subjects, questionCounts]);
-
-  const generateWAReport = () => {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-    const activeExams = exams.filter(e => e.status !== "archive");
-    const totalExams = activeExams.length;
-    const activeExamIds = new Set(activeExams.map(e => e.id));
-    const totalQuestions = Object.entries(questionCounts)
-      .filter(([id]) => activeExamIds.has(id))
-      .reduce((a, [, b]) => a + b, 0);
-
-    let text = `*LAPORAN PROGRESS BANK SOAL*\n`;
-    text += `${dateStr}\n`;
-    text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-    text += `*Ringkasan:*\n`;
-    text += `- Total Bank Soal: *${totalExams}*\n`;
-    text += `- Total Soal: *${totalQuestions}*\n`;
-    text += `- Jumlah Guru: *${reportData.length}*\n\n`;
-    text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-
-    // Pisahkan guru yang sudah cukup (>=30) dan yang kurang (<30)
-    const guruCukup = reportData.filter(t => t.exams.every(e => e.count >= 30));
-    const guruKurang = reportData.filter(t => t.exams.some(e => e.count < 30));
-
-    if (guruCukup.length > 0) {
-      text += `*Sudah Memenuhi (>=30 soal):*\n\n`;
-      guruCukup.forEach((t, idx) => {
-        text += `*${idx + 1}. ${t.name}*\n`;
-        text += `   ${t.exams.length} bank soal, ${t.totalQuestions} soal\n`;
-        t.exams.forEach(e => {
-          text += `   - ${e.title} (${e.subject}) — ${e.count} soal\n`;
-        });
-        text += `\n`;
-      });
-    }
-
-    if (guruKurang.length > 0) {
-      text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-      text += `*Belum Memenuhi (<30 soal):*\n\n`;
-      guruKurang.forEach((t, idx) => {
-        text += `*${idx + 1}. ${t.name}*\n`;
-        t.exams.forEach(e => {
-          if (e.count < 30) {
-            text += `   - ${e.title} (${e.subject}) — ${e.count} soal, kurang ${30 - e.count}\n`;
-          } else {
-            text += `   - ${e.title} (${e.subject}) — ${e.count} soal\n`;
-          }
-        });
-        text += `\n`;
-      });
-    }
-
-    // Guru yang belum buat sama sekali
-    const teachersWithExams = new Set(activeExams.map(e => e.teacherId));
-    const teachersWithout = teachers.filter((t: any) => !teachersWithExams.has(t.id));
-    if (teachersWithout.length > 0) {
-      text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-      text += `*Guru Belum Membuat Bank Soal:*\n`;
-      teachersWithout.forEach((t: any) => {
-        text += `   - ${t.name}\n`;
-      });
-      text += `\n`;
-    }
-
-    text += `━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `_Digenerate otomatis oleh sistem_`;
-    return text;
-  };
-
-  const handleCopyReport = () => {
-    const text = generateWAReport();
-    navigator.clipboard.writeText(text);
-    setReportCopied(true);
-    setTimeout(() => setReportCopied(false), 2500);
-  };
-
   const handleBatchExport = async (customExams?: ExamData[]) => {
     if (!pb) return;
     const targetExams = customExams || exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
@@ -2131,13 +2032,7 @@ const ExamsPage = () => {
                         <Download className="h-3.5 w-3.5 text-neutral-500" />
                         <span>Export Semua ke Word ZIP</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setIsReportOpen(true)}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-                      >
-                        <ClipboardList className="h-3.5 w-3.5 text-emerald-500" />
-                        <span>Laporan Progress Guru</span>
-                      </DropdownMenuItem>
+
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
@@ -2884,120 +2779,6 @@ const ExamsPage = () => {
         confirmLabel={confirmDialog.confirmLabel}
         isLoading={confirmDialog.isLoading}
       />
-
-      {/* Dialog Laporan Progress Guru */}
-      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
-        <DialogContent className="max-w-lg w-[95vw] bg-white dark:bg-[#0c0d0e] border border-neutral-200 dark:border-neutral-800 rounded-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 shadow-2xl">
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 shrink-0 pr-12">
-            <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                <ClipboardList className="h-4 w-4" />
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
-                  Laporan Progress Bank Soal
-                </h3>
-                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                  Rekapitulasi kesiapan butir soal guru pengampu untuk format pesan WhatsApp.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto space-y-4 p-5 sm:p-6">
-            {/* Ringkasan */}
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className="bg-neutral-50/80 dark:bg-neutral-900/60 rounded-xl p-3 text-center border border-neutral-200/60 dark:border-neutral-800">
-                <p className="text-lg font-mono font-bold text-neutral-900 dark:text-white">{exams.filter(e => e.status !== "archive").length}</p>
-                <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Bank Soal</p>
-              </div>
-              <div className="bg-neutral-50/80 dark:bg-neutral-900/60 rounded-xl p-3 text-center border border-neutral-200/60 dark:border-neutral-800">
-                <p className="text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400">{exams.filter(e => e.status !== "archive").reduce((sum, e) => sum + (questionCounts[e.id] || 0), 0)}</p>
-                <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Total Soal</p>
-              </div>
-              <div className="bg-neutral-50/80 dark:bg-neutral-900/60 rounded-xl p-3 text-center border border-neutral-200/60 dark:border-neutral-800">
-                <p className="text-lg font-mono font-bold text-blue-600 dark:text-blue-400">{reportData.length}</p>
-                <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Guru Aktif</p>
-              </div>
-            </div>
-
-            {/* Detail per Guru */}
-            <div className="space-y-2">
-              {reportData.map((t, idx) => (
-                <div key={idx} className="bg-neutral-50/60 dark:bg-neutral-900/50 rounded-xl p-3.5 border border-neutral-200/70 dark:border-neutral-800">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 bg-neutral-200 dark:bg-neutral-800 rounded-lg flex items-center justify-center font-mono text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                        {idx + 1}
-                      </div>
-                      <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">{t.name}</span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
-                      {t.totalQuestions} soal
-                    </span>
-                  </div>
-                  <div className="space-y-1.5 ml-8.5">
-                    {t.exams.map((e, eIdx) => (
-                      <div key={eIdx} className="flex items-center gap-2 text-xs">
-                        <span className={`w-1.5 h-1.5 rounded-full ${e.count > 0 ? "bg-emerald-500" : "bg-amber-400"}`}></span>
-                        <span className="text-neutral-600 dark:text-neutral-400 truncate flex-1">{e.title}</span>
-                        <span className="text-neutral-500 font-mono text-[11px]">{e.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-
-              {/* Guru belum buat */}
-              {(() => {
-                const teachersWithExams = new Set(exams.filter(e => e.status !== "archive").map(e => e.teacherId));
-                const teachersWithout = teachers.filter((t: any) => !teachersWithExams.has(t.id));
-                if (teachersWithout.length === 0) return null;
-                return (
-                  <div className="bg-amber-500/10 rounded-xl p-3.5 border border-amber-500/20">
-                    <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-2">Belum Membuat Bank Soal</p>
-                    <div className="space-y-1">
-                      {teachersWithout.map((t: any) => (
-                        <div key={t.id} className="flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                          <span>{t.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* Tombol Copy untuk WA */}
-          <div className="px-5 py-3.5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 flex items-center justify-between shrink-0">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setIsReportOpen(false)}
-              className="h-8.5 px-3.5 text-xs font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 cursor-pointer"
-            >
-              Tutup
-            </Button>
-            <Button
-              type="button"
-              onClick={handleCopyReport}
-              className={`h-8.5 px-4 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${reportCopied
-                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                : "bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs"
-                }`}
-            >
-              {reportCopied ? (
-                <><Check className="h-3.5 w-3.5 text-white" /> <span>Tersalin ke Clipboard</span></>
-              ) : (
-                <><Copy className="h-3.5 w-3.5" /> <span>Salin Teks untuk WhatsApp</span></>
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Batch Export Progress Dialog */}
       <NeonProgressModal
