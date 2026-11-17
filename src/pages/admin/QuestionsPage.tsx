@@ -1,3 +1,7 @@
+import { getQuestionColumns } from "./questions/components/questionColumns";
+import { QuestionDetailsView } from "./questions/components/QuestionDetailsView";
+import { useQuestionAI } from "./questions/hooks/useQuestionAI";
+import { localizeImage as localizeImageHelper, localizeInlineImages as localizeInlineImagesHelper } from "./questions/utils/imageLocalizer";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, Function, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Globe, Key, Layers, Target, Info, MoreHorizontal, Filter, RotateCw, Users, Share2 } from "lucide-react";
@@ -488,14 +492,7 @@ const QuestionsPage = () => {
     field?: "text" | "groupText" | "choice";
   } | null>(null);
 
-  // AI Import State
-  const [isAIImportOpen, setIsAIImportOpen] = useState(false);
-  const [importText, setImportText] = useState("");
-  const [importMode, setImportMode] = useState<'extract' | 'generate' | 'json'>('extract');
-  const [importCount, setImportCount] = useState(5);
-  const [importType, setImportType] = useState('pilihan_ganda');
-  const [isParsing, setIsParsing] = useState(false);
-  const [parsedResults, setParsedResults] = useState<any[]>([]);
+  // AI Import State managed by useQuestionAI
   const [isLiterasiGuideOpen, setIsLiterasiGuideOpen] = useState(false);
   const [isMathGuideOpen, setIsMathGuideOpen] = useState(false);
 
@@ -680,868 +677,8 @@ const QuestionsPage = () => {
     });
   };
 
-  // AI States
-  const [isAIChatDrawerOpen, setIsAIChatDrawerOpen] = useState(false);
-  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
-  const [isAIGenerating, setIsAIGenerating] = useState(false);
-  const [isAIGeneratingDirect, setIsAIGeneratingDirect] = useState(false);
-  const [aiProgress, setAiProgress] = useState(0);
-  const aiAbortRef = useRef<AbortController | null>(null);
-  const aiProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startAIProgress = () => {
-    setAiProgress(0);
-    if (aiProgressRef.current) clearInterval(aiProgressRef.current);
-    let progress = 0;
-    aiProgressRef.current = setInterval(() => {
-      // Simulate progress: fast at start, slow near end
-      const increment = progress < 30 ? 3 : progress < 60 ? 2 : progress < 85 ? 0.5 : 0.1;
-      progress = Math.min(progress + increment, 95);
-      setAiProgress(Math.round(progress));
-    }, 300);
-  };
-
-  const stopAIProgress = (success: boolean) => {
-    if (aiProgressRef.current) { clearInterval(aiProgressRef.current); aiProgressRef.current = null; }
-    setAiProgress(success ? 100 : 0);
-    if (success) setTimeout(() => setAiProgress(0), 1000);
-  };
-
-  const cancelAIGeneration = () => {
-    if (aiAbortRef.current) { aiAbortRef.current.abort(); aiAbortRef.current = null; }
-    stopAIProgress(false);
-    setIsAIGenerating(false);
-    setIsAIGeneratingDirect(false);
-    setIsParsing(false);
-    addToast({ title: "Dibatalkan", description: "Generasi AI dibatalkan.", type: "info" });
-  };
-  const [isRegeneratingIndex, setIsRegeneratingIndex] = useState<number | null>(null);
-  const [aiTopic, setAiTopic] = useState("");
-  const [aiCount, setAiCount] = useState(5);
-  const [aiLevel, setAiLevel] = useState("");
-  const [aiSubject, setAiSubject] = useState("");
-  const [aiType, setAiType] = useState<any>("pilihan_ganda");
-  const [isAiLiteracy, setIsAiLiteracy] = useState(false);
-  const [aiPassageLength, setAiPassageLength] = useState("sedang");
-  const [aiDifficulty, setAiDifficulty] = useState("sedang");
-  const [aiTaxonomy, setAiTaxonomy] = useState<string[]>(["C1", "C2", "C3", "C4", "C5", "C6"]); // multi-select C1-C6
-  const [aiMaterialFile, setAiMaterialFile] = useState<File | null>(null);
-  const [aiMaterialText, setAiMaterialText] = useState("");
-  const [aiMaterialFileName, setAiMaterialFileName] = useState("");
-  const [isExtractingMaterial, setIsExtractingMaterial] = useState(false);
-  const [aiObjectives, setAiObjectives] = useState<string[]>([]); // tujuan pembelajaran dari AI
-  const [isFetchingObjectives, setIsFetchingObjectives] = useState(false);
-
-  const toggleTaxonomy = (level: string) => {
-    setAiTaxonomy(prev => {
-      if (prev.includes(level)) {
-        const next = prev.filter(l => l !== level);
-        return next.length === 0 ? [level] : next; // minimal 1 harus dipilih
-      }
-      return [...prev, level];
-    });
-  };
-
-  const setTaxonomyPreset = (preset: "lots" | "hots" | "campuran") => {
-    if (preset === "lots") setAiTaxonomy(["C1", "C2", "C3"]);
-    else if (preset === "hots") setAiTaxonomy(["C4", "C5", "C6"]);
-    else setAiTaxonomy(["C1", "C2", "C3", "C4", "C5", "C6"]);
-  };
-
-  const getTaxonomyPreset = (): string => {
-    const sorted = [...aiTaxonomy].sort();
-    if (sorted.join(",") === "C1,C2,C3") return "lots";
-    if (sorted.join(",") === "C4,C5,C6") return "hots";
-    if (sorted.join(",") === "C1,C2,C3,C4,C5,C6") return "campuran";
-    return "";
-  };
-
-  const [dynamicSuggestions, setDynamicSuggestions] = useState<string[]>([]);
-  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
-
-  useEffect(() => {
-    const fetchSuggestions = async () => {
-      if (aiLevel && aiSubject && aiSubject.length > 2) {
-        setIsFetchingSuggestions(true);
-        try {
-          if (!pb) return;
-          const suggestions = await getTopicSuggestionsAI(
-            pb,
-            aiLevel,
-            aiSubject,
-            aiDifficulty,
-            aiType,
-            "umum",
-            isAiLiteracy
-          );
-          if (suggestions && suggestions[0] === "AI_RATE_LIMIT") {
-            setDynamicSuggestions([]);
-          } else {
-            setDynamicSuggestions(suggestions);
-          }
-        } catch (err) {
-          console.error("Failed to fetch suggestions:", err);
-        } finally {
-          setIsFetchingSuggestions(false);
-        }
-      } else {
-        setDynamicSuggestions([]);
-      }
-    };
-
-    const timer = setTimeout(fetchSuggestions, 1500);
-    return () => clearTimeout(timer);
-  }, [aiLevel, aiSubject, aiTaxonomy, isAiLiteracy]);
-
-  // Auto-generate Tujuan Pembelajaran berdasarkan topik + taksonomi (per-level C)
-  useEffect(() => {
-    const fetchObjectives = async () => {
-      if ((aiTopic.trim().length > 3 || aiMaterialText.trim().length > 20) && aiTaxonomy.length > 0 && pb) {
-        setIsFetchingObjectives(true);
-        try {
-          const objectives = await generateObjectivesAI(
-            pb,
-            aiTopic || "(dari bahan materi)",
-            aiTaxonomy,
-            aiLevel,
-            aiSubject,
-            aiMaterialText
-          );
-          if (objectives && objectives.length > 0) {
-            setAiObjectives(objectives);
-          }
-        } catch (err) {
-          console.error("Failed to fetch objectives:", err);
-        } finally {
-          setIsFetchingObjectives(false);
-        }
-      } else {
-        setAiObjectives([]);
-      }
-    };
-
-    const timer = setTimeout(fetchObjectives, 2000);
-    return () => clearTimeout(timer);
-  }, [aiTopic, aiTaxonomy, aiLevel, aiSubject, aiMaterialText]);
-
-  // Auto-generate Topik dari AI berdasarkan jenjang + mapel + materi
-  const [isGeneratingTopic, setIsGeneratingTopic] = useState(false);
-  const handleGenerateTopic = async () => {
-    if (!pb) return;
-    if (!aiSubject && !aiMaterialText) {
-      addToast({ type: "warning", title: "Isi dulu", description: "Isi Mata Pelajaran atau upload bahan materi terlebih dahulu.", duration: 2500 });
-      return;
-    }
-    setIsGeneratingTopic(true);
-    try {
-      const suggestions = await getTopicSuggestionsAI(
-        pb, aiLevel || "Umum", aiSubject || "Umum", aiDifficulty, aiType, "umum", isAiLiteracy
-      );
-      if (suggestions && suggestions.length > 0 && suggestions[0] !== "AI_RATE_LIMIT") {
-        // Pick a random one
-        const picked = suggestions[Math.floor(Math.random() * suggestions.length)];
-        setAiTopic(String(picked));
-        addToast({ type: "success", title: "Topik Digenerate", description: String(picked), duration: 2000 });
-      }
-    } catch (err) {
-      console.error("Generate topic error:", err);
-    } finally {
-      setIsGeneratingTopic(false);
-    }
-  };
 
 
-  const handleRandomFill = () => {
-    const presets = [
-      { level: "SD Kelas 4", subject: "IPA", topic: "Daur Hidup Kupu-kupu & Metamorfosis" },
-      { level: "SMP Kelas 8", subject: "Matematika", topic: "Teorema Pythagoras & Segitiga Siku-siku" },
-      { level: "SMA Kelas 11", subject: "Sejarah Indonesia", topic: "Dampak Penjajahan Belanda di Indonesia" },
-      { level: "SD Kelas 6", subject: "Bahasa Indonesia", topic: "Cara Membuat Laporan Hasil Pengamatan" },
-      { level: "SMA Kelas 12", subject: "Informatika", topic: "Dampak Sosial Informatika & Keamanan Data" },
-      { level: "SMP Kelas 9", subject: "Bahasa Inggris", topic: "Narrative Text: The Legend of Malin Kundang" }
-    ];
-    const random = presets[Math.floor(Math.random() * presets.length)];
-    setAiLevel(random.level);
-    setAiSubject(random.subject);
-    setAiTopic(random.topic);
-    addToast({
-      type: "info",
-      title: "Form Terisi Otomatis",
-      description: `Preset ${random.subject} Kelas ${random.level} telah dimuat.`,
-      duration: 2000
-    });
-  };
-
-  const handleAIMaterialUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsExtractingMaterial(true);
-    try {
-      let extractedText = "";
-      const extension = file.name.split('.').pop()?.toLowerCase();
-
-      if (extension === "docx" || extension === "docm") {
-        const arrayBuffer = await file.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        extractedText = result.value;
-      } else if (extension === "pdf") {
-        let pdfjs = (window as any).pdfjsLib;
-        if (!pdfjs) {
-          await new Promise<void>((resolve) => {
-            const script = document.createElement("script");
-            script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js";
-            script.onload = () => {
-              (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
-              resolve();
-            };
-            document.head.appendChild(script);
-          });
-          pdfjs = (window as any).pdfjsLib;
-        }
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-        let fullText = "";
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items.map((item: any) => item.str).join(" ");
-          fullText += pageText + "\n";
-        }
-        extractedText = fullText;
-      } else if (extension === "pptx" || extension === "ppt") {
-        // Basic PPTX text extraction via JSZip
-        const JSZip = (await import("jszip")).default;
-        const arrayBuffer = await file.arrayBuffer();
-        const zip = await JSZip.loadAsync(arrayBuffer);
-        let fullText = "";
-        const slideFiles = Object.keys(zip.files).filter(f => f.match(/ppt\/slides\/slide\d+\.xml/)).sort();
-        for (const slideFile of slideFiles) {
-          const content = await zip.files[slideFile].async("text");
-          const textMatches = content.match(/<a:t>([^<]*)<\/a:t>/g);
-          if (textMatches) {
-            const slideText = textMatches.map(m => m.replace(/<\/?a:t>/g, "")).join(" ");
-            fullText += slideText + "\n";
-          }
-        }
-        extractedText = fullText;
-      } else if (extension === "png" || extension === "jpg" || extension === "jpeg") {
-        // For images, we store the file and let AI handle it via description
-        setAiMaterialFile(file);
-        setAiMaterialFileName(file.name);
-        setAiMaterialText(`[Gambar: ${file.name}] - AI akan menganalisis gambar ini sebagai referensi materi.`);
-        addToast({ title: "Gambar Dimuat", description: `${file.name} siap digunakan sebagai referensi.`, type: "success", duration: 2000 });
-        setIsExtractingMaterial(false);
-        if (e.target) e.target.value = "";
-        return;
-      }
-
-      if (extractedText.trim()) {
-        // Limit to ~4000 chars to fit in prompt context
-        const trimmed = extractedText.trim().substring(0, 4000);
-        setAiMaterialText(trimmed);
-        setAiMaterialFileName(file.name);
-        setAiMaterialFile(file);
-        addToast({ title: "Materi Berhasil Diekstrak", description: `${file.name} (${Math.round(trimmed.length / 1000)}k karakter)`, type: "success", duration: 2000 });
-      } else {
-        throw new Error("Gagal mengekstrak teks dari file.");
-      }
-    } catch (err: any) {
-      addToast({ title: "Gagal Membaca File", description: err.message || "Pastikan file tidak rusak.", type: "error" });
-    } finally {
-      setIsExtractingMaterial(false);
-      if (e.target) e.target.value = "";
-    }
-  };
-
-  const handleAIGenerateDirect = async () => {
-    if (!pb) return;
-    setIsAIGeneratingDirect(true);
-    startAIProgress();
-    aiAbortRef.current = new AbortController();
-    try {
-      const generated = await generateQuestionsAI(
-        pb,
-        aiTopic || (exam?.subject + " " + (exam?.name?.split(' ')[0] || "")) || "Umum",
-        aiCount,
-        aiLevel,
-        aiSubject || (exam?.subject || ""),
-        aiType,
-        isAiLiteracy,
-        aiPassageLength,
-        aiDifficulty,
-        "umum",
-        aiTaxonomy.join(","),
-        aiMaterialText,
-        aiObjectives
-      );
-
-      const questionsForReview = generated.map(q => {
-        const qType = q.type || aiType;
-        const choicesBatch: Record<string, { text: string }> = {};
-        let correctKey = "";
-
-        // For choice-based types
-        if (q.choices && (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah")) {
-          const correctKeys: string[] = [];
-          Object.keys(q.choices).forEach(key => {
-            choicesBatch[key] = { text: q.choices![key].text };
-            if (q.choices![key].isCorrect) {
-              correctKeys.push(key);
-            }
-          });
-          correctKey = correctKeys.length > 0 ? correctKeys.join(",") : (q.answerKey || "").toLowerCase();
-        }
-
-        return {
-          text: q.text,
-          type: qType,
-          choices: Object.keys(choicesBatch).length > 0 ? choicesBatch : undefined,
-          correctKey: correctKey,
-          answerKey: q.answerKey || "",
-          pairs: q.pairs || (qType === "menjodohkan" ? [] : undefined),
-          items: q.items || (qType === "urutkan" || qType === "drag_drop" ? [] : undefined),
-          categories: q.categories || (qType === "klasifikasi" ? [] : undefined),
-          statements: q.statements || (qType === "klasifikasi" || qType === "matriks" || qType === "benar_salah" ? [] : undefined),
-          columns: q.columns || (qType === "matriks" ? [] : undefined),
-          blanks: q.blanks || (qType === "isian_rumpang" ? [] : undefined),
-          shuffleStatements: q.shuffleStatements,
-          groupId: q.groupId || "",
-          groupText: q.groupText || "",
-          isFromAI: true
-        };
-      });
-
-      setBatchQuestions(questionsForReview);
-      addToast({
-        type: "success",
-        title: "Generasi Selesai",
-        description: `${generated.length} soal baru telah dibuat.`,
-        duration: 3000
-      });
-    } catch (err: any) {
-      console.error("AI Direct Generate Error:", err);
-      if (err.message?.startsWith("AI_RATE_LIMIT")) {
-        const parts = err.message.split("|");
-        if (parts.length >= 5) {
-          const [, limit, used, remaining, requested] = parts;
-          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n\n Limit: ${Number(limit).toLocaleString()} token/hari\n Terpakai: ${Number(used).toLocaleString()} token\n Sisa: ${Number(remaining).toLocaleString()} token\n Diminta: ${Number(requested).toLocaleString()} token\n\nSilakan tunggu reset harian atau upgrade plan Groq.`, "danger");
-        } else {
-          showAlert("Limit Tercapai", "Server AI sedang sibuk karena terlalu banyak permintaan. Silakan tunggu sekitar 1-2 menit sebelum mencoba lagi.", "danger");
-        }
-      } else {
-        addToast({ type: "error", title: "Gagal", description: "Generasi gagal setelah beberapa percobaan. Coba lagi." });
-      }
-    } finally {
-      stopAIProgress(true);
-      setIsAIGeneratingDirect(false);
-      aiAbortRef.current = null;
-    }
-  };
-
-
-
-  const handleAIRegenerateSingle = async (index: number) => {
-    if (!pb) return;
-    setIsRegeneratingIndex(index);
-    try {
-      const q = batchQuestions[index];
-      const topicFallback = [aiTopic, exam?.subject, exam?.name?.split(' ')[0]].filter(Boolean).join(' ') || "Umum";
-      const regenerated = await generateSingleQuestionAI(
-        pb,
-        topicFallback,
-        q.type || aiType || "pilihan_ganda",
-        aiLevel || exam?.level || "Umum",
-        aiSubject || exam?.subject || "Umum",
-        aiDifficulty || "sedang",
-        "umum",
-        q.groupText || ""
-      );
-
-      if (!regenerated || !regenerated.text) {
-        throw new Error("AI tidak menghasilkan soal yang valid.");
-      }
-
-      const choicesBatch: Record<string, { text: string }> = {};
-      let correctKey = (regenerated.answerKey || "").toLowerCase();
-
-      if (regenerated.choices) {
-        if (Array.isArray(regenerated.choices)) {
-          regenerated.choices.forEach((c: any, i: number) => {
-            const key = String.fromCharCode(97 + i);
-            choicesBatch[key] = { text: typeof c === 'object' ? (c.text || String(c)) : String(c) };
-            if (typeof c === 'object' && c.isCorrect) correctKey = key;
-          });
-        } else {
-          Object.keys(regenerated.choices).forEach(key => {
-            const lowerKey = key.toLowerCase();
-            const val = (regenerated.choices as any)[key];
-            choicesBatch[lowerKey] = { text: typeof val === 'object' ? (val.text || String(val)) : String(val) };
-            if (typeof val === 'object' && val.isCorrect) correctKey = lowerKey;
-          });
-        }
-      }
-
-      const updatedRow = {
-        ...q,
-        text: regenerated.text,
-        type: regenerated.type || q.type,
-        choices: choicesBatch,
-        correctKey: correctKey,
-        answerKey: regenerated.answerKey || "",
-        pairs: regenerated.pairs || q.pairs,
-        items: regenerated.items || q.items,
-        categories: regenerated.categories || q.categories,
-        statements: regenerated.statements || q.statements,
-        columns: regenerated.columns || q.columns,
-        blanks: regenerated.blanks || q.blanks,
-        shuffleStatements: regenerated.shuffleStatements !== undefined ? regenerated.shuffleStatements : q.shuffleStatements,
-        isFromAI: true
-      };
-
-      const updatedBatch = [...batchQuestions];
-      updatedBatch[index] = updatedRow;
-      setBatchQuestions(updatedBatch);
-      addToast({
-        type: "success",
-        title: "Soal Diperbarui",
-        description: `Soal #${index + 1} berhasil ditampilkan ulang.`,
-        duration: 3000
-      });
-    } catch (err: any) {
-      console.error("AI Single Regenerate Error:", err);
-      if (err.message?.startsWith("AI_RATE_LIMIT")) {
-        const parts = err.message.split("|");
-        if (parts.length >= 5) {
-          const [, limit, used, remaining, requested] = parts;
-          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n Limit: ${Number(limit).toLocaleString()} token/hari\n Terpakai: ${Number(used).toLocaleString()}\n Sisa: ${Number(remaining).toLocaleString()}\n Diminta: ${Number(requested).toLocaleString()}\n\nTunggu reset harian atau upgrade plan.`, "danger");
-        } else {
-          showAlert("Limit Tercapai", "Permintaan terlalu cepat. Silakan tunggu 1 menit agar AI siap kembali.", "danger");
-        }
-      } else {
-        addToast({ type: "error", title: "Gagal", description: "Regenerasi gagal setelah beberapa percobaan. Coba lagi." });
-      }
-    } finally {
-      setIsRegeneratingIndex(null);
-    }
-  };
-
-  const handleAIParse = async () => {
-    if (!importText.trim() || !pb) return;
-
-    // JSON mode: parse directly without AI
-    if (importMode === 'json') {
-      try {
-        let parsed: any;
-        let trimmed = importText.trim();
-
-        // Handle concatenated arrays: ][ merge into single array
-        if (trimmed.includes('][')) {
-          trimmed = trimmed.replace(/\]\s*\[/g, ',');
-        }
-
-        try {
-          parsed = JSON.parse(trimmed);
-        } catch {
-          // Fallback: repair JSON (handles trailing commas, missing quotes, etc.)
-          try {
-            parsed = JSON.parse(jsonrepair(trimmed));
-          } catch {
-            throw new Error("JSON tidak valid. Periksa format data Anda.");
-          }
-        }
-        const questionsArr: any[] = Array.isArray(parsed) ? parsed : (parsed.questions || parsed.soal || parsed.data || []);
-
-        if (questionsArr.length === 0) {
-          addToast({ title: "Gagal", description: "JSON tidak berisi soal yang valid.", type: "error" });
-          return;
-        }
-
-        const results = questionsArr.map((q: any) => {
-          const choices = q.choices || q.options || {};
-          let correctKey = q.answerKey || q.answer_key || q.correctAnswer || q.correct_answer || "";
-
-          // Normalize choices
-          const normalizedChoices: any = {};
-          if (choices && typeof choices === 'object') {
-            Object.keys(choices).forEach(k => {
-              const val = choices[k];
-              if (typeof val === 'string') {
-                normalizedChoices[k] = { text: val, isCorrect: correctKey.includes(k) };
-              } else if (typeof val === 'object' && val) {
-                normalizedChoices[k] = { text: val.text || "", imageUrl: val.imageUrl || val.image_url || undefined, isCorrect: !!val.isCorrect };
-                if (val.isCorrect && !correctKey) correctKey = k;
-              }
-            });
-          }
-
-          if (!correctKey && normalizedChoices) {
-            const correctKeys = Object.keys(normalizedChoices).filter(k => normalizedChoices[k].isCorrect);
-            correctKey = correctKeys.join(",");
-          }
-
-          return {
-            text: q.text || q.question || "",
-            type: q.type || "pilihan_ganda",
-            choices: normalizedChoices,
-            answerKey: correctKey,
-            imageUrl: q.imageUrl || q.image_url || "",
-            groupId: q.groupId || q.group_id || "",
-            groupText: q.groupText || q.group_text || "",
-            pairs: q.pairs || undefined,
-            items: q.items || undefined,
-            statements: q.statements || (q.options?.statements ? q.options.statements : undefined),
-          };
-        }).filter((q: any) => q.text);
-
-        setParsedResults(results);
-        addToast({
-          title: "Parsing Berhasil",
-          description: `Ditemukan ${results.length} soal dari JSON. Silakan tinjau sebelum menyimpan.`,
-          type: "success"
-        });
-      } catch (err: any) {
-        addToast({
-          title: "Format JSON Salah",
-          description: err.message || "Pastikan JSON valid dan sesuai format.",
-          type: "error"
-        });
-      }
-      return;
-    }
-
-    setIsParsing(true);
-    startAIProgress();
-    aiAbortRef.current = new AbortController();
-    try {
-      let results = [];
-      if (importMode === 'extract') {
-        results = await parseQuestionsAI(pb, importText, exam?.name || "", exam?.level || "");
-      } else {
-        results = await generateFromMaterialAI(
-          pb,
-          importText,
-          importCount,
-          aiDifficulty,
-          exam?.subject || "",
-          exam?.level || "",
-          importType
-        );
-      }
-      setParsedResults(results);
-      addToast({
-        title: importMode === 'extract' ? "Ekstraksi Berhasil" : "Generasi Berhasil",
-        description: `Ditemukan ${results.length} soal. Silakan tinjau sebelum menyimpan.`,
-        type: "success"
-      });
-    } catch (err: any) {
-      addToast({
-        title: "Gagal Menarik Soal",
-        description: err.message?.startsWith("AI_RATE_LIMIT")
-          ? "Kuota token harian habis. Tunggu reset atau upgrade plan."
-          : `${err.message || "Gagal memproses dokumen."} Silakan coba ganti model AI di Pengaturan.`,
-        type: "error"
-      });
-    } finally {
-      stopAIProgress(parsedResults.length > 0);
-      setIsParsing(false);
-      aiAbortRef.current = null;
-    }
-  };
-
-
-
-  const handleSaveAIImport = async () => {
-    if (parsedResults.length === 0 || !pb) return;
-    setIsParsing(true);
-    try {
-      const typeMap: Record<string, string> = {
-        pilihan_ganda: "multiple_choice",
-        pilihan_ganda_kompleks: "complex_choice",
-        menjodohkan: "matching",
-        benar_salah: "true_false",
-        isian_singkat: "short_answer",
-        uraian: "essay",
-        urutkan: "sequence",
-        drag_drop: "drag_drop",
-        klasifikasi: "klasifikasi",
-        hotspot: "hotspot",
-        isian_rumpang: "isian_rumpang",
-        matriks: "matriks"
-      };
-
-      setBatchProgress({
-        isOpen: true,
-        total: parsedResults.length,
-        current: 0,
-        message: "Menyiapkan penyimpanan soal AI...",
-        title: "Simpan Soal AI"
-      });
-
-      let count = 0;
-      // Ambil order tertinggi dari database (bukan state) agar akurat
-      const dbQuestions = await pb.collection('questions').getFullList({ filter: `examId = "${examId}"`, fields: 'order' });
-      const maxOrder = dbQuestions.reduce((max, q) => Math.max(max, q.order || 0), 0);
-
-      // Build all payloads with localized images
-      const payloads = [];
-      for (let idx = 0; idx < parsedResults.length; idx++) {
-        const q = parsedResults[idx];
-        const type = q.type || "pilihan_ganda";
-        const field = typeMap[type] || "multiple_choice";
-
-        // Localize inline images
-        let localizedQText = await localizeInlineImages(q.text || "Pertanyaan Tanpa Judul");
-        const qImageUrl = q.imageUrl || q.image_url || "";
-        if (qImageUrl && !localizedQText.includes(qImageUrl)) {
-          const localizedImg = await localizeImage(qImageUrl, `ai_q_${idx}`);
-          if (localizedImg) {
-            localizedQText = `<p><img src="${localizedImg}" alt="Gambar Soal" style="max-height:320px;max-width:100%;border-radius:16px;margin-bottom:12px;" /></p>` + localizedQText;
-          }
-        }
-        const rawGroupText = q.groupText || q.group_text || "";
-        const localizedGroupText = rawGroupText ? await localizeInlineImages(rawGroupText) : "";
-
-        // Localize options
-        let options: any = {};
-        if (type === "benar_salah" && q.statements && Array.isArray(q.statements) && q.statements.length > 0) {
-          const validStatements = await Promise.all(q.statements.map(async (st: any) => ({
-            id: String(st.id || Math.random()),
-            text: await localizeInlineImages(st.text || ""),
-            answer: (st.answer || "benar").toLowerCase() === "salah" ? "salah" : "benar"
-          })));
-          options = { statements: validStatements };
-        } else if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
-          const rawChoices = q.choices || {};
-          const opts: any = {};
-          const keys = Object.keys(rawChoices);
-          for (let kIdx = 0; kIdx < keys.length; kIdx++) {
-            const k = keys[kIdx];
-            const val = rawChoices[k];
-            const choiceImg = val.imageUrl || val.image_url || "";
-            const localizedChoiceImg = choiceImg ? await localizeImage(choiceImg, `ai_opt_${idx}_${k}`) : undefined;
-            opts[k] = {
-              text: val.text ? await localizeInlineImages(val.text) : "",
-              imageUrl: localizedChoiceImg,
-              isCorrect: !!val.isCorrect
-            };
-          }
-          options = opts;
-        } else if (type === "menjodohkan") {
-          const pairs = q.pairs || [];
-          const localizedPairs = [];
-          for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
-            const p = pairs[pIdx];
-            localizedPairs.push({
-              ...p,
-              left: await localizeInlineImages(p.left || ""),
-              right: await localizeInlineImages(p.right || "")
-            });
-          }
-          options = { pairs: localizedPairs };
-        } else if (type === "urutkan" || type === "drag_drop") {
-          const items = q.items || [];
-          const localizedItems = [];
-          for (let itIdx = 0; itIdx < items.length; itIdx++) {
-            const it = items[itIdx];
-            const itemImg = it.imageUrl || it.image_url || "";
-            const localizedItemImg = itemImg ? await localizeImage(itemImg, `ai_item_${idx}_${itIdx}`) : undefined;
-            localizedItems.push({
-              ...it,
-              text: await localizeInlineImages(it.text || ""),
-              imageUrl: localizedItemImg
-            });
-          }
-          options = { items: localizedItems };
-        } else if (type === "klasifikasi") {
-          options = {
-            categories: q.categories || (q.options?.categories ? q.options.categories : []),
-            statements: q.statements || (q.options?.statements ? q.options.statements : []),
-            shuffleStatements: q.shuffleStatements !== undefined ? q.shuffleStatements : true
-          };
-        } else if (type === "matriks") {
-          options = {
-            columns: q.columns || (q.options?.columns ? q.options.columns : []),
-            statements: q.statements || (q.options?.statements ? q.options.statements : [])
-          };
-        } else if (type === "isian_rumpang") {
-          options = {
-            text: q.text,
-            blanks: q.blanks || (q.options?.blanks ? q.options.blanks : [])
-          };
-        }
-
-        let correctAnswer = "";
-        if (type === "benar_salah" && options?.statements && Array.isArray(options.statements)) {
-          correctAnswer = options.statements.map((s: any) => `${s.id}:${s.answer}`).join(",");
-        } else if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
-          correctAnswer = q.correctAnswer || q.answerKey || "";
-          if (!correctAnswer && options) {
-            const correctKeys = Object.keys(options).filter(k => options[k].isCorrect);
-            correctAnswer = correctKeys.join(",");
-          }
-        } else if (type === "isian_singkat" || type === "uraian") {
-          correctAnswer = q.answerKey || "";
-        }
-
-        // Localize main question imageUrl
-        const localizedQImageUrl = qImageUrl ? await localizeImage(qImageUrl, `ai_q_${idx}`) : "";
-
-        const createPayload: any = {
-          examId,
-          type,
-          text: localizedQText,
-          field,
-          options,
-          correctAnswer,
-          imageUrl: localizedQImageUrl,
-          order: maxOrder + idx + 1
-        };
-        if (q.groupId) { createPayload.groupId = q.groupId; createPayload.group_id = q.groupId; }
-        if (q.groupText) { createPayload.groupText = localizedGroupText; createPayload.group_text = localizedGroupText; }
-
-        payloads.push(createPayload);
-      }
-
-      // Save in parallel chunks of 10
-      const chunkSize = 10;
-      for (let i = 0; i < payloads.length; i += chunkSize) {
-        const chunk = payloads.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(p => pb.collection("questions").create(p)));
-        count = Math.min(i + chunkSize, payloads.length);
-        setImportProgress(Math.round((count / payloads.length) * 100));
-        setBatchProgress(prev => ({ ...prev, current: count, message: `Menyimpan soal (${count}/${payloads.length})` }));
-      }
-      setIsAIImportOpen(false);
-      addToast({
-        title: "Import Berhasil",
-        description: `${parsedResults.length} soal berhasil disimpan ke bank soal.`,
-        type: "success"
-      });
-      setParsedResults([]);
-      loadQuestions();
-    } catch (err: any) {
-      console.error("Save AI Import Error:", err, err?.data);
-      addToast({
-        title: "Gagal Menyimpan",
-        description: (err?.data ? JSON.stringify(err.data) : err.message) || "Beberapa soal mungkin gagal diimpor.",
-        type: "error"
-      });
-    } finally {
-      setIsParsing(false);
-      setImportProgress(0);
-      setBatchProgress(prev => ({ ...prev, isOpen: false }));
-    }
-  };
-
-  const handleAIGenerate = async () => {
-    if (!aiTopic.trim() || !pb) {
-      showAlert("Gagal", "Topik soal tidak boleh kosong.", "danger");
-      return;
-    }
-
-    setIsAIGenerating(true);
-    startAIProgress();
-    aiAbortRef.current = new AbortController();
-    try {
-      const generated = await generateQuestionsAI(
-        pb,
-        aiTopic,
-        aiCount,
-        aiLevel,
-        aiSubject || (exam?.subject || ""),
-        aiType,
-        isAiLiteracy,
-        aiPassageLength,
-        aiDifficulty,
-        "umum",
-        aiTaxonomy.join(","),
-        aiMaterialText,
-        aiObjectives
-      );
-
-      if (!generated || generated.length === 0 || !Array.isArray(generated)) {
-        throw new Error("AI tidak menghasilkan format soal yang valid.");
-      }
-
-      // NEW SYSTEM: Populate Batch Modal for Review instead of saving directly
-      const questionsForReview = generated.map(q => {
-        const choicesBatch: Record<string, { text: string }> = {};
-        let correctKey = (q.answerKey || "").toLowerCase();
-
-        if (q.choices) {
-          const foundKeys: string[] = [];
-          if (Array.isArray(q.choices)) {
-            q.choices.forEach((c: any, i: number) => {
-              const key = String.fromCharCode(97 + i);
-              choicesBatch[key] = { text: typeof c === 'object' ? (c.text || String(c)) : String(c) };
-              if (typeof c === 'object' && c.isCorrect) foundKeys.push(key);
-            });
-          } else {
-            Object.keys(q.choices).forEach(key => {
-              const lowerKey = key.toLowerCase();
-              const val = (q.choices as any)[key];
-              choicesBatch[lowerKey] = { text: typeof val === 'object' ? (val.text || String(val)) : String(val) };
-              if (typeof val === 'object' && val.isCorrect) foundKeys.push(lowerKey);
-            });
-          }
-          if (foundKeys.length > 0) {
-            correctKey = foundKeys.join(",");
-          }
-        }
-
-        return {
-          text: q.text,
-          type: q.type || aiType,
-          choices: choicesBatch,
-          correctKey: correctKey,
-          answerKey: q.answerKey || "",
-          pairs: q.pairs || (q.type === "menjodohkan" ? [] : undefined),
-          items: q.items || (q.type === "urutkan" || q.type === "drag_drop" ? [] : undefined),
-          categories: q.categories || (q.type === "klasifikasi" ? [] : undefined),
-          statements: q.statements || (q.type === "klasifikasi" || q.type === "matriks" || q.type === "benar_salah" ? [] : undefined),
-          columns: q.columns || (q.type === "matriks" ? [] : undefined),
-          blanks: q.blanks || (q.type === "isian_rumpang" ? [] : undefined),
-          shuffleStatements: q.shuffleStatements,
-          groupId: q.groupId || "",
-          groupText: q.groupText || "",
-          isFromAI: true,
-          imageUrl: q.imageUrl || ""
-        };
-      });
-
-      setBatchQuestions(questionsForReview);
-      setIsAIModalOpen(false);
-      setIsBatchModalOpen(true);
-
-      addToast({
-        type: "success",
-        title: "Generasi Selesai",
-        description: `${generated.length} soal telah siap ditinjau.`,
-        duration: 3000
-      });
-    } catch (err: any) {
-      console.error("AI Generate Error:", err);
-      if (err.message?.startsWith("AI_RATE_LIMIT")) {
-        const parts = err.message.split("|");
-        if (parts.length >= 5) {
-          const [, limit, used, remaining, requested] = parts;
-          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n Limit: ${Number(limit).toLocaleString()} token/hari\n Terpakai: ${Number(used).toLocaleString()}\n Sisa: ${Number(remaining).toLocaleString()}\n Diminta: ${Number(requested).toLocaleString()}\n\nTunggu reset harian atau upgrade plan.`, "danger");
-        } else {
-          showAlert("Server Sedang Limit", "Terlalu banyak permintaan AI. Silakan jeda sejenak (1 menit) sebelum memulai generasi baru.", "danger");
-        }
-      } else {
-        addToast({ type: "error", title: "Gagal", description: "Generasi gagal setelah beberapa percobaan. Coba lagi." });
-      }
-    } finally {
-      stopAIProgress(!isAIGenerating);
-      setIsAIGenerating(false);
-      aiAbortRef.current = null;
-    }
-  };
-  const [batchQuestions, setBatchQuestions] = useState<any[]>([
-    { text: "", choices: { a: { text: "" }, b: { text: "" }, c: { text: "" }, d: { text: "" }, e: { text: "" } }, correctKey: "a", imageFile: null }
-  ]);
 
   const handleBatchCreateClick = () => {
     setBatchQuestions([
@@ -1550,61 +687,7 @@ const QuestionsPage = () => {
     setIsBatchModalOpen(true);
   };
 
-  const handleApplyAIChatQuestions = (generated: any[]) => {
-    const questionsForReview = generated.map(q => {
-      const qType = q.type || "pilihan_ganda";
-      const choicesBatch: Record<string, { text: string }> = {};
-      let correctKey = (q.answerKey || "").toLowerCase();
 
-      if (q.choices) {
-        const foundKeys: string[] = [];
-        if (Array.isArray(q.choices)) {
-          q.choices.forEach((c: any, i: number) => {
-            const key = String.fromCharCode(97 + i);
-            choicesBatch[key] = { text: typeof c === 'object' ? (c.text || String(c)) : String(c) };
-            if (typeof c === 'object' && c.isCorrect) foundKeys.push(key);
-          });
-        } else {
-          Object.keys(q.choices).forEach(key => {
-            const lowerKey = key.toLowerCase();
-            const val = (q.choices as any)[key];
-            choicesBatch[lowerKey] = { text: typeof val === 'object' ? (val.text || String(val)) : String(val) };
-            if (typeof val === 'object' && val.isCorrect) foundKeys.push(lowerKey);
-          });
-        }
-        if (foundKeys.length > 0) {
-          correctKey = foundKeys.join(",");
-        }
-      }
-
-      return {
-        text: q.text,
-        type: qType,
-        choices: choicesBatch,
-        correctKey: correctKey,
-        answerKey: q.answerKey || "",
-        pairs: q.pairs || (qType === "menjodohkan" ? [] : undefined),
-        items: q.items || (qType === "urutkan" || qType === "drag_drop" ? [] : undefined),
-        categories: q.categories || (qType === "klasifikasi" ? [] : undefined),
-        statements: q.statements || (qType === "klasifikasi" || qType === "matriks" || qType === "benar_salah" ? [] : undefined),
-        columns: q.columns || (qType === "matriks" ? [] : undefined),
-        blanks: q.blanks || (qType === "isian_rumpang" ? [] : undefined),
-        shuffleStatements: q.shuffleStatements,
-        groupId: q.groupId || "",
-        groupText: q.groupText || "",
-        isFromAI: true,
-        imageUrl: q.imageUrl || ""
-      };
-    });
-
-    setBatchQuestions(questionsForReview);
-    setIsBatchModalOpen(true);
-    addToast({
-      type: "success",
-      title: "Soal Siap Ditinjau",
-      description: `${generated.length} butir soal dari Asisten AI telah masuk ke peninjauan.`
-    });
-  };
 
   const handleAddBatchRow = () => {
     setBatchQuestions(prev => [
@@ -2188,6 +1271,90 @@ const QuestionsPage = () => {
     }
   }, [examId, pb]);
 
+  const [batchQuestions, setBatchQuestions] = useState<any[]>([
+    { text: "", choices: { a: { text: "" }, b: { text: "" }, c: { text: "" }, d: { text: "" }, e: { text: "" } }, correctKey: "a", imageFile: null }
+  ]);
+
+  const {
+    isAIChatDrawerOpen,
+    setIsAIChatDrawerOpen,
+    isAIModalOpen,
+    setIsAIModalOpen,
+    isAIImportOpen,
+    setIsAIImportOpen,
+    isAIGenerating,
+    isAIGeneratingDirect,
+    aiProgress,
+    isRegeneratingIndex,
+    aiTopic,
+    setAiTopic,
+    aiCount,
+    setAiCount,
+    aiLevel,
+    setAiLevel,
+    aiSubject,
+    setAiSubject,
+    aiType,
+    setAiType,
+    isAiLiteracy,
+    setIsAiLiteracy,
+    aiPassageLength,
+    setAiPassageLength,
+    aiDifficulty,
+    setAiDifficulty,
+    aiTaxonomy,
+    toggleTaxonomy,
+    setTaxonomyPreset,
+    getTaxonomyPreset,
+    aiMaterialFile,
+    setAiMaterialFile,
+    aiMaterialText,
+    setAiMaterialText,
+    aiMaterialFileName,
+    setAiMaterialFileName,
+    isExtractingMaterial,
+    aiObjectives,
+    isFetchingObjectives,
+    dynamicSuggestions,
+    isFetchingSuggestions,
+    isGeneratingTopic,
+    importText,
+    setImportText,
+    importMode,
+    setImportMode,
+    importCount,
+    setImportCount,
+    importType,
+    setImportType,
+    isParsing,
+    setIsParsing,
+    parsedResults,
+    setParsedResults,
+    cancelAIGeneration,
+    handleGenerateTopic,
+    handleRandomFill,
+    handleAIMaterialUpload,
+    handleAIGenerateDirect,
+    handleAIRegenerateSingle,
+    handleAIParse,
+    handleSaveAIImport,
+    handleAIGenerate,
+    handleApplyAIChatQuestions
+  } = useQuestionAI({
+    pb,
+    exam,
+    examId,
+    school,
+    addToast,
+    showAlert,
+    loadQuestions,
+    batchQuestions,
+    setBatchQuestions,
+    setIsBatchModalOpen,
+    setBatchProgress,
+    setImportProgress
+  });
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2515,101 +1682,11 @@ const QuestionsPage = () => {
     return result;
   };
 
-  // Helper to localize a single image URL (remote or base64) to our Cloudflare R2 bucket
-  const localizeImage = async (url: string, filenamePrefix: string): Promise<string> => {
-    if (!url) return "";
-
-    const isOffline = school?.plan === "offline" || school?.id === "local_server" || (typeof window !== "undefined" && (/^(localhost|127\.|0\.0\.0\.0$|\[::1\])/.test(window.location.hostname) || /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname)));
-    if (isOffline) {
-      return url; // Di mode offline, jangan kontak Cloudflare
-    }
-
-    // 1. If base64
-    if (url.startsWith("data:image/")) {
-      try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        let file = new File([blob], `${filenamePrefix}-${Date.now()}.webp`, { type: blob.type });
-        // Compress if needed
-        if (blob.type !== "image/webp" && blob.size > 30 * 1024) {
-          try { file = await compressImage(file); } catch { /* keep original */ }
-        }
-        const schoolFolder = school?.slug || "unknown";
-        const uploaded = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, file);
-        return uploaded.url;
-      } catch (err) {
-        console.warn("Gagal upload base64 image:", err);
-        return url;
-      }
-    }
-
-    // 2. If external remote URL
-    const isRemote = url.startsWith("http") && !url.includes("assets.examku.my.id") && !url.includes("/api/files/");
-    if (isRemote) {
-      try {
-        // Fetch the remote image safely without PocketBase auth headers (to avoid preflight CORS failure)
-        const response = await fetch(url);
-        if (!response.ok) return url;
-        const blob = await response.blob();
-
-        // Determine file extension from content-type or URL
-        let ext = "png";
-        if (blob.type === "image/jpeg") ext = "jpg";
-        else if (blob.type === "image/webp") ext = "webp";
-        else if (blob.type === "image/gif") ext = "gif";
-
-        let file = new File([blob], `${filenamePrefix}-${Date.now()}.${ext}`, { type: blob.type });
-        if (blob.type !== "image/webp" && blob.size > 30 * 1024) {
-          try { file = await compressImage(file); } catch { /* keep original */ }
-        }
-
-        const schoolFolder = school?.slug || "unknown";
-        const uploaded = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, file);
-        return uploaded.url;
-      } catch (err) {
-        console.warn("Gagal localize remote image:", url, err);
-        return url;
-      }
-    }
-
-    return url;
-  };
-
-  // Helper to localize all remote image URLs inside HTML content
-  const localizeInlineImages = async (html: string): Promise<string> => {
-    if (!html) return html;
-
-    const isOffline = school?.plan === "offline" || school?.id === "local_server" || (typeof window !== "undefined" && (/^(localhost|127\.|0\.0\.0\.0$|\[::1\])/.test(window.location.hostname) || /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname)));
-    if (isOffline) {
-      return html; // Di mode offline, jangan kontak Cloudflare
-    }
-
-    // Find all <img src="..."> tags
-    const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
-    let result = html;
-    let match;
-    const matches: { full: string; src: string }[] = [];
-
-    while ((match = imgRegex.exec(html)) !== null) {
-      matches.push({ full: match[0], src: match[1] });
-    }
-
-    if (matches.length === 0) return html;
-
-    // Localize each image URL in parallel
-    const localized = await Promise.allSettled(matches.map(async (m, idx) => {
-      const newUrl = await localizeImage(m.src, `inline-imported-${idx}`);
-      return { src: m.src, newUrl };
-    }));
-
-    for (const r of localized) {
-      if (r.status === "fulfilled" && r.value) {
-        result = result.split(r.value.src).join(r.value.newUrl);
-      }
-    }
-
-    return result;
-  };
+  // Helper to localize images bound to current school and examId
+  const localizeImage = (url: string, filenamePrefix: string) =>
+    localizeImageHelper(url, filenamePrefix, { school, examId });
+  const localizeInlineImages = (html: string) =>
+    localizeInlineImagesHelper(html, { school, examId });
 
 
 
@@ -2926,420 +2003,22 @@ const QuestionsPage = () => {
     }
   };
 
-  const renderQuestionDetails = (item: QuestionData, showTypeBadge = true) => {
-    const qType = item.type || "pilihan_ganda";
-    const meta = QUESTION_TYPE_BADGE[qType] || { variant: "neutral" as const, label: qType };
-
-    const renderKeyAndCount = () => {
-      if (qType === "benar_salah") {
-        const stList = item.statements || item.options?.statements || [];
-        if (stList.length > 0) {
-          return (
-            <div className="flex flex-col items-start gap-1 min-w-0">
-              <div
-                className="flex items-center gap-0.5 flex-wrap cursor-help"
-                title={stList.map((s: any, idx: number) => `${idx + 1}. ${s.text ? s.text.replace(/<[^>]*>/g, '').trim() : 'Pernyataan'}: ${(s.answer || 'benar').toUpperCase()}`).join("\n")}
-              >
-                <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-bold mr-0.5">Kunci:</span>
-                {stList.slice(0, 5).map((s: any, idx: number) => {
-                  const isBenar = (s.answer || "benar").toLowerCase() === "benar";
-                  return (
-                    <span
-                      key={s.id || idx}
-                      className={cn(
-                        "inline-flex items-center justify-center px-1 py-0.2 rounded text-[10px] font-bold font-mono",
-                        isBenar
-                          ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-                          : "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30"
-                      )}
-                    >
-                      {idx + 1}:{isBenar ? "B" : "S"}
-                    </span>
-                  );
-                })}
-                {stList.length > 5 && <span className="text-[9px] text-neutral-400 font-mono">+{stList.length - 5}</span>}
-              </div>
-              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-                {stList.length} Pernyataan
-              </span>
-            </div>
-          );
-        }
-
-        const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
-        const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
-        if (keys.length > 0) {
-          const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
-          return (
-            <div className="flex flex-col items-start gap-1 min-w-0">
-              {correctKeys ? (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 truncate max-w-full shadow-2xs">
-                  Kunci: {correctKeys}
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                  Belum ada kunci
-                </span>
-              )}
-              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-                {keys.length} Opsi
-              </span>
-            </div>
-          );
-        }
-
-        return (
-          <span className="text-xs text-neutral-400 dark:text-neutral-500 italic">Belum ada pernyataan</span>
-        );
-      }
-
-      if (qType === "matriks") {
-        const cols = item.options?.columns || [];
-        const stList = item.options?.statements || [];
-        if (stList.length > 0 || cols.length > 0) {
-          return (
-            <div className="flex flex-col items-start gap-1 min-w-0">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
-                {stList.length} × {cols.length} Sel
-              </span>
-              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-                Tabel Matriks
-              </span>
-            </div>
-          );
-        }
-        return <span className="text-xs text-neutral-400 italic">Belum ada matriks</span>;
-      }
-
-      if (qType === "klasifikasi") {
-        const cats = item.options?.categories || [];
-        const stList = item.options?.statements || [];
-        if (stList.length > 0 || cats.length > 0) {
-          return (
-            <div className="flex flex-col items-start gap-1 min-w-0">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
-                {stList.length} Baris × {cats.length} Kat.
-              </span>
-              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-                Klasifikasi
-              </span>
-            </div>
-          );
-        }
-        return <span className="text-xs text-neutral-400 italic">Belum ada data</span>;
-      }
-
-      if (qType === "isian_rumpang") {
-        const blanks = item.options?.blanks || [];
-        return (
-          <div className="flex flex-col items-start gap-1 min-w-0">
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-              {blanks.length} Isian Rumpang
-            </span>
-            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-              Teks Rumpang
-            </span>
-          </div>
-        );
-      }
-
-      if (qType === "hotspot") {
-        const areas = item.options?.areas || [];
-        return (
-          <div className="flex flex-col items-start gap-1 min-w-0">
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
-              {areas.length} Area Hotspot
-            </span>
-            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-              Titik Gambar
-            </span>
-          </div>
-        );
-      }
-
-      if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks") {
-        const activeKeys = Object.keys(item.choices || {}).filter(k => (item.choices?.[k]?.text && item.choices?.[k]?.text.replace(/<[^>]*>/g, '').trim()) || item.choices?.[k]?.imageUrl);
-        const keys = activeKeys.length > 0 ? activeKeys : Object.keys(item.choices || {});
-        const correctKeys = keys.filter(k => item.choices?.[k]?.isCorrect).map(k => k.toUpperCase()).join(", ");
-
-        return (
-          <div className="flex flex-col items-start gap-1 min-w-0">
-            {correctKeys ? (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 truncate max-w-full shadow-2xs">
-                Kunci: {correctKeys}
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                Belum ada kunci
-              </span>
-            )}
-            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-              {keys.length} Opsi
-            </span>
-          </div>
-        );
-      }
-
-      if (qType === "menjodohkan") {
-        const pairs = item.pairs || [];
-        return (
-          <div className="flex flex-col items-start gap-1 min-w-0">
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
-              {pairs.length} Pasangan
-            </span>
-            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-              Mencocokkan
-            </span>
-          </div>
-        );
-      }
-
-      if (qType === "isian_singkat" || qType === "uraian") {
-        return (
-          <div className="flex flex-col items-start gap-1 min-w-0">
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 truncate max-w-[130px]" title={item.answerKey || "-"}>
-              {item.answerKey ? `Kunci: ${item.answerKey}` : "(Rubrik Esai)"}
-            </span>
-            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-              {qType === "uraian" ? "Jawaban Uraian" : "Isian Singkat"}
-            </span>
-          </div>
-        );
-      }
-
-      if (qType === "urutkan" || qType === "drag_drop") {
-        const items = item.items || [];
-        return (
-          <div className="flex flex-col items-start gap-1 min-w-0">
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
-              {items.length} Tahapan
-            </span>
-            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-              Urutan Kronologis
-            </span>
-          </div>
-        );
-      }
-
-      return null;
-    };
-
-    return (
-      <div className="flex flex-col items-start gap-1.5 min-w-0">
-        {showTypeBadge && (
-          <NeonBadge variant={meta.variant} size="xs" className="shrink-0 font-medium">
-            {meta.label}
-          </NeonBadge>
-        )}
-        {renderKeyAndCount()}
-      </div>
-    );
-  };
-
-  const neonColumns: NeonTableColumn<QuestionData>[] = useMemo(() => [
-    {
-      key: "no",
-      header: "#",
-      width: "36px",
-      align: "center",
-      className: "w-9 text-center shrink-0",
-      headerClassName: "w-9 text-center shrink-0",
-      render: (item, index) => {
-        const isInspected = inspectedQuestion?.id === item.id;
-        return (
-          <div className="flex items-center justify-center">
-            <span
-              className={cn(
-                "h-6 min-w-6 px-1.5 rounded-md font-mono text-xs font-bold flex items-center justify-center transition-all",
-                isInspected
-                  ? "bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.6)] scale-105"
-                  : "text-neutral-400 dark:text-neutral-500 group-hover:text-neutral-800 dark:group-hover:text-neutral-200"
-              )}
-            >
-              {index + 1}
-            </span>
-          </div>
-        );
-      }
-    },
-    {
-      key: "text",
-      header: "Teks Pertanyaan & Stimulus",
-      className: "min-w-0 max-w-full break-words",
-      headerClassName: "min-w-0",
-      render: (item) => (
-        <div className="space-y-1.5 py-0.5 min-w-0 max-w-full overflow-hidden">
-          {/* Question Text & Embedded Table/Image Wrapper (Max height capped to prevent giant rows) */}
-          <div className="relative max-h-24 sm:max-h-28 overflow-hidden rounded-md group/math">
-            <MathText
-              content={item.text}
-              className="text-xs sm:text-[13px] font-serif text-neutral-900 dark:text-neutral-100 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_figure]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4 [&_img]:!max-h-20 sm:[&_img]:!max-h-24 [&_img]:!max-w-[140px] sm:[&_img]:!max-w-[180px] [&_img]:!w-auto [&_img]:!h-auto [&_img]:object-contain [&_img]:rounded-md [&_img]:border [&_img]:border-neutral-200/80 [&_img]:dark:border-neutral-800 [&_img]:my-1 [&_img]:block [&_table]:!text-[10px] [&_table]:!leading-tight [&_table]:!my-1 [&_table]:!max-w-full [&_table]:!border-collapse [&_td]:!p-0.5 [&_td]:!px-2 [&_th]:!p-0.5 [&_th]:!px-2 [&_td]:!text-[10px] [&_th]:!text-[10px] [&_td]:!border [&_td]:!border-neutral-200 dark:[&_td]:!border-neutral-750 [&_th]:!border [&_th]:!border-neutral-200 dark:[&_th]:!border-neutral-750 [&_th]:!bg-neutral-50 dark:[&_th]:!bg-neutral-850 [&_.ql-table-embed]:!my-0.5 [&_.ql-table-embed]:!p-0 [&_.ql-table-embed]:!border-none [&_.ql-table-embed]:!bg-transparent shadow-2xs"
-            />
-
-          </div>
-
-          {/* Standalone Image Thumbnail (if question has item.imageUrl not embedded in text) */}
-          {item.imageUrl && !item.text?.includes("<img") && (
-            <img
-              src={item.imageUrl}
-              alt="Gambar Soal"
-              className="max-h-16 sm:max-h-20 max-w-[140px] sm:max-w-[180px] w-auto h-auto object-contain rounded-md border border-neutral-200/80 dark:border-neutral-800 my-1 block shadow-2xs"
-            />
-          )}
-
-          {/* Badges Metadata Line */}
-          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-            {item.text?.includes("<table") && (
-              <NeonBadge variant="neutral" size="xs" icon={FileSpreadsheet}>
-                Tabel Data
-              </NeonBadge>
-            )}
-            {(item.imageUrl || item.text.includes("<img")) && (
-              <NeonBadge variant="sky" size="xs" icon={Image}>
-                Bergambar
-              </NeonBadge>
-            )}
-            {item.groupId && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex min-w-0 shrink-0">
-                    <NeonBadge
-                      variant="amber"
-                      size="xs"
-                      icon={BookOpen}
-                      className="max-w-[180px] xs:max-w-[240px] sm:max-w-[320px] md:max-w-[420px] min-w-0 shrink-0 cursor-pointer hover:bg-amber-500/20 transition-colors"
-                    >
-                      <span className="truncate min-w-0">Paket: {item.groupId}</span>
-                      {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && (
-                        <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-600 text-white text-[9px] font-bold shrink-0">
-                          Wacana
-                        </span>
-                      )}
-                    </NeonBadge>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs max-w-xs space-y-1">
-                  <div className="font-bold text-amber-500 flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                    <span>Paket Stimulus (AKM)</span>
-                  </div>
-                  <p className="font-mono text-neutral-100 font-semibold break-all">{item.groupId}</p>
-                  {item.groupText && (
-                    <p className="text-[11px] text-neutral-300 font-serif line-clamp-3 pt-1 border-t border-neutral-700/60 leading-relaxed">
-                      {item.groupText.replace(/<[^>]*>/g, '')}
-                    </p>
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {/* Mobile Type Badge */}
-            <span className="sm:hidden">
-              <NeonBadge
-                variant={(QUESTION_TYPE_BADGE[item.type || "pilihan_ganda"]?.variant) || "neutral"}
-                size="xs"
-              >
-                {QUESTION_TYPE_LABELS[item.type || "pilihan_ganda"] || item.type}
-              </NeonBadge>
-            </span>
-          </div>
-        </div>
-      )
-    },
-    {
-      key: "details",
-      header: "Detail",
-      width: "145px",
-      className: "hidden sm:table-cell w-[145px] shrink-0",
-      headerClassName: "hidden sm:table-cell w-[145px] shrink-0",
-      render: (item) => renderQuestionDetails(item, true)
-    },
-    {
-      key: "actions",
-      header: "Aksi",
-      width: "92px",
-      overflow: "visible",
-      className: "w-[92px] text-right shrink-0 !px-2 overflow-visible",
-      headerClassName: "w-[92px] text-right shrink-0 !px-2",
-      align: "right",
-      render: (item) => {
-        const idx = questions.findIndex(q => q.id === item.id);
-        return (
-          <div className="flex justify-end items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-            {/* Quick Action: Pratinjau */}
-            <button
-              type="button"
-              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors shadow-2xs cursor-pointer shrink-0"
-              onClick={() => {
-                setPreviewIndex(idx >= 0 ? idx : 0);
-                setPreviewQuestion(item);
-                setIsPreviewOpen(true);
-              }}
-              title="Pratinjau Soal"
-            >
-              <Search className="h-3.5 w-3.5" />
-            </button>
-
-            {/* Quick Action: Edit (sm+) */}
-            {canEdit && (
-              <button
-                type="button"
-                className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors shadow-2xs cursor-pointer shrink-0"
-                onClick={() => handleEditClick(item)}
-                title="Edit Soal"
-              >
-                <Edit className="h-3.5 w-3.5" />
-              </button>
-            )}
-
-            {/* Dropdown Menu Seragam */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors shadow-2xs cursor-pointer shrink-0"
-                  title="Menu Lainnya"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
-                <DropdownMenuItem
-                  onClick={() => {
-                    setPreviewIndex(idx >= 0 ? idx : 0);
-                    setPreviewQuestion(item);
-                    setIsPreviewOpen(true);
-                  }}
-                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
-                >
-                  <Search className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
-                  <span>Pratinjau</span>
-                </DropdownMenuItem>
-                {canEdit && (
-                  <>
-                    <DropdownMenuItem
-                      onClick={() => handleEditClick(item)}
-                      className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
-                    >
-                      <Edit className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
-                      <span>Edit</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-                    <DropdownMenuItem
-                      onClick={() => handleDeleteClick(item)}
-                      className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
-                    >
-                      <Trash className="h-3.5 w-3.5 text-rose-500 shrink-0" />
-                      <span>Hapus</span>
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        );
-      }
-    }
-  ], [questions, isOwner, canEdit]);
+  const neonColumns: NeonTableColumn<QuestionData>[] = useMemo(
+    () =>
+      getQuestionColumns({
+        questions,
+        inspectedQuestion,
+        canEdit,
+        onPreview: (item, index) => {
+          setPreviewIndex(index);
+          setPreviewQuestion(item);
+          setIsPreviewOpen(true);
+        },
+        onEdit: handleEditClick,
+        onDelete: handleDeleteClick,
+      }),
+    [questions, inspectedQuestion, canEdit, handleEditClick, handleDeleteClick]
+  );
 
   const columns = neonColumns;
 
@@ -4478,7 +3157,7 @@ const QuestionsPage = () => {
                       <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800 space-y-1">
                         <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Konfigurasi Jawaban</div>
                         <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850/50 border border-neutral-200/60 dark:border-neutral-800">
-                          {renderQuestionDetails(inspectedQuestion, false)}
+                          <QuestionDetailsView item={inspectedQuestion} showTypeBadge={false} />
                         </div>
                       </div>
                     )}
