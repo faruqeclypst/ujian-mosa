@@ -973,7 +973,7 @@ const QuestionFormPage = () => {
         };
 
       } catch (error) {
-  
+
       }
     };
 
@@ -1068,11 +1068,11 @@ const QuestionFormPage = () => {
         { id: "s2", text: "", answer: "k2" }
       ],
       klasifikasiShuffle: true,
-    isianRumpangText: "",
-    isianRumpangBlanks: [],
-    hotspotImageUrl: "",
-    hotspotMode: "any",
-    hotspotAreas: []
+      isianRumpangText: "",
+      isianRumpangBlanks: [],
+      hotspotImageUrl: "",
+      hotspotMode: "any",
+      hotspotAreas: []
     });
     setIsLiterasiActive(false);
     setLiterasiMode("select");
@@ -1925,11 +1925,10 @@ const QuestionFormPage = () => {
                 </h1>
 
                 {/* Mode & Number Badge */}
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border transition-colors ${
-                  dialogMode === "edit"
-                    ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50"
-                    : "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800/50"
-                }`}>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border transition-colors ${dialogMode === "edit"
+                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50"
+                  : "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800/50"
+                  }`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${dialogMode === "edit" ? "bg-amber-500" : "bg-indigo-500"}`} />
                   {questionNumberBadge}
                 </span>
@@ -1987,11 +1986,10 @@ const QuestionFormPage = () => {
             <button
               type="button"
               onClick={() => setShowPreview(!showPreview)}
-              className={`inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg border transition-all shadow-2xs active:scale-95 cursor-pointer ${
-                showPreview
-                  ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/20"
-                  : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              }`}
+              className={`inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg border transition-all shadow-2xs active:scale-95 cursor-pointer ${showPreview
+                ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/20"
+                : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                }`}
               title={showPreview ? "Matikan pratinjau tampilan ujian siswa" : "Aktifkan pratinjau tampilan ujian siswa"}
               aria-pressed={showPreview}
             >
@@ -2127,8 +2125,8 @@ const QuestionFormPage = () => {
                           <span>Paket Stimulus / Literasi</span>
                         </label>
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-md border transition-colors ${isLiterasiActive
-                            ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800"
-                            : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                          ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800"
+                          : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
                           }`}>
                           {isLiterasiActive ? "TERHUBUNG" : "MANDIRI"}
                         </span>
@@ -2144,8 +2142,8 @@ const QuestionFormPage = () => {
                           }
                         }}
                         className={`w-full h-10 px-3 rounded-lg border text-left flex items-center justify-between transition-all shadow-xs ${isLiterasiActive
-                            ? "bg-blue-50/90 border-blue-300 dark:bg-blue-950/50 dark:border-blue-800 text-blue-900 dark:text-blue-200"
-                            : "bg-white hover:bg-slate-50 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-750 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                          ? "bg-blue-50/90 border-blue-300 dark:bg-blue-950/50 dark:border-blue-800 text-blue-900 dark:text-blue-200"
+                          : "bg-white hover:bg-slate-50 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-750 dark:border-slate-700 text-slate-700 dark:text-slate-300"
                           }`}
                       >
                         <span className="text-xs font-semibold">
@@ -2461,102 +2459,102 @@ const QuestionFormPage = () => {
         }}
       />
 
-        <SharedGalleryModal
-          isOpen={isGalleryOpen}
-          onClose={() => setIsGalleryOpen(false)}
-          onSelectImage={handlePickGallery}
-          pb={pb!}
-          school={school}
-          currentUser={user}
-          currentQuestionContext={{
-            text: formValues.text,
-            topic: exam?.title,
-            subject: exam?.subject,
-            options: Object.values(formValues.choices || {}).map((c: any) => c.text),
-            correctAnswer: formValues.answerKey,
-          }}
-        />
+      <SharedGalleryModal
+        isOpen={isGalleryOpen}
+        onClose={() => setIsGalleryOpen(false)}
+        onSelectImage={handlePickGallery}
+        pb={pb!}
+        school={school}
+        currentUser={user}
+        currentQuestionContext={{
+          text: formValues.text,
+          topic: exam?.title,
+          subject: exam?.subject,
+          options: Object.values(formValues.choices || {}).map((c: any) => c.text),
+          correctAnswer: formValues.answerKey,
+        }}
+      />
 
-        {/* 🧮 Visual Equation Studio Modal */}
-        <EquationStudioModal
-          isOpen={isEquationModalOpen}
-          onClose={() => {
-            setIsEquationModalOpen(false);
-            setEquationTarget(null);
-          }}
-          onInsert={handleInsertEquation}
-          initialLatex={initialEquationLatex}
-        />
+      {/* 🧮 Visual Equation Studio Modal */}
+      <EquationStudioModal
+        isOpen={isEquationModalOpen}
+        onClose={() => {
+          setIsEquationModalOpen(false);
+          setEquationTarget(null);
+        }}
+        onInsert={handleInsertEquation}
+        initialLatex={initialEquationLatex}
+      />
 
-        {/* ASISTEN AI CHAT DRAWER */}
-        <AIChatQuestionDrawer
-          isOpen={isAIChatDrawerOpen}
-          onClose={() => setIsAIChatDrawerOpen(false)}
-          exam={{
-            id: examId || "",
-            name: exam?.title || "Ujian",
-            subject: exam?.subject || "Umum"
-          }}
-          onApplyQuestions={handleApplyAIQuestions}
-        />
+      {/* ASISTEN AI CHAT DRAWER */}
+      <AIChatQuestionDrawer
+        isOpen={isAIChatDrawerOpen}
+        onClose={() => setIsAIChatDrawerOpen(false)}
+        exam={{
+          id: examId || "",
+          name: exam?.title || "Ujian",
+          subject: exam?.subject || "Umum"
+        }}
+        onApplyQuestions={handleApplyAIQuestions}
+      />
 
-        <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
-          <DialogContent className="max-w-sm bg-card p-4">
-            <DialogHeader>
-              <DialogTitle className="text-sm font-bold">Pilih Sumber Gambar</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col gap-2 pt-2">
-              <button
-                type="button"
-                className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
-                onClick={() => globalFileInputRef.current?.click()}
-              >
-                <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-800/40 text-purple-600 dark:text-purple-400">
-                  <Image className="h-4 w-4" />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="font-semibold text-xs">Unggah Dari Komputer</span>
-                  <span className="text-xs text-slate-400">File foto maksimal 2MB</span>
-                </div>
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
-                onClick={() => { setIsPickerOpen(false); setIsGalleryOpen(true); loadGalleryImages(); }}
-              >
-                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800/40 text-blue-600 dark:text-blue-400">
-                  <FolderOpen className="h-4 w-4" />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="font-semibold text-xs">Ambil Dari Galeri</span>
-                  <span className="text-xs text-slate-400">Gunakan file yang sudah di-upload</span>
-                </div>
-              </button>
-            </div>
-          </DialogContent>
-        </Dialog>
+      <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
+        <DialogContent className="max-w-sm bg-card p-4">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold">Pilih Sumber Gambar</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            <button
+              type="button"
+              className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
+              onClick={() => globalFileInputRef.current?.click()}
+            >
+              <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-800/40 text-purple-600 dark:text-purple-400">
+                <Image className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col items-start">
+                <span className="font-semibold text-xs">Unggah Dari Komputer</span>
+                <span className="text-xs text-slate-400">File foto maksimal 2MB</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
+              onClick={() => { setIsPickerOpen(false); setIsGalleryOpen(true); loadGalleryImages(); }}
+            >
+              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800/40 text-blue-600 dark:text-blue-400">
+                <FolderOpen className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col items-start">
+                <span className="font-semibold text-xs">Ambil Dari Galeri</span>
+                <span className="text-xs text-slate-400">Gunakan file yang sudah di-upload</span>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-        <ConfirmationDialog
-          isOpen={confirmModal.isOpen}
-          onClose={() => setConfirmModal((prev: any) => ({ ...prev, isOpen: false }))}
-          onConfirm={async () => {
-            if (confirmModal.onConfirm) await confirmModal.onConfirm();
-            setConfirmModal((prev: any) => ({ ...prev, isOpen: false }));
-          }}
-          title={confirmModal.title}
-          description={confirmModal.description}
-          type={confirmModal.type}
-          confirmLabel={confirmModal.confirmLabel || "OK"}
-          showCancel={confirmModal.showCancel}
-        />
+      <ConfirmationDialog
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev: any) => ({ ...prev, isOpen: false }))}
+        onConfirm={async () => {
+          if (confirmModal.onConfirm) await confirmModal.onConfirm();
+          setConfirmModal((prev: any) => ({ ...prev, isOpen: false }));
+        }}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        type={confirmModal.type}
+        confirmLabel={confirmModal.confirmLabel || "OK"}
+        showCancel={confirmModal.showCancel}
+      />
 
-        <input
-          type="file"
-          ref={globalFileInputRef}
-          accept="image/*"
-          className="hidden"
-          onChange={handleGlobalFileSelect}
-        />
+      <input
+        type="file"
+        ref={globalFileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleGlobalFileSelect}
+      />
     </div>
   );
 };
