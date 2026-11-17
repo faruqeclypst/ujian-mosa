@@ -54,6 +54,7 @@ import {
   getAbsoluteUrl,
   forceSmallImage,
   processHtmlInlineImages,
+  convertToPngBase64,
 } from "./questions/utils/imageProcessors";
 import {
   type QuestionType,
