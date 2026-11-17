@@ -293,7 +293,7 @@ const DOC_TOPICS: DocTopic[] = [
     lead: "Sistem pembuatan naskah ujian komprehensif mendukung 12 jenis butir soal, wacana literasi berdampingan, formula matematika LaTeX/KaTeX, serta impor dari Microsoft Word (.docx).",
     icon: BookOpen,
     sections: [
-      { id: "konfigurasi-paket", title: "Konfigurasi & Duplikasi Paket Soal" },
+      { id: "konfigurasi-paket", title: "Konfigurasi, Duplikasi & Kolaborasi MGMP" },
       { id: "rich-text-literasi", title: "Rich Text Editor & Mode Wacana Literasi" },
       { id: "metode-impor", title: "4 Metode Impor (Excel, Word, JSON, AI)" },
       { id: "katalog-tipe-soal", title: "Katalog 12 Tipe Butir Soal" },
@@ -820,7 +820,7 @@ const GuidePage: React.FC = () => {
                       rows={[
                         [
                           <span className="font-semibold text-neutral-900 dark:text-neutral-100">Guru Standar</span>,
-                          "Hanya paket soal miliknya sendiri",
+                          "Hanya paket soal miliknya sendiri & rekan se-mapel (MGMP). Tidak dapat melihat bank soal mapel lain.",
                           "Hanya ruang ujian yang ditugaskan kepadanya",
                           "Hanya membaca daftar siswa"
                         ],
@@ -838,6 +838,9 @@ const GuidePage: React.FC = () => {
                         ],
                       ]}
                     />
+                    <Callout type="tip" title="Kolaborasi MGMP (Musyawarah Guru Mata Pelajaran)">
+                      Guru dapat saling berkolaborasi menyusun soal dengan sesama guru yang mengajar mata pelajaran yang sama (MGMP). Saat fitur <strong>Kolaborasi MGMP</strong> aktif pada bank soal, rekan guru se-mapel dapat saling melihat, menambah butir soal, dan mengedit naskah bersama-sama. Bank soal mata pelajaran lain tetap terproteksi penuh dan tidak dapat dilihat oleh guru non-mapel.
+                    </Callout>
                   </section>
 
                   <section id="peserta-didik" className="scroll-mt-24 space-y-3">
@@ -908,11 +911,14 @@ const GuidePage: React.FC = () => {
                   <section id="konfigurasi-paket" className="scroll-mt-24 space-y-3">
                     <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 tracking-tight flex items-center gap-2">
                       <BookOpen size={16} className="text-emerald-600 dark:text-emerald-400" />
-                      Konfigurasi &amp; Duplikasi Paket Soal
+                      Konfigurasi, Duplikasi &amp; Kolaborasi MGMP
                     </h2>
                     <p>
                       Paket soal dikelompokkan berdasarkan Mata Pelajaran dan Jenjang Kelas. Fitur <strong>Duplikasi Paket</strong> memungkinkan guru menduplikasi seluruh butir soal ke semester atau tahun ajaran berikutnya tanpa mengetik ulang.
                     </p>
+                    <Callout type="note" title="Kolaborasi Terbuka MGMP Se-Mapel">
+                      Saat membuat atau mengedit bank soal, guru dapat mengaktifkan sakelar <strong>Kolaborasi MGMP (Guru Se-Mapel)</strong>. Fitur ini memungkinkan rekan guru pengampu mata pelajaran yang sama untuk saling melihat, menambahkan butir soal, dan mengedit naskah bersama. Demi keamanan privasi, guru tidak dapat melihat bank soal milik guru lain di luar kelompok mata pelajaran yang diampunya.
+                    </Callout>
                   </section>
 
                   <section id="rich-text-literasi" className="scroll-mt-24 space-y-3">
@@ -1135,6 +1141,9 @@ Karakteristik soal:
                     <p>
                       Jendela akses menentukan rentang waktu tombol <strong>Mulai Ujian</strong> aktif di layar siswa. Jika siswa membuka aplikasi setelah waktu berakhir, sesi dinyatakan ditutup dan siswa tidak dapat memulai ujian tanpa izin administrator.
                     </p>
+                    <Callout type="tip" title="Tampilan Card Jadwal di Portal Siswa">
+                      Pada dashboard siswa, card jadwal ujian menampilkan ringkasan informasi esensial: <strong>Mata Pelajaran</strong>, <strong>Nama Paket Soal</strong>, <strong>Guru Pengampu</strong>, <strong>Durasi Pengerjaan</strong> (misal: 90 Menit), dan <strong>Hari &amp; Tanggal</strong> pelaksanaan. Tombol pengerjaan akan otomatis aktif ketika jadwal berlangsung.
+                    </Callout>
                   </section>
 
                   <section id="durasi-timer" className="scroll-mt-24 space-y-3">

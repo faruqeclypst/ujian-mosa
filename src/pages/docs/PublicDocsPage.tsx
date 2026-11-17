@@ -445,7 +445,7 @@ export const PublicDocsPage: React.FC = () => {
                   <BookOpen size={14} /> Guru Mata Pelajaran
                 </p>
                 <p className="text-slate-600 leading-relaxed">
-                  Menyusun bank soal, mengoreksi butir esai siswa, serta melihat analisis butir soal dan statistik capaian siswa per kompetensi.
+                  Menyusun bank soal mandiri atau kolaborasi MGMP se-mapel, mengoreksi butir esai siswa, serta melihat analisis butir soal dan statistik capaian siswa.
                 </p>
               </div>
 
@@ -660,6 +660,15 @@ export const PublicDocsPage: React.FC = () => {
                 </p>
                 <p className="text-slate-600 leading-relaxed">
                   Soal eksakta (Matematika, Fisika, Kimia) mendukung penulisan rumus LaTeX standar seperti <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">{"$\\sqrt{x^2 + y^2}$"}</code>. Gambar dapat langsung di-upload atau dipaste ke dalam editor soal secara instan.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-2">
+                <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <Users size={15} className="text-indigo-600" /> Kolaborasi MGMP & Privasi Antar-Mapel
+                </p>
+                <p className="text-slate-600 leading-relaxed">
+                  Guru dapat mengaktifkan opsi <strong>Kolaborasi MGMP (Guru Se-Mapel)</strong> agar sesama guru pengampu mata pelajaran yang sama dapat saling melengkapi butir soal. Bank soal guru dari mata pelajaran lain otomatis terproteksi dan tidak dapat diakses demi menjaga privasi dan ketertiban administrasi.
                 </p>
               </div>
             </div>
