@@ -16,6 +16,7 @@ import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
 import { exportActiveRoomsToZip } from "../../lib/roomExcelExport";
 import { getStudentExamUrl } from "../../utils/domainHelper";
+import { useAsyncAction } from "../../hooks/useAsyncAction";
 
 import { NeonTable, type NeonTableColumn } from "../../components/ui/NeonTable";
 import {
@@ -115,9 +116,6 @@ const ExamRoomsPage = () => {
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif");
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const isSubmittingRef = useRef(false);
-  const isDeletingRef = useRef(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedRoom, setSelectedRoom] = useState<ExamRoomData | null>(null);
 
@@ -171,7 +169,6 @@ const ExamRoomsPage = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<ExamRoomData | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [showClassesRoom, setShowClassesRoom] = useState<ExamRoomData | null>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -730,10 +727,8 @@ const ExamRoomsPage = () => {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!roomToDelete || !pb || isDeletingRef.current) return;
-    isDeletingRef.current = true;
-    setIsDeleting(true);
+  const [handleConfirmDelete, isDeleting] = useAsyncAction(async () => {
+    if (!roomToDelete || !pb) return;
     try {
       await pb.collection('exam_rooms').delete(roomToDelete.id);
       showAlert("Berhasil", "Ruang dihapus.", "success");
@@ -741,11 +736,9 @@ const ExamRoomsPage = () => {
     } catch (e) {
       showAlert("Gagal", "Gagal hapus.", "danger");
     } finally {
-      isDeletingRef.current = false;
-      setIsDeleting(false);
       setDeleteDialogOpen(false);
     }
-  };
+  });
 
   const handleBatchToggleStatus = (enable: boolean) => {
     if (selectedIds.length === 0) return;
@@ -958,49 +951,46 @@ const ExamRoomsPage = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [handleSubmit, isSubmitting] = useAsyncAction(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmittingRef.current) return;
+    if (!formValues.examId) {
+      showAlert("Gagal", "Pilih bank soal terlebih dahulu.", "danger");
+      return;
+    }
+
+    const finalClassIds = formValues.allClasses
+      ? (examClasses || []).map(c => c.id)
+      : formValues.classId.split(",").filter(Boolean);
+
+    const data = {
+      title: formValues.room_name,
+      room_name: formValues.room_name,
+      group_name: (formValues.group_name || "").trim(),
+      examId: formValues.examId,
+      startTime: new Date(formValues.start_time).toISOString(),
+      start_time: new Date(formValues.start_time).toISOString(),
+      endTime: new Date(formValues.end_time).toISOString(),
+      end_time: new Date(formValues.end_time).toISOString(),
+      classIds: finalClassIds,
+      classId: finalClassIds,
+      allClasses: formValues.allClasses,
+      all_classes: formValues.allClasses,
+      duration: Number(formValues.duration),
+      cheat_limit: Number(formValues.cheat_limit),
+      submit_window: Number(formValues.submit_window),
+      max_questions: Number(formValues.max_questions) || 0,
+      randomize_questions: formValues.randomize_questions !== false,
+      room_code: formValues.room_code,
+      show_result: formValues.show_result,
+      is_exambro: formValues.is_exambro,
+      isActive: true,
+      status: "active",
+      isDisabled: false
+    };
+
+    if (!pb) return;
+
     try {
-      if (!formValues.examId) {
-        showAlert("Gagal", "Pilih bank soal terlebih dahulu.", "danger");
-        return;
-      }
-      isSubmittingRef.current = true;
-      setIsSubmitting(true);
-
-      const finalClassIds = formValues.allClasses
-        ? (examClasses || []).map(c => c.id)
-        : formValues.classId.split(",").filter(Boolean);
-
-      const data = {
-        title: formValues.room_name,
-        room_name: formValues.room_name,
-        group_name: (formValues.group_name || "").trim(),
-        examId: formValues.examId,
-        startTime: new Date(formValues.start_time).toISOString(),
-        start_time: new Date(formValues.start_time).toISOString(),
-        endTime: new Date(formValues.end_time).toISOString(),
-        end_time: new Date(formValues.end_time).toISOString(),
-        classIds: finalClassIds,
-        classId: finalClassIds,
-        allClasses: formValues.allClasses,
-        all_classes: formValues.allClasses,
-        duration: Number(formValues.duration),
-        cheat_limit: Number(formValues.cheat_limit),
-        submit_window: Number(formValues.submit_window),
-        max_questions: Number(formValues.max_questions) || 0,
-        randomize_questions: formValues.randomize_questions !== false,
-        room_code: formValues.room_code,
-        show_result: formValues.show_result,
-        is_exambro: formValues.is_exambro,
-        isActive: true,
-        status: "active",
-        isDisabled: false
-      };
-
-      if (!pb) return;
-
       if (dialogMode === "edit" && selectedRoom) {
         await pb.collection('exam_rooms').update(selectedRoom.id, data);
       } else {
@@ -1012,11 +1002,8 @@ const ExamRoomsPage = () => {
     } catch (e) {
       console.error("Save error:", e);
       showAlert("Gagal", "Gagal simpan.", "danger");
-    } finally {
-      isSubmittingRef.current = false;
-      setIsSubmitting(false);
     }
-  };
+  });
 
   const handleQuestionsClick = useCallback((room: ExamRoomData) => {
     const eId = room.examId || (room as any).examid || (room as any).expand?.examId?.id;

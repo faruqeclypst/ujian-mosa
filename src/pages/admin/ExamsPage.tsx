@@ -39,6 +39,7 @@ import { useTenant } from "../../context/TenantContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useExamData } from "../../context/ExamDataContext";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
+import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { BatchProgressDialog, type BatchProgressState } from "../../components/dialogs/BatchProgressDialog";
 import { NeonProgressModal } from "../../components/ui/NeonProgressModal";
 import {
@@ -375,10 +376,6 @@ const ExamsPage = () => {
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif");
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const isSubmittingRef = useRef(false);
-  const isDuplicatingRef = useRef(false);
-  const isDeletingRef = useRef(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedExam, setSelectedExam] = useState<ExamData | null>(null);
   const [activeExamIds, setActiveExamIds] = useState<string[]>(() => examsCache?.activeExamIds || []);
@@ -394,7 +391,6 @@ const ExamsPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
   const [questionCounts, setQuestionCounts] = useState<Record<string, number>>(() => examsCache?.questionCounts || {});
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
 
@@ -691,7 +687,8 @@ const ExamsPage = () => {
     description: string;
     type: "info" | "warning" | "danger" | "success";
     confirmLabel: string;
-    onConfirm: () => void;
+    isLoading?: boolean;
+    onConfirm: () => void | Promise<void>;
   }>({
     isOpen: false,
     title: "",
@@ -1123,9 +1120,48 @@ const ExamsPage = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDuplicateExam = (exam: ExamData) => {
+  const [executeDuplicateExam, isDuplicating] = useAsyncAction(async (exam: ExamData) => {
+    if (!pb) return;
     const mine = isOwner(exam);
     const targetTitle = mine ? `(Salinan) ${exam.title}` : `${exam.title} (Salinan Saya)`;
+    const newTeacherId = (role !== "admin" && (teacherId || user?.id)) ? (teacherId || user?.id) : exam.teacherId;
+    const newExam = await pb.collection('exams').create({
+      title: targetTitle,
+      subjectId: exam.subjectId,
+      teacherId: newTeacherId,
+      examType: exam.examType || "Latihan",
+      group_name: exam.group_name || "",
+      is_mgmp_shared: false,
+    });
+
+    const questions = await pb.collection('questions').getFullList({
+      filter: `examId = "${exam.id}"`
+    });
+
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < questions.length; i += CHUNK_SIZE) {
+      const chunk = questions.slice(i, i + CHUNK_SIZE);
+      await Promise.all(chunk.map((q) => {
+        const { id, created, updated, collectionId, collectionName, ...rest } = q;
+        return pb.collection('questions').create({
+          ...rest,
+          examId: newExam.id,
+        });
+      }));
+    }
+
+    addToast({
+      type: "success",
+      title: "Berhasil Menyalin Bank Soal",
+      description: `Bank soal "${targetTitle}" berhasil disalin ke koleksi Anda (${questions.length} butir soal).`
+    });
+    await fetchExams();
+  }, {
+    errorMessage: "Gagal menyalin bank soal."
+  });
+
+  const handleDuplicateExam = (exam: ExamData) => {
+    const mine = isOwner(exam);
     const teacherAuthor = teachers.find((t: any) => t.id === exam.teacherId)?.name || "rekan guru";
 
     setConfirmDialog({
@@ -1136,47 +1172,9 @@ const ExamsPage = () => {
         : `Salin bank soal "${exam.title}" karya ${teacherAuthor} ke koleksi Anda? Anda akan menjadi pemilik salinan ini dan memiliki akses penuh untuk mengeditnya.`,
       type: "info",
       confirmLabel: mine ? "Duplikat" : "Salin ke Koleksi Saya",
+      isLoading: isDuplicating,
       onConfirm: async () => {
-        if (!pb || isDuplicatingRef.current) return;
-        isDuplicatingRef.current = true;
-        try {
-          const newTeacherId = (role !== "admin" && (teacherId || user?.id)) ? (teacherId || user?.id) : exam.teacherId;
-          const newExam = await pb.collection('exams').create({
-            title: targetTitle,
-            subjectId: exam.subjectId,
-            teacherId: newTeacherId,
-            examType: exam.examType || "Latihan",
-            group_name: exam.group_name || "",
-            is_mgmp_shared: false,
-          });
-
-          const questions = await pb.collection('questions').getFullList({
-            filter: `examId = "${exam.id}"`
-          });
-
-          const CHUNK_SIZE = 5;
-          for (let i = 0; i < questions.length; i += CHUNK_SIZE) {
-            const chunk = questions.slice(i, i + CHUNK_SIZE);
-            await Promise.all(chunk.map((q) => {
-              const { id, created, updated, collectionId, collectionName, ...rest } = q;
-              return pb.collection('questions').create({
-                ...rest,
-                examId: newExam.id,
-              });
-            }));
-          }
-
-          addToast({
-            type: "success",
-            title: "Berhasil Menyalin Bank Soal",
-            description: `Bank soal "${targetTitle}" berhasil disalin ke koleksi Anda (${questions.length} butir soal).`
-          });
-          await fetchExams();
-        } catch (error) {
-          addToast({ type: "error", title: "Gagal", description: "Gagal menyalin bank soal." });
-        } finally {
-          isDuplicatingRef.current = false;
-        }
+        await executeDuplicateExam(exam);
       }
     });
   };
@@ -1259,11 +1257,9 @@ const ExamsPage = () => {
     setDeleteDialogOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [handleSubmit, isSubmitting] = useAsyncAction(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pb || isSubmittingRef.current) return;
-    isSubmittingRef.current = true;
-    setIsSubmitting(true);
+    if (!pb) return;
     try {
       const payload: any = {
         ...formValues,
@@ -1301,16 +1297,11 @@ const ExamsPage = () => {
       await fetchExams();
     } catch (error) {
       showAlert("Gagal", "Gagal menyimpan data ujian. Periksa log browser.", "danger");
-    } finally {
-      isSubmittingRef.current = false;
-      setIsSubmitting(false);
     }
-  };
+  });
 
-  const handleConfirmDelete = async () => {
-    if (!examToDelete || !pb || isDeletingRef.current) return;
-    isDeletingRef.current = true;
-    setIsDeleting(true);
+  const [handleConfirmDelete, isDeleting] = useAsyncAction(async () => {
+    if (!examToDelete || !pb) return;
     try {
       let useFast = false;
       try {
@@ -1343,11 +1334,9 @@ const ExamsPage = () => {
     } catch (error) {
       showAlert("Gagal", "Gagal menghapus bank soal.", "danger");
     } finally {
-      isDeletingRef.current = false;
-      setIsDeleting(false);
       setDeleteDialogOpen(false);
     }
-  };
+  });
 
   // === LAPORAN PROGRESS GURU ===
   const reportData = useMemo(() => {
@@ -2893,6 +2882,7 @@ const ExamsPage = () => {
         description={confirmDialog.description}
         type={confirmDialog.type}
         confirmLabel={confirmDialog.confirmLabel}
+        isLoading={confirmDialog.isLoading}
       />
 
       {/* Dialog Laporan Progress Guru */}

@@ -49,6 +49,7 @@ import { TeacherTable } from "../components/tables/TeacherTable";
 import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
 import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
 import { downloadTeacherImportTemplate, exportTeacherToExcel, parseTeacherImportExcel } from "../lib/teacherExcel";
 import type { Teacher } from "../types/exam";
@@ -69,8 +70,6 @@ const TeachersPage = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const isDeletingRef = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -143,22 +142,18 @@ const TeachersPage = () => {
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!teacherToDelete || isDeletingRef.current) return;
-    isDeletingRef.current = true;
-    setIsDeleting(true);
+  const [handleConfirmDelete, isDeleting] = useAsyncAction(async () => {
+    if (!teacherToDelete) return;
     try {
       await deleteTeacher(teacherToDelete.id);
     } catch (error) {
       console.error(`Gagal menghapus ${terminology.teacher.toLowerCase()}`, error);
       showAlert("Gagal", `Gagal menghapus data ${terminology.teacher.toLowerCase()}.`, "danger");
     } finally {
-      isDeletingRef.current = false;
-      setIsDeleting(false);
       setDeleteDialogOpen(false);
       setTeacherToDelete(null);
     }
-  };
+  });
 
   const handleResetPassword = async (teacherId: string) => {
     const teacher = teachers.find(t => t.id === teacherId);

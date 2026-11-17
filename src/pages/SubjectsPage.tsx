@@ -43,6 +43,7 @@ import { SubjectTable } from "../components/tables/SubjectTable";
 import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
 import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
 import { downloadSubjectImportTemplate, exportSubjectToExcel, parseSubjectImportExcel } from "../lib/subjectExcel";
 import type { SubjectData } from "../types/exam";
@@ -63,8 +64,6 @@ const SubjectsPage = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState<SubjectData | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const isDeletingRef = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -137,22 +136,18 @@ const SubjectsPage = () => {
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!subjectToDelete || isDeletingRef.current) return;
-    isDeletingRef.current = true;
-    setIsDeleting(true);
+  const [handleConfirmDelete, isDeleting] = useAsyncAction(async () => {
+    if (!subjectToDelete) return;
     try {
       await deleteSubject(subjectToDelete.id);
     } catch (error) {
       console.error(`Gagal menghapus ${terminology.subject.toLowerCase()}`, error);
       showAlert("Gagal", `Gagal menghapus ${terminology.subject.toLowerCase()}.`, "danger");
     } finally {
-      isDeletingRef.current = false;
-      setIsDeleting(false);
       setDeleteDialogOpen(false);
       setSubjectToDelete(null);
     }
-  };
+  });
 
   const handleImportSubjects = async (file: File) => {
     setIsImporting(true);

@@ -68,6 +68,7 @@ import StudentInterestDialog from "../components/dialogs/StudentInterestDialog";
 import StudentScoresDialog from "../components/dialogs/StudentScoresDialog";
 import BatchClassMoveDialog from "../components/dialogs/BatchClassMoveDialog";
 import ResetStudentPasswordDialog from "../components/dialogs/ResetStudentPasswordDialog";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
 import PrintExamCardsDialog from "../components/dialogs/PrintExamCardsDialog";
 import BatchStudentPhotoDialog from "../components/dialogs/BatchStudentPhotoDialog";
@@ -228,8 +229,6 @@ const StudentsPage = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<StudentData | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const isDeletingRef = useRef(false);
   const isBatchDeletingRef = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isExportingScores, setIsExportingScores] = useState(false);
@@ -665,10 +664,8 @@ const StudentsPage = () => {
     setIsResetModalOpen(false);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!studentToDelete || isDeletingRef.current) return;
-    isDeletingRef.current = true;
-    setIsDeleting(true);
+  const [handleConfirmDelete, isDeleting] = useAsyncAction(async () => {
+    if (!studentToDelete) return;
     try {
       await deleteStudent(studentToDelete.id);
       // Jika baris terakhir di halaman ini dihapus, mundur ke halaman sebelumnya
@@ -680,12 +677,10 @@ const StudentsPage = () => {
     } catch (error) {
       console.error("Gagal menghapus siswa:", error);
     } finally {
-      isDeletingRef.current = false;
-      setIsDeleting(false);
       setDeleteDialogOpen(false);
       setStudentToDelete(null);
     }
-  };
+  });
 
   const handleImportStudents = async (file: File) => {
     setIsImporting(true);

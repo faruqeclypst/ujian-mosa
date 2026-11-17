@@ -43,6 +43,7 @@ import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "../components/ui/dialog";
 import { ClassForm, ClassFormValues } from "../components/forms/ClassForm";
 import { ClassTable } from "../components/tables/ClassTable";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
 import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
@@ -82,8 +83,6 @@ const ClassesPage = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [classToDelete, setClassToDelete] = useState<ClassData | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const isDeletingRef = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -198,22 +197,18 @@ const ClassesPage = () => {
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!classToDelete || isDeletingRef.current) return;
-    isDeletingRef.current = true;
-    setIsDeleting(true);
+  const [handleConfirmDelete, isDeleting] = useAsyncAction(async () => {
+    if (!classToDelete) return;
     try {
       await deleteClass(classToDelete.id);
     } catch (error) {
       console.error(`Gagal menghapus ${terminology.class.toLowerCase()}`, error);
       showAlert("Gagal", `Gagal menghapus data ${terminology.class.toLowerCase()}.`, "danger");
     } finally {
-      isDeletingRef.current = false;
-      setIsDeleting(false);
       setDeleteDialogOpen(false);
       setClassToDelete(null);
     }
-  };
+  });
 
   const handleImportClasses = async (file: File) => {
     setIsImporting(true);
