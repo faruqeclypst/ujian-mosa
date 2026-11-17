@@ -92,39 +92,79 @@ export function getQuestionColumns({
                 Bergambar
               </NeonBadge>
             )}
-            {item.groupId && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex min-w-0 shrink-0">
-                    <NeonBadge
-                      variant="amber"
-                      size="xs"
-                      icon={BookOpen}
-                      className="max-w-[180px] xs:max-w-[240px] sm:max-w-[320px] md:max-w-[420px] min-w-0 shrink-0 cursor-pointer hover:bg-amber-500/20 transition-colors"
-                    >
-                      <span className="truncate min-w-0">Paket: {item.groupId}</span>
-                      {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && (
-                        <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-600 text-white text-[9px] font-bold shrink-0">
-                          Wacana
+            {item.groupId && (() => {
+              const isMainWacana = Boolean(item.groupText) || questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item);
+              return (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex min-w-0 shrink-0">
+                      <NeonBadge
+                        variant="amber"
+                        size="xs"
+                        icon={BookOpen}
+                        className="max-w-[190px] xs:max-w-[260px] sm:max-w-[340px] md:max-w-[420px] min-w-0 shrink-0 cursor-pointer transition-all duration-200 hover:border-amber-400 dark:hover:border-amber-400 hover:shadow-[0_0_10px_rgba(245,158,11,0.25)] hover:bg-amber-500/15"
+                      >
+                        <span className="truncate min-w-0 font-medium">Paket: {item.groupId}</span>
+                        {isMainWacana && (
+                          <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider shrink-0">
+                            Wacana
+                          </span>
+                        )}
+                      </NeonBadge>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    align="start"
+                    className="z-[110] max-w-sm sm:max-w-md p-3 bg-white dark:bg-neutral-900 border border-amber-200/90 dark:border-amber-800/70 rounded-xl shadow-xl shadow-amber-500/5 dark:shadow-none space-y-2 text-left text-neutral-900 dark:text-neutral-100"
+                  >
+                    <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-neutral-100 dark:border-neutral-800">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                          <BookOpen className="w-3 h-3" />
+                        </div>
+                        <span className="text-xs font-bold text-amber-700 dark:text-amber-400 tracking-tight">
+                          Paket Stimulus (Literasi / AKM)
+                        </span>
+                      </div>
+                      {isMainWacana ? (
+                        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0">
+                          Induk Wacana
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-medium text-neutral-400 dark:text-neutral-500">
+                          Soal Terhubung
                         </span>
                       )}
-                    </NeonBadge>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs max-w-xs space-y-1">
-                  <div className="font-bold text-amber-500 flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                    <span>Paket Stimulus (AKM)</span>
-                  </div>
-                  <p className="font-mono text-neutral-100 font-semibold break-all">{item.groupId}</p>
-                  {item.groupText && (
-                    <p className="text-[11px] text-neutral-300 font-serif line-clamp-3 pt-1 border-t border-neutral-700/60 leading-relaxed">
-                      {item.groupText.replace(/<[^>]*>/g, '')}
-                    </p>
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="text-neutral-500 dark:text-neutral-400 font-medium">ID Paket:</span>
+                        <code className="font-mono text-xs font-bold text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded border border-neutral-200 dark:border-neutral-700 break-all">
+                          {item.groupId}
+                        </code>
+                      </div>
+
+                      {item.groupText ? (
+                        <div className="space-y-1 pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block">
+                            Teks Stimulus:
+                          </span>
+                          <p className="text-xs text-neutral-700 dark:text-neutral-300 font-serif leading-relaxed line-clamp-4 bg-amber-50/50 dark:bg-amber-950/20 p-2.5 rounded-lg border border-amber-500/20">
+                            {item.groupText.replace(/<[^>]*>/g, '')}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 italic pt-1">
+                          Soal ini menggunakan stimulus bersama dari induk paket literasi "{item.groupId}".
+                        </p>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })()}
             {/* Mobile Type Badge */}
             <span className="sm:hidden">
               <NeonBadge
