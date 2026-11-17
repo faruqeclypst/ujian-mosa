@@ -266,10 +266,10 @@ export function NeonTable<T>({
       {/* ── Toolbar: Search & Filters ── */}
       {(onSearchChange !== undefined || filterSlot || actionSlot) && (
         <div className="p-3.5 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-900/20 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 min-w-0">
             {/* Search Input Box */}
             {onSearchChange !== undefined && (
-              <div className="relative w-full sm:w-72 shrink-0">
+              <div className="relative w-full sm:w-56 md:w-64 sm:min-w-[140px] shrink">
                 <Search className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
@@ -293,7 +293,7 @@ export function NeonTable<T>({
 
             {/* Filter Slot (e.g. status pills / select) */}
             {filterSlot && (
-              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+              <div className="flex items-center gap-1.5 flex-nowrap shrink-0">
                 {filterSlot}
               </div>
             )}

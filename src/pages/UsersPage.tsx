@@ -521,30 +521,30 @@ const UsersPage = () => {
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuContent align="end" className="w-40 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
                 <DropdownMenuItem
                   onClick={() => handleEditClick(u)}
-                  className="text-xs cursor-pointer gap-2 py-1.5"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                 >
-                  <Edit2 className="h-3.5 w-3.5 text-neutral-500" />
-                  <span>Edit Data Akun</span>
+                  <Edit2 className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                  <span>Edit</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => handleOpenResetDialog(u)}
-                  className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg sm:hidden text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                 >
-                  <Key className="h-3.5 w-3.5 text-amber-500" />
-                  <span>Reset Kata Sandi</span>
+                  <Key className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <span>Reset Sandi</span>
                 </DropdownMenuItem>
                 {!isSelf && (
                   <>
                     <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
                     <DropdownMenuItem
                       onClick={() => handleOpenDeleteDialog(u)}
-                      className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
+                      className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span>Hapus Akun</span>
+                      <Trash2 className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                      <span>Hapus</span>
                     </DropdownMenuItem>
                   </>
                 )}
@@ -782,14 +782,14 @@ const UsersPage = () => {
                     icon={Edit2}
                     onClick={() => handleEditClick(inspectedUser)}
                   >
-                    Edit Data Akun
+                    Edit
                   </InspectorButton>
                   <InspectorButton
                     variant="secondary"
                     icon={Key}
                     onClick={() => handleOpenResetDialog(inspectedUser)}
                   >
-                    Reset Sandi Default
+                    Reset Sandi
                   </InspectorButton>
                   <InspectorButton
                     variant="danger"
@@ -797,7 +797,7 @@ const UsersPage = () => {
                     disabled={inspectedUser.id === currentUser?.id}
                     onClick={() => handleOpenDeleteDialog(inspectedUser)}
                   >
-                    Hapus Akun
+                    Hapus
                   </InspectorButton>
                 </InspectorActions>
               </div>

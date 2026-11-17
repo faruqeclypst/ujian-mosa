@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { SlidersHorizontal, ChevronDown, RotateCcw, X } from "lucide-react";
+import { SlidersHorizontal, ChevronDown, RotateCcw } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 export interface NeonFilterPopoverProps {
@@ -52,7 +52,7 @@ export const NeonFilterPopover: React.FC<NeonFilterPopoverProps> = ({
   const hasActive = activeCount > 0;
 
   return (
-    <div ref={containerRef} className={cn("relative inline-flex items-center gap-1.5", className)}>
+    <div ref={containerRef} className={cn("relative inline-flex items-center gap-1.5 shrink-0 flex-nowrap", className)}>
       {/* 1. Main Trigger Button */}
       <button
         type="button"
@@ -90,20 +90,7 @@ export const NeonFilterPopover: React.FC<NeonFilterPopoverProps> = ({
         />
       </button>
 
-      {/* 2. Quick Reset Button (Visible outside when active) */}
-      {hasActive && onReset && (
-        <button
-          type="button"
-          onClick={onReset}
-          className="h-8 px-2 text-xs font-semibold text-neutral-500 hover:text-rose-600 dark:text-neutral-400 dark:hover:text-rose-400 transition-colors flex items-center gap-1 cursor-pointer"
-          title="Reset semua filter"
-        >
-          <X className="h-3 w-3" />
-          <span className="hidden sm:inline">Reset</span>
-        </button>
-      )}
-
-      {/* 3. Popover Card */}
+      {/* 2. Popover Card */}
       {isOpen && (
         <div
           className={cn(

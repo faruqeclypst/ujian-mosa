@@ -157,6 +157,24 @@ def fix_db(db_path):
                 conn.commit()
                 print(f"[OK] Successfully updated _collections for students in {db_path}")
 
+        # 5. Update koleksi exam_rooms rules
+        cur.execute("SELECT listRule, viewRule, createRule, updateRule, deleteRule FROM _collections WHERE name='exam_rooms'")
+        er_row = cur.fetchone()
+        if er_row:
+            target_er_list = '(@request.auth.role = "admin") || (@request.auth.role = "teacher" && (examId.teacherId = @request.auth.teacherId || examId.teacherId = @request.auth.id || examId.is_mgmp_shared = true)) || (@request.auth.id != "" && @request.auth.role = "") || (@request.auth.collectionName = "students")'
+            target_er_view = '(@request.auth.role = "admin") || (@request.auth.role = "teacher" && (examId.teacherId = @request.auth.teacherId || examId.teacherId = @request.auth.id || examId.is_mgmp_shared = true)) || (@request.auth.id != "" && @request.auth.role = "") || (@request.auth.collectionName = "students")'
+            target_er_create = '(@request.auth.role = "admin") || (@request.auth.role = "teacher")'
+            target_er_update = '(@request.auth.role = "admin") || (@request.auth.role = "teacher" && (examId.teacherId = @request.auth.teacherId || examId.teacherId = @request.auth.id || examId.is_mgmp_shared = true))'
+            target_er_delete = '(@request.auth.role = "admin") || (@request.auth.role = "teacher" && (examId.teacherId = @request.auth.teacherId || examId.teacherId = @request.auth.id || examId.is_mgmp_shared = true))'
+
+            cur.execute("""
+                UPDATE _collections 
+                SET listRule = ?, viewRule = ?, createRule = ?, updateRule = ?, deleteRule = ?
+                WHERE name = 'exam_rooms'
+            """, (target_er_list, target_er_view, target_er_create, target_er_update, target_er_delete))
+            conn.commit()
+            print(f"[OK] Successfully updated _collections for exam_rooms in {db_path}")
+
         conn.close()
         return True
     except Exception as e:

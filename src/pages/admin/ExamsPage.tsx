@@ -1978,77 +1978,79 @@ const ExamsPage = () => {
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuContent align="end" className="w-44 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                {/* Mobile only quick action items */}
                 <DropdownMenuItem
                   onClick={() => navigate(`/admin/simulate/${exam.id}`)}
-                  className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg sm:hidden text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                 >
-                  <Eye className="h-3.5 w-3.5 text-neutral-500" />
-                  <span>Simulasi Tampilan Siswa</span>
+                  <Eye className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                  <span>Simulasi</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
                     sessionStorage.setItem("activeQuestionsExamId", exam.id);
                     navigate("/admin/bank-soal/questions");
                   }}
-                  className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg sm:hidden text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                 >
-                  <BookOpen className="h-3.5 w-3.5 text-emerald-500" />
-                  <span>Kelola Butir Soal</span>
+                  <BookOpen className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                  <span>Kelola Soal</span>
                 </DropdownMenuItem>
+
                 {canEditExam(exam) && (
                   <DropdownMenuItem
                     onClick={() => handleEditClick(exam)}
-                    className="text-xs cursor-pointer gap-2 py-1.5"
+                    className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                   >
-                    <Edit className="h-3.5 w-3.5 text-neutral-500" />
-                    <span>Edit Data Bank Soal</span>
+                    <Edit className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                    <span>Edit</span>
                   </DropdownMenuItem>
                 )}
 
                 <DropdownMenuItem
                   onClick={() => handleBatchExport([exam])}
-                  className="text-xs cursor-pointer gap-2 py-1.5"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                 >
-                  <Download className="h-3.5 w-3.5 text-neutral-500" />
-                  <span>Export Word (.doc)</span>
+                  <Download className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                  <span>Export Word</span>
                 </DropdownMenuItem>
 
-                {/* Duplikat / Salin Bank Soal - Tersedia untuk Admin dan Guru (termasuk MGMP) */}
+                {/* Duplikat / Salin Bank Soal */}
                 <DropdownMenuItem
                   onClick={() => handleDuplicateExam(exam)}
-                  className="text-xs cursor-pointer gap-2 py-1.5"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                 >
-                  <Copy className="h-3.5 w-3.5 text-neutral-500" />
-                  <span>{isOwner(exam) ? "Duplikat Bank Soal" : "Salin ke Bank Soal Saya"}</span>
+                  <Copy className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                  <span>{isOwner(exam) ? "Duplikat" : "Salin Bank Soal"}</span>
                 </DropdownMenuItem>
 
                 {owner && (
                   <>
-                    <DropdownMenuSeparator className="my-1 border-neutral-150 dark:border-neutral-800" />
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
                     {activeTab === "aktif" ? (
                       <DropdownMenuItem
                         onClick={() => handleArchiveExam(exam)}
-                        className="text-xs cursor-pointer gap-2 py-1.5 text-amber-600 dark:text-amber-400"
+                        className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-amber-600 dark:text-amber-400 focus:text-amber-600 focus:bg-amber-50 dark:focus:bg-amber-950/40"
                       >
-                        <Archive className="h-3.5 w-3.5" />
+                        <Archive className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                         <span>Arsipkan</span>
                       </DropdownMenuItem>
                     ) : (
                       <>
                         <DropdownMenuItem
                           onClick={() => handleRestoreExam(exam)}
-                          className="text-xs cursor-pointer gap-2 py-1.5 text-emerald-600 dark:text-emerald-400"
+                          className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 focus:text-emerald-600 focus:bg-emerald-50 dark:focus:bg-emerald-950/40"
                         >
-                          <RotateCw className="h-3.5 w-3.5" />
-                          <span>Pulihkan Bank Soal</span>
+                          <RotateCw className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                          <span>Pulihkan</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleDeleteClick(exam)}
-                          className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400"
+                          className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
                         >
-                          <Trash className="h-3.5 w-3.5" />
-                          <span>Hapus Permanen</span>
+                          <Trash className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                          <span>Hapus</span>
                         </DropdownMenuItem>
                       </>
                     )}

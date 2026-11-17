@@ -487,34 +487,38 @@ const ExamRoomsPage = () => {
         const subjectObj = examObj?.expand?.subjectId || subjects.find(s => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
         const teacherObj = examObj?.expand?.teacherId || masterTeachers.find(t => t.id === eTeacherId);
 
-        const isAll = Boolean(room.allClasses || (room as any).all_classes);
+        const clsData = room.classId || (room as any).classid || (room as any).classIds || (room as any).classids || "";
+        let classList: string[] = [];
+        if (Array.isArray(clsData)) {
+          classList = clsData.map(id => String(id).trim()).filter(id => id && id.toLowerCase() !== "all");
+        } else if (typeof clsData === 'string' && clsData.length > 0) {
+          classList = clsData.split(",").map(id => id.trim()).filter(id => id && id.toLowerCase() !== "all");
+        }
+
+        const isAll = Boolean(
+          room.allClasses || 
+          (room as any).all_classes || 
+          classList.length === 0 || 
+          (examClasses.length > 0 && classList.length >= examClasses.length)
+        );
+
         let className = `Semua ${terminology.class}`;
         if (!isAll) {
-          const clsData = room.classId || (room as any).classid || (room as any).classIds || (room as any).classids || "";
-          let classList: string[] = [];
-          if (Array.isArray(clsData)) {
-            classList = clsData.map(id => String(id).trim()).filter(id => id && id.toLowerCase() !== "all");
-          } else if (typeof clsData === 'string' && clsData.length > 0) {
-            classList = clsData.split(",").map(id => id.trim()).filter(id => id && id.toLowerCase() !== "all");
-          }
+          const foundNames = classList.map(id => {
+            const c = (examClasses || []).find(cl => cl.id === id);
+            return c ? c.name : null;
+          }).filter(Boolean);
 
-          if (classList.length === 0 || (examClasses.length > 0 && classList.length >= examClasses.length)) {
-            className = `Semua ${terminology.class}`;
-          } else {
-            const foundNames = classList.map(id => {
-              const c = (examClasses || []).find(cl => cl.id === id);
-              return c ? c.name : null;
-            }).filter(Boolean);
-
-            if (foundNames.length > 0) className = foundNames.join(", ");
-            else className = classList.length > 0 ? `ID: ${classList[0].substring(0, 5)}...` : `Semua ${terminology.class}`;
-          }
+          if (foundNames.length > 0) className = foundNames.join(", ");
+          else className = classList.length > 0 ? `ID: ${classList[0].substring(0, 5)}...` : `Semua ${terminology.class}`;
         }
 
         const { id, ...rest } = room;
         return {
           id,
           ...rest,
+          allClasses: isAll,
+          all_classes: isAll,
           examId: sId,
           room_name: roomName,
           start_time: startTime,
@@ -526,6 +530,7 @@ const ExamRoomsPage = () => {
           subjectName: subjectObj?.name || "N/A",
           teacherName: teacherObj?.name || "N/A",
           examTeacherId: eTeacherId,
+          is_mgmp_shared: Boolean(examObj?.is_mgmp_shared),
           className: className,
           max_questions: Number(room.max_questions) || 0,
           randomize_questions: room.randomize_questions !== false,
@@ -997,11 +1002,15 @@ const ExamRoomsPage = () => {
     }
   };
 
-  const handleQuestionsClick = (room: ExamRoomData) => {
-    if (!room.examId) return;
-    sessionStorage.setItem("activeQuestionsExamId", room.examId);
+  const handleQuestionsClick = useCallback((room: ExamRoomData) => {
+    const eId = room.examId || (room as any).examid || (room as any).expand?.examId?.id;
+    if (!eId) {
+      showAlert("Peringatan", "Ruang ujian ini belum terhubung dengan bank soal.", "warning");
+      return;
+    }
+    sessionStorage.setItem("activeQuestionsExamId", eId);
     navigate(`/admin/bank-soal/questions`);
-  };
+  }, [navigate, showAlert]);
 
   const handleMonitorClick = (room: ExamRoomData) => {
     sessionStorage.setItem("activeMonitoringRoomId", room.id);
@@ -1211,14 +1220,25 @@ const ExamRoomsPage = () => {
       dot = null;
     }
 
-    const classList = room.allClasses
+    const isAll = Boolean(
+      room.allClasses || 
+      (room as any).all_classes || 
+      room.className === `Semua ${terminology.class}` ||
+      room.className?.toLowerCase()?.includes("semua")
+    );
+
+    const classList = isAll
       ? (examClasses || []).map(c => c.name)
-      : (room.className || "").split(", ").filter(Boolean);
-    const classLabel = room.allClasses
-      ? `Semua ${terminology.class}`
-      : classList.length > 0
-        ? `${classList.length} ${terminology.class}`
-        : `Tanpa ${terminology.class}`;
+      : (room.className || "")
+          .split(", ")
+          .map(s => s.trim())
+          .filter(s => s && !s.toLowerCase().startsWith("semua"));
+
+    const totalCount = isAll ? (examClasses.length || classList.length) : classList.length;
+
+    const classLabel = totalCount > 0
+      ? `${totalCount} ${terminology.class}`
+      : `Tanpa ${terminology.class}`;
 
     return {
       dateText,
@@ -1226,6 +1246,8 @@ const ExamRoomsPage = () => {
       label,
       badgeStyle,
       dot,
+      isAll,
+      totalCount,
       classList,
       classLabel,
     };
@@ -1292,19 +1314,66 @@ const ExamRoomsPage = () => {
               )}
             </div>
 
-            {/* Baris 2: Mapel • Pengampu (Hanya field penting, bersih & leluasa) */}
-            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 min-w-0 truncate">
-              <span className="font-medium text-neutral-700 dark:text-neutral-300 truncate">
-                {room.subjectName || "Semua Mapel"}
-              </span>
-              {room.teacherName && (
-                <>
-                  <span className="text-neutral-300 dark:text-neutral-700 shrink-0">•</span>
-                  <span className="truncate text-neutral-500 dark:text-neutral-400">
-                    {room.teacherName}
-                  </span>
-                </>
-              )}
+            {/* Baris 2: Mapel • Pengampu (Hover tooltip info bank soal + klik untuk lari ke butir soal) */}
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 min-w-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleQuestionsClick(room);
+                    }}
+                    className="inline-flex items-center gap-1.5 min-w-0 text-left hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors group/mapel cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 rounded px-1 -ml-1 py-0.5"
+                    title="Klik untuk membuka bank soal"
+                  >
+                    <span className="font-medium text-neutral-700 dark:text-neutral-300 group-hover/mapel:text-emerald-600 dark:group-hover/mapel:text-emerald-400 group-hover/mapel:underline truncate">
+                      {room.subjectName || "Semua Mapel"}
+                    </span>
+                    {room.teacherName && (
+                      <>
+                        <span className="text-neutral-300 dark:text-neutral-700 shrink-0">•</span>
+                        <span className="truncate text-neutral-500 dark:text-neutral-400 group-hover/mapel:text-emerald-600 dark:group-hover/mapel:text-emerald-400">
+                          {room.teacherName}
+                        </span>
+                      </>
+                    )}
+                    <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover/mapel:opacity-100 transition-opacity text-emerald-500 shrink-0" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  align="start"
+                  sideOffset={6}
+                  className="z-50 p-3 rounded-xl bg-neutral-900/95 dark:bg-[#111214]/95 text-white backdrop-blur-md border border-neutral-700/80 dark:border-neutral-800 shadow-2xl max-w-sm animate-in fade-in-0 zoom-in-95 pointer-events-none"
+                >
+                  <div className="flex items-center justify-between gap-3 pb-2 mb-2 border-b border-neutral-800 text-[11px] font-bold tracking-tight">
+                    <span className="text-neutral-300 flex items-center gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+                      Paket Bank Soal Terhubung
+                    </span>
+                    {room.examType && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        {room.examType}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="font-semibold text-white leading-snug">
+                      {room.examTitle || "Tanpa Judul Bank Soal"}
+                    </div>
+                    <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
+                      <span>Mapel: <strong className="text-neutral-200">{room.subjectName || "-"}</strong></span>
+                      <span>•</span>
+                      <span>Guru: <strong className="text-neutral-200">{room.teacherName || "-"}</strong></span>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-1.5 border-t border-neutral-800 text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Klik untuk membuka & kelola butir soal</span>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Jadwal on Mobile */}
@@ -1348,15 +1417,15 @@ const ExamRoomsPage = () => {
                   <button
                     type="button"
                     onClick={(e) => {
-                      if (!room.allClasses && classList.length > 2) {
+                      if (!meta.isAll && classList.length > 2) {
                         e.stopPropagation();
                         setShowClassesRoom(room);
                       }
                     }}
                     className={cn(
                       "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer shrink-0 focus:outline-none focus:ring-1 focus:ring-emerald-500/40",
-                      room.allClasses
-                        ? "bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                      meta.totalCount > 0
+                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/20 hover:border-emerald-500/40"
                         : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-emerald-500/50 hover:text-emerald-600 dark:hover:text-emerald-400"
                     )}
                   >
@@ -1376,15 +1445,15 @@ const ExamRoomsPage = () => {
                       Daftar {terminology.class} Terdaftar
                     </span>
                     <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      {room.allClasses ? `Semua (${examClasses.length})` : `${classList.length} Kelas`}
+                      {meta.isAll ? `Semua (${examClasses.length || classList.length})` : `${classList.length} ${terminology.class}`}
                     </span>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
-                    {room.allClasses ? (
+                    {meta.isAll ? (
                       <div className="space-y-1.5 w-full">
                         <p className="text-[11px] text-neutral-400 leading-relaxed">
-                          Semua {examClasses.length} kelas aktif dapat mengakses ujian ini:
+                          Semua {examClasses.length || classList.length} {terminology.class.toLowerCase()} aktif dapat mengakses ujian ini:
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {classList.slice(0, 15).map((clsName, idx) => (
@@ -1416,7 +1485,7 @@ const ExamRoomsPage = () => {
                     )}
                   </div>
 
-                  {!room.allClasses && classList.length > 2 && (
+                  {!meta.isAll && classList.length > 2 && (
                     <div className="mt-2 pt-1.5 border-t border-neutral-800 text-[10px] text-neutral-400 text-center">
                       Klik tombol untuk melihat detail kelas
                     </div>
@@ -1488,81 +1557,106 @@ const ExamRoomsPage = () => {
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuContent align="end" className="w-44 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                {/* 0. Monitor (Tampil di layar mobile saat tombol quick monitor tersembunyi) */}
                 <DropdownMenuItem
                   onClick={() => handleMonitorClick(room)}
-                  className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg sm:hidden text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                 >
-                  <Search className="h-3.5 w-3.5 text-emerald-500" />
-                  <span>Monitor Live CBT</span>
+                  <Search className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                  <span>Monitor</span>
                 </DropdownMenuItem>
+
+                {/* 1. Bank Soal */}
+                <DropdownMenuItem
+                  onClick={() => handleQuestionsClick(room)}
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
+                >
+                  <BookOpen className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                  <span>Bank Soal</span>
+                </DropdownMenuItem>
+
+                {/* 2. Penilaian */}
                 <DropdownMenuItem
                   onClick={() => navigate(`/admin/penilaian?roomId=${room.id}`)}
-                  className="text-xs cursor-pointer gap-2 py-1.5"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                 >
-                  <CheckSquare className="h-3.5 w-3.5 text-neutral-500" />
-                  <span>Penilaian & Nilai</span>
+                  <CheckSquare className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                  <span>Penilaian</span>
                 </DropdownMenuItem>
+
+                {/* 3. Analisis */}
                 <DropdownMenuItem
                   onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${room.id}&examId=${room.examId || ""}`)}
-                  className="text-xs cursor-pointer gap-2 py-1.5"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                 >
-                  <BarChart2 className="h-3.5 w-3.5 text-neutral-500" />
-                  <span>Analisis Butir Soal</span>
+                  <BarChart2 className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                  <span>Analisis</span>
                 </DropdownMenuItem>
+
+                {/* 4. Edit */}
                 {owner && (
                   <DropdownMenuItem
                     onClick={() => handleEditClick(room)}
-                    className="text-xs cursor-pointer gap-2 py-1.5"
+                    className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                   >
-                    <Edit className="h-3.5 w-3.5 text-neutral-500" />
-                    <span>Edit Parameter Ruang</span>
+                    <Edit className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                    <span>Edit</span>
                   </DropdownMenuItem>
                 )}
+
+                {/* 5. Nonaktif / Aktifkan */}
                 {owner && (
                   <DropdownMenuItem
                     onClick={() => handleToggleDisabled(room)}
-                    className="text-xs cursor-pointer gap-2 py-1.5"
+                    className={cn(
+                      "text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg",
+                      room.isDisabled
+                        ? "text-emerald-600 dark:text-emerald-400 focus:bg-emerald-50 dark:focus:bg-emerald-950/40 focus:text-emerald-600"
+                        : "text-rose-600 dark:text-rose-400 focus:bg-rose-50 dark:focus:bg-rose-950/40 focus:text-rose-600"
+                    )}
                   >
                     {room.isDisabled ? (
                       <>
-                        <Power className="h-3.5 w-3.5 text-emerald-600" />
-                        <span className="text-emerald-600">Aktifkan Ruangan</span>
+                        <Power className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                        <span>Aktifkan</span>
                       </>
                     ) : (
                       <>
-                        <PowerOff className="h-3.5 w-3.5 text-rose-600" />
-                        <span className="text-rose-600">Nonaktifkan Ruangan</span>
+                        <PowerOff className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                        <span>Nonaktif</span>
                       </>
                     )}
                   </DropdownMenuItem>
                 )}
+
+                {/* 6. Arsipkan / Pulihkan / Hapus */}
                 {owner && (
                   <>
                     <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
                     {activeTab === "aktif" ? (
                       <DropdownMenuItem
                         onClick={() => handleArchiveRoom(room)}
-                        className="text-xs cursor-pointer gap-2 py-1.5 text-amber-600 dark:text-amber-400 focus:text-amber-600 focus:bg-amber-50 dark:focus:bg-amber-950/40"
+                        className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-amber-600 dark:text-amber-400 focus:text-amber-600 focus:bg-amber-50 dark:focus:bg-amber-950/40"
                       >
-                        <Archive className="h-3.5 w-3.5" />
-                        <span>Arsipkan Ruangan</span>
+                        <Archive className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <span>Arsipkan</span>
                       </DropdownMenuItem>
                     ) : (
                       <>
                         <DropdownMenuItem
                           onClick={() => handleRestoreRoom(room)}
-                          className="text-xs cursor-pointer gap-2 py-1.5 text-emerald-600 dark:text-emerald-400 focus:text-emerald-600 focus:bg-emerald-50 dark:focus:bg-emerald-950/40"
+                          className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 focus:text-emerald-600 focus:bg-emerald-50 dark:focus:bg-emerald-950/40"
                         >
-                          <RotateCw className="h-3.5 w-3.5" />
-                          <span>Pulihkan Ruang</span>
+                          <RotateCw className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                          <span>Pulihkan</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleDeleteClick(room)}
-                          className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
+                          className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
                         >
-                          <Trash className="h-3.5 w-3.5" />
-                          <span>Hapus Permanen</span>
+                          <Trash className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                          <span>Hapus</span>
                         </DropdownMenuItem>
                       </>
                     )}
@@ -1890,15 +1984,32 @@ const ExamRoomsPage = () => {
                     value={inspectedRoom.room_name || inspectedRoom.examTitle || "Tanpa Nama"}
                   />
 
-                  <InspectorField
-                    label="Pengampu & Mata Pelajaran"
-                    value={`${inspectedRoom.teacherName} • ${inspectedRoom.subjectName}`}
-                  />
+                  <InspectorField label="Pengampu & Mata Pelajaran">
+                    <button
+                      type="button"
+                      onClick={() => handleQuestionsClick(inspectedRoom)}
+                      className="w-full text-left font-normal text-neutral-700 dark:text-neutral-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors group cursor-pointer focus:outline-none flex items-center justify-between gap-1 py-0.5"
+                      title="Klik untuk membuka butir soal bank soal ini"
+                    >
+                      <span className="truncate">{`${inspectedRoom.teacherName} • ${inspectedRoom.subjectName}`}</span>
+                      <ExternalLink className="h-3 w-3 text-neutral-400 group-hover:text-emerald-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  </InspectorField>
 
-                  <InspectorField
-                    label="Paket Bank Soal"
-                    value={inspectedRoom.examTitle}
-                  />
+                  <InspectorField label="Paket Bank Soal">
+                    <button
+                      type="button"
+                      onClick={() => handleQuestionsClick(inspectedRoom)}
+                      className="w-full flex items-center justify-between gap-1.5 text-left font-medium text-emerald-600 dark:text-emerald-400 hover:underline group cursor-pointer focus:outline-none py-0.5"
+                      title="Klik untuk membuka & kelola butir soal ini"
+                    >
+                      <span className="flex items-center gap-1.5 min-w-0 truncate">
+                        <BookOpen className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate font-semibold">{inspectedRoom.examTitle || "Tanpa Judul Bank Soal"}</span>
+                      </span>
+                      <ExternalLink className="h-3 w-3 shrink-0 text-emerald-500 opacity-70 group-hover:opacity-100" />
+                    </button>
+                  </InspectorField>
 
                   <InspectorGrid>
                     <InspectorField
@@ -1941,13 +2052,21 @@ const ExamRoomsPage = () => {
                       </InspectorButton>
                       <InspectorButton
                         variant="secondary"
+                        icon={BookOpen}
+                        onClick={() => handleQuestionsClick(inspectedRoom)}
+                        title="Buka & Kelola Butir Soal"
+                      >
+                        Bank Soal
+                      </InspectorButton>
+                      <InspectorButton
+                        variant="secondary"
                         icon={CheckSquare}
                         onClick={() => navigate(`/admin/penilaian?roomId=${inspectedRoom.id}`)}
                         title="Buka Lembar Penilaian Ruangan"
                       >
                         Penilaian
                       </InspectorButton>
-                      {isOwner(inspectedRoom) && (
+                      {isOwner(inspectedRoom) ? (
                         <InspectorButton
                           variant="secondary"
                           icon={Edit}
@@ -1956,16 +2075,27 @@ const ExamRoomsPage = () => {
                         >
                           Edit
                         </InspectorButton>
+                      ) : (
+                        <InspectorButton
+                          variant="secondary"
+                          icon={BarChart2}
+                          onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${inspectedRoom.id}&examId=${inspectedRoom.examId || ""}`)}
+                          title="Buka Analisis Butir Soal"
+                        >
+                          Analisis
+                        </InspectorButton>
                       )}
-                      <InspectorButton
-                        variant="secondary"
-                        icon={BarChart2}
-                        onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${inspectedRoom.id}&examId=${inspectedRoom.examId || ""}`)}
-                        title="Buka Analisis Butir Soal"
-                        className={!isOwner(inspectedRoom) ? "col-span-2" : ""}
-                      >
-                        Analisis
-                      </InspectorButton>
+                      {isOwner(inspectedRoom) && (
+                        <InspectorButton
+                          variant="secondary"
+                          icon={BarChart2}
+                          onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${inspectedRoom.id}&examId=${inspectedRoom.examId || ""}`)}
+                          title="Buka Analisis Butir Soal"
+                          className="col-span-2"
+                        >
+                          Analisis
+                        </InspectorButton>
+                      )}
                     </div>
                   </InspectorActions>
                 </div>

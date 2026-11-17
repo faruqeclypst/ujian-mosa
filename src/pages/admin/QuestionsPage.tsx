@@ -4556,34 +4556,34 @@ const QuestionsPage = () => {
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuContent align="end" className="w-40 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
                 <DropdownMenuItem
                   onClick={() => {
                     setPreviewIndex(idx >= 0 ? idx : 0);
                     setPreviewQuestion(item);
                     setIsPreviewOpen(true);
                   }}
-                  className="text-xs cursor-pointer gap-2 py-1.5"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                 >
-                  <Search className="h-3.5 w-3.5 text-neutral-500" />
-                  <span>Pratinjau Soal</span>
+                  <Search className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                  <span>Pratinjau</span>
                 </DropdownMenuItem>
                 {canEdit && (
                   <>
                     <DropdownMenuItem
                       onClick={() => handleEditClick(item)}
-                      className="text-xs cursor-pointer gap-2 py-1.5"
+                      className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
                     >
-                      <Edit className="h-3.5 w-3.5 text-neutral-500" />
-                      <span>Edit Butir Soal</span>
+                      <Edit className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+                      <span>Edit</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
                     <DropdownMenuItem
                       onClick={() => handleDeleteClick(item)}
-                      className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
+                      className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
                     >
-                      <Trash className="h-3.5 w-3.5" />
-                      <span>Hapus Butir Soal</span>
+                      <Trash className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                      <span>Hapus</span>
                     </DropdownMenuItem>
                   </>
                 )}
@@ -6309,7 +6309,7 @@ const QuestionsPage = () => {
               onSearchChange={setSearchQuery}
               searchPlaceholder="Cari pertanyaan, stimulus, kunci..."
               filterSlot={
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
                   <NeonFilterPopover
                     title="Filter Butir Soal"
                     activeCount={(typeFilter !== "all" ? 1 : 0) + (groupFilter !== "all" ? 1 : 0)}
@@ -6676,7 +6676,7 @@ const QuestionsPage = () => {
                           setIsPreviewOpen(true);
                         }}
                       >
-                        Pratinjau Soal Lengkap
+                        Pratinjau
                       </InspectorButton>
 
                       {canEdit ? (
@@ -6687,7 +6687,7 @@ const QuestionsPage = () => {
                             onClick={() => handleEditClick(inspectedQuestion)}
                             className="flex-1"
                           >
-                            Edit Butir Soal
+                            Edit
                           </InspectorButton>
                           <button
                             type="button"

@@ -110,7 +110,7 @@ export const InspectorHeader: React.FC<InspectorHeaderProps> = ({
             type="button"
             onClick={onClose}
             className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
-            title="Tutup Panel Detail"
+            title="Tutup Detail"
           >
             <svg
               className="h-3.5 w-3.5"
@@ -433,7 +433,7 @@ export interface InspectorToggleProps extends React.ButtonHTMLAttributes<HTMLBut
 export const InspectorToggle: React.FC<InspectorToggleProps> = ({
   active,
   onToggle,
-  label = "Panel Detail",
+  label = "Detail",
   className,
   ...props
 }) => {
@@ -448,17 +448,11 @@ export const InspectorToggle: React.FC<InspectorToggleProps> = ({
           : "bg-white dark:bg-neutral-850 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200",
         className
       )}
-      title={active ? "Sembunyikan panel detail" : "Tampilkan panel detail"}
+      title={active ? "Sembunyikan detail" : "Tampilkan detail"}
       {...props}
     >
       <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", active ? "bg-emerald-500 animate-pulse" : "bg-neutral-400")} />
       <span>{label}</span>
-      <span className={cn(
-        "text-[10px] font-mono ml-0.5 px-1 py-0.5 rounded",
-        active ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 font-bold" : "opacity-75"
-      )}>
-        {active ? "Aktif" : "Mati"}
-      </span>
     </button>
   );
 };

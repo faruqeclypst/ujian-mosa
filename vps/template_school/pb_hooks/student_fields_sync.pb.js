@@ -79,14 +79,36 @@ onBootstrap((e) => {
             try { db.newQuery("ALTER TABLE exams ADD COLUMN group_name TEXT DEFAULT ''").execute(); } catch (_) {}
 
             const erCol = $app.findCollectionByNameOrId("exam_rooms");
-            if (erCol && !erCol.fields.getByName("group_name")) {
-                const tf = new TextField();
-                tf.name = "group_name";
-                tf.required = false;
-                tf.max = 150;
-                erCol.fields.add(tf);
-                $app.save(erCol);
-                console.log("[SCHEMA_SYNC] Ensured group_name field in exam_rooms collection");
+            if (erCol) {
+                let modEr = false;
+                if (!erCol.fields.getByName("group_name")) {
+                    const tf = new TextField();
+                    tf.name = "group_name";
+                    tf.required = false;
+                    tf.max = 150;
+                    erCol.fields.add(tf);
+                    modEr = true;
+                    console.log("[SCHEMA_SYNC] Ensured group_name field in exam_rooms collection");
+                }
+                const targetErList = '(@request.auth.role = "admin") || (@request.auth.role = "teacher" && (examId.teacherId = @request.auth.teacherId || examId.teacherId = @request.auth.id || examId.is_mgmp_shared = true)) || (@request.auth.id != "" && @request.auth.role = "") || (@request.auth.collectionName = "students")';
+                const targetErView = '(@request.auth.role = "admin") || (@request.auth.role = "teacher" && (examId.teacherId = @request.auth.teacherId || examId.teacherId = @request.auth.id || examId.is_mgmp_shared = true)) || (@request.auth.id != "" && @request.auth.role = "") || (@request.auth.collectionName = "students")';
+                const targetErCreate = '(@request.auth.role = "admin") || (@request.auth.role = "teacher")';
+                const targetErUp = '(@request.auth.role = "admin") || (@request.auth.role = "teacher" && (examId.teacherId = @request.auth.teacherId || examId.teacherId = @request.auth.id || examId.is_mgmp_shared = true))';
+                const targetErDel = '(@request.auth.role = "admin") || (@request.auth.role = "teacher" && (examId.teacherId = @request.auth.teacherId || examId.teacherId = @request.auth.id || examId.is_mgmp_shared = true))';
+                if (erCol.listRule !== targetErList) { erCol.listRule = targetErList; modEr = true; }
+                if (erCol.viewRule !== targetErView) { erCol.viewRule = targetErView; modEr = true; }
+                if (erCol.createRule !== targetErCreate) { erCol.createRule = targetErCreate; modEr = true; }
+                if (erCol.updateRule !== targetErUp) { erCol.updateRule = targetErUp; modEr = true; }
+                if (erCol.deleteRule !== targetErDel) { erCol.deleteRule = targetErDel; modEr = true; }
+                if (modEr) {
+                    try {
+                        $app.save(erCol);
+                        console.log("[SCHEMA_SYNC] Ensured rules in exam_rooms collection");
+                    } catch (eSaveEr) {
+                        db.newQuery("UPDATE _collections SET listRule = {:l}, viewRule = {:v}, createRule = {:c}, updateRule = {:u}, deleteRule = {:d} WHERE name = 'exam_rooms'")
+                            .bind({ l: targetErList, v: targetErView, c: targetErCreate, u: targetErUp, d: targetErDel }).execute();
+                    }
+                }
             }
 
             const exCol = $app.findCollectionByNameOrId("exams");
