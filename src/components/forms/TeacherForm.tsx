@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -71,18 +71,25 @@ export const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
     }
   }, [defaultValues?.name, defaultValues?.code, defaultValues?.username, defaultValues?.email, defaultValues?.phone, JSON.stringify(defaultValues?.subjects), reset]);
 
+  const isSubmittingRef = useRef(false);
   const submitHandler = async (values: TeacherFormValues) => {
-    await onSubmit({
-      name: values.name,
-      code: values.code || "",
-      username: values.username,
-      email: values.email || "",
-      phone: values.phone || "",
-      subjects: values.subjects,
-    });
-    
-    if (!defaultValues || Object.keys(defaultValues).length === 0) {
-      reset({ name: "", code: "", username: "", email: "", phone: "", subjects: [] });
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    try {
+      await onSubmit({
+        name: values.name,
+        code: values.code || "",
+        username: values.username,
+        email: values.email || "",
+        phone: values.phone || "",
+        subjects: values.subjects,
+      });
+      
+      if (!defaultValues || Object.keys(defaultValues).length === 0) {
+        reset({ name: "", code: "", username: "", email: "", phone: "", subjects: [] });
+      }
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

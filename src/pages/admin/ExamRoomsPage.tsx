@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare, MoreVertical, MoreHorizontal, Folder, Layers } from "lucide-react";
+import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare, MoreVertical, MoreHorizontal, Folder, Layers, Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
@@ -115,6 +115,9 @@ const ExamRoomsPage = () => {
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif");
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const isDeletingRef = useRef(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedRoom, setSelectedRoom] = useState<ExamRoomData | null>(null);
 
@@ -728,13 +731,20 @@ const ExamRoomsPage = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!roomToDelete || !pb) return;
+    if (!roomToDelete || !pb || isDeletingRef.current) return;
+    isDeletingRef.current = true;
     setIsDeleting(true);
     try {
       await pb.collection('exam_rooms').delete(roomToDelete.id);
       showAlert("Berhasil", "Ruang dihapus.", "success");
-    } catch (e) { showAlert("Gagal", "Gagal hapus.", "danger"); }
-    finally { setIsDeleting(false); setDeleteDialogOpen(false); }
+      await fetchRooms();
+    } catch (e) {
+      showAlert("Gagal", "Gagal hapus.", "danger");
+    } finally {
+      isDeletingRef.current = false;
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
   };
 
   const handleBatchToggleStatus = (enable: boolean) => {
@@ -950,11 +960,14 @@ const ExamRoomsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     try {
       if (!formValues.examId) {
         showAlert("Gagal", "Pilih bank soal terlebih dahulu.", "danger");
         return;
       }
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
 
       const finalClassIds = formValues.allClasses
         ? (examClasses || []).map(c => c.id)
@@ -999,6 +1012,9 @@ const ExamRoomsPage = () => {
     } catch (e) {
       console.error("Save error:", e);
       showAlert("Gagal", "Gagal simpan.", "danger");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -2161,7 +2177,7 @@ const ExamRoomsPage = () => {
       </div>
 
       {/* Dialog Create/Edit (Neon Console Split Pane) */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open && !isSubmitting) setIsDialogOpen(false); }}>
         <DialogContent className="max-w-5xl w-[95vw] h-[88vh] max-h-[820px] overflow-hidden p-0 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shadow-2xl flex flex-col">
 
           {/* 1. Header Dialog */}
@@ -2633,18 +2649,20 @@ const ExamRoomsPage = () => {
             <div className="flex items-center gap-2 ml-auto">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => setIsDialogOpen(false)}
-                className="h-8 px-3.5 rounded-md text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                className="h-8 px-3.5 rounded-md text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800 transition-colors cursor-pointer disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 type="submit"
                 form="room-form"
-                disabled={!formValues.examId}
-                className="h-8 px-4 rounded-md font-semibold text-xs bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white transition-colors shadow-xs disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                disabled={!formValues.examId || isSubmitting}
+                className="h-8 px-4 rounded-md font-semibold text-xs bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white transition-colors shadow-xs disabled:opacity-50 disabled:pointer-events-none cursor-pointer flex items-center gap-1.5"
               >
-                {dialogMode === "edit" ? "Perbarui Ruangan" : "Buka Ruangan"}
+                {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />}
+                <span>{isSubmitting ? "Menyimpan..." : (dialogMode === "edit" ? "Perbarui Ruangan" : "Buka Ruangan")}</span>
               </button>
             </div>
           </div>

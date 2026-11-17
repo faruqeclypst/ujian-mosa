@@ -78,19 +78,66 @@ export const NeonConfirmModal: React.FC<NeonConfirmModalProps> = ({
   icon: CustomIcon,
 }) => {
   const [inputValue, setInputValue] = React.useState("");
+  const [internalLoading, setInternalLoading] = React.useState(false);
+  const isMountedRef = React.useRef(true);
+  const isRunningRef = React.useRef(false);
 
   React.useEffect(() => {
-    if (isOpen) setInputValue("");
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setInputValue("");
+      setInternalLoading(false);
+      isRunningRef.current = false;
+    }
   }, [isOpen]);
 
+  const effectiveLoading = isLoading || internalLoading;
+
+  const handleConfirm = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    // Cegah multi-klik / spam klik ganda saat internet lambat
+    if (effectiveLoading || isRunningRef.current) return;
+
+    isRunningRef.current = true;
+    if (isMountedRef.current) {
+      setInternalLoading(true);
+    }
+
+    try {
+      const result = onConfirm();
+      if (result && typeof (result as any).then === "function") {
+        await result;
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setInternalLoading(false);
+        // Cooldown singkat 400ms untuk menepis klik ganda reflek
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            isRunningRef.current = false;
+          }
+        }, 400);
+      }
+    }
+  };
+
   const config = TYPE_CONFIGS[type] || TYPE_CONFIGS.info;
-  const isConfirmDisabled = isLoading || (requireWord ? inputValue.trim() !== requireWord.trim() : false);
+  const isConfirmDisabled = effectiveLoading || (requireWord ? inputValue.trim() !== requireWord.trim() : false);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isLoading) onClose(); }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !effectiveLoading) onClose(); }}>
       <DialogContent
         className="max-w-md w-[calc(100vw-2rem)] bg-white dark:bg-[#0c0d0e] border border-neutral-200/90 dark:border-neutral-800 rounded-2xl shadow-2xl p-0 overflow-hidden"
-        hideClose={isLoading}
+        hideClose={effectiveLoading}
       >
         {/* Header Bar */}
         <div className="px-5 sm:px-6 py-4 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-[#111214] flex items-center gap-3">
@@ -133,7 +180,7 @@ export const NeonConfirmModal: React.FC<NeonConfirmModalProps> = ({
                 placeholder={requireWord}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value.toUpperCase())}
-                disabled={isLoading}
+                disabled={effectiveLoading}
               />
             </div>
           )}
@@ -147,7 +194,7 @@ export const NeonConfirmModal: React.FC<NeonConfirmModalProps> = ({
               variant="secondary"
               size="sm"
               onClick={onClose}
-              disabled={isLoading}
+              disabled={effectiveLoading}
             >
               {cancelLabel}
             </NeonButton>
@@ -158,9 +205,9 @@ export const NeonConfirmModal: React.FC<NeonConfirmModalProps> = ({
             variant={config.buttonVariant}
             color={config.buttonColor}
             size="sm"
-            onClick={onConfirm}
+            onClick={handleConfirm}
             disabled={isConfirmDisabled}
-            loading={isLoading}
+            loading={effectiveLoading}
           >
             {confirmLabel}
           </NeonButton>

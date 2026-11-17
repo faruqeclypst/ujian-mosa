@@ -1,21 +1,21 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { 
-  Plus, 
-  Trash, 
-  Loader2, 
-  BookOpen, 
-  FileSpreadsheet, 
-  Download, 
+import {
+  Plus,
+  Trash,
+  Loader2,
+  BookOpen,
+  FileSpreadsheet,
+  Download,
   ChevronDown,
   FileText,
   Upload,
   Edit,
   Info
 } from "lucide-react";
-import { 
+import {
   NeonInspector,
   InspectorSection,
   InspectorHeader,
@@ -25,10 +25,10 @@ import {
   InspectorButton,
   InspectorEmpty,
 } from "../components/ui/NeonInspector";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel
@@ -51,7 +51,7 @@ import { NeonStatGrid, NeonStatCard } from "../components/ui/NeonStats";
 const SubjectsPage = () => {
   const { subjects, teachers, loading, createSubject, updateSubject, deleteSubject } = useExamData();
   const { terminology, school } = useTenant();
-  
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedSubject, setSelectedSubject] = useState<SubjectData | null>(null);
@@ -60,10 +60,11 @@ const SubjectsPage = () => {
   const inspectedSubject = useMemo(() => {
     return subjects.find(s => s.id === inspectedSubjectId) || subjects[0] || null;
   }, [subjects, inspectedSubjectId]);
-  
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState<SubjectData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const isDeletingRef = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -137,7 +138,8 @@ const SubjectsPage = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!subjectToDelete) return;
+    if (!subjectToDelete || isDeletingRef.current) return;
+    isDeletingRef.current = true;
     setIsDeleting(true);
     try {
       await deleteSubject(subjectToDelete.id);
@@ -145,6 +147,7 @@ const SubjectsPage = () => {
       console.error(`Gagal menghapus ${terminology.subject.toLowerCase()}`, error);
       showAlert("Gagal", `Gagal menghapus ${terminology.subject.toLowerCase()}.`, "danger");
     } finally {
+      isDeletingRef.current = false;
       setIsDeleting(false);
       setDeleteDialogOpen(false);
       setSubjectToDelete(null);
@@ -156,7 +159,7 @@ const SubjectsPage = () => {
     try {
       const parsed = await parseSubjectImportExcel(file);
       if (parsed.length === 0) return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
-      
+
       setBatchProgress({
         isOpen: true,
         total: parsed.length,
@@ -184,7 +187,7 @@ const SubjectsPage = () => {
       if (failures.length > 0) {
         message += `\n\n❌ ${failures.length} data gagal:\n- ${failures.slice(0, 5).join("\n- ")}`;
       }
-      
+
       showAlert("Hasil Import", message, failures.length > 0 ? "warning" : "success");
     } catch (err: any) {
       showAlert("Gagal Import", err.message || `Gagal mengimport ${terminology.subject.toLowerCase()}.`, "danger");
@@ -212,13 +215,13 @@ const SubjectsPage = () => {
           message: "Menyiapkan penghapusan...",
           title: `Hapus ${terminology.subject} Massal`
         });
-        
+
         try {
           const chunkSize = 10;
           for (let i = 0; i < selectedIds.length; i += chunkSize) {
             const chunk = selectedIds.slice(i, i + chunkSize);
             await Promise.all(chunk.map(id => deleteSubject(id)));
-            
+
             const currentProcessed = Math.min(i + chunkSize, selectedIds.length);
             setBatchProgress(prev => ({
               ...prev,
@@ -239,9 +242,9 @@ const SubjectsPage = () => {
     );
   };
 
-  const defaultValues = useMemo(() => 
-    selectedSubject ? { name: selectedSubject.name } : { name: "" }, 
-  [selectedSubject]);
+  const defaultValues = useMemo(() =>
+    selectedSubject ? { name: selectedSubject.name } : { name: "" },
+    [selectedSubject]);
 
   const schoolSlug = school?.slug || school?.name?.toLowerCase().replace(/\s+/g, "-") || "modalbangsa";
 
@@ -291,8 +294,8 @@ const SubjectsPage = () => {
             ) : (
               <>
                 {selectedIds.length > 0 && (
-                  <Button 
-                    variant="default" 
+                  <Button
+                    variant="default"
                     size="sm"
                     className="h-8 px-3 text-xs font-semibold bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 animate-in fade-in"
                     onClick={handleBatchDelete}
@@ -318,7 +321,7 @@ const SubjectsPage = () => {
                     <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2.5 py-1">
                       Kelola {terminology.subject}
                     </DropdownMenuLabel>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                       onClick={() => {
                         const input = document.getElementById("subject-import-input") as HTMLInputElement;
@@ -333,8 +336,8 @@ const SubjectsPage = () => {
                         <span className="text-[10px] text-neutral-400">Unggah file {terminology.subject.toLowerCase()}</span>
                       </div>
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={handleExportSubjects} 
+                    <DropdownMenuItem
+                      onClick={handleExportSubjects}
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                     >
                       <Download className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -344,8 +347,8 @@ const SubjectsPage = () => {
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-                    <DropdownMenuItem 
-                      onClick={() => downloadSubjectImportTemplate(terminology)} 
+                    <DropdownMenuItem
+                      onClick={() => downloadSubjectImportTemplate(terminology)}
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                     >
                       <FileText className="h-4 w-4 text-neutral-500" />
@@ -417,12 +420,12 @@ const SubjectsPage = () => {
         {/* ── Main Content Grid: Table + Right Inspector ── */}
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-6 items-start">
           <div className="min-w-0 space-y-6">
-            <SubjectTable 
-              subjects={subjects} 
+            <SubjectTable
+              subjects={subjects}
               selectedIds={selectedIds}
               onSelectChange={setSelectedIds}
-              onEdit={handleEditClick} 
-              onDelete={handleDeleteClick} 
+              onEdit={handleEditClick}
+              onDelete={handleDeleteClick}
               isLoading={loading}
               activeKey={inspectedSubject?.id}
               onRowClick={(s) => setInspectedSubjectId(s.id)}
@@ -518,8 +521,8 @@ const SubjectsPage = () => {
         <ConfirmationDialog
           isOpen={alertDialog.isOpen}
           onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
-          onConfirm={() => {
-            if (alertDialog.onConfirm) alertDialog.onConfirm();
+          onConfirm={async () => {
+            if (alertDialog.onConfirm) await alertDialog.onConfirm();
             setAlertDialog({ ...alertDialog, isOpen: false });
           }}
           title={alertDialog.title}

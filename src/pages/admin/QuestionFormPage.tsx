@@ -1225,6 +1225,7 @@ const QuestionFormPage = () => {
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [isSavingQuestion, setIsSavingQuestion] = useState(false);
+  const isSavingQuestionRef = useRef(false);
   const [batchDragState, setBatchDragState] = useState<{ questionIndex: number; itemIndex: number } | null>(null);
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false, title: "", description: "", type: "info", confirmLabel: "Ok", onConfirm: () => { } });
 
@@ -3157,7 +3158,7 @@ const QuestionFormPage = () => {
   const handleSubmit = async (e: any, stayOpen: boolean = false) => {
     e.preventDefault();
     if (!pb) return;
-    if (isSavingQuestion) return; // Prevent double-click
+    if (isSavingQuestionRef.current || isSavingQuestion) return; // Prevent double-click
 
     // 1. Validasi Teks Pertanyaan (teks ATAU gambar harus ada)
     const hasQuestionText = formValues.text && formValues.text.replace(/<[^>]*>/g, '').trim() !== "";
@@ -3274,6 +3275,7 @@ const QuestionFormPage = () => {
       }
     }
 
+    isSavingQuestionRef.current = true;
     setIsSavingQuestion(true);
     try {
       let imageUrl = formValues.imageUrl || "";
@@ -3543,6 +3545,7 @@ const QuestionFormPage = () => {
       console.error("Gagal menyimpan soal:", error);
       showAlert("Gagal", error?.message || "Gagal menyimpan soal ke PocketBase.", "danger");
     } finally {
+      isSavingQuestionRef.current = false;
       setIsSavingQuestion(false);
     }
   };
@@ -7405,8 +7408,8 @@ const QuestionFormPage = () => {
         <ConfirmationDialog
           isOpen={confirmModal.isOpen}
           onClose={() => setConfirmModal((prev: any) => ({ ...prev, isOpen: false }))}
-          onConfirm={() => {
-            if (confirmModal.onConfirm) confirmModal.onConfirm();
+          onConfirm={async () => {
+            if (confirmModal.onConfirm) await confirmModal.onConfirm();
             setConfirmModal((prev: any) => ({ ...prev, isOpen: false }));
           }}
           title={confirmModal.title}

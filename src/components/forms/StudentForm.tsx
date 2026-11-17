@@ -43,6 +43,7 @@ export const StudentForm = ({
 }: StudentFormProps) => {
   const { terminology, school } = useTenant();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isSubmittingRef = useRef(false);
   const [photoValue, setPhotoValue] = useState<string>(defaultValues?.photo || "");
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -166,24 +167,30 @@ export const StudentForm = ({
   };
 
   const submitHandler = async (values: StudentFormValues) => {
-    await onSubmit({
-      ...values,
-      photo: photoValue,
-    });
-    if (!defaultValues || Object.keys(defaultValues).length === 0) {
-      reset({
-        nisn: "",
-        name: "",
-        gender: "L",
-        classId: "",
-        photo: "",
-        birthPlace: "",
-        birthDate: "",
-        room: "",
-        session: "",
-        examNumber: "",
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    try {
+      await onSubmit({
+        ...values,
+        photo: photoValue,
       });
-      setPhotoValue("");
+      if (!defaultValues || Object.keys(defaultValues).length === 0) {
+        reset({
+          nisn: "",
+          name: "",
+          gender: "L",
+          classId: "",
+          photo: "",
+          birthPlace: "",
+          birthDate: "",
+          room: "",
+          session: "",
+          examNumber: "",
+        });
+        setPhotoValue("");
+      }
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Plus,
   BookOpen,
@@ -375,6 +375,10 @@ const ExamsPage = () => {
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif");
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const isDuplicatingRef = useRef(false);
+  const isDeletingRef = useRef(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedExam, setSelectedExam] = useState<ExamData | null>(null);
   const [activeExamIds, setActiveExamIds] = useState<string[]>(() => examsCache?.activeExamIds || []);
@@ -1133,7 +1137,8 @@ const ExamsPage = () => {
       type: "info",
       confirmLabel: mine ? "Duplikat" : "Salin ke Koleksi Saya",
       onConfirm: async () => {
-        if (!pb) return;
+        if (!pb || isDuplicatingRef.current) return;
+        isDuplicatingRef.current = true;
         try {
           const newTeacherId = (role !== "admin" && (teacherId || user?.id)) ? (teacherId || user?.id) : exam.teacherId;
           const newExam = await pb.collection('exams').create({
@@ -1149,12 +1154,16 @@ const ExamsPage = () => {
             filter: `examId = "${exam.id}"`
           });
 
-          for (const q of questions) {
-            const { id, created, updated, collectionId, collectionName, ...rest } = q;
-            await pb.collection('questions').create({
-              ...rest,
-              examId: newExam.id,
-            });
+          const CHUNK_SIZE = 5;
+          for (let i = 0; i < questions.length; i += CHUNK_SIZE) {
+            const chunk = questions.slice(i, i + CHUNK_SIZE);
+            await Promise.all(chunk.map((q) => {
+              const { id, created, updated, collectionId, collectionName, ...rest } = q;
+              return pb.collection('questions').create({
+                ...rest,
+                examId: newExam.id,
+              });
+            }));
           }
 
           addToast({
@@ -1162,8 +1171,11 @@ const ExamsPage = () => {
             title: "Berhasil Menyalin Bank Soal",
             description: `Bank soal "${targetTitle}" berhasil disalin ke koleksi Anda (${questions.length} butir soal).`
           });
+          await fetchExams();
         } catch (error) {
           addToast({ type: "error", title: "Gagal", description: "Gagal menyalin bank soal." });
+        } finally {
+          isDuplicatingRef.current = false;
         }
       }
     });
@@ -1249,7 +1261,9 @@ const ExamsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pb) return;
+    if (!pb || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
     try {
       const payload: any = {
         ...formValues,
@@ -1284,13 +1298,18 @@ const ExamsPage = () => {
         }
       }
       setIsDialogOpen(false);
+      await fetchExams();
     } catch (error) {
       showAlert("Gagal", "Gagal menyimpan data ujian. Periksa log browser.", "danger");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
   const handleConfirmDelete = async () => {
-    if (!examToDelete || !pb) return;
+    if (!examToDelete || !pb || isDeletingRef.current) return;
+    isDeletingRef.current = true;
     setIsDeleting(true);
     try {
       let useFast = false;
@@ -1324,6 +1343,7 @@ const ExamsPage = () => {
     } catch (error) {
       showAlert("Gagal", "Gagal menghapus bank soal.", "danger");
     } finally {
+      isDeletingRef.current = false;
       setIsDeleting(false);
       setDeleteDialogOpen(false);
     }
@@ -2604,7 +2624,7 @@ const ExamsPage = () => {
       </div>
 
       {/* Dialog Create/Edit (Neon Console Style) */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open && !isSubmitting) setIsDialogOpen(false); }}>
         <DialogContent className="max-w-lg w-[95vw] overflow-hidden p-0 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shadow-2xl flex flex-col gap-0">
           {/* Header Dialog */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 shrink-0 pr-12">
@@ -2824,18 +2844,27 @@ const ExamsPage = () => {
               <Button
                 type="button"
                 variant="ghost"
+                disabled={isSubmitting}
                 onClick={() => setIsDialogOpen(false)}
-                className="h-8.5 px-3.5 text-xs font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 cursor-pointer"
+                className="h-8.5 px-3.5 text-xs font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 cursor-pointer disabled:opacity-50"
               >
                 Batal
               </Button>
               <Button
                 type="submit"
-                disabled={role !== "admin" && availableSubjectsForForm.length === 0}
+                disabled={(role !== "admin" && availableSubjectsForForm.length === 0) || isSubmitting}
                 className="h-8.5 px-4 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Check className="h-3.5 w-3.5" />
-                <span>{dialogMode === "edit" ? "Perbarui Bank Soal" : "Simpan Bank Soal"}</span>
+                {isSubmitting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                ) : (
+                  <Check className="h-3.5 w-3.5 shrink-0" />
+                )}
+                <span>
+                  {isSubmitting
+                    ? "Menyimpan..."
+                    : (dialogMode === "edit" ? "Perbarui Bank Soal" : "Simpan Bank Soal")}
+                </span>
               </Button>
             </div>
           </form>

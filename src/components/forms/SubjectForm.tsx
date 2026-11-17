@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -46,10 +46,17 @@ export const SubjectForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
     }
   }, [defaultValues, reset]);
 
+  const isSubmittingRef = useRef(false);
   const submitHandler = async (values: SubjectFormValues) => {
-    await onSubmit(values);
-    if (!defaultValues || Object.keys(defaultValues).length === 0) {
-      reset({ name: "" });
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    try {
+      await onSubmit(values);
+      if (!defaultValues || Object.keys(defaultValues).length === 0) {
+        reset({ name: "" });
+      }
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

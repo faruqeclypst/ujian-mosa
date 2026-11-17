@@ -1,14 +1,14 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { 
-  Plus, 
-  Trash, 
-  Loader2, 
-  LayoutGrid, 
-  FileSpreadsheet, 
-  Download, 
+import {
+  Plus,
+  Trash,
+  Loader2,
+  LayoutGrid,
+  FileSpreadsheet,
+  Download,
   ChevronDown,
   FileText,
   Upload,
@@ -18,7 +18,7 @@ import {
   GraduationCap,
   Users
 } from "lucide-react";
-import { 
+import {
   NeonInspector,
   InspectorSection,
   InspectorHeader,
@@ -28,10 +28,10 @@ import {
   InspectorButton,
   InspectorEmpty,
 } from "../components/ui/NeonInspector";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel
@@ -68,21 +68,22 @@ const ClassesPage = () => {
           if (typeof _total === "number") setFastTotalStudents(_total);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [pb]);
-  
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
   const [inspectedClassId, setInspectedClassId] = useState<string | null>(null);
-  
+
   const inspectedClass = useMemo(() => {
     return classes.find(c => c.id === inspectedClassId) || classes[0] || null;
   }, [classes, inspectedClassId]);
-  
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [classToDelete, setClassToDelete] = useState<ClassData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const isDeletingRef = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -198,7 +199,8 @@ const ClassesPage = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!classToDelete) return;
+    if (!classToDelete || isDeletingRef.current) return;
+    isDeletingRef.current = true;
     setIsDeleting(true);
     try {
       await deleteClass(classToDelete.id);
@@ -206,6 +208,7 @@ const ClassesPage = () => {
       console.error(`Gagal menghapus ${terminology.class.toLowerCase()}`, error);
       showAlert("Gagal", `Gagal menghapus data ${terminology.class.toLowerCase()}.`, "danger");
     } finally {
+      isDeletingRef.current = false;
       setIsDeleting(false);
       setDeleteDialogOpen(false);
       setClassToDelete(null);
@@ -217,7 +220,7 @@ const ClassesPage = () => {
     try {
       const parsed = await parseClassImportExcel(file);
       if (parsed.length === 0) return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
-      
+
       setBatchProgress({
         isOpen: true,
         total: parsed.length,
@@ -245,7 +248,7 @@ const ClassesPage = () => {
       if (failures.length > 0) {
         message += `\n\n❌ ${failures.length} data gagal:\n- ${failures.slice(0, 5).join("\n- ")}`;
       }
-      
+
       showAlert("Hasil Import", message, failures.length > 0 ? "warning" : "success");
     } catch (err: any) {
       showAlert("Gagal Import", err.message || `Gagal mengimport data ${terminology.class.toLowerCase()}.`, "danger");
@@ -273,13 +276,13 @@ const ClassesPage = () => {
           message: "Menyiapkan penghapusan...",
           title: `Hapus ${terminology.class} Massal`
         });
-        
+
         try {
           const chunkSize = 10;
           for (let i = 0; i < selectedIds.length; i += chunkSize) {
             const chunk = selectedIds.slice(i, i + chunkSize);
             await Promise.all(chunk.map(id => deleteClass(id)));
-            
+
             const currentProcessed = Math.min(i + chunkSize, selectedIds.length);
             setBatchProgress(prev => ({
               ...prev,
@@ -300,9 +303,9 @@ const ClassesPage = () => {
     );
   };
 
-  const defaultValues = useMemo(() => 
-    selectedClass ? { name: selectedClass.name } : { name: "" }, 
-  [selectedClass]);
+  const defaultValues = useMemo(() =>
+    selectedClass ? { name: selectedClass.name } : { name: "" },
+    [selectedClass]);
 
   const schoolSlug = school?.slug || school?.name?.toLowerCase().replace(/\s+/g, "-") || "modalbangsa";
   const totalStudentCount = fastTotalStudents !== null ? fastTotalStudents : students.length;
@@ -365,9 +368,9 @@ const ClassesPage = () => {
             ) : (
               <>
                 {selectedIds.length > 0 && (
-                  <Button 
-                    variant="default" 
-                    size="sm" 
+                  <Button
+                    variant="default"
+                    size="sm"
                     className="h-8 px-3 text-xs font-semibold bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 animate-in fade-in"
                     onClick={handleBatchDelete}
                   >
@@ -392,7 +395,7 @@ const ClassesPage = () => {
                     <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2.5 py-1">
                       Kelola {terminology.class}
                     </DropdownMenuLabel>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                       onClick={() => {
                         const input = document.getElementById("class-import-input") as HTMLInputElement;
@@ -407,8 +410,8 @@ const ClassesPage = () => {
                         <span className="text-[10px] text-neutral-400">Unggah file data {terminology.class.toLowerCase()}</span>
                       </div>
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={handleExportClasses} 
+                    <DropdownMenuItem
+                      onClick={handleExportClasses}
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                     >
                       <Download className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -418,8 +421,8 @@ const ClassesPage = () => {
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-                    <DropdownMenuItem 
-                      onClick={() => downloadClassImportTemplate(terminology)} 
+                    <DropdownMenuItem
+                      onClick={() => downloadClassImportTemplate(terminology)}
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                     >
                       <FileText className="h-4 w-4 text-neutral-500" />
@@ -490,13 +493,13 @@ const ClassesPage = () => {
         {/* ── Main Content Grid: Table + Right Inspector ── */}
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-6 items-start">
           <div className="min-w-0 space-y-6">
-            <ClassTable 
-              classes={classes} 
+            <ClassTable
+              classes={classes}
               studentCounts={studentCountMap}
               selectedIds={selectedIds}
               onSelectChange={setSelectedIds}
-              onEdit={handleEditClick} 
-              onDelete={handleDeleteClick} 
+              onEdit={handleEditClick}
+              onDelete={handleDeleteClick}
               onResetPassword={handleResetClassPassword}
               isLoading={loading}
               activeKey={inspectedClass?.id}
@@ -604,8 +607,8 @@ const ClassesPage = () => {
         <ConfirmationDialog
           isOpen={alertDialog.isOpen}
           onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
-          onConfirm={() => {
-            if (alertDialog.onConfirm) alertDialog.onConfirm();
+          onConfirm={async () => {
+            if (alertDialog.onConfirm) await alertDialog.onConfirm();
             setAlertDialog({ ...alertDialog, isOpen: false });
           }}
           title={alertDialog.title}

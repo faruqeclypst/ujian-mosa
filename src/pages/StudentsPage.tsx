@@ -229,6 +229,8 @@ const StudentsPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<StudentData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const isDeletingRef = useRef(false);
+  const isBatchDeletingRef = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isExportingScores, setIsExportingScores] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -664,7 +666,8 @@ const StudentsPage = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!studentToDelete) return;
+    if (!studentToDelete || isDeletingRef.current) return;
+    isDeletingRef.current = true;
     setIsDeleting(true);
     try {
       await deleteStudent(studentToDelete.id);
@@ -677,6 +680,7 @@ const StudentsPage = () => {
     } catch (error) {
       console.error("Gagal menghapus siswa:", error);
     } finally {
+      isDeletingRef.current = false;
       setIsDeleting(false);
       setDeleteDialogOpen(false);
       setStudentToDelete(null);
@@ -941,12 +945,14 @@ const StudentsPage = () => {
   };
 
   const handleBatchDelete = async () => {
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0 || isBatchDeletingRef.current) return;
     showAlert(
       `Hapus ${terminology.student} Massal`,
       `Apakah Anda yakin ingin menghapus {selectedIds.length} {terminology.student.toLowerCase()} terpilih?`,
       "danger",
       async () => {
+        if (isBatchDeletingRef.current) return;
+        isBatchDeletingRef.current = true;
         setBatchProgress({
           isOpen: true,
           total: selectedIds.length,
@@ -973,6 +979,7 @@ const StudentsPage = () => {
           console.error("Gagal menghapus siswa massal", error);
           showAlert("Gagal", `Gagal menghapus ${terminology.student.toLowerCase()} massal.`, "danger");
         } finally {
+          isBatchDeletingRef.current = false;
           setBatchProgress(prev => ({ ...prev, isOpen: false }));
           fetchStudentTable();
         }
@@ -1909,8 +1916,8 @@ const StudentsPage = () => {
       <ConfirmationDialog
         isOpen={alertDialog.isOpen}
         onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
-        onConfirm={() => {
-          if (alertDialog.onConfirm) alertDialog.onConfirm();
+        onConfirm={async () => {
+          if (alertDialog.onConfirm) await alertDialog.onConfirm();
           setAlertDialog({ ...alertDialog, isOpen: false });
         }}
         title={alertDialog.title}

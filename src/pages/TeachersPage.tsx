@@ -1,18 +1,18 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { 
-  Plus, 
-  Trash, 
-  Loader2, 
-  Users, 
-  FileSpreadsheet, 
-  Download, 
-  ChevronDown, 
-  FileText, 
-  Upload, 
-  KeyRound, 
+import {
+  Plus,
+  Trash,
+  Loader2,
+  Users,
+  FileSpreadsheet,
+  Download,
+  ChevronDown,
+  FileText,
+  Upload,
+  KeyRound,
   MoreHorizontal,
   Edit,
   Info,
@@ -21,7 +21,7 @@ import {
   GraduationCap
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
-import { 
+import {
   NeonInspector,
   InspectorSection,
   InspectorHeader,
@@ -31,10 +31,10 @@ import {
   InspectorButton,
   InspectorEmpty,
 } from "../components/ui/NeonInspector";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel
@@ -57,7 +57,7 @@ import { NeonStatGrid, NeonStatCard } from "../components/ui/NeonStats";
 const TeachersPage = () => {
   const { teachers, subjects, loading, createTeacher, updateTeacher, deleteTeacher, resetUserPassword } = useExamData();
   const { pb, terminology, school } = useTenant();
-  
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
@@ -66,10 +66,11 @@ const TeachersPage = () => {
   const inspectedTeacher = useMemo(() => {
     return teachers.find(t => t.id === inspectedTeacherId) || teachers[0] || null;
   }, [teachers, inspectedTeacherId]);
-  
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const isDeletingRef = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -143,7 +144,8 @@ const TeachersPage = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!teacherToDelete) return;
+    if (!teacherToDelete || isDeletingRef.current) return;
+    isDeletingRef.current = true;
     setIsDeleting(true);
     try {
       await deleteTeacher(teacherToDelete.id);
@@ -151,6 +153,7 @@ const TeachersPage = () => {
       console.error(`Gagal menghapus ${terminology.teacher.toLowerCase()}`, error);
       showAlert("Gagal", `Gagal menghapus data ${terminology.teacher.toLowerCase()}.`, "danger");
     } finally {
+      isDeletingRef.current = false;
       setIsDeleting(false);
       setDeleteDialogOpen(false);
       setTeacherToDelete(null);
@@ -191,7 +194,7 @@ const TeachersPage = () => {
               const safeCode = (teacher.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
               username = safeCode ? `guru_${safeCode}` : `guru_${Math.floor(100 + Math.random() * 900)}`;
             }
-            
+
             await pb.collection("users").create({
               username: username,
               password: defaultPass,
@@ -205,7 +208,7 @@ const TeachersPage = () => {
             if (!teacher.username || teacher.username !== username) {
               await pb.collection("teachers").update(teacherId, { username });
             }
-            
+
             showAlert("Berhasil Dipulihkan", `Akun login ${terminology.teacher.toLowerCase()} ${teacher.name} yang sempat hilang telah dibuat kembali dengan username "${username}" dan password default 12345678.`, "success");
           }
         } catch (error: any) {
@@ -238,7 +241,7 @@ const TeachersPage = () => {
           for (let i = 0; i < teachers.length; i++) {
             const teacher = teachers[i];
             setBatchProgress(prev => ({ ...prev, current: i, message: `Memeriksa ${teacher.name}...` }));
-            
+
             if (!pb) continue;
             try {
               await pb.collection("users").getFirstListItem(`teacherId="${teacher.id}"`);
@@ -255,7 +258,7 @@ const TeachersPage = () => {
                   const safeCode = (teacher.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                   username = safeCode ? `guru_${safeCode}` : `guru_${Math.floor(100 + Math.random() * 900)}`;
                 }
-                
+
                 await pb.collection("users").create({
                   username: username,
                   password: defaultPass,
@@ -291,7 +294,7 @@ const TeachersPage = () => {
     try {
       const parsed = await parseTeacherImportExcel(file);
       if (parsed.length === 0) return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
-      
+
       setBatchProgress({
         isOpen: true,
         total: parsed.length,
@@ -306,10 +309,10 @@ const TeachersPage = () => {
         try {
           // Logika Generate: Hapus gelar (setelah koma)
           const namePart = row.name.split(',')[0].trim();
-          
+
           // 1. Generate Username: kecilkan, ganti spasi jadi _
           const generatedUsername = namePart.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-          
+
           // 2. Generate Kode: Ambil inisial (Alfaruq Asri -> AA)
           const generatedCode = namePart
             .split(/\s+/)
@@ -333,7 +336,7 @@ const TeachersPage = () => {
             username: finalUsername,
             subjects: row.subjects,
           });
-          
+
           setBatchProgress(prev => ({
             ...prev,
             current: i + 1,
@@ -349,7 +352,7 @@ const TeachersPage = () => {
       if (failures.length > 0) {
         message += `\n\n❌ ${failures.length} data gagal:\n- ${failures.slice(0, 5).join("\n- ")}`;
       }
-      
+
       showAlert("Hasil Import", message, failures.length > 0 ? "warning" : "success");
     } catch (err: any) {
       showAlert("Gagal Import", err.message || `Gagal mengimport data ${terminology.teacher.toLowerCase()}.`, "danger");
@@ -377,13 +380,13 @@ const TeachersPage = () => {
           message: "Menyiapkan penghapusan...",
           title: `Hapus ${terminology.teacher} Massal`
         });
-        
+
         try {
           const chunkSize = 10;
           for (let i = 0; i < selectedIds.length; i += chunkSize) {
             const chunk = selectedIds.slice(i, i + chunkSize);
             await Promise.all(chunk.map(id => deleteTeacher(id)));
-            
+
             const currentProcessed = Math.min(i + chunkSize, selectedIds.length);
             setBatchProgress(prev => ({
               ...prev,
@@ -500,18 +503,18 @@ const TeachersPage = () => {
     );
   };
 
-  const defaultValues = useMemo(() => 
+  const defaultValues = useMemo(() =>
     selectedTeacher
       ? {
-          name: selectedTeacher.name,
-          code: selectedTeacher.code || "",
-          username: selectedTeacher.username || "",
-          email: selectedTeacher.email || "",
-          phone: selectedTeacher.phone || "",
-          subjects: selectedTeacher.subjects || [],
-        }
+        name: selectedTeacher.name,
+        code: selectedTeacher.code || "",
+        username: selectedTeacher.username || "",
+        email: selectedTeacher.email || "",
+        phone: selectedTeacher.phone || "",
+        subjects: selectedTeacher.subjects || [],
+      }
       : { name: "", code: "", username: "", email: "", phone: "", subjects: [] },
-  [selectedTeacher]);
+    [selectedTeacher]);
 
   const schoolSlug = school?.slug || school?.name?.toLowerCase().replace(/\s+/g, "-") || "modalbangsa";
   const linkedAccountsCount = teachers.filter(t => t.username).length;
@@ -580,7 +583,7 @@ const TeachersPage = () => {
                         <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2.5 py-1">
                           Aksi ({selectedIds.length} {terminology.teacher})
                         </DropdownMenuLabel>
-                        
+
                         <DropdownMenuItem
                           onClick={handleBatchResetPassword}
                           className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
@@ -619,7 +622,7 @@ const TeachersPage = () => {
                     <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2.5 py-1">
                       Kelola {terminology.teacher}
                     </DropdownMenuLabel>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                       onClick={() => {
                         const input = document.getElementById("teacher-import-input") as HTMLInputElement;
@@ -634,8 +637,8 @@ const TeachersPage = () => {
                         <span className="text-[10px] text-neutral-400">Unggah file data {terminology.teacher.toLowerCase()}</span>
                       </div>
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={handleExportTeachers} 
+                    <DropdownMenuItem
+                      onClick={handleExportTeachers}
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                     >
                       <Download className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -645,8 +648,8 @@ const TeachersPage = () => {
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-                    <DropdownMenuItem 
-                      onClick={() => downloadTeacherImportTemplate(terminology)} 
+                    <DropdownMenuItem
+                      onClick={() => downloadTeacherImportTemplate(terminology)}
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                     >
                       <FileText className="h-4 w-4 text-neutral-500" />
@@ -656,8 +659,8 @@ const TeachersPage = () => {
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-                    <DropdownMenuItem 
-                      onClick={handleSyncAllUsers} 
+                    <DropdownMenuItem
+                      onClick={handleSyncAllUsers}
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                     >
                       <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
@@ -728,12 +731,12 @@ const TeachersPage = () => {
         {/* ── Main Content Grid: Table + Right Inspector ── */}
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-6 items-start">
           <div className="min-w-0 space-y-6">
-            <TeacherTable 
-              teachers={teachers} 
+            <TeacherTable
+              teachers={teachers}
               selectedIds={selectedIds}
               onSelectChange={setSelectedIds}
-              onEdit={handleEditClick} 
-              onDelete={handleDeleteClick} 
+              onEdit={handleEditClick}
+              onDelete={handleDeleteClick}
               onResetPassword={handleResetPassword}
               isLoading={loading}
               activeKey={inspectedTeacher?.id}
@@ -885,8 +888,8 @@ const TeachersPage = () => {
         <ConfirmationDialog
           isOpen={alertDialog.isOpen}
           onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
-          onConfirm={() => {
-            if (alertDialog.onConfirm) alertDialog.onConfirm();
+          onConfirm={async () => {
+            if (alertDialog.onConfirm) await alertDialog.onConfirm();
             setAlertDialog({ ...alertDialog, isOpen: false });
           }}
           title={alertDialog.title}

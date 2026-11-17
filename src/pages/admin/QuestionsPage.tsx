@@ -1318,6 +1318,9 @@ const QuestionsPage = () => {
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [isSavingQuestion, setIsSavingQuestion] = useState(false);
+  const isSavingQuestionRef = useRef(false);
+  const isDuplicatingRef = useRef(false);
+  const isDeletingRef = useRef(false);
   const [batchDragState, setBatchDragState] = useState<{ questionIndex: number; itemIndex: number } | null>(null);
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false, title: "", description: "", type: "info", confirmLabel: "Ok", onConfirm: () => { } });
 
@@ -3004,7 +3007,7 @@ const QuestionsPage = () => {
   const [isDuplicatingExam, setIsDuplicatingExam] = useState(false);
 
   const handleDuplicateCurrentExam = async () => {
-    if (!exam || !pb) return;
+    if (!exam || !pb || isDuplicatingRef.current) return;
     const isMine = isOwner;
     const targetTitle = isMine ? `(Salinan) ${exam.title}` : `${exam.title} (Salinan Saya)`;
 
@@ -3015,6 +3018,8 @@ const QuestionsPage = () => {
         : `Salin bank soal "${exam.title}" karya ${exam.teacherName || "rekan guru"} ke koleksi Anda? Anda akan menjadi pemilik penuh salinan ini dan bebas mengedit serta menggunakannya di Ruang Ujian.`,
       "info",
       async () => {
+        if (isDuplicatingRef.current) return;
+        isDuplicatingRef.current = true;
         try {
           setIsDuplicatingExam(true);
           const newTeacherId = (role !== "admin" && (teacherId || user?.id)) ? (teacherId || user?.id) : exam.teacherId;
@@ -3027,12 +3032,16 @@ const QuestionsPage = () => {
             is_mgmp_shared: false,
           });
 
-          for (const q of questions) {
-            const { id, created, updated, collectionId, collectionName, ...rest } = q as any;
-            await pb.collection('questions').create({
-              ...rest,
-              examId: newExam.id,
-            });
+          const CHUNK_SIZE = 5;
+          for (let i = 0; i < questions.length; i += CHUNK_SIZE) {
+            const chunk = questions.slice(i, i + CHUNK_SIZE);
+            await Promise.all(chunk.map((q) => {
+              const { id, created, updated, collectionId, collectionName, ...rest } = q as any;
+              return pb.collection('questions').create({
+                ...rest,
+                examId: newExam.id,
+              });
+            }));
           }
 
           addToast({
@@ -3046,6 +3055,7 @@ const QuestionsPage = () => {
         } catch (err: any) {
           showAlert("Gagal", err?.message || "Gagal menyalin bank soal.", "danger");
         } finally {
+          isDuplicatingRef.current = false;
           setIsDuplicatingExam(false);
         }
       }
@@ -3411,7 +3421,7 @@ const QuestionsPage = () => {
   const handleSubmit = async (e: any, stayOpen: boolean = false) => {
     e.preventDefault();
     if (!pb) return;
-    if (isSavingQuestion) return; // Prevent double-click
+    if (isSavingQuestionRef.current || isSavingQuestion) return; // Prevent double-click
 
     // 1. Validasi Teks Pertanyaan (teks ATAU gambar harus ada)
     const hasQuestionText = formValues.text && formValues.text.replace(/<[^>]*>/g, '').trim() !== "";
@@ -3528,6 +3538,7 @@ const QuestionsPage = () => {
       }
     }
 
+    isSavingQuestionRef.current = true;
     setIsSavingQuestion(true);
     try {
       let imageUrl = formValues.imageUrl || "";
@@ -3796,6 +3807,7 @@ const QuestionsPage = () => {
     } catch (error) {
       showAlert("Gagal", "Gagal menyimpan soal ke PocketBase.", "danger");
     } finally {
+      isSavingQuestionRef.current = false;
       setIsSavingQuestion(false);
     }
   };
@@ -3853,7 +3865,8 @@ const QuestionsPage = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!questionToDelete || !pb) return;
+    if (!questionToDelete || !pb || isDeletingRef.current) return;
+    isDeletingRef.current = true;
     setIsDeleting(true);
     try {
       // Hapus gambar di R2 (Non-blocking: jika gagal tetap hapus record DB)
@@ -3888,6 +3901,7 @@ const QuestionsPage = () => {
       console.error("Delete Question Error:", error);
       showAlert("Gagal", "Gagal menghapus data soal dari database.", "danger");
     } finally {
+      isDeletingRef.current = false;
       setIsDeleting(false);
       setDeleteDialogOpen(false);
     }
@@ -8207,7 +8221,7 @@ const QuestionsPage = () => {
           isOpen={confirmModal.isOpen}
           onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
           onConfirm={async () => {
-            if (confirmModal.onConfirm) confirmModal.onConfirm();
+            if (confirmModal.onConfirm) await confirmModal.onConfirm();
             setConfirmModal({ ...confirmModal, isOpen: false });
           }}
           title={confirmModal.title}
@@ -8391,8 +8405,8 @@ const QuestionsPage = () => {
         <ConfirmationDialog
           isOpen={confirmModal.isOpen}
           onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-          onConfirm={() => {
-            if (confirmModal.onConfirm) confirmModal.onConfirm();
+          onConfirm={async () => {
+            if (confirmModal.onConfirm) await confirmModal.onConfirm();
             setConfirmModal({ ...confirmModal, isOpen: false });
           }}
           title={confirmModal.title}
