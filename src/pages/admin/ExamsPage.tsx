@@ -521,28 +521,6 @@ const ExamsPage = () => {
     });
   }, [role, subjects, currentTeacher]);
 
-  const mySubjectIds = useMemo(() => {
-    const set = new Set<string>();
-    // Hanya ambil dari mapel yang disetting admin untuk guru ini
-    teacherAssignedSubjects.forEach((sub: any) => {
-      if (sub.id) set.add(sub.id);
-      if (sub.name) set.add(sub.name.toLowerCase());
-    });
-    return Array.from(set);
-  }, [teacherAssignedSubjects]);
-
-  // Daftar mapel untuk form modal Tambah/Edit (role guru hanya melihat mapel miliknya)
-  const availableSubjectsForForm = useMemo(() => {
-    if (role === "admin") return subjects;
-    const list = [...teacherAssignedSubjects];
-    // Jika sedang mode edit dan bank soal memiliki mapel sebelumnya, sertakan agar tidak hilang
-    if (formValues.subjectId && !list.some((s: any) => s.id === formValues.subjectId)) {
-      const existingSub = subjects.find((s: any) => s.id === formValues.subjectId);
-      if (existingSub) list.unshift(existingSub);
-    }
-    return list;
-  }, [role, subjects, teacherAssignedSubjects, formValues.subjectId]);
-
   // Apakah bank soal ini benar-benar dibuat oleh guru login saat ini
   const isRealOwner = useCallback((exam: any) => {
     if (!exam) return false;
@@ -558,6 +536,38 @@ const ExamsPage = () => {
     if (teacherFullAccess) return true;
     return isRealOwner(exam);
   }, [role, teacherFullAccess, isRealOwner]);
+
+  const mySubjectIds = useMemo(() => {
+    const set = new Set<string>();
+    // 1. Dari mapel yang disetting admin untuk guru ini
+    teacherAssignedSubjects.forEach((sub: any) => {
+      if (sub.id) set.add(sub.id);
+      if (sub.name) set.add(sub.name.toLowerCase());
+    });
+    // 2. Fallback: Dari bank soal yang dimiliki oleh guru ini sendiri jika admin belum mengisi di profil guru
+    if (set.size === 0) {
+      exams.forEach((e: any) => {
+        if (isRealOwner(e) && e.subjectId) {
+          set.add(e.subjectId);
+          const sName = e.subjectName || subjects.find((s: any) => s.id === e.subjectId)?.name;
+          if (sName) set.add(sName.toLowerCase());
+        }
+      });
+    }
+    return Array.from(set);
+  }, [teacherAssignedSubjects, exams, isRealOwner, subjects]);
+
+  // Daftar mapel untuk form modal Tambah/Edit (role guru hanya melihat mapel miliknya)
+  const availableSubjectsForForm = useMemo(() => {
+    if (role === "admin") return subjects;
+    const list = [...teacherAssignedSubjects];
+    // Jika sedang mode edit dan bank soal memiliki mapel sebelumnya, sertakan agar tidak hilang
+    if (formValues.subjectId && !list.some((s: any) => s.id === formValues.subjectId)) {
+      const existingSub = subjects.find((s: any) => s.id === formValues.subjectId);
+      if (existingSub) list.unshift(existingSub);
+    }
+    return list;
+  }, [role, subjects, teacherAssignedSubjects, formValues.subjectId]);
 
   const isMgmpExam = useCallback((exam: any) => {
     if (!exam || !exam.subjectId) return false;
@@ -575,19 +585,24 @@ const ExamsPage = () => {
     return false;
   }, [isOwner, isMgmpExam]);
 
+  // Bank soal aktif/arsip — untuk role guru HANYA bank soal miliknya sendiri atau rekan MGMP se-mapel
   const tabExams = useMemo(() => {
-    return exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
-  }, [exams, activeTab]);
+    const base = exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
+    if (role !== "admin") {
+      return base.filter(e => isRealOwner(e) || isMgmpExam(e));
+    }
+    return base;
+  }, [exams, activeTab, role, isRealOwner, isMgmpExam]);
 
   const availableGroups = useMemo(() => {
     const set = new Set<string>();
-    exams.forEach(e => {
+    tabExams.forEach(e => {
       if (e.group_name && e.group_name.trim()) {
         set.add(e.group_name.trim());
       }
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [exams]);
+  }, [tabExams]);
 
   const myExamsCount = useMemo(() => {
     return tabExams.filter(e => isRealOwner(e)).length;
@@ -599,6 +614,10 @@ const ExamsPage = () => {
 
   const displayExams = useMemo(() => {
     return tabExams.filter(exam => {
+      // Proteksi kuat: Guru TIDAK BISA melihat bank soal guru lain kecuali MGMP
+      if (role !== "admin" && !isRealOwner(exam) && !isMgmpExam(exam)) {
+        return false;
+      }
       if (ownerFilter === "mine" && !isRealOwner(exam)) {
         return false;
       }
@@ -632,7 +651,7 @@ const ExamsPage = () => {
       }
       return true;
     });
-  }, [tabExams, ownerFilter, isOwner, isMgmpExam, subjectFilter, typeFilter, groupFilter, searchQuery, subjects, teachers]);
+  }, [tabExams, role, ownerFilter, isRealOwner, isMgmpExam, subjectFilter, typeFilter, groupFilter, searchQuery, subjects, teachers]);
 
   const filteredExams = displayExams;
 
@@ -1337,7 +1356,7 @@ const ExamsPage = () => {
 
   const handleBatchExport = async (customExams?: ExamData[]) => {
     if (!pb) return;
-    const targetExams = customExams || exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
+    const targetExams = customExams || tabExams;
     if (targetExams.length === 0) {
       addToast({ type: "warning", title: "Kosong", description: "Tidak ada bank soal untuk diexport." });
       return;
@@ -1790,14 +1809,14 @@ const ExamsPage = () => {
                 {exam.examType || "Latihan"}
               </span>
 
-              {/* Tampilkan badge HANYA jika soal milik orang lain (guru rekan / MGMP), untuk soal milik sendiri TIDAK perlu badge */}
+              {/* Tampilkan badge HANYA jika soal rekan MGMP, untuk soal milik sendiri TIDAK perlu badge */}
               {role !== "admin" && !isRealOwner(exam) && (
                 <span
                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 shrink-0 cursor-help transition-colors hover:bg-neutral-200/70 dark:hover:bg-neutral-700/70"
-                  title={`Soal milik ${teacherName}`}
+                  title={`Soal milik rekan guru MGMP: ${teacherName}`}
                 >
                   <Users className="h-3 w-3 text-neutral-400" />
-                  <span>{isMgmpExam(exam) ? "MGMP" : "Soal Rekan"}</span>
+                  <span>MGMP</span>
                 </span>
               )}
 

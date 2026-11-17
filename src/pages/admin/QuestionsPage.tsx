@@ -4,7 +4,7 @@ import { useQuestionAI } from "./questions/hooks/useQuestionAI";
 import { localizeImage as localizeImageHelper, localizeInlineImages as localizeInlineImagesHelper } from "./questions/utils/imageLocalizer";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, Function, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Globe, Key, Layers, Target, Info, MoreHorizontal, Filter, RotateCw, Users, Share2 } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, Function, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Globe, Key, Layers, Target, Info, MoreHorizontal, Filter, RotateCw, Users, Share2, Lock } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
@@ -1018,10 +1018,29 @@ const QuestionsPage = () => {
     return teachers.find((t: any) => t.id === teacherId || t.id === user?.id || (user?.email && t.email === user.email));
   }, [teachers, teacherId, user]);
 
+  // Apakah bank soal ini benar-benar dibuat oleh guru login saat ini
+  const isRealOwner = useMemo(() => {
+    if (!exam || (!teacherId && !user?.id)) return false;
+    const examTeacherId = exam.teacherId || exam.teacherid;
+    return examTeacherId === teacherId || examTeacherId === user?.id;
+  }, [exam, teacherId, user]);
+
   const mySubjectIds = useMemo(() => {
     const set = new Set<string>();
-    if (currentTeacher?.subjects && Array.isArray(currentTeacher.subjects)) {
-      currentTeacher.subjects.forEach((s: string) => {
+    if (currentTeacher?.subjects) {
+      let rawList: string[] = [];
+      if (Array.isArray(currentTeacher.subjects)) {
+        rawList = currentTeacher.subjects;
+      } else if (typeof currentTeacher.subjects === "string") {
+        try {
+          const parsed = JSON.parse(currentTeacher.subjects);
+          if (Array.isArray(parsed)) rawList = parsed;
+          else rawList = [currentTeacher.subjects];
+        } catch {
+          rawList = [currentTeacher.subjects];
+        }
+      }
+      rawList.forEach((s: string) => {
         if (!s) return;
         const sTrim = String(s).trim();
         set.add(sTrim);
@@ -1034,15 +1053,14 @@ const QuestionsPage = () => {
         }
       });
     }
+    // Fallback: Jika admin belum mengisi mapel di data guru, ambil dari bank soal milik sendiri
+    if (set.size === 0 && exam && isRealOwner && exam.subjectId) {
+      set.add(exam.subjectId);
+      const sName = exam.subjectName || exam.subject || subjects.find((s: any) => s.id === exam.subjectId)?.name;
+      if (sName) set.add(sName.toLowerCase());
+    }
     return Array.from(set);
-  }, [currentTeacher, subjects]);
-
-  // Apakah bank soal ini benar-benar dibuat oleh guru login saat ini
-  const isRealOwner = useMemo(() => {
-    if (!exam || (!teacherId && !user?.id)) return false;
-    const examTeacherId = exam.teacherId || exam.teacherid;
-    return examTeacherId === teacherId || examTeacherId === user?.id;
-  }, [exam, teacherId, user]);
+  }, [currentTeacher, subjects, exam, isRealOwner]);
 
   // Hak akses mengelola/mengedit
   const isOwner = useMemo(() => {
@@ -1056,6 +1074,14 @@ const QuestionsPage = () => {
     const subName = (exam.subjectName || exam.subject || subjects.find((s: any) => s.id === exam.subjectId)?.name || "").toLowerCase();
     return mySubjectIds.includes(exam.subjectId) || (Boolean(subName) && mySubjectIds.includes(subName));
   }, [exam, isRealOwner, role, mySubjectIds, subjects]);
+
+  // Akses melihat bank soal: Admin selalu bisa; Guru HANYA bisa jika pemilik asli ATAU rekan MGMP
+  const hasViewAccess = useMemo(() => {
+    if (role === "admin") return true;
+    if (teacherFullAccess) return true;
+    if (!exam) return true; // sedang proses load
+    return isRealOwner || isMgmpExam;
+  }, [role, teacherFullAccess, exam, isRealOwner, isMgmpExam]);
 
   const canEdit = useMemo(() => {
     if (isOwner) return true;
@@ -1861,6 +1887,33 @@ const QuestionsPage = () => {
     setLastSelectedIndex(index);
   };
 
+  // Proteksi Akses: Guru tidak bisa melihat bank soal milik guru lain kecuali MGMP
+  if (!loading && exam && !hasViewAccess) {
+    return (
+      <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] flex items-center justify-center p-6 text-center font-sans">
+        <div className="max-w-md w-full bg-neutral-50/70 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-8 space-y-4 shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
+            <Lock className="w-6 h-6" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-base font-bold text-neutral-900 dark:text-white">Akses Terbatas</h2>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+              Anda tidak memiliki izin untuk melihat bank soal ini. Guru hanya dapat melihat bank soal miliknya sendiri atau rekan guru se-mapel (MGMP).
+            </p>
+          </div>
+          <NeonButton
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate("/admin/bank-soal")}
+            className="w-full"
+          >
+            Kembali ke Bank Soal
+          </NeonButton>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
       {/* Global Progress Bar */}
@@ -1943,16 +1996,16 @@ const QuestionsPage = () => {
                   </span>
                 )}
 
-                {/* Tampilkan badge HANYA jika soal milik rekan guru lain, untuk soal sendiri TIDAK perlu badge */}
+                {/* Tampilkan badge HANYA jika soal rekan MGMP, untuk soal sendiri TIDAK perlu badge */}
                 {!isRealOwner && role !== "admin" && (
                   <>
                     <span className="text-neutral-300 dark:text-neutral-600">•</span>
                     <span
                       className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium cursor-help"
-                      title={`Soal milik ${exam?.teacherName || "rekan guru"}`}
+                      title={`Soal milik rekan guru MGMP: ${exam?.teacherName || "rekan guru"}`}
                     >
                       <Users className="h-3 w-3" />
-                      {isMgmpExam ? "Soal Rekan (MGMP)" : "Soal Rekan"}
+                      Soal Rekan (MGMP)
                     </span>
                   </>
                 )}

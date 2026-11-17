@@ -19,6 +19,7 @@ import {
   Edit,
   Trash,
   Plus,
+  Lock,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import {
@@ -1025,6 +1026,13 @@ const QuestionFormPage = () => {
     return false;
   }, [isOwner, exam?.is_mgmp_shared, isMgmpExam]);
 
+  // Akses melihat / mengedit: Guru hanya bisa jika pemilik asli ATAU rekan MGMP se-mapel
+  const hasAccess = useMemo(() => {
+    if (role === "admin") return true;
+    if (teacherFullAccess) return true;
+    if (!exam) return true;
+    return isOwner || isMgmpExam;
+  }, [role, teacherFullAccess, exam, isOwner, isMgmpExam]);
 
   const handleCreateClick = () => {
     setSelectedQuestion(null);
@@ -1379,6 +1387,10 @@ const QuestionFormPage = () => {
   const handleSubmit = async (e: any, stayOpen: boolean = false) => {
     e.preventDefault();
     if (!pb) return;
+    if (!canEdit) {
+      showAlert("Akses Ditolak", "Anda tidak memiliki izin untuk mengedit atau menambahkan butir soal pada bank soal ini.", "danger");
+      return;
+    }
     if (isSavingQuestionRef.current || isSavingQuestion) return; // Prevent double-click
 
     // 1. Validasi Teks Pertanyaan (teks ATAU gambar harus ada)
@@ -1867,7 +1879,32 @@ const QuestionFormPage = () => {
     }
   };
 
-
+  // Proteksi Akses: Guru tidak bisa melihat/mengedit bank soal milik guru lain kecuali MGMP
+  if (exam && !hasAccess) {
+    return (
+      <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] flex items-center justify-center p-6 text-center font-sans">
+        <div className="max-w-md w-full bg-neutral-50/70 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-8 space-y-4 shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
+            <Lock className="w-6 h-6" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-base font-bold text-neutral-900 dark:text-white">Akses Terbatas</h2>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+              Anda tidak memiliki izin untuk mengedit bank soal ini. Guru hanya dapat melihat atau mengedit bank soal miliknya sendiri atau rekan guru se-mapel (MGMP).
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/admin/bank-soal")}
+            className="w-full cursor-pointer"
+          >
+            Kembali ke Bank Soal
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-neutral-50/50 dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans pb-32">

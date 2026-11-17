@@ -718,21 +718,17 @@ const StudentDashboardPage = () => {
                                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate mt-1">{room.teacherName}</span>
                                   </div>
                                   <div className="flex flex-col">
+                                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none">Durasi</span>
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">{room.duration} Menit</span>
+                                  </div>
+                                </div>
+
+                                <div className="pb-1">
+                                  <div className="flex flex-col">
                                     <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none">Hari & Tanggal</span>
                                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">
                                       {new Date(room.startTimeDate).toLocaleDateString("id-ID", { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
                                     </span>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3 pb-1">
-                                  <div className="flex flex-col">
-                                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none">Durasi</span>
-                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">{room.duration} Menit</span>
-                                  </div>
-                                  <div className="flex flex-col">
-                                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none">Waktu Mulai</span>
-                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">Pkl {new Date(room.startTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })} WIB</span>
                                   </div>
                                 </div>
                                 <div className="mt-auto pt-4 border-t border-slate-50 dark:border-slate-800/50">
