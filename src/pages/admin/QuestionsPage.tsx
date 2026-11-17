@@ -48,6 +48,13 @@ import { EquationStudioModal } from "../../components/dialogs/EquationStudioModa
 import { insertImageIntoQuestionText } from "../../lib/imageSearch";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
+import { exportQuestionsToWord } from "./questions/utils/questionExportWord";
+import { exportQuestionsToJson } from "./questions/utils/questionExportJson";
+import {
+  importQuestionsFromWord,
+  importQuestionsFromExcel,
+  importQuestionsFromJson,
+} from "./questions/utils/questionImport";
 import { Select } from "../../components/ui/select";
 import { latexToOmml } from "../../lib/latexToWordMath";
 
@@ -60,361 +67,19 @@ import { AISmartImportDialog } from "./questions/dialogs/AISmartImportDialog";
 import { QuestionBatchDialog } from "./questions/dialogs/QuestionBatchDialog";
 import { jsonrepair } from "jsonrepair";
 import mammoth from "mammoth";
-import ReactQuill, { Quill } from "react-quill";
-import ImageResize from "quill-image-resize-module-react";
-import "react-quill/dist/quill.snow.css";
-
-Quill.register("modules/imageResize", ImageResize);
-
-// Allow width/height attributes on images (untuk ImageResize module)
-const ImageBlot = Quill.import('formats/image') as any;
-ImageBlot.sanitize = (url: string) => url; // allow all URLs
-const BaseImageFormat = Quill.import('formats/image') as any;
-const ImageFormatAttributesList = ['alt', 'height', 'width', 'style', 'class'];
-class CustomImageFormat extends BaseImageFormat {
-  static formats(domNode: HTMLElement) {
-    return ImageFormatAttributesList.reduce((formats: any, attribute) => {
-      if (domNode.hasAttribute(attribute)) {
-        formats[attribute] = domNode.getAttribute(attribute);
-      }
-      return formats;
-    }, {});
-  }
-  format(name: string, value: string) {
-    if (ImageFormatAttributesList.indexOf(name) > -1) {
-      if (value) {
-        this.domNode.setAttribute(name, value);
-      } else {
-        this.domNode.removeAttribute(name);
-      }
-    } else {
-      super.format(name, value);
-    }
-  }
-}
-Quill.register(CustomImageFormat, true);
-
-// REGISTER TABLE EMBED (preserve tables from Word copy-paste as non-editable blocks)
-const BlockEmbed = Quill.import('blots/block/embed');
-
-class TableEmbed extends BlockEmbed {
-  static blotName = 'tableEmbed';
-  static tagName = 'div';
-  static className = 'ql-table-embed';
-
-  static create(value: string) {
-    const node = super.create() as HTMLElement;
-    node.innerHTML = value;
-    node.setAttribute('contenteditable', 'false');
-    node.style.margin = '0.75rem 0';
-    node.style.overflowX = 'auto';
-    return node;
-  }
-
-  static value(node: HTMLElement) {
-    return node.innerHTML;
-  }
-}
-Quill.register(TableEmbed);
-
-/**
- * Wrap raw <table> tags in the ql-table-embed div so Quill can handle them.
- * Also handles the reverse: when saving, unwrap back to raw <table> for clean storage.
- */
-const wrapTablesForQuill = (html: string): string => {
-  if (!html || !html.includes('<table')) return html;
-  // If already wrapped, don't double-wrap
-  if (html.includes('ql-table-embed')) return html;
-  // Strip all inline style/width/height from table elements for auto-fit
-  let cleaned = html;
-  // Remove style, width, height attributes from table-related tags
-  cleaned = cleaned.replace(/<(table|tr|td|th|thead|tbody|col|colgroup)([^>]*?)\s+(style|width|height)="[^"]*"/gi, '<$1$2');
-  cleaned = cleaned.replace(/<(table|tr|td|th|thead|tbody|col|colgroup)([^>]*?)\s+(style|width|height)="[^"]*"/gi, '<$1$2');
-  cleaned = cleaned.replace(/<(table|tr|td|th|thead|tbody|col|colgroup)([^>]*?)\s+(style|width|height)="[^"]*"/gi, '<$1$2');
-  // Remove colgroup elements
-  cleaned = cleaned.replace(/<colgroup[\s\S]*?<\/colgroup>/gi, '');
-  // Wrap all <table>...</table> blocks
-  return cleaned.replace(/(<table[\s\S]*?<\/table>)/gi, '<div class="ql-table-embed" contenteditable="false">$1</div>');
-};
-
-const unwrapTablesForStorage = (html: string): string => {
-  if (!html || !html.includes('ql-table-embed')) return html;
-  return html.replace(/<div class="ql-table-embed"[^>]*>([\s\S]*?)<\/div>/gi, '$1');
-};
-
-const getAbsoluteUrl = (url: string): string => {
-  if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
-    return url;
-  }
-  const cleanUrl = url.startsWith("/") ? url.substring(1) : url;
-  if (cleanUrl.startsWith("api/files/")) {
-    return `${window.location.origin}/${cleanUrl}`;
-  }
-  if (cleanUrl.startsWith("schools/")) {
-    const r2Base = getR2PublicBaseUrl();
-    if (r2Base) {
-      const base = r2Base.replace(/\/$/, "");
-      return `${base}/${cleanUrl}`;
-    }
-  }
-  return `${window.location.origin}/${cleanUrl}`;
-};
-
-const forceSmallImage = (imgTag: string, physW: number, physH: number): string => {
-  // 1. Remove existing width/height HTML attributes from the tag (supports quoted and unquoted values)
-  let cleaned = imgTag
-    .replace(/\bwidth\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/\bheight\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-
-  // 2. Remove width/height from inline style attribute if present
-  cleaned = cleaned.replace(/(style=["'])([^"']*)(["'])/gi, (_, prefix, styleContent, suffix) => {
-    const cleanedStyle = styleContent
-      .replace(/\bwidth\s*:\s*[^;]+;?/gi, '')
-      .replace(/\bheight\s*:\s*[^;]+;?/gi, '');
-    return prefix + cleanedStyle + suffix;
-  });
-
-  // 3. Add explicit proportional width and height HTML attributes to prevent Word layout stretching
-  if (physW > 0 && physH > 0) {
-    const maxDisplayW = 290;
-    let displayW = physW;
-    let displayH = physH;
-    if (physW > maxDisplayW) {
-      displayH = Math.round((physH * maxDisplayW) / physW);
-      displayW = maxDisplayW;
-    }
-    cleaned = cleaned.replace(/\/?>$/, ` width="${displayW}" height="${displayH}"$&`);
-  } else {
-    cleaned = cleaned.replace(/\/?>$/, ' width="290"$&');
-  }
-  return cleaned;
-};
-
-const processHtmlInlineImages = (
-  htmlText: string,
-  imageMapping?: Map<string, { mappedUrl: string, base64: string, width: number, height: number }>
-): string => {
-  if (!htmlText) return "";
-  let result = htmlText;
-  const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
-  let match;
-  const matches: { full: string; src: string }[] = [];
-  while ((match = imgRegex.exec(htmlText)) !== null) {
-    matches.push({ full: match[0], src: match[1] });
-  }
-  for (const m of matches) {
-    let replacedUrl = "";
-    let width = 0;
-    let height = 0;
-    const absSrc = getAbsoluteUrl(m.src);
-    const info = imageMapping ? (imageMapping.get(m.src) || (absSrc ? imageMapping.get(absSrc) : undefined)) : undefined;
-
-    if (info) {
-      replacedUrl = info.mappedUrl;
-      width = info.width;
-      height = info.height;
-      let replacedImg = m.full.replace(m.src, replacedUrl);
-
-      // For Word export compatibility, strictly force standard images to be small and proportional
-      const isLatex = m.src.includes("latex.codecogs.com");
-      if (!isLatex) {
-        replacedImg = forceSmallImage(replacedImg, width, height);
-      } else if (width > 480) {
-        const scaledH = Math.round((height * 480) / width);
-        replacedImg = replacedImg.replace(/\/?>$/, ` width="480" height="${scaledH}"$&`);
-      }
-
-      result = result.replace(m.full, replacedImg);
-    } else {
-      replacedUrl = absSrc || m.src;
-      let replacedImg = m.full.replace(m.src, replacedUrl);
-      const isLatex = m.src.includes("latex.codecogs.com");
-      if (!isLatex) {
-        replacedImg = forceSmallImage(replacedImg, width, height);
-      }
-      result = result.replace(m.full, replacedImg);
-    }
-  }
-  return result;
-};
-
-const convertToPngBase64 = async (
-  url: string,
-  pb?: any
-): Promise<{ base64: string, width: number, height: number }> => {
-  if (!url) return { base64: "", width: 0, height: 0 };
-
-  const processDataUriWithCanvas = (dataUri: string): Promise<{ base64: string, width: number, height: number }> => {
-    return new Promise((resolve) => {
-      const img = new window.Image();
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          const w = img.naturalWidth || img.width;
-          const h = img.naturalHeight || img.height;
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          ctx?.drawImage(img, 0, 0, w, h);
-          const outDataUrl = canvas.toDataURL("image/png");
-          const base64Data = outDataUrl.split(",")[1] || "";
-          resolve({ base64: base64Data, width: w, height: h });
-        } catch (canvasErr) {
-          console.warn("Canvas export failed for image:", canvasErr);
-          const rawBase64 = dataUri.split(",")[1] || "";
-          resolve({ base64: rawBase64, width: img.naturalWidth || 290, height: img.naturalHeight || 200 });
-        }
-      };
-      img.onerror = () => {
-        resolve({ base64: "", width: 0, height: 0 });
-      };
-      img.src = dataUri;
-    });
-  };
-
-  // 1. Data URI directly
-  if (url.startsWith("data:")) {
-    return processDataUriWithCanvas(url);
-  }
-
-  // 2. Direct fetch with optional PocketBase authorization header
-  let blob: Blob | null = null;
-  const isPbFile = url.includes("/api/files/");
-  const pbToken = pb?.authStore?.token;
-
-  try {
-    const resp = await fetch(url, (isPbFile && pbToken) ? { headers: { "Authorization": pbToken } } : undefined);
-    if (resp.ok) {
-      blob = await resp.blob();
-    }
-  } catch (err) {
-    // Expected when browser CORS blocks cross-origin requests
-    blob = null;
-  }
-
-  // 2b. Cloudflare Worker fallback (with open CORS headers)
-  const workerUrl = getR2WorkerUrl();
-  const publicBaseUrl = getR2PublicBaseUrl();
-
-  if (!blob && workerUrl) {
-    try {
-      let workerFetchUrl = "";
-      if (publicBaseUrl && url.startsWith(publicBaseUrl)) {
-        const key = url.replace(publicBaseUrl, "").replace(/^\/+/, "");
-        workerFetchUrl = `${workerUrl}/${encodeURI(key)}`;
-      } else if (!isPbFile) {
-        workerFetchUrl = `${workerUrl}/proxy?url=${encodeURIComponent(url)}`;
-      }
-      if (workerFetchUrl) {
-        const wResp = await fetch(workerFetchUrl);
-        if (wResp.ok) {
-          blob = await wResp.blob();
-        }
-      }
-    } catch {
-      // Proceed to PocketBase fallback
-    }
-  }
-
-  // 3. Fallback to PocketBase image proxy if direct and worker fetch failed
-  if (!blob && pb) {
-    try {
-      const pbBase = (pb.baseUrl || window.location.origin).replace(/\/$/, "");
-      const proxyUrl = `${pbBase}/api/image-proxy?url=${encodeURIComponent(url)}`;
-      const proxyResp = await fetch(proxyUrl);
-      if (proxyResp.ok) {
-        const json = await proxyResp.json();
-        if (json.base64) {
-          const mime = json.contentType || "image/png";
-          const dataUri = `data:${mime};base64,${json.base64}`;
-          return processDataUriWithCanvas(dataUri);
-        }
-      }
-    } catch (proxyErr) {
-      console.warn("PocketBase image proxy fallback failed for:", url, proxyErr);
-    }
-  }
-
-  if (!blob) {
-    return { base64: "", width: 0, height: 0 };
-  }
-
-  // 4. Codecogs LaTeX: already standard small PNG, avoid re-rendering through canvas
-  const isLatex = url.toLowerCase().includes("latex.codecogs.com");
-  if (isLatex) {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = (reader.result as string) || "";
-        const base64Data = dataUrl.split(",")[1] || "";
-        const img = new window.Image();
-        img.onload = () => resolve({ base64: base64Data, width: img.width, height: img.height });
-        img.onerror = () => resolve({ base64: base64Data, width: 0, height: 0 });
-        img.src = dataUrl;
-      };
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  // 5. All other images (WebP, JPG, PNG): load via FileReader and canvas to convert to PNG
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const dataUrl = reader.result as string;
-      if (!dataUrl) {
-        resolve({ base64: "", width: 0, height: 0 });
-        return;
-      }
-      processDataUriWithCanvas(dataUrl).then(resolve);
-    };
-    reader.onerror = () => resolve({ base64: "", width: 0, height: 0 });
-    reader.readAsDataURL(blob);
-  });
-};
-
-// REGISTER CUSTOM FORMATS (only line-height, NOT margin-left/text-indent which trap indentation)
-const Parchment = Quill.import('parchment');
-const LineHeightStyle = new Parchment.Attributor.Style('line-height', 'line-height', {
-  scope: Parchment.Scope.BLOCK
-});
-
-Quill.register(LineHeightStyle, true);
-Quill.register(LineHeightStyle, true);
-
-// FORMATS WHITELIST (Penting agar Quill tidak menghapus tag/style kustom)
-const quillFormats = [
-  'header', 'font', 'size',
-  'bold', 'italic', 'underline', 'strike', 'blockquote',
-  'script',
-  'list', 'bullet', 'indent',
-  'link', 'image', 'video', 'formula',
-  'color', 'background',
-  'align', 'code-block',
-  'line-height',
-  'tableEmbed',
-  'width', 'height', 'style', 'alt', 'class'
-];
-
-// FORMATS WHITELIST KHUSUS PILIHAN JAWABAN (Opsi A, B, C, D, E)
-// Hanya BOLD, LIST (sub-pernyataan), formula, dan gambar yang diizinkan agar pilihan selalu rata kiri dan teks normal
-const quillFormatsChoice = [
-  'bold',
-  'list',
-  'formula',
-  'image',
-  'tableEmbed',
-  'width', 'height', 'style', 'alt', 'class'
-];
-
-// Allow standard CSS styles that might come from Word/Mammoth
-const AlignStyle = Quill.import('attributors/style/align');
-Quill.register(AlignStyle, true);
-const BackgroundStyle = Quill.import('attributors/style/background');
-Quill.register(BackgroundStyle, true);
-const ColorStyle = Quill.import('attributors/style/color');
-Quill.register(ColorStyle, true);
-
+import ReactQuill from "react-quill";
+import Quill, {
+  wrapTablesForQuill,
+  unwrapTablesForStorage,
+  quillFormats,
+  quillFormatsChoice,
+} from "../../lib/quillSetup";
+import {
+  getAbsoluteUrl,
+  forceSmallImage,
+  processHtmlInlineImages,
+  convertToPngBase64,
+} from "./questions/utils/imageProcessors";
 import { sanitizeChoiceContent, cleanDeltaForChoice, sanitizeChoiceText } from "../../lib/sanitizeChoice";
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
@@ -432,110 +97,23 @@ import {
   DropdownMenuLabel
 } from "../../components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-export type QuestionType = "pilihan_ganda" | "pilihan_ganda_kompleks" | "menjodohkan" | "benar_salah" | "isian_singkat" | "uraian" | "urutkan" | "drag_drop" | "klasifikasi" | "hotspot" | "isian_rumpang" | "matriks";
+import {
+  type QuestionType,
+  type QuestionData,
+  detectRumpangIds,
+  hasUnbalancedRumpang,
+  QUESTION_TYPE_LABELS,
+  QUESTION_TYPE_BADGE,
+  getQuestionTypeColor,
+} from "./questions/types";
 
-export interface QuestionData {
-  id: string;
-  examId: string;
-  type?: QuestionType; // Default is pilihan_ganda if undefined
-  text: string;
-  imageUrl?: string;
-  groupId?: string; // ID Kelompok/Literasi (Opsional)
-  groupText?: string; // Teks khusus Literasi (Opsional)
-  choices?: Record<string, { text: string; imageUrl?: string; isCorrect?: boolean }>;
-  // Menjodohkan
-  pairs?: Array<{ id: string; left: string; right: string }>;
-  // Isian Singkat / Uraian
-  answerKey?: string;
-  // Urutkan / Drag & Drop
-  items?: Array<{ id: string; text: string; imageUrl?: string }>;
-  // Benar / Salah Statement Matrix / Matriks / Klasifikasi
-  statements?: Array<{ id: string; text: string; answer?: any }>;
-  categories?: Array<{ id: string; text: string }>;
-  columns?: Array<{ id: string; text: string }>;
-  blanks?: Array<{ id: string; answers: string[]; caseSensitive?: boolean }>;
-  shuffleStatements?: boolean;
-  options?: any;
-  order?: number;
-}
-
-// Helper: deteksi ID rumpang [[n]] dari teks isian_rumpang
-const detectRumpangIds = (text: string): string[] => {
-  const ids: string[] = [];
-  const re = /\[\[(\d+)\]\]/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    if (!ids.includes(m[1])) ids.push(m[1]);
-  }
-  return ids;
-};
-
-// Helper: cek apakah ada [[ tanpa pasangan ]]
-const hasUnbalancedRumpang = (text: string): boolean => {
-  const openCount = (text.match(/\[\[/g) || []).length;
-  const closeCount = (text.match(/\]\]/g) || []).length;
-  return openCount !== closeCount;
-};
-
-export const QUESTION_TYPE_LABELS: Record<string, string> = {
-  pilihan_ganda: "Pilihan Ganda",
-  pilihan_ganda_kompleks: "PG Kompleks",
-  benar_salah: "Benar / Salah",
-  menjodohkan: "Menjodohkan",
-  isian_singkat: "Isian Singkat",
-  uraian: "Uraian / Esai",
-  matriks: "Matriks",
-  klasifikasi: "Klasifikasi",
-  isian_rumpang: "Isian Rumpang",
-  hotspot: "Hotspot",
-  urutkan: "Urutkan",
-  drag_drop: "Drag & Drop"
-};
-
-export const QUESTION_TYPE_BADGE: Record<string, { variant: NeonBadgeVariant; label: string }> = {
-  pilihan_ganda: { variant: "sky", label: "Pilihan Ganda" },
-  pilihan_ganda_kompleks: { variant: "purple", label: "PG Kompleks" },
-  benar_salah: { variant: "emerald", label: "Benar / Salah" },
-  menjodohkan: { variant: "purple", label: "Menjodohkan" },
-  isian_singkat: { variant: "amber", label: "Isian Singkat" },
-  uraian: { variant: "emerald", label: "Uraian / Esai" },
-  matriks: { variant: "sky", label: "Matriks" },
-  klasifikasi: { variant: "purple", label: "Klasifikasi" },
-  isian_rumpang: { variant: "amber", label: "Isian Rumpang" },
-  hotspot: { variant: "rose", label: "Hotspot" },
-  urutkan: { variant: "sky", label: "Urutkan" },
-  drag_drop: { variant: "rose", label: "Drag & Drop" }
-};
-
-export const getQuestionTypeColor = (type?: string): string => {
-  switch (type) {
-    case "pilihan_ganda":
-      return "bg-blue-500/15 border-blue-500/30 text-blue-700 dark:text-blue-300 shadow-[0_0_8px_rgba(59,130,246,0.12)]";
-    case "pilihan_ganda_kompleks":
-      return "bg-indigo-500/15 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 shadow-[0_0_8px_rgba(99,102,241,0.12)]";
-    case "benar_salah":
-      return "bg-cyan-500/15 border-cyan-500/30 text-cyan-700 dark:text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.12)]";
-    case "menjodohkan":
-      return "bg-purple-500/15 border-purple-500/30 text-purple-700 dark:text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.12)]";
-    case "isian_singkat":
-      return "bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.12)]";
-    case "uraian":
-      return "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.12)]";
-    case "matriks":
-      return "bg-teal-500/15 border-teal-500/30 text-teal-700 dark:text-teal-300 shadow-[0_0_8px_rgba(20,184,166,0.12)]";
-    case "klasifikasi":
-      return "bg-violet-500/15 border-violet-500/30 text-violet-700 dark:text-violet-300 shadow-[0_0_8px_rgba(139,92,246,0.12)]";
-    case "isian_rumpang":
-      return "bg-lime-500/15 border-lime-500/30 text-lime-700 dark:text-lime-300 shadow-[0_0_8px_rgba(132,204,22,0.12)]";
-    case "hotspot":
-      return "bg-sky-500/15 border-sky-500/30 text-sky-700 dark:text-sky-300 shadow-[0_0_8px_rgba(14,165,233,0.12)]";
-    case "urutkan":
-      return "bg-fuchsia-500/15 border-fuchsia-500/30 text-fuchsia-700 dark:text-fuchsia-300 shadow-[0_0_8px_rgba(217,70,239,0.12)]";
-    case "drag_drop":
-      return "bg-rose-500/15 border-rose-500/30 text-rose-700 dark:text-rose-300 shadow-[0_0_8px_rgba(244,63,94,0.12)]";
-    default:
-      return "bg-neutral-100 border-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300";
-  }
+export type { QuestionType, QuestionData };
+export {
+  detectRumpangIds,
+  hasUnbalancedRumpang,
+  QUESTION_TYPE_LABELS,
+  QUESTION_TYPE_BADGE,
+  getQuestionTypeColor,
 };
 
 
@@ -4620,141 +4198,26 @@ const QuestionsPage = () => {
       total: 0,
       current: 0,
       message: "Menganalisis file Word...",
-      title: "Import file Word"
+      title: "Import file Word",
     });
 
     try {
-      const parsed = await parseQuestionsFromWord(file);
-      console.log("Word Parser Results:", parsed.length, "soal ditemukan", parsed.map((q, i) => `[${i + 1}] type=${q.type} groupId=${q.groupId} text=${(q.text || "").substring(0, 50)}`));
-      if (parsed.length === 0) throw new Error("Tidak ada soal yang dikenali dalam file.");
-
-      //  FILTER BY ALLOWED TYPES
-      // Only import question types that are enabled by admin
-      const filteredByType = parsed.filter(q => {
-        const qType = q.type || "pilihan_ganda";
-        return allowedTypes[qType] !== false; // default true if not set
+      const result = await importQuestionsFromWord({
+        file,
+        pb,
+        examId: examId!,
+        allowedTypes,
+        onProgress: (p) => {
+          if (p.percent !== undefined) setImportProgress(p.percent);
+          setBatchProgress((prev) => ({ ...prev, ...p, isOpen: true }));
+        },
+        localizeImage,
+        localizeInlineImages,
       });
 
-      const skippedByType = parsed.length - filteredByType.length;
-      if (filteredByType.length === 0) {
-        setBatchProgress(prev => ({ ...prev, isOpen: false }));
-        const disabledTypes = parsed.map(q => q.type).filter((v, i, a) => a.indexOf(v) === i && allowedTypes[v || "pilihan_ganda"] === false);
-        throw new Error(`Semua soal bertipe ${disabledTypes.join(", ")} yang belum diaktifkan admin. Aktifkan tipe soal tersebut di Pengaturan terlebih dahulu.`);
-      }
-
-      //  DUPLICATE DETECTION & UNIQUE GROUP ID
-      // Fetch existing questions for this exam to check duplicates
-      const existingQuestions = await pb!.collection('questions').getFullList({ filter: `examId = "${examId}"` });
-      const existingTexts = new Set(existingQuestions.map(q => (q.text || "").replace(/<[^>]*>/g, '').trim().toLowerCase().substring(0, 80)));
-      const existingGroupIds = new Set(existingQuestions.map(q => q.groupId || q.group_id || "").filter(Boolean));
-      const maxExistingOrder = existingQuestions.reduce((max, q) => Math.max(max, q.order || 0), 0);
-
-      // Filter out duplicates (same question text already exists)
-      const uniqueParsed = filteredByType.filter(q => {
-        const cleanText = (q.text || "").replace(/<[^>]*>/g, '').trim().toLowerCase().substring(0, 80);
-        return cleanText.length > 0 && !existingTexts.has(cleanText);
-      });
-
-      // Make groupIds unique if they already exist in DB
-      const groupIdRemap = new Map<string, string>();
-      uniqueParsed.forEach(q => {
-        if (q.groupId && !groupIdRemap.has(q.groupId)) {
-          let newId = q.groupId;
-          if (existingGroupIds.has(newId)) {
-            // Add unique suffix
-            const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-            newId = `${q.groupId}-${suffix}`;
-          }
-          groupIdRemap.set(q.groupId, newId);
-          existingGroupIds.add(newId); // prevent collision within same import
-        }
-      });
-      // Apply remapped groupIds
-      uniqueParsed.forEach(q => {
-        if (q.groupId && groupIdRemap.has(q.groupId)) {
-          q.groupId = groupIdRemap.get(q.groupId)!;
-        }
-      });
-
-      const skippedCount = filteredByType.length - uniqueParsed.length;
-
-      setBatchProgress(prev => ({ ...prev, total: uniqueParsed.length, message: `Menyiapkan import ${uniqueParsed.length} soal${skippedCount > 0 ? ` (${skippedCount} duplikat dilewati)` : ''}${skippedByType > 0 ? ` (${skippedByType} tipe tidak aktif)` : ''}...` }));
-
-      let importedCount = 0;
-      const chunkSize = 5;
-
-      for (let i = 0; i < uniqueParsed.length; i += chunkSize) {
-        const chunk = uniqueParsed.slice(i, i + chunkSize);
-
-        await Promise.all(chunk.map(async (q, index) => {
-          const actualIndex = i + index;
-
-          // Localize Question Image (handles base64 and remote URLs)
-          const imageUrl = q.imageUrl ? await localizeImage(q.imageUrl, `word_q_${actualIndex}`) : "";
-
-          // Localize Choice Images and Map them
-          const choices: Record<string, any> = {};
-          await Promise.all(Object.entries(q.choices).map(async ([key, val]: [string, any]) => {
-            const choiceImgUrl = val.imageUrl ? await localizeImage(val.imageUrl, `word_opt_${actualIndex}_${key}`) : "";
-            const choiceText = val.text ? await localizeInlineImages(val.text) : "";
-
-            choices[key.toLowerCase()] = {
-              text: choiceText,
-              isCorrect: val.isCorrect || false,
-              imageUrl: choiceImgUrl
-            };
-          }));
-
-          const answerKey = Object.entries(choices).find(([_, v]) => v.isCorrect)?.[0] || "";
-
-          // Determine field type based on parsed question type
-          const typeMap: Record<string, string> = {
-            pilihan_ganda: "multiple_choice",
-            isian_singkat: "short_answer",
-            uraian: "essay"
-          };
-          const questionType = q.type || "pilihan_ganda";
-          const fieldType = typeMap[questionType] || "multiple_choice";
-
-          // Localize question text and group text HTML
-          const localizedQText = await localizeInlineImages(q.text || "");
-          const localizedGroupText = q.groupText ? await localizeInlineImages(q.groupText) : "";
-
-          const payload: any = {
-            examId,
-            text: localizedQText,
-            field: fieldType,
-            type: questionType,
-            options: questionType === "pilihan_ganda" ? choices : {},
-            correctAnswer: questionType === "pilihan_ganda" ? answerKey.toLowerCase() : (q.answerKey || ""),
-            answerKey: questionType === "pilihan_ganda" ? answerKey.toLowerCase() : (q.answerKey || ""),
-            groupId: q.groupId || "",
-            groupText: localizedGroupText,
-            order: maxExistingOrder + actualIndex + 1,
-            imageUrl: imageUrl
-          };
-
-          try {
-            await pb!.collection('questions').create(payload);
-            importedCount++;
-          } catch (createErr) {
-            console.error("Gagal membuat soal Word pada index:", actualIndex, createErr);
-          }
-        }));
-
-        const currentProcessed = Math.min(i + chunkSize, uniqueParsed.length);
-        const progress = Math.round((currentProcessed / uniqueParsed.length) * 100);
-        setImportProgress(progress);
-        setBatchProgress(prev => ({
-          ...prev,
-          current: currentProcessed,
-          message: `Mengimport soal (${currentProcessed}/${uniqueParsed.length})`
-        }));
-      }
-
-      let message = `${importedCount} soal berhasil diimport.`;
-      if (skippedCount > 0) message += ` ${skippedCount} soal duplikat dilewati.`;
-      if (skippedByType > 0) message += ` ${skippedByType} soal dilewati (tipe belum diaktifkan).`;
+      let message = `${result.importedCount} soal berhasil diimport.`;
+      if (result.skippedCount && result.skippedCount > 0) message += ` ${result.skippedCount} soal duplikat dilewati.`;
+      if (result.skippedByType && result.skippedByType > 0) message += ` ${result.skippedByType} soal dilewati (tipe belum diaktifkan).`;
       loadQuestions();
       showAlert("Berhasil", message, "success");
     } catch (err: any) {
@@ -4763,7 +4226,7 @@ const QuestionsPage = () => {
     } finally {
       setIsImporting(false);
       setImportProgress(0);
-      setBatchProgress(prev => ({ ...prev, isOpen: false }));
+      setBatchProgress((prev) => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -4775,95 +4238,31 @@ const QuestionsPage = () => {
       total: 0,
       current: 0,
       message: "Membaca file Excel...",
-      title: "Import dari Excel"
+      title: "Import dari Excel",
     });
 
     try {
-      const parsed = await parseQuestionImportExcel(file);
-      if (parsed.length === 0) {
-        setBatchProgress(prev => ({ ...prev, isOpen: false }));
-        return showAlert("File Kosong", "Tidak ada soal yang ditemukan dalam file Excel tersebut.", "warning");
-      }
-
-      setBatchProgress(prev => ({ ...prev, total: parsed.length, message: "Memulai import..." }));
-
-      // Get max order from database
-      const excelExisting = await pb.collection('questions').getFullList({ filter: `examId = "${examId}"`, fields: 'order' });
-      const maxExistingOrder = excelExisting.reduce((max, q) => Math.max(max, q.order || 0), 0);
-
-      let importedCount = 0;
-      const chunkSize = 10;
-      for (let i = 0; i < parsed.length; i += chunkSize) {
-        const chunk = parsed.slice(i, i + chunkSize);
-
-        await Promise.all(chunk.map(async (q, index) => {
-          const actualIndex = i + index;
-
-          // Localize inline images in question and group text
-          const localizedQText = await localizeInlineImages(q.text || "");
-          const localizedGroupText = q.groupText ? await localizeInlineImages(q.groupText) : "";
-
-          // Localize choices
-          const choices: Record<string, any> = {};
-          if (q.choices) {
-            await Promise.all(Object.entries(q.choices).map(async ([key, val]: [string, any]) => {
-              const choiceImgUrl = val.imageUrl ? await localizeImage(val.imageUrl, `excel_opt_${actualIndex}_${key}`) : "";
-              const choiceText = val.text ? await localizeInlineImages(val.text) : "";
-
-              choices[key.toLowerCase()] = {
-                text: choiceText,
-                isCorrect: val.isCorrect || false,
-                imageUrl: choiceImgUrl
-              };
-            }));
-          }
-
-          // Determine correct answer based on question type
-          let answerKey = "";
-          if (q.type === "isian_singkat" || q.type === "uraian") {
-            answerKey = q.answerKey || "";
-          } else {
-            answerKey = Object.entries(choices).find(([_, v]: any) => v.isCorrect)?.[0] || q.answerKey || "";
-          }
-
-          const payload = {
-            examId,
-            text: localizedQText,
-            field: q.field || "multiple_choice",
-            type: q.type,
-            options: q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah" ? choices : q.choices,
-            correctAnswer: answerKey,
-            answerKey: answerKey,
-            groupId: q.groupId || "",
-            groupText: localizedGroupText,
-            order: maxExistingOrder + actualIndex + 1,
-            imageUrl: ""
-          };
-
-          try {
-            await pb!.collection('questions').create(payload);
-            importedCount++;
-          } catch (createErr) {
-            console.error("Gagal membuat soal pada index:", actualIndex, createErr);
-          }
-        }));
-
-        const currentProcessed = Math.min(i + chunkSize, parsed.length);
-        setBatchProgress(prev => ({
-          ...prev,
-          current: currentProcessed,
-          message: `Mengimport soal (${currentProcessed}/${parsed.length})`
-        }));
-      }
+      const result = await importQuestionsFromExcel({
+        file,
+        pb,
+        examId: examId!,
+        onProgress: (p) => {
+          if (p.percent !== undefined) setImportProgress(p.percent);
+          setBatchProgress((prev) => ({ ...prev, ...p, isOpen: true }));
+        },
+        localizeImage,
+        localizeInlineImages,
+      });
 
       loadQuestions();
-      showAlert("Import Berhasil", `${importedCount} soal berhasil diimport dari Excel.`, "success");
+      showAlert("Berhasil", `${result.importedCount} soal berhasil diimport dari Excel.`, "success");
     } catch (err: any) {
       console.error("Import Excel Error:", err);
       showAlert("Gagal Import", err.message || "Gagal mengimport Excel.", "danger");
     } finally {
       setIsImporting(false);
-      setBatchProgress(prev => ({ ...prev, isOpen: false }));
+      setImportProgress(0);
+      setBatchProgress((prev) => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -4875,162 +4274,31 @@ const QuestionsPage = () => {
       current: 0,
       total: 0,
       message: "Membaca file JSON...",
-      title: "Import dari JSON"
+      title: "Import dari JSON",
     });
 
     try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-
-      // Support both array format and {questions: [...]} format
-      const questionsArr: any[] = Array.isArray(data) ? data : (data.questions || data.soal || data.data || []);
-
-      if (questionsArr.length === 0) {
-        setBatchProgress(prev => ({ ...prev, isOpen: false }));
-        showAlert("Gagal", "File JSON tidak berisi soal yang valid.", "danger");
-        return;
-      }
-
-      setBatchProgress(prev => ({ ...prev, total: questionsArr.length, message: `Mengimport ${questionsArr.length} soal...` }));
-
-      // Get max order from database
-      const existingForOrder = await pb.collection('questions').getFullList({ filter: `examId = "${examId}"`, fields: 'order' });
-      const jsonMaxOrder = existingForOrder.reduce((max, q) => Math.max(max, q.order || 0), 0);
-
-      const typeMap: Record<string, string> = {
-        pilihan_ganda: "multiple_choice",
-        pilihan_ganda_kompleks: "complex_choice",
-        menjodohkan: "matching",
-        benar_salah: "true_false",
-        isian_singkat: "short_answer",
-        uraian: "essay",
-        urutkan: "sequence",
-        drag_drop: "drag_drop",
-        klasifikasi: "klasifikasi",
-        hotspot: "hotspot",
-        isian_rumpang: "isian_rumpang",
-        matriks: "matriks",
-        multiple_choice: "multiple_choice",
-        complex_choice: "complex_choice",
-        matching: "matching",
-        true_false: "true_false",
-        short_answer: "short_answer",
-        essay: "essay",
-        sequence: "sequence",
-      };
-
-      let importedCount = 0;
-      for (let i = 0; i < questionsArr.length; i++) {
-        const q = questionsArr[i];
-        if (!q.text && !q.question) continue;
-
-        const qType = q.type || "pilihan_ganda";
-        const choices = q.choices || q.options || {};
-
-        // Determine correct answer
-        let correctAnswer = q.answerKey || q.answer_key || q.correctAnswer || q.correct_answer || "";
-        if (!correctAnswer && choices) {
-          const correctKeys = Object.keys(choices).filter(k => {
-            const c = choices[k];
-            return typeof c === 'object' && c.isCorrect;
-          });
-          correctAnswer = correctKeys.join(",");
-        }
-
-        // Localize remote image and inline images
-        const qImageUrl = q.imageUrl || q.image_url || "";
-        const localizedQImageUrl = qImageUrl ? await localizeImage(qImageUrl, `json_q_${i}`) : "";
-        const finalQImageUrl = localizedQImageUrl || qImageUrl;
-        let localizedQText = await localizeInlineImages(q.text || q.question || "");
-        if (finalQImageUrl && !localizedQText.includes(finalQImageUrl)) {
-          localizedQText = `<p><img src="${finalQImageUrl}" alt="Gambar Soal" style="max-height:320px;max-width:100%;border-radius:16px;margin-bottom:12px;" /></p>` + localizedQText;
-        }
-        const rawGroupText = q.groupText || q.group_text || "";
-        const localizedGroupText = rawGroupText ? await localizeInlineImages(rawGroupText) : "";
-
-        const payload: any = {
-          examId,
-          text: localizedQText,
-          field: typeMap[qType] || "multiple_choice",
-          options: {},
-          correctAnswer: correctAnswer,
-          imageUrl: localizedQImageUrl,
-          order: q.order || (jsonMaxOrder + i + 1),
-          groupId: q.groupId || q.group_id || "",
-          group_id: q.groupId || q.group_id || "",
-          groupText: localizedGroupText,
-          group_text: localizedGroupText,
-        };
-
-        // Build options based on type with image localization
-        if ((qType === "benar_salah" || qType === "true_false") && q.statements && Array.isArray(q.statements) && q.statements.length > 0) {
-          const validStatements = await Promise.all(q.statements.map(async (st: any) => ({
-            id: String(st.id || Math.random()),
-            text: await localizeInlineImages(st.text || ""),
-            answer: (st.answer || "benar").toLowerCase() === "salah" ? "salah" : "benar"
-          })));
-          payload.options = { statements: validStatements };
-          payload.correctAnswer = validStatements.map((s: any) => `${s.id}:${s.answer}`).join(",");
-        } else if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah" || qType === "multiple_choice" || qType === "complex_choice" || qType === "true_false") {
-          const opts: any = {};
-          const keys = Object.keys(choices);
-          for (let kIdx = 0; kIdx < keys.length; kIdx++) {
-            const k = keys[kIdx];
-            const val = choices[k];
-            if (typeof val === 'string') {
-              opts[k] = { text: await localizeInlineImages(val), isCorrect: correctAnswer.includes(k) };
-            } else if (typeof val === 'object') {
-              const choiceImg = val.imageUrl || val.image_url || "";
-              const localizedChoiceImg = choiceImg ? await localizeImage(choiceImg, `json_opt_${i}_${k}`) : undefined;
-              opts[k] = {
-                text: await localizeInlineImages(val.text || ""),
-                imageUrl: localizedChoiceImg,
-                isCorrect: !!val.isCorrect
-              };
-            }
-          }
-          payload.options = opts;
-        } else if (qType === "menjodohkan" || qType === "matching") {
-          const pairs = q.pairs || [];
-          const localizedPairs = [];
-          for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
-            const p = pairs[pIdx];
-            localizedPairs.push({
-              ...p,
-              left: await localizeInlineImages(p.left || ""),
-              right: await localizeInlineImages(p.right || "")
-            });
-          }
-          payload.options = { pairs: localizedPairs };
-        } else if (qType === "urutkan" || qType === "drag_drop" || qType === "sequence") {
-          const items = q.items || [];
-          const localizedItems = [];
-          for (let itIdx = 0; itIdx < items.length; itIdx++) {
-            const it = items[itIdx];
-            const itemImg = it.imageUrl || it.image_url || "";
-            const localizedItemImg = itemImg ? await localizeImage(itemImg, `json_item_${i}_${itIdx}`) : undefined;
-            localizedItems.push({
-              ...it,
-              text: await localizeInlineImages(it.text || ""),
-              imageUrl: localizedItemImg
-            });
-          }
-          payload.options = { items: localizedItems };
-        }
-
-        await pb.collection('questions').create(payload);
-        importedCount++;
-        setBatchProgress(prev => ({ ...prev, current: importedCount, message: `${importedCount}/${questionsArr.length} soal diimport...` }));
-      }
+      const result = await importQuestionsFromJson({
+        file,
+        pb,
+        examId: examId!,
+        onProgress: (p) => {
+          if (p.percent !== undefined) setImportProgress(p.percent);
+          setBatchProgress((prev) => ({ ...prev, ...p, isOpen: true }));
+        },
+        localizeImage,
+        localizeInlineImages,
+      });
 
       loadQuestions();
-      showAlert("Import Berhasil", `${importedCount} soal berhasil diimport dari JSON.`, "success");
+      showAlert("Berhasil", `${result.importedCount} butir soal berhasil diimpor dari file JSON!`, "success");
     } catch (err: any) {
       console.error("Import JSON Error:", err);
-      showAlert("Gagal Import", err.message || "Gagal mengimport JSON. Pastikan format file benar.", "danger");
+      showAlert("Gagal", err.message || "Gagal mengimpor file JSON.", "danger");
     } finally {
       setIsImporting(false);
-      setBatchProgress(prev => ({ ...prev, isOpen: false }));
+      setImportProgress(0);
+      setBatchProgress((prev) => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -5104,678 +4372,69 @@ const QuestionsPage = () => {
 
   const handleExportToWord = async () => {
     if (questions.length === 0) return;
-
-    setBatchProgress({
-      isOpen: true,
-      total: questions.length,
-      current: 0,
-      message: "Menyiapkan export...",
-      title: "Export ke Word"
-    });
-
-    const cleanForWord = (htmlText: string) => {
-      if (!htmlText) return "";
-      return htmlText
-        .replace(/<p>/gi, "")
-        .replace(/<\/p>/gi, "<br/>")
-        .replace(/<div>/gi, "")
-        .replace(/<\/div>/gi, "<br/>")
-        .replace(/(<br\/>)+$/, "")
-        .trim();
-    };
-
-    // Replace LaTeX in text with native Word OMML equations (or CodeCogs image fallback)
-    const processLatex = (htmlInput: string) => {
-      if (!htmlInput) return htmlInput;
-      let result = htmlInput;
-      const fixFormula = (f: string) => f.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
-
-      result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
-        const clean = fixFormula(formula);
-        const omml = latexToOmml(clean);
-        if (omml) return `<br/>${omml}<br/>`;
-        const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
-        return `<br/><img src="${url}" class="latex-formula" /><br/>`;
+    try {
+      const result = await exportQuestionsToWord({
+        questions,
+        exam,
+        pb,
+        terminology: {
+          student: (school as any)?.studentTerminology || "Siswa",
+          teacher: (school as any)?.teacherTerminology || "Guru",
+          class: (school as any)?.classTerminology || "Kelas",
+        },
+        onProgress: (p) => setBatchProgress({ isOpen: true, ...p }),
       });
-      result = result.replace(/(?<!\$)(\$)([^\$\n]+?)(\$)(?!\$)/g, (_, _s, formula) => {
-        const clean = fixFormula(formula);
-        if (!/[\\^_{}]/.test(clean)) return formula;
-        const omml = latexToOmml(clean);
-        if (omml) return ` ${omml} `;
-        const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
-        return `&nbsp;<img src="${url}" class="latex-formula" style="vertical-align: -2px; margin: 0 1pt;" />&nbsp;`;
-      });
-      result = result.replace(/(\\\()([\s\S]*?)(\\\))/g, (_, _s, formula) => {
-        const clean = fixFormula(formula);
-        const omml = latexToOmml(clean);
-        if (omml) return ` ${omml} `;
-        const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
-        return `&nbsp;<img src="${url}" class="latex-formula" style="vertical-align: -2px; margin: 0 1pt;" />&nbsp;`;
-      });
-      return result;
-    };
-
-    // 1. Pre-collect all image URLs
-    const urlsToConvert = new Set<string>();
-
-    const addUrl = (url: string | undefined) => {
-      if (!url) return;
-      const abs = getAbsoluteUrl(url);
-      if (abs) {
-        urlsToConvert.add(abs);
+      if (result.count > 0) {
+        addToast({ title: "Export Sukses", description: `${result.count} butir soal berhasil diexport ke Word.`, type: "success" });
       }
-      urlsToConvert.add(url);
-    };
-
-    const collectFromHtml = (htmlText: string | undefined) => {
-      if (!htmlText) return;
-      const processed = processLatex(htmlText);
-      const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
-      let match;
-      while ((match = imgRegex.exec(processed)) !== null) {
-        addUrl(match[1]);
-      }
-    };
-
-    for (const q of questions) {
-      collectFromHtml(q.groupText);
-      collectFromHtml(q.text);
-      addUrl(q.imageUrl);
-
-      if (q.choices && (q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah")) {
-        for (const letter of ['a', 'b', 'c', 'd', 'e']) {
-          const c = (q.choices as any)[letter];
-          if (c) {
-            collectFromHtml(c.text);
-            addUrl(c.imageUrl);
-          }
-        }
-      } else if (q.type === "menjodohkan" && q.pairs) {
-        for (const p of q.pairs) {
-          collectFromHtml(p.left);
-          collectFromHtml(p.right);
-        }
-      } else if ((q.type === "urutkan" || q.type === "drag_drop") && q.items) {
-        for (const item of q.items) {
-          collectFromHtml(item.text);
-          addUrl(item.imageUrl);
-        }
-      }
+    } catch (err) {
+      console.error("Export Word Error:", err);
+      addToast({ title: "Gagal", description: "Gagal export ke Word.", type: "error" });
+    } finally {
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
-
-    // 2. Download and convert all collected images to standard PNGs
-    const imageMapping = new Map<string, { mappedUrl: string, base64: string, width: number, height: number }>();
-    const urlList = Array.from(urlsToConvert);
-
-    setBatchProgress(prev => ({
-      ...prev,
-      total: urlList.length + questions.length,
-      current: 0,
-      message: `Mengunduh & mengonversi gambar (0/${urlList.length})...`
-    }));
-
-    for (let idx = 0; idx < urlList.length; idx++) {
-      const originalUrl = urlList[idx];
-      setBatchProgress(prev => ({
-        ...prev,
-        current: idx,
-        message: `Mengunduh & mengonversi gambar (${idx + 1}/${urlList.length})...`
-      }));
-
-      const result = await convertToPngBase64(originalUrl, pb);
-      if (result.base64) {
-        const mappedUrl = `https://local-asset/img_${idx}.png`;
-        const mappedObj = { mappedUrl, base64: result.base64, width: result.width, height: result.height };
-        imageMapping.set(originalUrl, mappedObj);
-        const abs = getAbsoluteUrl(originalUrl);
-        if (abs) {
-          imageMapping.set(abs, mappedObj);
-        }
-      }
-    }
-
-    const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-
-    let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset='utf-8'>
-<style>
-  @page { size: A4; margin: 2cm; }
-  body { font-family: 'Times New Roman', serif; color: #000; font-size: 11pt; }
-  .kop { text-align: center; border-bottom: 2pt solid #000; margin-bottom: 15px; padding-bottom: 5px; }
-  .hanging { margin-left: 0pt; padding-left: 0pt; text-indent: 0pt; margin-bottom: 3pt; text-align: left; }
-  .choice { padding-left: 45pt; text-indent: -20pt; margin-bottom: 1pt; text-align: left; }
-  img { display: block; margin: 5pt 0; border: none; }
-  img.latex-formula { display: inline; margin: 0 1pt; vertical-align: -2px; }
-  .wacana { border: 1pt solid #000; padding: 10pt; margin-bottom: 15pt; background: #f5f5f5; font-style: italic; }
-  .spacer { margin: 0; padding: 0; line-height: 12pt; font-size: 12pt; height: 12pt; }
-  p, div, span { margin: 0; padding: 0; line-height: 1.3; text-align: left; }
-</style>
-</head>
-<body>
-  <div class="kop">
-    <p style="font-size: 14pt; font-weight: bold;">NASKAH SOAL UJIAN</p>
-    <p style="font-size: 12pt;">${exam?.title || "UJIAN CBT"}</p>
-    <p style="font-size: 10pt; font-weight: normal;">Mata Pelajaran: ${exam?.subject || "-"} | ${terminology.teacher}: ${exam?.teacherName || "-"}</p>
-  </div>
-  <table border="0" cellpadding="0" cellspacing="0" style="width:100%; font-size: 10pt; margin-bottom: 15pt; border: none; border-collapse: collapse;">
-    <tr>
-      <td width="15%" style="border:none; padding: 2px;">No. Peserta</td><td width="2%" style="border:none;">:</td><td width="33%" style="border:none; border-bottom: 0.5pt solid #000;"></td>
-      <td width="15%" style="border:none; padding: 2px;">${terminology.class}</td><td width="2%" style="border:none;">:</td><td style="border:none;">${exam?.level || "-"}</td>
-    </tr>
-    <tr>
-      <td style="border:none; padding: 2px;">Nama ${terminology.student}</td><td>:</td><td style="border:none; border-bottom: 0.5pt solid #000;"></td>
-      <td style="padding: 2px;">Hari/Tgl</td><td>:</td><td>..........................</td>
-    </tr>
-  </table>
-`;
-
-    let currentGroupId = "";
-    let keys = "";
-
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
-      setBatchProgress(prev => ({ ...prev, current: urlList.length + i + 1, message: `Memproses soal #${i + 1}...` }));
-
-      if (q.groupId && q.groupId !== currentGroupId && q.groupText) {
-        const cleanLiterasi = cleanForWord(processHtmlInlineImages(processLatex(q.groupText || ""), imageMapping));
-        html += `<div class="wacana"><b>STIMULUS / LITERASI:</b><br/>${cleanLiterasi}</div>`;
-        currentGroupId = q.groupId;
-      }
-
-      const processedQText = cleanForWord(processHtmlInlineImages(processLatex(q.text || ""), imageMapping));
-      html += `
-      <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 3pt; border: none; border-collapse: collapse;">
-        <tr>
-          <td valign="top" width="25" style="width: 25pt; border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3;"><b>${i + 1}.</b></td>
-          <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3; text-align: left;"><span>${processedQText}</span></td>
-        </tr>
-      </table>`;
-
-      // Render main question imageUrl if present
-      if (q.imageUrl) {
-        const absImg = getAbsoluteUrl(q.imageUrl);
-        const info = imageMapping.get(q.imageUrl) || (absImg ? imageMapping.get(absImg) : undefined);
-        if (info) {
-          const displayW = Math.round(info.width > 290 ? 290 : info.width);
-          const displayH = Math.round(info.width > 290 ? (info.height * 290) / info.width : info.height);
-          html += `<div style="margin: 5pt 0 5pt 25pt;"><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Soal" /></div>`;
-        }
-      }
-
-      if (q.choices && (q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah")) {
-        for (const letter of ['a', 'b', 'c', 'd', 'e']) {
-          const c = (q.choices as any)[letter];
-          if (c && (c.text || c.imageUrl)) {
-            const processedCText = cleanForWord(processHtmlInlineImages(processLatex(c.text || ""), imageMapping));
-            let choiceHtml = `
-            <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-left: 25pt; margin-bottom: 1pt; border: none; border-collapse: collapse;">
-              <tr>
-                <td valign="top" width="20" style="width: 20pt; border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3;">${letter.toUpperCase()}.</td>
-                <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3; text-align: left;">
-                  <span>${processedCText}</span>`;
-            if (c.imageUrl) {
-              const absChoiceImg = getAbsoluteUrl(c.imageUrl);
-              const info = imageMapping.get(c.imageUrl) || (absChoiceImg ? imageMapping.get(absChoiceImg) : undefined);
-              if (info) {
-                const displayW = Math.round(info.width > 181 ? 181 : info.width);
-                const displayH = Math.round(info.width > 181 ? (info.height * 181) / info.width : info.height);
-                choiceHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Pilihan" />`;
-              }
-            }
-            choiceHtml += `
-                </td>
-              </tr>
-            </table>`;
-            html += choiceHtml;
-          }
-        }
-        html += `<p class="spacer">&nbsp;</p>`;
-        const ans = Object.entries(q.choices).filter(([_, v]) => (v as any).isCorrect).map(([k]) => k.toUpperCase()).join(", ");
-        keys += `<tr><td align="center">${i + 1}</td><td align="center"><b>${ans || "-"}</b></td></tr>`;
-      } else if (q.type === "menjodohkan" && q.pairs) {
-        html += `<div style="margin-left: 25pt; margin-bottom: 5pt;">`;
-        html += `<table border="1" cellpadding="4" style="border-collapse: collapse; width: 80%;">`;
-        html += `<tr style="background-color: #f3f4f6;"><th>Pernyataan 1</th><th>Pernyataan 2</th></tr>`;
-        for (const p of q.pairs) {
-          html += `<tr><td>${cleanForWord(processHtmlInlineImages(processLatex(p.left || ""), imageMapping))}</td><td>${cleanForWord(processHtmlInlineImages(processLatex(p.right || ""), imageMapping))}</td></tr>`;
-        }
-        html += `</table></div>`;
-        keys += `<tr><td align="center">${i + 1}</td><td>Menjodohkan (Lihat Lembar Jawaban)</td></tr>`;
-        html += `<p class="spacer">&nbsp;</p>`;
-      } else if ((q.type === "urutkan" || q.type === "drag_drop") && q.items) {
-        html += `<div style="margin-left: 25pt; margin-bottom: 5pt;"><ol>`;
-        for (const item of q.items) {
-          let itemHtml = `<li>${cleanForWord(processHtmlInlineImages(processLatex(item.text || ""), imageMapping))}`;
-          if (item.imageUrl) {
-            const absItemImg = getAbsoluteUrl(item.imageUrl);
-            const info = imageMapping.get(item.imageUrl) || (absItemImg ? imageMapping.get(absItemImg) : undefined);
-            if (info) {
-              const displayW = Math.round(info.width > 145 ? 145 : info.width);
-              const displayH = Math.round(info.width > 145 ? (info.height * 145) / info.width : info.height);
-              itemHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Item" />`;
-            }
-          }
-          itemHtml += `</li>`;
-          html += itemHtml;
-        }
-        html += `</ol></div>`;
-        keys += `<tr><td align="center">${i + 1}</td><td>${q.answerKey || "-"}</td></tr>`;
-        html += `<p class="spacer">&nbsp;</p>`;
-      } else {
-        keys += `<tr><td align="center">${i + 1}</td><td>${q.answerKey || "-"}</td></tr>`;
-        html += `<p class="spacer">&nbsp;</p>`;
-      }
-    }
-
-    html += `
-  <div style="page-break-before: always;"></div>
-  <p align="center" style="font-weight:bold; font-size:14pt; border-bottom:1pt solid #000;">KUNCI JAWABAN</p>
-  <table border="1" style="width:100%; border-collapse:collapse; margin-top:10px;">
-    <tr style="background:#eee;"><th>No</th><th>Jawaban</th></tr>
-    ${keys}
-  </table>
-</body></html>`;
-
-    // 3. Assemble as MHTML
-    const boundary = "----=_NextPart_Boundary_Ujian_CBT";
-
-    let mhtml = "";
-    mhtml += "MIME-Version: 1.0\r\n";
-    mhtml += `Content-Type: multipart/related; type="text/html"; boundary="${boundary}"\r\n\r\n`;
-
-    // HTML Part
-    mhtml += `--${boundary}\r\n`;
-    mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n";
-    mhtml += "Content-Transfer-Encoding: 8bit\r\n";
-    mhtml += "Content-Location: https://local-asset/document.html\r\n\r\n";
-    mhtml += html + "\r\n\r\n";
-
-    // Attached image parts
-    const attachedUrls = new Set<string>();
-    for (const [_, mapped] of imageMapping.entries()) {
-      if (attachedUrls.has(mapped.mappedUrl)) continue;
-      attachedUrls.add(mapped.mappedUrl);
-
-      const filename = mapped.mappedUrl.split('/').pop() || 'image.png';
-
-      mhtml += `--${boundary}\r\n`;
-      mhtml += "Content-Type: image/png\r\n";
-      mhtml += "Content-Transfer-Encoding: base64\r\n";
-      mhtml += `Content-ID: <${filename}>\r\n`;
-      mhtml += `Content-Location: ${mapped.mappedUrl}\r\n\r\n`;
-
-      const base64Formatted = mapped.base64.replace(/(.{76})/g, "$1\r\n");
-      mhtml += base64Formatted + "\r\n\r\n";
-    }
-
-    mhtml += `--${boundary}--\r\n`;
-
-    const blob = new Blob([mhtml], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const fileName = `${exam?.subject || "Ujian"} - ${exam?.teacherName || "Guru"} - ${dateStr}.doc`;
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    link.click();
-
-    setBatchProgress(prev => ({ ...prev, isOpen: false }));
-    addToast({ title: "Export Sukses", description: "Naskah soal berhasil diexport.", type: "success" });
   };
 
   const handleExportToJson = () => {
-    if (questions.length === 0) return;
-
-    // Create a clean version of questions for export (remove undefined/null fields)
-    const exportData = questions.map(q => {
-      const clean: any = { text: q.text || "", type: q.type || "pilihan_ganda" };
-      if (q.imageUrl) clean.imageUrl = q.imageUrl;
-      if (q.groupId) clean.groupId = q.groupId;
-      if (q.groupText) clean.groupText = q.groupText;
-      if (q.choices && Object.keys(q.choices).length > 0) clean.choices = q.choices;
-      if (q.pairs && q.pairs.length > 0) clean.pairs = q.pairs;
-      if (q.items && q.items.length > 0) clean.items = q.items;
-      if (q.answerKey) clean.answerKey = q.answerKey;
-      if (q.order) clean.order = q.order;
-      return clean;
+    const result = exportQuestionsToJson({
+      questions,
+      examTitle: exam?.title || exam?.subject || "Ujian",
     });
-
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
-    const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-    const fileName = `BANK_SOAL_${exam?.subject || "Ujian"}_${dateStr}.json`;
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    addToast({ title: "Export Sukses", description: "File JSON berhasil diunduh.", type: "success" });
+    if (result.count > 0) {
+      addToast({ title: "Export Sukses", description: "File JSON berhasil diunduh.", type: "success" });
+    }
   };
 
-  // Export Selected Questions to JSON
   const handleExportSelectedToJson = () => {
-    const selectedQuestions = questions.filter(q => selectedIds.includes(q.id));
-    if (selectedQuestions.length === 0) return;
-
-    const exportData = selectedQuestions.map(q => {
-      const clean: any = { text: q.text || "", type: q.type || "pilihan_ganda" };
-      if (q.imageUrl) clean.imageUrl = q.imageUrl;
-      if (q.groupId) clean.groupId = q.groupId;
-      if (q.groupText) clean.groupText = q.groupText;
-      if (q.choices && Object.keys(q.choices).length > 0) clean.choices = q.choices;
-      if (q.pairs && q.pairs.length > 0) clean.pairs = q.pairs;
-      if (q.items && q.items.length > 0) clean.items = q.items;
-      if (q.answerKey) clean.answerKey = q.answerKey;
-      if (q.order) clean.order = q.order;
-      return clean;
+    const result = exportQuestionsToJson({
+      questions,
+      examTitle: exam?.title || exam?.subject || "Ujian",
+      selectedIds,
     });
-
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
-    const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-    const fileName = `SOAL_TERPILIH_${selectedQuestions.length}_${dateStr}.json`;
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    addToast({ title: "Export Sukses", description: `${selectedQuestions.length} soal berhasil diexport ke JSON.`, type: "success" });
+    if (result.count > 0) {
+      addToast({ title: "Export Sukses", description: `${result.count} soal berhasil diexport ke JSON.`, type: "success" });
+    }
   };
 
-  // Export Selected Questions to Word
   const handleExportSelectedToWord = async () => {
     const selectedQuestions = questions.filter(q => selectedIds.includes(q.id));
     if (selectedQuestions.length === 0) return;
-
-    setBatchProgress({ isOpen: true, total: selectedQuestions.length, current: 0, message: "Menyiapkan export...", title: "Export Terpilih ke Word" });
-
     try {
-      const processLatex = (htmlInput: string) => {
-        if (!htmlInput) return htmlInput;
-        let result = htmlInput;
-        const fixFormula = (f: string) => f.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
-
-        result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
-          const clean = fixFormula(formula);
-          const omml = latexToOmml(clean);
-          if (omml) return `<br/>${omml}<br/>`;
-          const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
-          return `<br/><img src="${url}" class="latex-formula" /><br/>`;
-        });
-        result = result.replace(/(?<!\$)(\$)([^\$\n]+?)(\$)(?!\$)/g, (_, _s, formula) => {
-          const clean = fixFormula(formula);
-          if (!/[\\^_{}]/.test(clean)) return formula;
-          const omml = latexToOmml(clean);
-          if (omml) return ` ${omml} `;
-          const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
-          return `&nbsp;<img src="${url}" class="latex-formula" style="vertical-align: -2px; margin: 0 1pt;" />&nbsp;`;
-        });
-        result = result.replace(/(\\\()([\s\S]*?)(\\\))/g, (_, _s, formula) => {
-          const clean = fixFormula(formula);
-          const omml = latexToOmml(clean);
-          if (omml) return ` ${omml} `;
-          const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
-          return `&nbsp;<img src="${url}" class="latex-formula" style="vertical-align: -2px; margin: 0 1pt;" />&nbsp;`;
-        });
-        return result;
-      };
-
-      const cleanForWord = (htmlText: string): string => {
-        if (!htmlText) return "";
-        let clean = htmlText;
-        clean = clean.replace(/<pre[^>]*class="ql-syntax"[^>]*>([\s\S]*?)<\/pre>/gi, '<p style="font-family:Consolas,monospace;background:#f3f4f6;padding:8px;border:1px solid #e5e7eb;white-space:pre-wrap;">$1</p>');
-        return clean;
-      };
-
-      // 1. Pre-collect all image URLs
-      const urlsToConvert = new Set<string>();
-
-      const addUrl = (url: string | undefined) => {
-        if (!url) return;
-        const abs = getAbsoluteUrl(url);
-        if (abs) {
-          urlsToConvert.add(abs);
-        }
-        urlsToConvert.add(url);
-      };
-
-      const collectFromHtml = (htmlText: string | undefined) => {
-        if (!htmlText) return;
-        const processed = processLatex(htmlText);
-        const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
-        let match;
-        while ((match = imgRegex.exec(processed)) !== null) {
-          addUrl(match[1]);
-        }
-      };
-
-      for (const q of selectedQuestions) {
-        collectFromHtml(q.groupText);
-        collectFromHtml(q.text);
-        addUrl(q.imageUrl);
-
-        if (q.choices && (q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah")) {
-          const keys = Object.keys(q.choices);
-          for (const key of keys) {
-            const choice = q.choices[key];
-            if (choice) {
-              collectFromHtml(choice.text);
-              addUrl(choice.imageUrl);
-            }
-          }
-        } else if (q.type === "menjodohkan" && q.pairs) {
-          for (const p of q.pairs) {
-            collectFromHtml(p.left);
-            collectFromHtml(p.right);
-          }
-        } else if ((q.type === "urutkan" || q.type === "drag_drop") && q.items) {
-          for (const item of q.items) {
-            collectFromHtml(item.text);
-            addUrl(item.imageUrl);
-          }
-        }
+      const result = await exportQuestionsToWord({
+        questions,
+        exam,
+        pb,
+        selectedIds,
+        terminology: {
+          student: (school as any)?.studentTerminology || "Siswa",
+          teacher: (school as any)?.teacherTerminology || "Guru",
+          class: (school as any)?.classTerminology || "Kelas",
+        },
+        onProgress: (p) => setBatchProgress({ isOpen: true, ...p }),
+      });
+      if (result.count > 0) {
+        addToast({ title: "Export Sukses", description: `${result.count} soal berhasil diexport ke Word.`, type: "success" });
       }
-
-      // 2. Download and convert all collected images to standard PNGs
-      const imageMapping = new Map<string, { mappedUrl: string, base64: string, width: number, height: number }>();
-      const urlList = Array.from(urlsToConvert);
-
-      setBatchProgress(prev => ({
-        ...prev,
-        total: urlList.length + selectedQuestions.length,
-        current: 0,
-        message: `Mengunduh & mengonversi gambar (0/${urlList.length})...`
-      }));
-
-      for (let idx = 0; idx < urlList.length; idx++) {
-        const originalUrl = urlList[idx];
-        setBatchProgress(prev => ({
-          ...prev,
-          current: idx,
-          message: `Mengunduh & mengonversi gambar (${idx + 1}/${urlList.length})...`
-        }));
-
-        const result = await convertToPngBase64(originalUrl, pb);
-        if (result.base64) {
-          const mappedUrl = `https://local-asset/img_${idx}.png`;
-          const mappedObj = { mappedUrl, base64: result.base64, width: result.width, height: result.height };
-          imageMapping.set(originalUrl, mappedObj);
-          const abs = getAbsoluteUrl(originalUrl);
-          if (abs) {
-            imageMapping.set(abs, mappedObj);
-          }
-        }
-      }
-
-      let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset="utf-8"><style>
-        body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; margin: 2cm; }
-        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
-        td, th { border: 1px solid #000; padding: 6px 8px; vertical-align: top; font-size: 11pt; }
-        .soal { margin-bottom: 16px; }
-        .opsi { margin-left: 20px; }
-        .kunci { color: #059669; font-weight: bold; }
-        .stimulus { border: 1px solid #059669; padding: 12px; margin-bottom: 12px; background: #f0fdf4; }
-        img { display: block; margin: 5pt 0; border: none; }
-        img.latex-formula { display: inline; margin: 0; width: auto; height: auto; vertical-align: middle; }
-      </style></head><body>`;
-
-      html += `<h2 style="text-align:center;">EXPORT SOAL TERPILIH</h2>`;
-      html += `<p style="text-align:center;font-size:10pt;color:#666;">${exam?.subject || ""} - ${selectedQuestions.length} soal - ${new Date().toLocaleDateString('id-ID')}</p><hr/>`;
-
-      let currentGroupId = "";
-      for (let idx = 0; idx < selectedQuestions.length; idx++) {
-        const q = selectedQuestions[idx];
-        setBatchProgress(prev => ({ ...prev, current: urlList.length + idx + 1, message: `Memproses soal ${idx + 1}/${selectedQuestions.length}` }));
-
-        // Show stimulus if new group
-        if (q.groupId && q.groupId !== currentGroupId && q.groupText) {
-          html += `<div class="stimulus"><b>STIMULUS:</b><br/>${cleanForWord(processHtmlInlineImages(processLatex(q.groupText), imageMapping))}</div>`;
-          currentGroupId = q.groupId;
-        }
-
-        const processedQText = cleanForWord(processHtmlInlineImages(processLatex(q.text || ""), imageMapping));
-        html += `
-        <div class="soal">
-          <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 3pt; border: none; border-collapse: collapse;">
-            <tr>
-              <td valign="top" width="25" style="width: 25pt; border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5;"><b>${idx + 1}.</b></td>
-              <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; text-align: left;"><span>${processedQText}</span></td>
-            </tr>
-          </table>`;
-
-        // Render main question image
-        if (q.imageUrl) {
-          const absImg = getAbsoluteUrl(q.imageUrl);
-          const info = imageMapping.get(q.imageUrl) || (absImg ? imageMapping.get(absImg) : undefined);
-          if (info) {
-            const displayW = Math.round(info.width > 290 ? 290 : info.width);
-            const displayH = Math.round(info.width > 290 ? (info.height * 290) / info.width : info.height);
-            html += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Soal" /><br/>`;
-          }
-        }
-
-        if (q.choices && (q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah")) {
-          html += `<div class="opsi">`;
-          const keys = Object.keys(q.choices).sort();
-          for (const key of keys) {
-            const choice = q.choices[key];
-            const isCorrect = choice.isCorrect;
-            const processedCText = cleanForWord(processHtmlInlineImages(processLatex(choice.text || ""), imageMapping));
-            let choiceHtml = `
-            <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 1pt; border: none; border-collapse: collapse;">
-              <tr>
-                <td valign="top" width="20" style="width: 20pt; border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5;">${isCorrect ? '<span class="kunci">' : ''}${key.toUpperCase()}.${isCorrect ? '</span>' : ''}</td>
-                <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; text-align: left;">
-                  ${isCorrect ? '<span class="kunci">' : ''}${processedCText}`;
-            if (choice.imageUrl) {
-              const absChoiceImg = getAbsoluteUrl(choice.imageUrl);
-              const info = imageMapping.get(choice.imageUrl) || (absChoiceImg ? imageMapping.get(absChoiceImg) : undefined);
-              if (info) {
-                const displayW = Math.round(info.width > 181 ? 181 : info.width);
-                const displayH = Math.round(info.width > 181 ? (info.height * 181) / info.width : info.height);
-                choiceHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Pilihan" />`;
-              }
-            }
-            choiceHtml += `${isCorrect ? '</span>' : ''}
-                </td>
-              </tr>
-            </table>`;
-            html += choiceHtml;
-          }
-          html += `</div>`;
-        } else if (q.type === "menjodohkan" && q.pairs) {
-          html += `<table><tr><th>Kiri</th><th>Kanan</th></tr>`;
-          for (const p of q.pairs) {
-            html += `<tr><td>${cleanForWord(processHtmlInlineImages(processLatex(p.left || ""), imageMapping))}</td><td>${cleanForWord(processHtmlInlineImages(processLatex(p.right || ""), imageMapping))}</td></tr>`;
-          }
-          html += `</table>`;
-        } else if ((q.type === "urutkan" || q.type === "drag_drop") && q.items) {
-          html += `<ol>`;
-          for (const item of q.items) {
-            let itemHtml = `<li>${cleanForWord(processHtmlInlineImages(processLatex(item.text || ""), imageMapping))}`;
-            if (item.imageUrl) {
-              const absItemImg = getAbsoluteUrl(item.imageUrl);
-              const info = imageMapping.get(item.imageUrl) || (absItemImg ? imageMapping.get(absItemImg) : undefined);
-              if (info) {
-                const displayW = Math.round(info.width > 145 ? 145 : info.width);
-                const displayH = Math.round(info.width > 145 ? (info.height * 145) / info.width : info.height);
-                itemHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Item" />`;
-              }
-            }
-            itemHtml += `</li>`;
-            html += itemHtml;
-          }
-          html += `</ol>`;
-        }
-
-        if (q.answerKey) {
-          html += `<p class="kunci">Kunci: ${q.answerKey.toUpperCase()}</p>`;
-        }
-        html += `</div>`;
-      }
-
-      html += `</body></html>`;
-
-      // 3. Assemble as MHTML
-      const boundary = "----=_NextPart_Boundary_Ujian_CBT";
-
-      let mhtml = "";
-      mhtml += "MIME-Version: 1.0\r\n";
-      mhtml += `Content-Type: multipart/related; type="text/html"; boundary="${boundary}"\r\n\r\n`;
-
-      // HTML Part
-      mhtml += `--${boundary}\r\n`;
-      mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n";
-      mhtml += "Content-Transfer-Encoding: 8bit\r\n";
-      mhtml += "Content-Location: https://local-asset/document.html\r\n\r\n";
-      mhtml += html + "\r\n\r\n";
-
-      // Attached image parts
-      const attachedUrls = new Set<string>();
-      for (const [_, mapped] of imageMapping.entries()) {
-        if (attachedUrls.has(mapped.mappedUrl)) continue;
-        attachedUrls.add(mapped.mappedUrl);
-
-        const filename = mapped.mappedUrl.split('/').pop() || 'image.png';
-
-        mhtml += `--${boundary}\r\n`;
-        mhtml += "Content-Type: image/png\r\n";
-        mhtml += "Content-Transfer-Encoding: base64\r\n";
-        mhtml += `Content-ID: <${filename}>\r\n`;
-        mhtml += `Content-Location: ${mapped.mappedUrl}\r\n\r\n`;
-
-        const base64Formatted = mapped.base64.replace(/(.{76})/g, "$1\r\n");
-        mhtml += base64Formatted + "\r\n\r\n";
-      }
-
-      mhtml += `--${boundary}--\r\n`;
-
-      const blob = new Blob([mhtml], { type: 'application/msword' });
-      const url = URL.createObjectURL(blob);
-      const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-      const fileName = `SOAL_TERPILIH_${selectedQuestions.length}_${dateStr}.doc`;
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      addToast({ title: "Export Sukses", description: `${selectedQuestions.length} soal berhasil diexport ke Word.`, type: "success" });
     } catch (err) {
       console.error("Export Selected Word Error:", err);
       addToast({ title: "Gagal", description: "Gagal export ke Word.", type: "error" });
