@@ -2626,7 +2626,9 @@ const QuestionsPage = () => {
                         {QUESTION_TYPE_LABELS[inspectedQuestion.type || "pilihan_ganda"] || inspectedQuestion.type}
                       </NeonBadge>
                       {inspectedQuestion.groupId && (() => {
-                        const isMainWacana = Boolean(inspectedQuestion.groupText) || questions.findIndex(q => q.groupId === inspectedQuestion.groupId) === questions.findIndex(q => q.id === inspectedQuestion.id);
+                        const firstMainInGroup = questions.find(q => q.groupId === inspectedQuestion.groupId && Boolean(q.groupText)) || questions.find(q => q.groupId === inspectedQuestion.groupId);
+                        const isMainWacana = firstMainInGroup ? firstMainInGroup.id === inspectedQuestion.id : false;
+                        const stimulusText = inspectedQuestion.groupText || firstMainInGroup?.groupText || "";
                         return (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -2639,8 +2641,8 @@ const QuestionsPage = () => {
                                 >
                                   <span className="truncate min-w-0 font-medium">Paket: {inspectedQuestion.groupId}</span>
                                   {isMainWacana && (
-                                    <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider shrink-0">
-                                      Wacana
+                                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/25 text-amber-900 dark:text-amber-200 border border-amber-500/40 text-[9px] font-bold uppercase tracking-wider shrink-0 leading-none">
+                                      Main
                                     </span>
                                   )}
                                 </NeonBadge>
@@ -2649,9 +2651,9 @@ const QuestionsPage = () => {
                             <TooltipContent
                               side="top"
                               align="start"
-                              className="z-[110] max-w-sm sm:max-w-md p-3 bg-white dark:bg-neutral-900 border border-amber-200/90 dark:border-amber-800/70 rounded-xl shadow-xl shadow-amber-500/5 dark:shadow-none space-y-2 text-left text-neutral-900 dark:text-neutral-100"
+                              className="z-[110] max-w-sm sm:max-w-md p-3.5 bg-white dark:bg-neutral-900 border border-amber-200/90 dark:border-amber-800/70 rounded-xl shadow-xl shadow-amber-500/5 dark:shadow-none space-y-2.5 text-left text-neutral-900 dark:text-neutral-100"
                             >
-                              <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-neutral-100 dark:border-neutral-800">
+                              <div className="flex items-center justify-between gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-800">
                                 <div className="flex items-center gap-1.5">
                                   <div className="w-5 h-5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
                                     <BookOpen className="w-3 h-3" />
@@ -2661,31 +2663,32 @@ const QuestionsPage = () => {
                                   </span>
                                 </div>
                                 {isMainWacana ? (
-                                  <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0">
-                                    Induk Wacana
+                                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 shrink-0">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                    Main
                                   </span>
                                 ) : (
-                                  <span className="text-[9px] font-medium text-neutral-400 dark:text-neutral-500">
-                                    Soal Terhubung
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700 shrink-0">
+                                    Terhubung
                                   </span>
                                 )}
                               </div>
 
-                              <div className="space-y-1.5">
-                                <div className="flex items-center gap-1.5 text-xs">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-xs">
                                   <span className="text-neutral-500 dark:text-neutral-400 font-medium">ID Paket:</span>
                                   <code className="font-mono text-xs font-bold text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded border border-neutral-200 dark:border-neutral-700 break-all">
                                     {inspectedQuestion.groupId}
                                   </code>
                                 </div>
 
-                                {inspectedQuestion.groupText ? (
-                                  <div className="space-y-1 pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
+                                {stimulusText ? (
+                                  <div className="space-y-1.5 pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
                                     <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block">
                                       Teks Stimulus:
                                     </span>
                                     <p className="text-xs text-neutral-700 dark:text-neutral-300 font-serif leading-relaxed line-clamp-4 bg-amber-50/50 dark:bg-amber-950/20 p-2.5 rounded-lg border border-amber-500/20">
-                                      {inspectedQuestion.groupText.replace(/<[^>]*>/g, '')}
+                                      {stimulusText.replace(/<[^>]*>/g, '')}
                                     </p>
                                   </div>
                                 ) : (
