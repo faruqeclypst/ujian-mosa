@@ -1576,6 +1576,7 @@ const CBTPage = () => {
       // Hentikan timer dan countdown segera
       cancelPenaltyCountdown();
       lastLeftTimeRef.current = null;
+      isCheatWarningOpenRef.current = true; // Kunci ref secara sinkron agar tidak di-override oleh event focus/visibility
 
       const currentAttempt = attemptRef.current || attempt;
       const currentCheat = currentAttempt?.cheatCount || 0;
@@ -1688,8 +1689,8 @@ const CBTPage = () => {
         if (hadDepartureTime) {
           const elapsed = Date.now() - hadDepartureTime;
           lastLeftTimeRef.current = null;
-          // Hanya beri penalti jika siswa benar-benar meninggalkan aplikasi lebih dari 5 detik saat JS pause
-          if (elapsed >= 5000 && !wasScreenOff) {
+          // Hanya beri penalti jika siswa benar-benar meninggalkan aplikasi >= 4800ms (toleransi jitter 200ms) saat JS pause
+          if (elapsed >= 4800 && !wasScreenOff) {
             triggerPenalty();
             return;
           }
@@ -1752,7 +1753,7 @@ const CBTPage = () => {
         if (hadDepartureTime) {
           const elapsed = Date.now() - hadDepartureTime;
           lastLeftTimeRef.current = null;
-          if (elapsed >= 5000 && !wasScreenOff) {
+          if (elapsed >= 4800 && !wasScreenOff) {
             triggerPenalty();
             return;
           }
@@ -1770,8 +1771,13 @@ const CBTPage = () => {
       cancelPenaltyCountdown();
     };
 
+    const handlePageShow = () => {
+      // Pastikan flag reload/navigasi reset saat halaman kembali aktif dari background/bfcache
+      isNavigatingOrReloadingRef.current = false;
+    };
+
     window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("pagehide", handleBeforeUnload);
+    window.addEventListener("pageshow", handlePageShow);
 
     const graceTimer = setTimeout(() => {
       document.addEventListener("visibilitychange", handleCheatDetection);
@@ -1788,7 +1794,7 @@ const CBTPage = () => {
     return () => {
       clearTimeout(graceTimer);
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("pagehide", handleBeforeUnload);
+      window.removeEventListener("pageshow", handlePageShow);
       if (!isCheatWarningOpenRef.current) {
         try { CheatAlert.stopAlarm(); } catch (err) { }
       }
@@ -3131,8 +3137,21 @@ const CBTPage = () => {
         </div>
       )}
 
-      <Dialog open={!isKicked && isCheatWarningOpen} onOpenChange={setIsCheatWarningOpen}>
-        <DialogContent className="max-w-xs rounded-[2rem] p-6 text-center border-none shadow-2xl pointer-events-auto bg-white dark:bg-slate-950">
+      <Dialog
+        open={!isKicked && isCheatWarningOpen}
+        onOpenChange={(open) => {
+          // Jangan izinkan modal ditutup oleh klik luar atau tombol escape
+          if (!open) return;
+          setIsCheatWarningOpen(open);
+        }}
+      >
+        <DialogContent
+          hideClose
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          className="max-w-xs rounded-[2rem] p-6 text-center border-none shadow-2xl pointer-events-auto bg-white dark:bg-slate-950 z-[10000]"
+        >
           <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4 animate-pulse" />
           <DialogTitle className="text-xl font-black text-red-600 uppercase tracking-tighter">Pelanggaran!</DialogTitle>
           <div className="space-y-3 mt-2">
@@ -3150,6 +3169,7 @@ const CBTPage = () => {
           </div>
           <Button onClick={() => {
             setIsCheatWarningOpen(false);
+            isCheatWarningOpenRef.current = false;
             try { CheatAlert.stopAlarm(); } catch (err) { }
           }} className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black uppercase tracking-widest h-12 rounded-2xl mt-6 transition-colors shadow-lg shadow-emerald-600/20">SAYA MENGERTI</Button>
         </DialogContent>
