@@ -8,14 +8,7 @@ import {
   TooltipTrigger,
   TooltipContent
 } from "../../../../components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator
-} from "../../../../components/ui/dropdown-menu";
-import { BookOpen, Search, Edit, MoreHorizontal, Trash, FileSpreadsheet, Image } from "lucide-react";
+import { BookOpen, Search, Edit, Trash, FileSpreadsheet, Image } from "lucide-react";
 import { QuestionData, QUESTION_TYPE_BADGE, QUESTION_TYPE_LABELS } from "../types";
 import { QuestionDetailsView } from "./QuestionDetailsView";
 
@@ -156,10 +149,10 @@ export function getQuestionColumns({
     {
       key: "actions",
       header: "Aksi",
-      width: "92px",
+      width: "100px",
       overflow: "visible",
-      className: "w-[92px] text-right shrink-0 !px-2 overflow-visible",
-      headerClassName: "w-[92px] text-right shrink-0 !px-2",
+      className: "w-[100px] text-right shrink-0 !px-2 overflow-visible",
+      headerClassName: "w-[100px] text-right shrink-0 !px-2",
       align: "right",
       render: (item) => {
         const idx = questions.findIndex(q => q.id === item.id);
@@ -175,11 +168,11 @@ export function getQuestionColumns({
               <Search className="h-3.5 w-3.5" />
             </button>
 
-            {/* Quick Action: Edit (sm+) */}
+            {/* Quick Action: Edit */}
             {canEdit && (
               <button
                 type="button"
-                className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors shadow-2xs cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors shadow-2xs cursor-pointer shrink-0"
                 onClick={() => onEdit(item)}
                 title="Edit Soal"
               >
@@ -187,46 +180,17 @@ export function getQuestionColumns({
               </button>
             )}
 
-            {/* Dropdown Menu Seragam */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors shadow-2xs cursor-pointer shrink-0"
-                  title="Menu Lainnya"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
-                <DropdownMenuItem
-                  onClick={() => onPreview(item, idx >= 0 ? idx : 0)}
-                  className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
-                >
-                  <Search className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
-                  <span>Pratinjau</span>
-                </DropdownMenuItem>
-                {canEdit && (
-                  <>
-                    <DropdownMenuItem
-                      onClick={() => onEdit(item)}
-                      className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
-                    >
-                      <Edit className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
-                      <span>Edit</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-                    <DropdownMenuItem
-                      onClick={() => onDelete(item)}
-                      className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
-                    >
-                      <Trash className="h-3.5 w-3.5 text-rose-500 shrink-0" />
-                      <span>Hapus</span>
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Quick Action: Hapus */}
+            {canEdit && (
+              <button
+                type="button"
+                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-200 dark:hover:border-rose-800 transition-colors shadow-2xs cursor-pointer shrink-0"
+                onClick={() => onDelete(item)}
+                title="Hapus Soal"
+              >
+                <Trash className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         );
       }

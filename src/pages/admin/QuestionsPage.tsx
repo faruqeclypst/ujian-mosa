@@ -1305,7 +1305,12 @@ const QuestionsPage = () => {
       }
 
       await pb.collection('questions').delete(questionToDelete.id);
-      showAlert("Berhasil", "Soal berhasil dihapus.", "success");
+      setQuestions(prev => prev.filter(q => q.id !== questionToDelete.id));
+      if (inspectedQuestion?.id === questionToDelete.id) {
+        setInspectedQuestionId(null);
+      }
+      addToast({ title: "Berhasil", description: "Soal berhasil dihapus.", type: "success" });
+      loadQuestions();
     } catch (error) {
       console.error("Delete Question Error:", error);
       showAlert("Gagal", "Gagal menghapus data soal dari database.", "danger");
@@ -2962,6 +2967,28 @@ const QuestionsPage = () => {
           handleAIParse={handleAIParse}
           handleSaveAIImport={handleSaveAIImport}
           cancelAIGeneration={cancelAIGeneration}
+        />
+
+        <ConfirmationDialog
+          isOpen={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          onConfirm={handleConfirmDelete}
+          type="danger"
+          title="Hapus Butir Soal"
+          description="Apakah Anda yakin ingin menghapus butir soal ini? Tindakan ini tidak dapat dibatalkan."
+          confirmLabel="Hapus Soal"
+          isLoading={isDeleting}
+        />
+
+        <ConfirmationDialog
+          isOpen={deleteAllDialogOpen}
+          onClose={() => setDeleteAllDialogOpen(false)}
+          onConfirm={handleConfirmDeleteAll}
+          type="danger"
+          title="Hapus Semua Soal"
+          description={`Apakah Anda yakin ingin menghapus SEMUA (${questions.length}) butir soal dalam bank soal ini? Seluruh data soal dan gambar akan dihapus permanen.`}
+          confirmLabel="Hapus Semua"
+          isLoading={isDeleting}
         />
 
         <ConfirmationDialog
