@@ -463,7 +463,7 @@ export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta 
           display: grid;
           grid-template-columns: ${rkas ? "1fr 1fr 1fr" : "1.5fr 1fr"};
           gap: 20px;
-          align-items: flex-end;
+          align-items: flex-start;
           margin-top: 20px;
         }
         .sig-col {
@@ -482,34 +482,24 @@ export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta 
           margin-top: 2px;
         }
         .sig-space {
-          height: 50px;
+          height: 65px;
         }
         .sig-name {
           font-size: 11px;
           font-weight: 700;
           color: #0f172a;
-          text-decoration: underline;
         }
         .sig-nip {
           font-size: 9.5px;
           color: #64748b;
           margin-top: 2px;
         }
-        .sig-stamp {
-          width: 100px;
-          height: 45px;
-          margin: 4px auto;
-          border: 2px solid ${isPaid ? '#059669' : '#dc2626'};
-          color: ${isPaid ? '#059669' : '#dc2626'};
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 6px;
-          font-weight: 800;
-          font-size: 13px;
-          letter-spacing: 1.5px;
-          transform: rotate(-4deg);
-          background: ${isPaid ? 'rgba(5,150,105,0.05)' : 'rgba(220,38,38,0.05)'};
+        .tte-disclaimer {
+          text-align: center;
+          font-size: 9.5px;
+          color: #475569;
+          margin-top: 22px;
+          line-height: 1.5;
         }
 
         .print-footer {
@@ -660,32 +650,34 @@ export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta 
           ${rkas ? `
             <div class="signatures-grid">
               <div class="sig-col">
+                <div style="height: 16px; margin-bottom: 2px;"></div>
                 <div class="sig-label">Menyetujui,</div>
                 <div class="sig-role">Kepala Sekolah</div>
-                <div class="sig-space"></div>
-                <div class="sig-name">${rkas.headmaster_name || "Kepala Sekolah"}</div>
+                <div class="sig-space" style="height: 68px;"></div>
+                <div class="sig-name">${rkas.headmaster_name ? `( ${rkas.headmaster_name} )` : "( Kepala Sekolah )"}</div>
                 <div class="sig-nip">NIP. ${rkas.headmaster_nip || "...................................."}</div>
               </div>
               <div class="sig-col">
+                <div style="height: 16px; margin-bottom: 2px;"></div>
                 <div class="sig-label">Lunas Dibayar,</div>
                 <div class="sig-role">Bendahara BOS / Sekolah</div>
-                <div class="sig-space"></div>
-                <div class="sig-name">${rkas.treasurer_name || "Bendahara BOS"}</div>
+                <div class="sig-space" style="height: 68px;"></div>
+                <div class="sig-name">${rkas.treasurer_name ? `( ${rkas.treasurer_name} )` : "( Bendahara BOS )"}</div>
                 <div class="sig-nip">NIP. ${rkas.treasurer_nip || "...................................."}</div>
               </div>
               <div class="sig-col">
+                <div style="font-size: 10px; color: #475569; height: 16px; margin-bottom: 2px;">Banda Aceh, ${createdDate}</div>
                 <div class="sig-label">Penerima Pembayaran,</div>
-                <div class="sig-role">Tim Keuangan EXAMKU</div>
-                <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin: 4px 0;">
-                  <div class="sig-stamp">${isPaid ? 'PAID' : 'UNPAID'}</div>
+                <div class="sig-role">Penyedia (EXAMKU CBT)</div>
+                <div style="height: 68px; display:flex; align-items:center; justify-content:center; margin: 2px 0;">
                   ${qrCodeDataUrl ? `
-                    <div style="padding: 2px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;">
-                      <img src="${qrCodeDataUrl}" alt="Barcode TTE" style="width: 46px; height: 46px; display: block;" />
-                    </div>
-                  ` : ''}
+                    <img src="${qrCodeDataUrl}" alt="Barcode TTE Sah" style="width: 64px; height: 64px; display: block;" />
+                  ` : `
+                    <div style="height: 68px;"></div>
+                  `}
                 </div>
-                <div class="sig-name">Alfaruq Asri / Tim Keuangan</div>
-                <div class="sig-nip">Dokumen Divalidasi Sistem</div>
+                <div class="sig-name">( Alfaruq Asri )</div>
+                <div class="sig-nip">Tim Keuangan EXAMKU CBT</div>
               </div>
             </div>
           ` : `
@@ -697,20 +689,26 @@ export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta 
                 <p>3. Hubungi billing@examku.my.id untuk konfirmasi atau bantuan faktur pajak.</p>
               </div>
               <div class="sig-col">
-                <div style="font-size:10.5px; color:#475569; margin-bottom:6px;">Banda Aceh, ${createdDate}</div>
-                <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin: 4px 0;">
-                  <div class="sig-stamp">${isPaid ? 'PAID' : 'UNPAID'}</div>
+                <div style="font-size: 10px; color: #475569; margin-bottom: 2px;">Banda Aceh, ${createdDate}</div>
+                <div class="sig-label">Penerima Pembayaran,</div>
+                <div class="sig-role">Penyedia (EXAMKU CBT)</div>
+                <div style="height: 68px; display:flex; align-items:center; justify-content:center; margin: 2px 0;">
                   ${qrCodeDataUrl ? `
-                    <div style="padding: 2px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;">
-                      <img src="${qrCodeDataUrl}" alt="Barcode TTE" style="width: 46px; height: 46px; display: block;" />
-                    </div>
-                  ` : ''}
+                    <img src="${qrCodeDataUrl}" alt="Barcode TTE Sah" style="width: 64px; height: 64px; display: block;" />
+                  ` : `
+                    <div style="height: 68px;"></div>
+                  `}
                 </div>
-                <div class="sig-name" style="margin-top:4px;">Alfaruq Asri / Tim Keuangan</div>
-                <div class="sig-nip">Dokumen Resmi Terverifikasi</div>
+                <div class="sig-name">( Alfaruq Asri )</div>
+                <div class="sig-nip">Tim Keuangan EXAMKU CBT</div>
               </div>
             </div>
           `}
+
+          <div class="tte-disclaimer">
+            Ditandatangani secara elektronik. Dokumen ini dikeluarkan secara resmi oleh EXAMKU CBT.<br />
+            Pindai kode QR untuk verifikasi keaslian.
+          </div>
         </div>
 
         <div class="print-footer">
@@ -914,7 +912,7 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
           grid-template-columns: 1fr 1fr 1fr;
           gap: 15px;
           text-align: center;
-          margin-top: 35px;
+          margin-top: 30px;
         }
         .sig-box {
           font-size: 10.5px;
@@ -928,23 +926,48 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
         }
         .sig-name {
           font-weight: 700;
-          text-decoration: underline;
+          color: #0f172a;
         }
         .sig-nip {
           font-size: 9.5px;
           color: #64748b;
+          margin-top: 2px;
         }
 
-        .materai-box {
-          width: 85px;
-          height: 45px;
-          border: 1px dashed #94a3b8;
-          color: #94a3b8;
-          display: flex;
+        .tte-disclaimer {
+          text-align: center;
+          font-size: 9.5px;
+          color: #475569;
+          margin-top: 26px;
+          line-height: 1.5;
+        }
+
+        .lunas-header-badge {
+          display: inline-flex;
           align-items: center;
-          justify-content: center;
-          font-size: 8.5px;
-          margin: 6px auto;
+          gap: 6px;
+          background: #ecfdf5;
+          color: #047857;
+          border: 1.5px solid #10b981;
+          padding: 3px 10px;
+          border-radius: 6px;
+          font-weight: 800;
+          font-size: 11px;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+        }
+
+        .lunas-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: #059669;
+          color: #ffffff;
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-weight: 800;
+          font-size: 11px;
+          letter-spacing: 0.5px;
           text-transform: uppercase;
         }
 
@@ -967,8 +990,9 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
           <p>Pelaporan Surat Pertanggungjawaban (SPJ) Dana BOS / BOSP Satuan Pendidikan</p>
         </div>
 
-        <div class="title-box">
-          <div class="kuitansi-no">Nomor Kuitansi: KWT/BOS/${inv.invoice_number}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px;">
+          <div class="kuitansi-no">Nomor Kuitansi: <strong>KWT/BOS/${inv.invoice_number}</strong></div>
+          <div class="lunas-header-badge">&#10003; LUNAS / TERVERIFIKASI</div>
         </div>
 
         <table class="meta-table">
@@ -981,7 +1005,10 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
             <td class="label">Uang Sejumlah</td>
             <td class="sep">:</td>
             <td class="val">
-              <div class="nominal-badge">${formatRupiah(finalGrandTotal)}</div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="nominal-badge">${formatRupiah(finalGrandTotal)}</div>
+                <div class="lunas-tag">&#10003; SUDAH LUNAS</div>
+              </div>
             </td>
           </tr>
           <tr>
@@ -1054,46 +1081,42 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
         </div>
         ` : ""}
 
-        <div style="text-align: right; font-size: 11px; margin-bottom: 10px; color: #475569;">
-          Banda Aceh, ${createdDate}
-        </div>
-
         <div class="signatures-grid">
           <div class="sig-box">
+            <div style="height: 18px; margin-bottom: 2px;"></div>
             <div>Setuju Dibayar,</div>
             <div class="sig-role">Kepala Sekolah (KPA)</div>
-            <div class="sig-space"></div>
-            <div class="sig-name">${rkas?.headmaster_name || "Kepala Sekolah"}</div>
+            <div class="sig-space" style="height: 75px;"></div>
+            <div class="sig-name">${rkas?.headmaster_name ? `( ${rkas.headmaster_name} )` : "( Kepala Sekolah )"}</div>
             <div class="sig-nip">NIP. ${rkas?.headmaster_nip || "...................................."}</div>
           </div>
           <div class="sig-box">
+            <div style="height: 18px; margin-bottom: 2px;"></div>
             <div>Lunas Dibayar,</div>
             <div class="sig-role">Bendahara BOS</div>
-            <div class="sig-space"></div>
-            <div class="sig-name">${rkas?.treasurer_name || "Bendahara BOS"}</div>
+            <div class="sig-space" style="height: 75px;"></div>
+            <div class="sig-name">${rkas?.treasurer_name ? `( ${rkas.treasurer_name} )` : "( Bendahara BOS )"}</div>
             <div class="sig-nip">NIP. ${rkas?.treasurer_nip || "...................................."}</div>
           </div>
-          <div class="sig-box" style="display: flex; flex-direction: column; align-items: center;">
+          <div class="sig-box">
+            <div style="font-size: 11px; color: #475569; height: 18px; margin-bottom: 2px;">Banda Aceh, ${createdDate}</div>
             <div>Yang Menerima,</div>
             <div class="sig-role">Penyedia (EXAMKU CBT)</div>
-            
             <div style="height: 75px; display: flex; align-items: center; justify-content: center;">
               ${qrCodeDataUrl ? `
-                <div style="padding: 3px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); display: inline-block;">
-                  <img src="${qrCodeDataUrl}" alt="Barcode TTE Sah" style="width: 66px; height: 66px; display: block;" />
-                </div>
+                <img src="${qrCodeDataUrl}" alt="Barcode TTE Sah" style="width: 72px; height: 72px; display: block;" />
               ` : `
-                <div class="sig-space"></div>
+                <div class="sig-space" style="height: 75px;"></div>
               `}
             </div>
-
-            <div class="sig-name">Alfaruq Asri</div>
+            <div class="sig-name">( Alfaruq Asri )</div>
             <div class="sig-nip">Tim Keuangan EXAMKU CBT</div>
-            <div style="font-size: 8.5px; color: #0284c7; font-weight: 600; margin-top: 2px;">
-              &#10003; Barcode TTE Sah & Tervalidasi
-            </div>
-            ${inv.amount >= 5000000 ? '<div style="font-size: 8px; color: #94a3b8; margin-top: 1px;">* Lampirkan e-Materai jika disyaratkan BPKAD</div>' : ''}
           </div>
+        </div>
+
+        <div class="tte-disclaimer">
+          Ditandatangani secara elektronik. Dokumen ini dikeluarkan secara resmi oleh EXAMKU CBT.<br />
+          Pindai kode QR untuk verifikasi keaslian.
         </div>
 
         <div class="print-footer">
