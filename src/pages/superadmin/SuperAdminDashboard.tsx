@@ -203,7 +203,6 @@ const getActiveUntilInfo = (dateStr?: string) => {
 
 const SchoolAvatar = ({ name, logoUrl, className }: { name: string; logoUrl?: string; className?: string }) => {
   const [error, setError] = useState(false);
-  const initial = (name || "S").trim()[0]?.toUpperCase() || "S";
 
   useEffect(() => {
     setError(false);
@@ -215,22 +214,22 @@ const SchoolAvatar = ({ name, logoUrl, className }: { name: string; logoUrl?: st
       : masterPb.files.getUrl({ id: "" } as any, logoUrl)
     : "";
 
-  if (resolvedUrl && !error) {
-    return (
-      <div className={cn("w-9 h-9 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200", className)}>
-        <img
-          src={resolvedUrl}
-          alt=""
-          className="w-full h-full object-contain p-0.5"
-          onError={() => setError(true)}
-        />
-      </div>
-    );
-  }
+  const finalSrc = resolvedUrl && !error ? resolvedUrl : "/logo-default.webp";
 
   return (
-    <div className={cn("w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-black text-xs uppercase shrink-0 shadow-2xs", className)}>
-      {initial}
+    <div className={cn("w-9 h-9 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200", className)}>
+      <img
+        src={finalSrc}
+        alt={name || ""}
+        className="w-full h-full object-contain p-0.5"
+        onError={(e) => {
+          if (!error && resolvedUrl) {
+            setError(true);
+          } else {
+            (e.target as HTMLImageElement).src = "/logo-default.png";
+          }
+        }}
+      />
     </div>
   );
 };
