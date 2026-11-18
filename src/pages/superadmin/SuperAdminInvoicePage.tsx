@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   FileText, Plus, Search, Filter, Download, Eye,
-  CheckCircle2, Clock, XCircle, Upload, X, ChevronDown,
+  CheckCircle2, Clock, XCircle, Upload, X, ChevronDown, ChevronUp,
   Building2, Calendar, CreditCard, Printer, RefreshCw,
   AlertTriangle, Paperclip, ExternalLink, Trash2, Edit,
-  TrendingUp,
+  TrendingUp, Layers, BookOpen, Check
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -18,7 +18,14 @@ import {
   fetchAndApplyPricing,
 } from "../../utils/pricingHelper";
 import { upgradeSchoolFromInvoice, calculateTopup, isTopupInvoice } from "../../utils/subscriptionHelper";
-import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
+import {
+  printDigitalInvoice,
+  printOfficialReceiptSpj,
+  InvoiceCustomData,
+  InvoiceLineItem,
+  RkasMetadata,
+  parseCustomData
+} from "../../utils/invoicePdfHelper";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -44,6 +51,7 @@ interface Invoice {
   paid_date?: string;
   notes?: string;
   payment_proof?: string;
+  custom_data?: InvoiceCustomData | string | null;
   created: string;
   updated: string;
 }
@@ -174,6 +182,85 @@ const SuperAdminInvoicePage = () => {
   const [form, setForm] = useState(blankForm());
   const [saving, setSaving] = useState(false);
   const [uploadingProof, setUploadingProof] = useState<string | null>(null);
+
+  // ─── Custom Line Items & RKAS / SPJ Data ───
+  const [customItemsEnabled, setCustomItemsEnabled] = useState(false);
+  const [customItems, setCustomItems] = useState<InvoiceLineItem[]>([]);
+  const [rkasEnabled, setRkasEnabled] = useState(false);
+  const [rkasData, setRkasData] = useState<RkasMetadata>({
+    enabled: false,
+    budget_code: "5.1.02.02.01.0061",
+    activity_name: "Pelaksanaan Evaluasi / Asesmen Pembelajaran Berbasis Komputer (CBT)",
+    fiscal_year: new Date().getFullYear().toString(),
+    funding_source: "BOS Reguler",
+    headmaster_name: "",
+    headmaster_nip: "",
+    treasurer_name: "",
+    treasurer_nip: "",
+    supplier_npwp: "",
+  });
+  const [showCustomItemsSection, setShowCustomItemsSection] = useState(false);
+  const [showRkasSection, setShowRkasSection] = useState(false);
+
+  const handleAddCustomItem = () => {
+    setCustomItems(prev => [
+      ...prev,
+      {
+        id: Math.random().toString(36).slice(2, 9),
+        description: "",
+        qty: 1,
+        unit: "Paket",
+        price: 0,
+        total: 0,
+      },
+    ]);
+  };
+
+  const handleUpdateCustomItem = (index: number, patch: Partial<InvoiceLineItem>) => {
+    setCustomItems(prev => {
+      const updated = [...prev];
+      const cur = { ...updated[index], ...patch };
+      const qty = Number(cur.qty) || 0;
+      const price = Number(cur.price) || 0;
+      cur.total = qty * price;
+      updated[index] = cur;
+      return updated;
+    });
+  };
+
+  const handleRemoveCustomItem = (index: number) => {
+    setCustomItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleLoadDefaultCustomItems = () => {
+    const planQuota = PLAN_PRICING[normalizePlanKey(form.plan)]?.quota || 50;
+    const planLabel = PLAN_PRICING[normalizePlanKey(form.plan)]?.label || form.plan;
+    const duration = Number(form.duration_months) || 12;
+    const amount = Number(form.amount) || 0;
+    setCustomItems([
+      {
+        id: "cbt-app",
+        description: `Biaya Layanan & Lisensi Aplikasi CBT EXAMKU (${planLabel} - Kuota ${planQuota} Siswa)`,
+        qty: duration === 0 ? 1 : duration,
+        unit: duration === 0 ? "Top-up" : "Bulan",
+        price: duration === 0 ? amount : Math.round(amount / Math.max(1, duration)),
+        total: amount,
+      },
+      {
+        id: "infra",
+        description: "Alokasi Media Storage Cloudflare R2, Dedicated Database Sekolah & Server Uptime SLA 99.9%",
+        qty: 1,
+        unit: "Paket",
+        price: 0,
+        total: 0,
+      },
+    ]);
+  };
+
+  const handleApplyCustomItemsTotal = () => {
+    const sum = customItems.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
+    setForm(f => ({ ...f, amount: sum }));
+  };
 
   // ─── Top-Up Kuota (periode tetap) ───
   const [showTopupModal, setShowTopupModal] = useState(false);
@@ -391,6 +478,23 @@ const SuperAdminInvoicePage = () => {
   const openCreate = () => {
     setEditingInvoice(null);
     setForm(blankForm());
+    setCustomItemsEnabled(false);
+    setCustomItems([]);
+    setRkasEnabled(false);
+    setRkasData({
+      enabled: false,
+      budget_code: "5.1.02.02.01.0061",
+      activity_name: "Pelaksanaan Evaluasi / Asesmen Pembelajaran Berbasis Komputer (CBT)",
+      fiscal_year: new Date().getFullYear().toString(),
+      funding_source: "BOS Reguler",
+      headmaster_name: "",
+      headmaster_nip: "",
+      treasurer_name: "",
+      treasurer_nip: "",
+      supplier_npwp: "",
+    });
+    setShowCustomItemsSection(false);
+    setShowRkasSection(false);
     setShowModal(true);
   };
 
@@ -411,6 +515,42 @@ const SuperAdminInvoicePage = () => {
       notes: inv.notes || "",
       payment_proof: inv.payment_proof || "",
     });
+
+    const parsedCustom = parseCustomData(inv.custom_data);
+    if (parsedCustom?.items && parsedCustom.items.length > 0) {
+      setCustomItemsEnabled(true);
+      setCustomItems(parsedCustom.items);
+      setShowCustomItemsSection(true);
+    } else {
+      setCustomItemsEnabled(false);
+      setCustomItems([]);
+      setShowCustomItemsSection(false);
+    }
+
+    if (parsedCustom?.rkas?.enabled) {
+      setRkasEnabled(true);
+      setRkasData({
+        ...parsedCustom.rkas,
+        enabled: true,
+      });
+      setShowRkasSection(true);
+    } else {
+      setRkasEnabled(false);
+      setRkasData({
+        enabled: false,
+        budget_code: parsedCustom?.rkas?.budget_code || "5.1.02.02.01.0061",
+        activity_name: parsedCustom?.rkas?.activity_name || "Pelaksanaan Evaluasi / Asesmen Pembelajaran Berbasis Komputer (CBT)",
+        fiscal_year: parsedCustom?.rkas?.fiscal_year || new Date().getFullYear().toString(),
+        funding_source: parsedCustom?.rkas?.funding_source || "BOS Reguler",
+        headmaster_name: parsedCustom?.rkas?.headmaster_name || "",
+        headmaster_nip: parsedCustom?.rkas?.headmaster_nip || "",
+        treasurer_name: parsedCustom?.rkas?.treasurer_name || "",
+        treasurer_nip: parsedCustom?.rkas?.treasurer_nip || "",
+        supplier_npwp: parsedCustom?.rkas?.supplier_npwp || "",
+      });
+      setShowRkasSection(false);
+    }
+
     setShowModal(true);
   };
 
@@ -480,6 +620,16 @@ const SuperAdminInvoicePage = () => {
 
       const contactEmail = form.contact_email?.trim();
       if (contactEmail) payload.contact_email = contactEmail;
+
+      let customPayload: InvoiceCustomData | null = null;
+      if (customItemsEnabled || rkasEnabled) {
+        customPayload = {
+          is_custom: customItemsEnabled,
+          items: customItemsEnabled ? customItems.filter(it => it.description.trim()) : undefined,
+          rkas: rkasEnabled ? { ...rkasData, enabled: true } : undefined,
+        };
+      }
+      payload.custom_data = customPayload ? JSON.stringify(customPayload) : "";
 
       let saved: any;
       if (editingInvoice) {
@@ -1012,9 +1162,9 @@ const SuperAdminInvoicePage = () => {
       )}
 
       {/* ─── Create/Edit Modal ─────────────────────────────────────────── */}
-            {showModal && (
+      {showModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
               <div>
                 <h2 className="font-bold text-slate-900">{editingInvoice ? "Edit Invoice" : "Buat Invoice Baru"}</h2>
@@ -1161,6 +1311,355 @@ const SuperAdminInvoicePage = () => {
                   />
                 </div>
               )}
+
+              {/* ─── Accordion 1: Rincian Item Kustom (Line Items) ─── */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+                <div
+                  className="flex items-center justify-between px-4 py-3 cursor-pointer bg-white hover:bg-slate-50/80 transition select-none"
+                  onClick={() => setShowCustomItemsSection(!showCustomItemsSection)}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <Layers size={14} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-800">Rincian Item Kustom (Line Items)</span>
+                        {customItemsEnabled && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                            {customItems.length} Item
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400">Sesuaikan rincian baris tagihan atau breakdown biaya untuk dokumen sekolah</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-400">
+                    {showCustomItemsSection ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                </div>
+
+                {showCustomItemsSection && (
+                  <div className="p-4 border-t border-slate-200 bg-white space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={customItemsEnabled}
+                          onChange={e => {
+                            const val = e.target.checked;
+                            setCustomItemsEnabled(val);
+                            if (val && customItems.length === 0) {
+                              handleLoadDefaultCustomItems();
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                        />
+                        <span className="text-xs font-semibold text-slate-700">
+                          Aktifkan Rincian Item Kustom di Invoice & Dokumen
+                        </span>
+                      </label>
+
+                      {customItemsEnabled && (
+                        <button
+                          type="button"
+                          onClick={handleLoadDefaultCustomItems}
+                          className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition"
+                        >
+                          + Muat Paket Default
+                        </button>
+                      )}
+                    </div>
+
+                    {customItemsEnabled ? (
+                      <div className="space-y-2.5">
+                        {customItems.map((item, idx) => (
+                          <div key={item.id || idx} className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={item.description}
+                                onChange={e => handleUpdateCustomItem(idx, { description: e.target.value })}
+                                placeholder="Uraian pekerjaan / nama layanan..."
+                                className="flex-1 px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCustomItem(idx)}
+                                className="p-1.5 text-slate-400 hover:text-red-500 transition rounded-lg hover:bg-red-50"
+                                title="Hapus item"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-4 gap-2 items-center">
+                              <div>
+                                <label className="block text-[10px] text-slate-400 mb-0.5">Qty</label>
+                                <input
+                                  type="number"
+                                  value={item.qty}
+                                  onChange={e => handleUpdateCustomItem(idx, { qty: Number(e.target.value) })}
+                                  min={1}
+                                  className="w-full px-2 py-1 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-slate-400 mb-0.5">Satuan</label>
+                                <input
+                                  type="text"
+                                  value={item.unit || "Paket"}
+                                  onChange={e => handleUpdateCustomItem(idx, { unit: e.target.value })}
+                                  placeholder="Bulan / Paket / Siswa"
+                                  className="w-full px-2 py-1 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-slate-400 mb-0.5">Harga Satuan (Rp)</label>
+                                <input
+                                  type="number"
+                                  value={item.price}
+                                  onChange={e => handleUpdateCustomItem(idx, { price: Number(e.target.value) })}
+                                  min={0}
+                                  className="w-full px-2 py-1 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-slate-400 mb-0.5">Subtotal</label>
+                                <div className="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-100 rounded-lg text-right truncate">
+                                  {formatRupiah(item.total || (item.qty * item.price))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        <div className="flex items-center justify-between pt-1">
+                          <button
+                            type="button"
+                            onClick={handleAddCustomItem}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
+                          >
+                            <Plus size={13} />
+                            <span>Tambah Item</span>
+                          </button>
+
+                          {customItems.length > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500">
+                                Total Item: <strong>{formatRupiah(customItems.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0))}</strong>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={handleApplyCustomItemsTotal}
+                                className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer"
+                                title="Set jumlah tagihan invoice sama dengan total rincian item di atas"
+                              >
+                                Terapkan ke Total
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">
+                        Default: Sistem mencantumkan paket SaaS standar EXAMKU dengan kuota siswa dan alokasi infrastruktur. Centang kotak di atas jika ingin menyusun rincian item khusus.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ─── Accordion 2: Kelengkapan Dokumen RKAS / SPJ Dana BOS ─── */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+                <div
+                  className="flex items-center justify-between px-4 py-3 cursor-pointer bg-white hover:bg-slate-50/80 transition select-none"
+                  onClick={() => setShowRkasSection(!showRkasSection)}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <BookOpen size={14} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-800">Kelengkapan Dokumen RKAS / SPJ Dana BOS</span>
+                        {rkasEnabled && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                            Aktif (BOS SPJ)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400">Kode Rekening ARKAS, Sumber Dana, dan data Tanda Tangan SPJ Kepala Sekolah & Bendahara</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-400">
+                    {showRkasSection ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                </div>
+
+                {showRkasSection && (
+                  <div className="p-4 border-t border-slate-200 bg-white space-y-3">
+                    <label className="flex items-center gap-2 cursor-pointer select-none pb-2 border-b border-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={rkasEnabled}
+                        onChange={e => {
+                          const val = e.target.checked;
+                          setRkasEnabled(val);
+                          setRkasData(r => ({ ...r, enabled: val }));
+                        }}
+                        className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">
+                        Aktifkan Format Pelaporan SPJ Dana BOS & Kuitansi Resmi ARKAS
+                      </span>
+                    </label>
+
+                    {rkasEnabled ? (
+                      <div className="space-y-3 pt-1">
+                        {/* Preset badges */}
+                        <div>
+                          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Preset Cepat Kode Rekening ARKAS</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setRkasData(r => ({
+                                ...r,
+                                budget_code: "5.1.02.02.01.0061",
+                                activity_name: "Belanja Sewa Lisensi Piranti Lunak / Aplikasi Ujian CBT",
+                              }))}
+                              className="px-2.5 py-1 text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200/60 transition"
+                            >
+                              5.1.02.02.01.0061 (Sewa Lisensi Software CBT)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRkasData(r => ({
+                                ...r,
+                                budget_code: "5.1.02.01.01.0024",
+                                activity_name: "Belanja Bahan Pelaksanaan Asesmen / Evaluasi Pembelajaran",
+                              }))}
+                              className="px-2.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition"
+                            >
+                              5.1.02.01.01.0024 (Bahan Asesmen Siswa)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRkasData(r => ({
+                                ...r,
+                                budget_code: "5.1.02.02.01.0063",
+                                activity_name: "Belanja Jasa Pengelolaan Sistem Komputerisasi / Web Server Ujian",
+                              }))}
+                              className="px-2.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition"
+                            >
+                              5.1.02.02.01.0063 (Jasa Komputerisasi Server)
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Kode Rekening & Uraian Kegiatan */}
+                        <div className="grid grid-cols-3 gap-2.5">
+                          <div className="col-span-1">
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Kode Rekening Belanja</label>
+                            <input
+                              type="text"
+                              value={rkasData.budget_code || ""}
+                              onChange={e => setRkasData(r => ({ ...r, budget_code: e.target.value }))}
+                              placeholder="5.1.02.02.01.0061"
+                              className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Uraian Kegiatan RKAS</label>
+                            <input
+                              type="text"
+                              value={rkasData.activity_name || ""}
+                              onChange={e => setRkasData(r => ({ ...r, activity_name: e.target.value }))}
+                              placeholder="Pelaksanaan Asesmen Sumatif Jenjang Pendidikan Berbasis CBT"
+                              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Tahun Anggaran & Sumber Dana */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tahun Anggaran</label>
+                            <input
+                              type="text"
+                              value={rkasData.fiscal_year || ""}
+                              onChange={e => setRkasData(r => ({ ...r, fiscal_year: e.target.value }))}
+                              placeholder={new Date().getFullYear().toString()}
+                              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Sumber Dana</label>
+                            <select
+                              value={rkasData.funding_source || "BOS Reguler"}
+                              onChange={e => setRkasData(r => ({ ...r, funding_source: e.target.value }))}
+                              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                            >
+                              <option value="BOS Reguler">BOS Reguler (Kemendikbud)</option>
+                              <option value="BOS Kinerja">BOS Kinerja</option>
+                              <option value="BOS Daerah">BOS Daerah (BOSDA)</option>
+                              <option value="Dana Komite">Dana Komite Sekolah</option>
+                              <option value="BOSP Madrasah">BOSP Madrasah (Kemenag)</option>
+                              <option value="Yayasan / Mandiri">Yayasan / Kas Mandiri</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Penandatangan SPJ */}
+                        <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2.5">
+                          <p className="text-[11px] font-bold text-slate-700">Pejabat Pengesah SPJ Sekolah (Format Cetak Kuitansi Resmi)</p>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="block text-[10px] text-slate-500 mb-0.5">Nama Kepala Sekolah</label>
+                              <input
+                                type="text"
+                                value={rkasData.headmaster_name || ""}
+                                onChange={e => setRkasData(r => ({ ...r, headmaster_name: e.target.value }))}
+                                placeholder="Drs. H. Ahmad, M.Pd"
+                                className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                              <label className="block text-[10px] text-slate-500 mt-1 mb-0.5">NIP Kepala Sekolah</label>
+                              <input
+                                type="text"
+                                value={rkasData.headmaster_nip || ""}
+                                onChange={e => setRkasData(r => ({ ...r, headmaster_nip: e.target.value }))}
+                                placeholder="19750101 200003 1 001"
+                                className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-slate-500 mb-0.5">Nama Bendahara BOS</label>
+                              <input
+                                type="text"
+                                value={rkasData.treasurer_name || ""}
+                                onChange={e => setRkasData(r => ({ ...r, treasurer_name: e.target.value }))}
+                                placeholder="Siti Rahmawati, S.Pd"
+                                className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                              <label className="block text-[10px] text-slate-500 mt-1 mb-0.5">NIP Bendahara BOS</label>
+                              <input
+                                type="text"
+                                value={rkasData.treasurer_nip || ""}
+                                onChange={e => setRkasData(r => ({ ...r, treasurer_nip: e.target.value }))}
+                                placeholder="19820512 200801 2 004 / -"
+                                className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">
+                        Default: Dokumen invoice standar tanpa tanda tangan pejabat sekolah. Aktifkan fitur ini jika sekolah memerlukan berkas SPJ resmi, Kode Rekening ARKAS/SIPLah, dan lembar Kuitansi Pengeluaran Kas.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Notes */}
               <div>
@@ -1330,7 +1829,15 @@ const SuperAdminInvoicePage = () => {
                   title="Cetak Invoice Digital Resmi (PDF)"
                 >
                   <Printer size={13} />
-                  <span>Cetak Invoice (PDF)</span>
+                  <span>Invoice (PDF)</span>
+                </button>
+                <button
+                  onClick={() => printOfficialReceiptSpj(detailInvoice, { name: detailInvoice.school_name, slug: detailInvoice.school_slug })}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition shadow-xs"
+                  title="Cetak format Kuitansi Resmi SPJ Pengeluaran Kas untuk pertanggungjawaban Dana BOS"
+                >
+                  <FileText size={13} />
+                  <span>Kuitansi SPJ (BOS)</span>
                 </button>
                 <button onClick={() => setDetailInvoice(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition">
                   <X size={18} />
@@ -1376,6 +1883,51 @@ const SuperAdminInvoicePage = () => {
                   </div>
                 </div>
               </div>
+
+              {/* RKAS / Custom Items Preview */}
+              {(() => {
+                const cd = parseCustomData(detailInvoice.custom_data);
+                if (!cd?.rkas?.enabled && (!cd?.items || cd.items.length === 0)) return null;
+                return (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <BookOpen size={14} className="text-emerald-600" />
+                        Kelengkapan Dokumen RKAS / SPJ Dana BOS
+                      </span>
+                      {cd.rkas?.enabled && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                          Format SPJ BOS Aktif
+                        </span>
+                      )}
+                    </div>
+
+                    {cd.rkas?.enabled && (
+                      <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200/70">
+                        <div><span className="text-slate-400">Kode Rekening ARKAS:</span> <span className="font-mono font-bold text-slate-800">{cd.rkas.budget_code || "-"}</span></div>
+                        <div><span className="text-slate-400">Sumber Dana:</span> <span className="font-semibold text-slate-800">{cd.rkas.funding_source || "-"}</span></div>
+                        <div className="col-span-2"><span className="text-slate-400">Uraian Kegiatan:</span> <span className="font-medium text-slate-800">{cd.rkas.activity_name || "-"}</span></div>
+                        <div><span className="text-slate-400">Kepala Sekolah:</span> <span className="font-medium text-slate-800">{cd.rkas.headmaster_name || "-"}</span> {cd.rkas.headmaster_nip ? `(NIP: ${cd.rkas.headmaster_nip})` : ""}</div>
+                        <div><span className="text-slate-400">Bendahara BOS:</span> <span className="font-medium text-slate-800">{cd.rkas.treasurer_name || "-"}</span> {cd.rkas.treasurer_nip ? `(NIP: ${cd.rkas.treasurer_nip})` : ""}</div>
+                      </div>
+                    )}
+
+                    {cd.items && cd.items.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200/80">
+                        <p className="text-[11px] font-semibold text-slate-500 mb-1.5">Rincian Item Kustom ({cd.items.length} item):</p>
+                        <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200/70">
+                          {cd.items.map((it, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-xs text-slate-700 py-0.5 border-b border-slate-100 last:border-0">
+                              <span><strong>{it.qty} {it.unit || "Paket"}</strong> &times; {it.description}</span>
+                              <span className="font-semibold">{formatRupiah(it.total || (it.qty * it.price))}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {detailInvoice.notes && (
                 <div className="bg-slate-50 rounded-xl p-3.5">

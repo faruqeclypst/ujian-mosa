@@ -22,7 +22,12 @@ import {
   PlanKey,
   fetchAndApplyPricing,
 } from "../../utils/pricingHelper";
-import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
+import {
+  printDigitalInvoice,
+  printOfficialReceiptSpj,
+  InvoiceCustomData,
+  parseCustomData
+} from "../../utils/invoicePdfHelper";
 import { isTopupInvoice } from "../../utils/subscriptionHelper";
 import { ProofLightbox, isImageProof } from "../../components/ProofLightbox";
 
@@ -50,6 +55,7 @@ interface Invoice {
   paid_date?: string;
   notes?: string;
   payment_proof?: string;
+  custom_data?: InvoiceCustomData | string | null;
   created: string;
   updated: string;
 }
@@ -763,6 +769,19 @@ const SchoolInvoicePage = () => {
                             <span>Invoice PDF</span>
                           </Button>
 
+                          {(effectiveStatus === "paid" || parseCustomData(inv.custom_data)?.rkas?.enabled) && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => printOfficialReceiptSpj(inv, school)}
+                              className="h-7.5 px-2.5 text-xs font-semibold border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                              title="Cetak format Kuitansi Resmi SPJ Pengeluaran Kas untuk pertanggungjawaban Dana BOS"
+                            >
+                              <FileText className="h-3 w-3" />
+                              <span>Kuitansi SPJ</span>
+                            </Button>
+                          )}
+
                           {needsAction && (
                             <>
                               <Button
@@ -1096,6 +1115,47 @@ const SchoolInvoicePage = () => {
                     </div>
                   )}
 
+                  {/* RKAS / Line Items Preview */}
+                  {(() => {
+                    const cd = parseCustomData(detailInvoice.custom_data);
+                    if (!cd?.rkas?.enabled && (!cd?.items || cd.items.length === 0)) return null;
+                    return (
+                      <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                            <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            Kelengkapan Dokumen RKAS / SPJ Dana BOS
+                          </span>
+                          {cd.rkas?.enabled && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                              Format BOS SPJ
+                            </span>
+                          )}
+                        </div>
+                        {cd.rkas?.enabled && (
+                          <div className="grid grid-cols-2 gap-2 text-[11px] text-neutral-600 dark:text-neutral-400">
+                            <div><span>Kode Rekening:</span> <span className="font-mono font-bold text-neutral-900 dark:text-neutral-100">{cd.rkas.budget_code || "-"}</span></div>
+                            <div><span>Sumber Dana:</span> <span className="font-semibold text-neutral-900 dark:text-neutral-100">{cd.rkas.funding_source || "-"}</span></div>
+                            <div className="col-span-2"><span>Uraian:</span> <span className="font-medium text-neutral-800 dark:text-neutral-200">{cd.rkas.activity_name || "-"}</span></div>
+                          </div>
+                        )}
+                        {cd.items && cd.items.length > 0 && (
+                          <div className="pt-1.5 border-t border-neutral-200 dark:border-neutral-800 text-[11px]">
+                            <p className="font-semibold text-neutral-500 mb-1">Rincian Item ({cd.items.length} item):</p>
+                            <div className="space-y-1">
+                              {cd.items.map((it, idx) => (
+                                <div key={idx} className="flex justify-between text-neutral-700 dark:text-neutral-300">
+                                  <span>{it.qty} {it.unit || "Paket"} &times; {it.description}</span>
+                                  <span className="font-mono font-semibold">{formatRupiah(it.total || (it.qty * it.price))}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Status Lunas Info */}
                   {detailInvoice.status === "paid" && (
                     <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-3">
@@ -1108,19 +1168,31 @@ const SchoolInvoicePage = () => {
                           </p>
                         </div>
                       </div>
-                      <Button
-                        type="button"
-                        onClick={() => printDigitalInvoice(detailInvoice, school)}
-                        className="h-7.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-xs inline-flex items-center gap-1.5"
-                      >
-                        <Printer className="h-3 w-3" />
-                        <span>Invoice PDF</span>
-                      </Button>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          onClick={() => printDigitalInvoice(detailInvoice, school)}
+                          className="h-7.5 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-xs inline-flex items-center gap-1.5"
+                        >
+                          <Printer className="h-3 w-3" />
+                          <span>Invoice PDF</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => printOfficialReceiptSpj(detailInvoice, school)}
+                          className="h-7.5 px-2.5 text-xs font-semibold border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 rounded-lg shadow-2xs inline-flex items-center gap-1.5"
+                          title="Cetak Kuitansi Resmi SPJ Pengeluaran Kas (Dana BOS)"
+                        >
+                          <FileText className="h-3 w-3" />
+                          <span>Kuitansi SPJ</span>
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                <DialogFooter className="pt-2">
+                <DialogFooter className="pt-2 flex items-center justify-end gap-2">
                   <Button
                     type="button"
                     onClick={() => printDigitalInvoice(detailInvoice, school)}
@@ -1128,6 +1200,16 @@ const SchoolInvoicePage = () => {
                   >
                     <Printer className="h-3.5 w-3.5" />
                     <span>Cetak Invoice (PDF)</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => printOfficialReceiptSpj(detailInvoice, school)}
+                    className="h-8 px-3.5 text-xs font-semibold border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 rounded-lg shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                    title="Cetak format Kuitansi Resmi SPJ Pengeluaran Kas untuk pertanggungjawaban Dana BOS"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>Kuitansi SPJ (BOS)</span>
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -1222,6 +1304,15 @@ const SchoolInvoicePage = () => {
                     >
                       <Printer className="h-3.5 w-3.5" />
                       <span>Cetak Invoice Digital Lunas (PDF)</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => printOfficialReceiptSpj(paymentSession.invoice, school)}
+                      className="w-full h-8.5 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-semibold rounded-lg text-xs shadow-xs inline-flex items-center justify-center gap-1.5"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      <span>Cetak Kuitansi Resmi SPJ (BOS)</span>
                     </Button>
                     <Button
                       type="button"
