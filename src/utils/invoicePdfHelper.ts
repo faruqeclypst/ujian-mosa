@@ -4,6 +4,7 @@
  * Didesain khusus untuk akuntansi umum, pelaporan SPJ, RKAS/ARKAS, dan Dana BOS/BOSP.
  */
 
+import QRCode from "qrcode";
 import { PLAN_PRICING, normalizePlanKey } from "./pricingHelper";
 
 export function terbilang(nominal: number): string {
@@ -138,7 +139,7 @@ export function parseCustomData(raw: unknown): InvoiceCustomData | null {
  * Cetak Invoice Digital Resmi (A4)
  * Mendukung format paket SaaS standar maupun rincian item kustom & RKAS.
  */
-export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null) {
+export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null) {
   const isPaid = inv.status === "paid";
   const createdDate = formatDateIndo(inv.created || new Date().toISOString());
   const dueDate = formatDateIndo(inv.due_date);
@@ -169,6 +170,28 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
   }
 
   const terbilangText = terbilang(finalGrandTotal);
+
+  const qrVerificationText = [
+    `DOKUMEN INVOICE EXAMKU CBT`,
+    `Invoice: ${inv.invoice_number}`,
+    `Penyedia: Alfaruq Asri (EXAMKU CBT)`,
+    `Institusi: ${school?.name || inv.school_name || "Sekolah"}`,
+    `Total: Rp ${finalGrandTotal.toLocaleString("id-ID")}`,
+    `Status: ${isPaid ? "LUNAS (PAID)" : "MENUNGGU PEMBAYARAN"}`,
+    `Jatuh Tempo: ${dueDate}`,
+    `Tautan: https://examku.my.id/admin/invoice`
+  ].join("\n");
+
+  let qrCodeDataUrl = "";
+  try {
+    qrCodeDataUrl = await QRCode.toDataURL(qrVerificationText, {
+      width: 140,
+      margin: 1,
+      color: { dark: "#0f172a", light: "#ffffff" }
+    });
+  } catch (e) {
+    console.error("Gagal membuat QR Code TTE:", e);
+  }
 
   const planQuota = PLAN_PRICING[normalizePlanKey(inv.plan)]?.quota;
   const quotaText = planQuota
@@ -653,8 +676,15 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
               <div class="sig-col">
                 <div class="sig-label">Penerima Pembayaran,</div>
                 <div class="sig-role">Tim Keuangan EXAMKU</div>
-                <div class="sig-stamp">${isPaid ? 'PAID' : 'UNPAID'}</div>
-                <div class="sig-name">EXAMKU Billing Dept.</div>
+                <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin: 4px 0;">
+                  <div class="sig-stamp">${isPaid ? 'PAID' : 'UNPAID'}</div>
+                  ${qrCodeDataUrl ? `
+                    <div style="padding: 2px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;">
+                      <img src="${qrCodeDataUrl}" alt="Barcode TTE" style="width: 46px; height: 46px; display: block;" />
+                    </div>
+                  ` : ''}
+                </div>
+                <div class="sig-name">Alfaruq Asri / Tim Keuangan</div>
                 <div class="sig-nip">Dokumen Divalidasi Sistem</div>
               </div>
             </div>
@@ -668,8 +698,15 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
               </div>
               <div class="sig-col">
                 <div style="font-size:10.5px; color:#475569; margin-bottom:6px;">Banda Aceh, ${createdDate}</div>
-                <div class="sig-stamp">${isPaid ? 'PAID' : 'UNPAID'}</div>
-                <div class="sig-name" style="margin-top:8px;">Tim Keuangan EXAMKU</div>
+                <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin: 4px 0;">
+                  <div class="sig-stamp">${isPaid ? 'PAID' : 'UNPAID'}</div>
+                  ${qrCodeDataUrl ? `
+                    <div style="padding: 2px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;">
+                      <img src="${qrCodeDataUrl}" alt="Barcode TTE" style="width: 46px; height: 46px; display: block;" />
+                    </div>
+                  ` : ''}
+                </div>
+                <div class="sig-name" style="margin-top:4px;">Alfaruq Asri / Tim Keuangan</div>
                 <div class="sig-nip">Dokumen Resmi Terverifikasi</div>
               </div>
             </div>
@@ -699,7 +736,7 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
  * Cetak Kuitansi Resmi SPJ Dana BOS (A4 Landscape / Portrait)
  * Format standar pengeluaran kas pelaporan SPJ sekolah negeri & madrasah.
  */
-export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | null) {
+export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | null) {
   const createdDate = formatDateIndo(inv.paid_date || inv.created || new Date().toISOString());
   const customData = parseCustomData(inv.custom_data);
   const rkas = customData?.rkas?.enabled ? customData.rkas : null;
@@ -727,6 +764,29 @@ export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | 
 
   const terbilangText = terbilang(finalGrandTotal);
   const planLabel = inv.plan_label || (inv.plan ? inv.plan.toUpperCase() : "STANDARD");
+
+  const qrVerificationText = [
+    `DOKUMEN RESMI TTE EXAMKU CBT`,
+    `No. Kuitansi : KWT/BOS/${inv.invoice_number}`,
+    `Ref Invoice  : ${inv.invoice_number}`,
+    `Penyedia     : Alfaruq Asri (EXAMKU CBT)`,
+    `Institusi    : ${school?.name || inv.school_name || "Sekolah"}`,
+    `Nominal      : Rp ${finalGrandTotal.toLocaleString("id-ID")}`,
+    `Status       : LUNAS & TERVALIDASI ELEKTRONIK`,
+    `Tanggal      : ${createdDate}`,
+    `Verifikasi   : https://examku.my.id/admin/invoice`
+  ].join("\n");
+
+  let qrCodeDataUrl = "";
+  try {
+    qrCodeDataUrl = await QRCode.toDataURL(qrVerificationText, {
+      width: 140,
+      margin: 1,
+      color: { dark: "#0f172a", light: "#ffffff" }
+    });
+  } catch (e) {
+    console.error("Gagal membuat QR Code TTE:", e);
+  }
 
   const html = `
     <!DOCTYPE html>
@@ -864,7 +924,7 @@ export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | 
           color: #0f172a;
         }
         .sig-space {
-          height: 60px;
+          height: 75px;
         }
         .sig-name {
           font-weight: 700;
@@ -1013,49 +1073,24 @@ export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | 
             <div class="sig-name">${rkas?.treasurer_name || "Bendahara BOS"}</div>
             <div class="sig-nip">NIP. ${rkas?.treasurer_nip || "...................................."}</div>
           </div>
-          <div class="sig-box" style="position: relative;">
+          <div class="sig-box" style="display: flex; flex-direction: column; align-items: center;">
             <div>Yang Menerima,</div>
             <div class="sig-role">Penyedia (EXAMKU CBT)</div>
             
-            <div style="position: relative; height: 60px; margin: 4px auto; display: flex; align-items: center; justify-content: center;">
-              <!-- Official Stamp SVG Seal -->
-              <svg viewBox="0 0 200 200" width="88" height="88" style="position: absolute; top: -14px; left: 50%; transform: translateX(-50%) rotate(-7deg); opacity: 0.9; pointer-events: none;">
-                <circle cx="100" cy="100" r="92" fill="none" stroke="#1d4ed8" stroke-width="2.8" stroke-dasharray="6 2" />
-                <circle cx="100" cy="100" r="84" fill="none" stroke="#1d4ed8" stroke-width="1.6" />
-                <circle cx="100" cy="100" r="58" fill="none" stroke="#1d4ed8" stroke-width="1.4" />
-                <path id="curveTopSpj" d="M 24 100 A 76 76 0 0 1 176 100" fill="none" />
-                <path id="curveBottomSpj" d="M 176 100 A 76 76 0 0 1 24 100" fill="none" />
-                <text font-size="10" font-family="Arial, sans-serif" font-weight="bold" fill="#1d4ed8" letter-spacing="1.8">
-                  <textPath href="#curveTopSpj" startOffset="50%" text-anchor="middle">
-                    EXAMKU CBT INDONESIA
-                  </textPath>
-                </text>
-                <text font-size="8.5" font-family="Arial, sans-serif" font-weight="bold" fill="#1d4ed8" letter-spacing="1.2">
-                  <textPath href="#curveBottomSpj" startOffset="50%" text-anchor="middle">
-                    * SAH & TERVERIFIKASI *
-                  </textPath>
-                </text>
-                <line x1="44" y1="84" x2="156" y2="84" stroke="#1d4ed8" stroke-width="1.2" />
-                <text x="100" y="103" font-size="15" font-family="Arial Black, Impact, sans-serif" font-weight="900" fill="#1d4ed8" text-anchor="middle" letter-spacing="2">
-                  LUNAS
-                </text>
-                <text x="100" y="117" font-size="7.5" font-family="Arial, sans-serif" font-weight="bold" fill="#1d4ed8" text-anchor="middle" letter-spacing="0.5">
-                  DIGITAL SIGNED
-                </text>
-                <line x1="44" y1="123" x2="156" y2="123" stroke="#1d4ed8" stroke-width="1.2" />
-              </svg>
-
-              <!-- E-Signature Blue Pen Stroke -->
-              <svg viewBox="0 0 180 80" width="120" height="52" style="position: absolute; top: 4px; left: 50%; transform: translateX(-50%) rotate(-4deg); opacity: 0.95; pointer-events: none;">
-                <path d="M 15 50 Q 30 20, 42 42 T 68 38 Q 88 15, 98 48 T 120 32 Q 138 18, 150 38 Q 160 48, 170 28" fill="none" stroke="#1e3a8a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M 32 44 Q 60 60, 105 54 T 160 48" fill="none" stroke="#1e3a8a" stroke-width="1.6" stroke-linecap="round" />
-              </svg>
+            <div style="height: 75px; display: flex; align-items: center; justify-content: center;">
+              ${qrCodeDataUrl ? `
+                <div style="padding: 3px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); display: inline-block;">
+                  <img src="${qrCodeDataUrl}" alt="Barcode TTE Sah" style="width: 66px; height: 66px; display: block;" />
+                </div>
+              ` : `
+                <div class="sig-space"></div>
+              `}
             </div>
 
-            <div class="sig-name">Alfaruq Asri / Tim Keuangan</div>
-            <div class="sig-nip">Penyedia Lisensi EXAMKU CBT</div>
-            <div style="font-size: 8.5px; color: #16a34a; font-weight: 600; margin-top: 2px;">
-              &#10003; Ditandatangani & Distempel Digital
+            <div class="sig-name">Alfaruq Asri</div>
+            <div class="sig-nip">Tim Keuangan EXAMKU CBT</div>
+            <div style="font-size: 8.5px; color: #0284c7; font-weight: 600; margin-top: 2px;">
+              &#10003; Barcode TTE Sah & Tervalidasi
             </div>
             ${inv.amount >= 5000000 ? '<div style="font-size: 8px; color: #94a3b8; margin-top: 1px;">* Lampirkan e-Materai jika disyaratkan BPKAD</div>' : ''}
           </div>
