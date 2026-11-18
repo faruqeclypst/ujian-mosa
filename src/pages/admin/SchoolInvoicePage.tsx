@@ -6,7 +6,7 @@ import {
   AlertTriangle, XCircle, ExternalLink, Trash2,
   RefreshCw, X, TrendingUp, Sparkles,
   Send, Building2, Calendar, ShieldCheck, MessageCircle,
-  Landmark, QrCode, CreditCard
+  Landmark, QrCode, CreditCard, Copy, Check
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import { masterPb } from "../../lib/pocketbase";
@@ -151,6 +151,13 @@ const SchoolInvoicePage = () => {
   const [renewalNotes, setRenewalNotes] = useState<string>("");
   const [submittingRenewal, setSubmittingRenewal] = useState(false);
   const [renewalSubmitted, setRenewalSubmitted] = useState(false);
+
+  const [copiedAccount, setCopiedAccount] = useState<string | null>(null);
+  const handleCopyAccount = (acc: string) => {
+    navigator.clipboard.writeText(acc);
+    setCopiedAccount(acc);
+    setTimeout(() => setCopiedAccount(null), 2000);
+  };
 
   const proofFileRef = useRef<HTMLInputElement>(null);
 
@@ -567,125 +574,164 @@ const SchoolInvoicePage = () => {
 
           return (
             <NeonCard className={cn(
-              "border-amber-500/30",
-              isBosWapu ? "bg-amber-500/10 dark:bg-amber-500/15" : "bg-amber-500/5 dark:bg-amber-500/10"
+              "border-amber-500/30 overflow-hidden",
+              isBosWapu ? "bg-amber-500/5 dark:bg-amber-500/10" : "bg-amber-500/5 dark:bg-amber-500/10"
             )}>
-              <div className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="space-y-1.5 min-w-0">
+              <div className="p-4 sm:p-5 space-y-4">
+                {/* 1. Header with Title & Action Buttons */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-500/15">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                     <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-900 dark:text-neutral-100">
-                      Tagihan Perpanjangan Resmi Siap Dibayar ({activeUnpaidInvoice.invoice_number})
+                      Tagihan Perpanjangan Siap Dibayar
                     </h3>
+                    <span className="font-mono text-xs font-bold text-neutral-800 dark:text-neutral-200 bg-white dark:bg-neutral-800 px-2 py-0.5 rounded-md border border-neutral-200 dark:border-neutral-750">
+                      {activeUnpaidInvoice.invoice_number}
+                    </span>
                     {isBosWapu && (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
                         Format SPJ Dana BOS (WAPU)
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed max-w-xl">
-                    SuperAdmin telah menerbitkan invoice perpanjangan untuk sekolah Anda sebesar <strong className="font-semibold text-neutral-900 dark:text-neutral-100">{formatRupiah(activeUnpaidInvoice.amount)}</strong>.
-                    {isBosWapu
-                      ? " Sesuai ketentuan SPJ Dana BOS / ARKAS (WAPU), pembayaran wajib dilakukan melalui Transfer Bank Resmi ke rekening di bawah ini."
-                      : " Silakan bayar via QRIS instan atau transfer manual ke rekening resmi."}
-                  </p>
 
-                  {/* Info Khusus SPJ BOS WAPU */}
-                  {isBosWapu && cd?.tax?.enabled && (
-                    <div className="mt-2.5 p-3 rounded-xl bg-white dark:bg-neutral-850 border border-amber-300/80 dark:border-amber-700/80 text-xs shadow-2xs">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-800">
+                  {/* Actions Row (All buttons h-8, icon h-3.5 w-3.5) */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => printDigitalInvoice(activeUnpaidInvoice, school)}
+                      className="h-8 px-3 text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Printer className="h-3.5 w-3.5" />
+                      <span>Invoice PDF</span>
+                    </Button>
+
+                    {(cd?.rkas?.enabled || cd?.tax?.enabled) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => printOfficialReceiptSpj(activeUnpaidInvoice, school)}
+                        className="h-8 px-3 text-xs font-semibold border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        <span>Kuitansi SPJ</span>
+                      </Button>
+                    )}
+
+                    {!isBosWapu ? (
+                      <Button
+                        type="button"
+                        onClick={() => handlePayWithQris(activeUnpaidInvoice)}
+                        disabled={payingInvoiceId === activeUnpaidInvoice.id}
+                        className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                      >
+                        <QrCode className={cn("h-3.5 w-3.5", payingInvoiceId === activeUnpaidInvoice.id && "animate-spin")} />
+                        <span>Bayar QRIS</span>
+                      </Button>
+                    ) : (
+                      <label className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5 select-none">
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>Upload Bukti Transfer</span>
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          disabled={uploadingProof}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) handleProofUpload(activeUnpaidInvoice.id, file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Content Grid: Amount & Bank Accounts */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Left Box: Nominal & Rincian */}
+                  <div className="p-3.5 bg-white dark:bg-neutral-850 rounded-xl border border-neutral-200/80 dark:border-neutral-750 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                          Total Tagihan
+                        </span>
+                        <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                          Jatuh tempo: {formatDate(activeUnpaidInvoice.due_date)}
+                        </span>
+                      </div>
+                      <div className="font-mono font-bold text-2xl text-neutral-900 dark:text-neutral-100">
+                        {formatRupiah(activeUnpaidInvoice.amount)}
+                      </div>
+                    </div>
+
+                    {isBosWapu && cd?.tax?.enabled && (
+                      <div className="mt-3 pt-2.5 border-t border-neutral-100 dark:border-neutral-800 grid grid-cols-2 gap-2 text-xs">
                         <div>
-                          <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block">Hak Bersih Layanan (Transfer ke Penyedia):</span>
-                          <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400 text-sm">
+                          <span className="text-[10.5px] text-neutral-400 block">Hak Bersih Layanan:</span>
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             {formatRupiah(cd.tax.subtotal || (activeUnpaidInvoice.amount - (cd.tax.tax_amount || 0)))}
                           </span>
                         </div>
                         <div>
-                          <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block">PPN {cd.tax.rate_percent ?? 11}% (Disetor Bendahara via e-Billing):</span>
-                          <span className="font-bold font-mono text-amber-700 dark:text-amber-400 text-sm">
+                          <span className="text-[10.5px] text-neutral-400 block">PPN {cd.tax.rate_percent ?? 11}% (e-Billing):</span>
+                          <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
                             {formatRupiah(cd.tax.tax_amount || 0)}
                           </span>
                         </div>
                       </div>
-                      <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-2 leading-relaxed">
-                        💡 <strong>Catatan Bendahara BOS:</strong> Pembayaran melalui QRIS e-wallet dinonaktifkan khusus tagihan ini agar tidak ada biaya switching perbankan (MDR) dan pembukuan SPJ ARKAS klop 100%. Silakan transfer ke rekening bank resmi di bawah lalu unggah bukti transfer.
-                      </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
+                  {/* Right Box: Rekening Transfer Resmi */}
                   {banks.length > 0 && (
-                    <div className="mt-2.5 p-3 bg-white dark:bg-neutral-850 rounded-xl border border-neutral-200 dark:border-neutral-750 text-xs">
-                      <p className="font-bold text-neutral-800 dark:text-neutral-200 mb-2 flex items-center gap-1.5">
-                        <Landmark className="h-3.5 w-3.5 text-neutral-500" /> Rekening Transfer Resmi:
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="p-3.5 bg-white dark:bg-neutral-850 rounded-xl border border-neutral-200/80 dark:border-neutral-750 flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Landmark className="h-3.5 w-3.5 text-neutral-500" />
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+                          Rekening Transfer Resmi
+                        </span>
+                      </div>
+
+                      <div className="space-y-2">
                         {banks.map((b, i) => (
-                          <div key={i} className="flex items-center gap-2.5 p-2 bg-neutral-50 dark:bg-neutral-900 rounded-lg border border-neutral-200/70 dark:border-neutral-800">
-                            <div className="w-8 h-8 rounded-md bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-750 flex items-center justify-center font-bold text-[10px] text-neutral-600 shrink-0">
-                              {b.bank_name.substring(0, 3)}
-                            </div>
+                          <div key={i} className="flex items-center justify-between gap-2 p-2 bg-neutral-50 dark:bg-neutral-900 rounded-lg border border-neutral-200/60 dark:border-neutral-800">
                             <div className="min-w-0">
-                              <span className="font-bold text-neutral-800 dark:text-neutral-200 text-xs block truncate">
-                                {b.bank_name} - <span className="font-mono text-emerald-600 dark:text-emerald-400">{b.account_number}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-neutral-800 dark:text-neutral-200 text-xs">
+                                  {b.bank_name}
+                                </span>
+                                <span className="text-[11px] text-neutral-400">&bull; a.n. {b.account_name}</span>
+                              </div>
+                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs tracking-wide">
+                                {b.account_number}
                               </span>
-                              <span className="text-[11px] text-neutral-400 block truncate">a.n. {b.account_name}</span>
                             </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleCopyAccount(b.account_number)}
+                              className="h-7 px-2 text-[11px] font-medium rounded-md border border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-750 text-neutral-600 dark:text-neutral-300 transition cursor-pointer flex items-center gap-1 shrink-0"
+                              title="Salin nomor rekening"
+                            >
+                              {copiedAccount === b.account_number ? (
+                                <>
+                                  <Check className="h-3 w-3 text-emerald-600" />
+                                  <span className="text-emerald-600 font-bold">Disalin</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3 w-3" />
+                                  <span>Salin</span>
+                                </>
+                              )}
+                            </button>
                           </div>
                         ))}
                       </div>
                     </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-col sm:items-stretch">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => printDigitalInvoice(activeUnpaidInvoice, school)}
-                    className="h-8 px-3 text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5 justify-center"
-                  >
-                    <Printer className="h-3.5 w-3.5" />
-                    <span>Invoice PDF</span>
-                  </Button>
-
-                  {(cd?.rkas?.enabled || cd?.tax?.enabled) && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => printOfficialReceiptSpj(activeUnpaidInvoice, school)}
-                      className="h-8 px-3 text-xs font-semibold border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5 justify-center"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      <span>Kuitansi SPJ</span>
-                    </Button>
-                  )}
-
-                  {!isBosWapu ? (
-                    <Button
-                      type="button"
-                      onClick={() => handlePayWithQris(activeUnpaidInvoice)}
-                      disabled={payingInvoiceId === activeUnpaidInvoice.id}
-                      className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 justify-center"
-                    >
-                      <QrCode className={cn("h-3.5 w-3.5", payingInvoiceId === activeUnpaidInvoice.id && "animate-spin")} />
-                      <span>Bayar QRIS</span>
-                    </Button>
-                  ) : (
-                    <label className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 justify-center select-none">
-                      <Upload className="h-3.5 w-3.5" />
-                      <span>Upload Bukti Transfer</span>
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        className="hidden"
-                        disabled={uploadingProof}
-                        onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (file) handleProofUpload(activeUnpaidInvoice.id, file);
-                          e.target.value = "";
-                        }}
-                      />
-                    </label>
                   )}
                 </div>
               </div>
@@ -854,14 +900,14 @@ const SchoolInvoicePage = () => {
                           })()}
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <Button
                             type="button"
                             variant="outline"
                             onClick={() => setDetailInvoice(inv)}
-                            className="h-7.5 px-2.5 text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                            className="h-8 px-3 text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                           >
-                            <Eye className="h-3 w-3" />
+                            <Eye className="h-3.5 w-3.5" />
                             <span>Detail</span>
                           </Button>
 
@@ -869,10 +915,10 @@ const SchoolInvoicePage = () => {
                             type="button"
                             variant="outline"
                             onClick={() => printDigitalInvoice(inv, school)}
-                            className="h-7.5 px-2.5 text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                            className="h-8 px-3 text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                             title="Cetak atau Simpan Invoice Digital (PDF)"
                           >
-                            <Printer className="h-3 w-3" />
+                            <Printer className="h-3.5 w-3.5" />
                             <span>Invoice PDF</span>
                           </Button>
 
@@ -881,37 +927,32 @@ const SchoolInvoicePage = () => {
                               type="button"
                               variant="outline"
                               onClick={() => printOfficialReceiptSpj(inv, school)}
-                              className="h-7.5 px-2.5 text-xs font-semibold border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                              className="h-8 px-3 text-xs font-semibold border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                               title="Cetak format Kuitansi Resmi SPJ Pengeluaran Kas untuk pertanggungjawaban Dana BOS"
                             >
-                              <FileText className="h-3 w-3" />
+                              <FileText className="h-3.5 w-3.5" />
                               <span>Kuitansi SPJ</span>
                             </Button>
                           )}
 
                           {needsAction && (
                             <>
-                              {!isBosWapuInvoice(inv) ? (
+                              {!isBosWapuInvoice(inv) && (
                                 <Button
                                   type="button"
                                   onClick={() => handlePayWithQris(inv)}
                                   disabled={payingInvoiceId === inv.id}
-                                  className="h-7.5 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                                  className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                                 >
-                                  <QrCode className={cn("h-3 w-3", payingInvoiceId === inv.id && "animate-spin")} />
+                                  <QrCode className={cn("h-3.5 w-3.5", payingInvoiceId === inv.id && "animate-spin")} />
                                   <span>{payingInvoiceId === inv.id ? "Memproses..." : "Bayar QRIS"}</span>
                                 </Button>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700" title="Pembayaran SPJ BOS wajib via Transfer Bank Resmi">
-                                  <Landmark className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                                  Transfer BOS
-                                </span>
                               )}
 
                               {!hasProof && (
-                                <label className="h-7.5 px-2.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 rounded-lg cursor-pointer transition-colors shadow-2xs border border-neutral-200 dark:border-neutral-750 inline-flex items-center gap-1.5 select-none">
-                                  <Upload className="h-3 w-3" />
-                                  <span>{isBosWapuInvoice(inv) ? "Upload Bukti Transfer" : "Upload"}</span>
+                                <label className="h-8 px-3 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-lg cursor-pointer transition-colors shadow-2xs inline-flex items-center gap-1.5 select-none">
+                                  <Upload className="h-3.5 w-3.5" />
+                                  <span>{isBosWapuInvoice(inv) ? "Upload Bukti Transfer" : "Upload Bukti"}</span>
                                   <input
                                     type="file"
                                     accept="image/*,.pdf"
@@ -933,23 +974,23 @@ const SchoolInvoicePage = () => {
                                 type="button"
                                 onClick={() => setProofView(inv)}
                                 title="Klik untuk memperbesar bukti"
-                                className="group relative overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-900 shadow-2xs shrink-0 cursor-pointer"
+                                className="group relative overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-900 shadow-2xs shrink-0 cursor-pointer h-8 w-12"
                               >
                                 {isImageProof(getProofUrl(inv)) ? (
-                                  <img src={getProofUrl(inv)} alt="Bukti transfer" className="h-7.5 w-12 object-cover" />
+                                  <img src={getProofUrl(inv)} alt="Bukti transfer" className="h-8 w-12 object-cover" />
                                 ) : (
-                                  <span className="flex h-7.5 w-12 items-center justify-center gap-1 text-sky-600 dark:text-sky-400">
-                                    <FileText className="h-3 w-3" />
+                                  <span className="flex h-8 w-12 items-center justify-center gap-1 text-sky-600 dark:text-sky-400">
+                                    <FileText className="h-3.5 w-3.5" />
                                     <span className="text-[10px] font-bold">PDF</span>
                                   </span>
                                 )}
                                 <span className="absolute inset-0 flex items-center justify-center bg-neutral-900/0 group-hover:bg-neutral-900/30 transition-colors">
-                                  <Eye className="h-3 w-3 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  <Eye className="h-3.5 w-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </span>
                               </button>
 
-                              <label className="h-7.5 px-2.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 rounded-lg cursor-pointer transition-colors shadow-2xs border border-neutral-200 dark:border-neutral-750 inline-flex items-center gap-1.5 select-none">
-                                <Upload className="h-3 w-3" />
+                              <label className="h-8 px-3 text-xs font-semibold text-neutral-700 dark:text-neutral-300 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 rounded-lg cursor-pointer transition-colors shadow-2xs border border-neutral-200 dark:border-neutral-750 inline-flex items-center gap-1.5 select-none">
+                                <Upload className="h-3.5 w-3.5" />
                                 <span>{uploadingProof ? "Mengunggah..." : "Upload Ulang"}</span>
                                 <input
                                   type="file"
