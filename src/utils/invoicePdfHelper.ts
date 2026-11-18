@@ -895,43 +895,27 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
         .meta-table {
           width: 100%;
           border-collapse: collapse;
-          margin-bottom: 24px;
+          margin-bottom: 22px;
         }
         .meta-table td {
-          padding: 7px 4px;
+          padding: 6px 4px;
           vertical-align: top;
+          font-size: 11.5px;
+          line-height: 1.5;
         }
         .meta-table .label {
-          width: 180px;
+          width: 165px;
           color: #475569;
           font-weight: 600;
         }
         .meta-table .sep {
           width: 15px;
           text-align: center;
+          color: #64748b;
         }
         .meta-table .val {
           color: #0f172a;
-          font-weight: 600;
-        }
-
-        .nominal-badge {
-          display: inline-block;
-          font-size: 16px;
-          font-weight: 800;
-          color: #0f172a;
-          background: #f1f5f9;
-          padding: 6px 16px;
-          border-radius: 8px;
-          border: 1px dashed #94a3b8;
-        }
-        .terbilang-quote {
-          font-style: italic;
-          background: #f8fafc;
-          padding: 8px 12px;
-          border-radius: 6px;
-          display: inline-block;
-          color: #1e293b;
+          font-weight: 500;
         }
 
         .rkas-details-box {
@@ -999,20 +983,6 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
           text-transform: uppercase;
         }
 
-        .lunas-tag {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          background: #059669;
-          color: #ffffff;
-          padding: 4px 10px;
-          border-radius: 6px;
-          font-weight: 800;
-          font-size: 11px;
-          letter-spacing: 0.5px;
-          text-transform: uppercase;
-        }
-
         .print-footer {
           margin-top: 30px;
           padding-top: 10px;
@@ -1046,26 +1016,23 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
           <tr>
             <td class="label">Uang Sejumlah</td>
             <td class="sep">:</td>
-            <td class="val">
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <div class="nominal-badge">${formatRupiah(finalGrandTotal)}</div>
-                <div class="lunas-tag">&#10003; SUDAH LUNAS</div>
-              </div>
+            <td class="val" style="font-weight: 700; color: #0f172a;">
+              ${formatRupiah(finalGrandTotal)}
             </td>
           </tr>
           <tr>
             <td class="label">Terbilang</td>
             <td class="sep">:</td>
-            <td class="val">
-              <div class="terbilang-quote">*** ${terbilangText} ***</div>
+            <td class="val" style="font-style: italic; color: #1e293b;">
+              ( ${terbilangText} )
             </td>
           </tr>
           <tr>
             <td class="label">Untuk Pembayaran</td>
             <td class="sep">:</td>
-            <td class="val" style="font-weight: 500;">
+            <td class="val">
               <div>${rkas?.activity_name || "Pelaksanaan Evaluasi / Asesmen Pembelajaran Berbasis Komputer CBT"}</div>
-              <div style="font-size: 10.5px; color: #475569; margin-top: 3px; font-weight: 400;">
+              <div style="font-size: 10.5px; color: #475569; margin-top: 2px;">
                 Biaya Layanan Aplikasi EXAMKU CBT (${planLabel}) &bull; ${Number(inv.duration_months) === 0 ? "Top-up Kuota" : `Durasi ${inv.duration_months} Bulan`}
               </div>
             </td>
@@ -1074,9 +1041,9 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
           <tr>
             <td class="label">Keterangan Pajak</td>
             <td class="sep">:</td>
-            <td class="val" style="font-weight: 600; color: #0f172a;">
-              Termasuk PPN ${tax.rate_percent ?? 11}% (${formatRupiah(taxAmount)}) &bull; Subtotal Hak Layanan: ${formatRupiah(subtotalAmount)}
-              <div style="font-size: 9.5px; color: #64748b; font-weight: 400; margin-top: 2px;">
+            <td class="val">
+              <div>Termasuk PPN ${tax.rate_percent ?? 11}% (${formatRupiah(taxAmount)}) &bull; Subtotal Hak Layanan: ${formatRupiah(subtotalAmount)}</div>
+              <div style="font-size: 9.5px; color: #64748b; margin-top: 2px;">
                 * PPN dipungut dan disetorkan ke Kas Negara oleh Bendahara BOS selaku WAPU
               </div>
             </td>
