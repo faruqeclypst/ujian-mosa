@@ -1013,12 +1013,51 @@ export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | 
             <div class="sig-name">${rkas?.treasurer_name || "Bendahara BOS"}</div>
             <div class="sig-nip">NIP. ${rkas?.treasurer_nip || "...................................."}</div>
           </div>
-          <div class="sig-box">
+          <div class="sig-box" style="position: relative;">
             <div>Yang Menerima,</div>
             <div class="sig-role">Penyedia (EXAMKU CBT)</div>
-            ${inv.amount >= 5000000 ? '<div class="materai-box">Materai Rp 10.000</div>' : '<div style="height:25px;"></div>'}
-            <div class="sig-name">Tim Keuangan EXAMKU</div>
-            <div class="sig-nip">Lunas & Divalidasi</div>
+            
+            <div style="position: relative; height: 60px; margin: 4px auto; display: flex; align-items: center; justify-content: center;">
+              <!-- Official Stamp SVG Seal -->
+              <svg viewBox="0 0 200 200" width="88" height="88" style="position: absolute; top: -14px; left: 50%; transform: translateX(-50%) rotate(-7deg); opacity: 0.9; pointer-events: none;">
+                <circle cx="100" cy="100" r="92" fill="none" stroke="#1d4ed8" stroke-width="2.8" stroke-dasharray="6 2" />
+                <circle cx="100" cy="100" r="84" fill="none" stroke="#1d4ed8" stroke-width="1.6" />
+                <circle cx="100" cy="100" r="58" fill="none" stroke="#1d4ed8" stroke-width="1.4" />
+                <path id="curveTopSpj" d="M 24 100 A 76 76 0 0 1 176 100" fill="none" />
+                <path id="curveBottomSpj" d="M 176 100 A 76 76 0 0 1 24 100" fill="none" />
+                <text font-size="10" font-family="Arial, sans-serif" font-weight="bold" fill="#1d4ed8" letter-spacing="1.8">
+                  <textPath href="#curveTopSpj" startOffset="50%" text-anchor="middle">
+                    EXAMKU CBT INDONESIA
+                  </textPath>
+                </text>
+                <text font-size="8.5" font-family="Arial, sans-serif" font-weight="bold" fill="#1d4ed8" letter-spacing="1.2">
+                  <textPath href="#curveBottomSpj" startOffset="50%" text-anchor="middle">
+                    * SAH & TERVERIFIKASI *
+                  </textPath>
+                </text>
+                <line x1="44" y1="84" x2="156" y2="84" stroke="#1d4ed8" stroke-width="1.2" />
+                <text x="100" y="103" font-size="15" font-family="Arial Black, Impact, sans-serif" font-weight="900" fill="#1d4ed8" text-anchor="middle" letter-spacing="2">
+                  LUNAS
+                </text>
+                <text x="100" y="117" font-size="7.5" font-family="Arial, sans-serif" font-weight="bold" fill="#1d4ed8" text-anchor="middle" letter-spacing="0.5">
+                  DIGITAL SIGNED
+                </text>
+                <line x1="44" y1="123" x2="156" y2="123" stroke="#1d4ed8" stroke-width="1.2" />
+              </svg>
+
+              <!-- E-Signature Blue Pen Stroke -->
+              <svg viewBox="0 0 180 80" width="120" height="52" style="position: absolute; top: 4px; left: 50%; transform: translateX(-50%) rotate(-4deg); opacity: 0.95; pointer-events: none;">
+                <path d="M 15 50 Q 30 20, 42 42 T 68 38 Q 88 15, 98 48 T 120 32 Q 138 18, 150 38 Q 160 48, 170 28" fill="none" stroke="#1e3a8a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M 32 44 Q 60 60, 105 54 T 160 48" fill="none" stroke="#1e3a8a" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+            </div>
+
+            <div class="sig-name">Alfaruq Asri / Tim Keuangan</div>
+            <div class="sig-nip">Penyedia Lisensi EXAMKU CBT</div>
+            <div style="font-size: 8.5px; color: #16a34a; font-weight: 600; margin-top: 2px;">
+              &#10003; Ditandatangani & Distempel Digital
+            </div>
+            ${inv.amount >= 5000000 ? '<div style="font-size: 8px; color: #94a3b8; margin-top: 1px;">* Lampirkan e-Materai jika disyaratkan BPKAD</div>' : ''}
           </div>
         </div>
 
