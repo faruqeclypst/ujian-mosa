@@ -16,6 +16,7 @@ import {
   PLAN_PRICING,
   PlanKey,
   fetchAndApplyPricing,
+  billingPeriodLabel,
 } from "../../utils/pricingHelper";
 import { upgradeSchoolFromInvoice, calculateTopup, isTopupInvoice } from "../../utils/subscriptionHelper";
 import {
@@ -202,18 +203,54 @@ const SuperAdminInvoicePage = () => {
   const [showCustomItemsSection, setShowCustomItemsSection] = useState(false);
   const [showRkasSection, setShowRkasSection] = useState(false);
 
-  const handleAddCustomItem = () => {
-    setCustomItems(prev => [
-      ...prev,
+  const syncAmountFromItems = (items: InvoiceLineItem[]) => {
+    const sum = items.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
+    setForm(f => ({ ...f, amount: sum }));
+  };
+
+  const buildDefaultLineItems = (planKey: string, durationMonths: number, totalAmount: number): InvoiceLineItem[] => {
+    const key = normalizePlanKey(planKey);
+    const quota = PLAN_PRICING[key]?.quota || 50;
+    const label = PLAN_PRICING[key]?.label || planKey;
+    const dur = Math.max(1, durationMonths);
+    const unitPrice = Math.round(totalAmount / Math.max(1, dur));
+
+    return [
       {
-        id: Math.random().toString(36).slice(2, 9),
-        description: "",
+        id: "cbt-app",
+        description: `Biaya Layanan & Lisensi Aplikasi CBT EXAMKU (${label} - Kuota ${quota} Siswa)`,
+        qty: dur,
+        unit: "Bulan",
+        price: unitPrice,
+        total: totalAmount,
+      },
+      {
+        id: "infra",
+        description: "Alokasi Media Storage Cloudflare R2, Dedicated Database Sekolah & Server Uptime SLA 99.9%",
         qty: 1,
         unit: "Paket",
         price: 0,
         total: 0,
       },
-    ]);
+    ];
+  };
+
+  const handleAddCustomItem = () => {
+    setCustomItems(prev => {
+      const updated = [
+        ...prev,
+        {
+          id: Math.random().toString(36).slice(2, 9),
+          description: "",
+          qty: 1,
+          unit: "Paket",
+          price: 0,
+          total: 0,
+        },
+      ];
+      syncAmountFromItems(updated);
+      return updated;
+    });
   };
 
   const handleUpdateCustomItem = (index: number, patch: Partial<InvoiceLineItem>) => {
@@ -224,42 +261,66 @@ const SuperAdminInvoicePage = () => {
       const price = Number(cur.price) || 0;
       cur.total = qty * price;
       updated[index] = cur;
+      syncAmountFromItems(updated);
       return updated;
     });
   };
 
   const handleRemoveCustomItem = (index: number) => {
-    setCustomItems(prev => prev.filter((_, i) => i !== index));
+    setCustomItems(prev => {
+      const updated = prev.filter((_, i) => i !== index);
+      syncAmountFromItems(updated);
+      return updated;
+    });
   };
 
-  const handleLoadDefaultCustomItems = () => {
-    const planQuota = PLAN_PRICING[normalizePlanKey(form.plan)]?.quota || 50;
+  const handleLoadDefaultCustomItems = (planOverride?: string, durOverride?: number) => {
+    const plan = planOverride || form.plan;
+    const dur = Math.max(1, durOverride || Number(form.duration_months) || 12);
+    const planInfo = calculatePlanInvoice(plan, dur);
+    const def = buildDefaultLineItems(plan, dur, planInfo.amount);
+    setCustomItems(def);
+    syncAmountFromItems(def);
+  };
+
+  const handleToggleCustomItems = (checked: boolean) => {
+    setCustomItemsEnabled(checked);
+    if (checked) {
+      setShowCustomItemsSection(true);
+      if (customItems.length === 0) {
+        handleLoadDefaultCustomItems();
+      }
+    }
+  };
+
+  const handleToggleRkas = (checked: boolean) => {
+    setRkasEnabled(checked);
+    setShowRkasSection(checked);
+    if (checked) {
+      const planLabel = PLAN_PRICING[normalizePlanKey(form.plan)]?.label || form.plan;
+      const dur = Math.max(1, Number(form.duration_months) || 12);
+      setRkasData(r => ({
+        ...r,
+        enabled: true,
+        budget_code: r.budget_code || "5.1.02.02.01.0061",
+        activity_name: r.activity_name || `Pelaksanaan Evaluasi / Asesmen Pembelajaran Siswa Berbasis Komputer CBT (${planLabel} - ${dur} Bulan)`,
+        fiscal_year: r.fiscal_year || new Date().getFullYear().toString(),
+        funding_source: r.funding_source || "BOS Reguler",
+      }));
+    }
+  };
+
+  const handleSyncRkasActivityFromPlan = () => {
     const planLabel = PLAN_PRICING[normalizePlanKey(form.plan)]?.label || form.plan;
-    const duration = Number(form.duration_months) || 12;
-    const amount = Number(form.amount) || 0;
-    setCustomItems([
-      {
-        id: "cbt-app",
-        description: `Biaya Layanan & Lisensi Aplikasi CBT EXAMKU (${planLabel} - Kuota ${planQuota} Siswa)`,
-        qty: duration === 0 ? 1 : duration,
-        unit: duration === 0 ? "Top-up" : "Bulan",
-        price: duration === 0 ? amount : Math.round(amount / Math.max(1, duration)),
-        total: amount,
-      },
-      {
-        id: "infra",
-        description: "Alokasi Media Storage Cloudflare R2, Dedicated Database Sekolah & Server Uptime SLA 99.9%",
-        qty: 1,
-        unit: "Paket",
-        price: 0,
-        total: 0,
-      },
-    ]);
+    const dur = Math.max(1, Number(form.duration_months) || 12);
+    setRkasData(r => ({
+      ...r,
+      activity_name: `Pelaksanaan Evaluasi / Asesmen Pembelajaran Siswa Berbasis Komputer CBT (${planLabel} - ${dur} Bulan)`,
+    }));
   };
 
   const handleApplyCustomItemsTotal = () => {
-    const sum = customItems.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
-    setForm(f => ({ ...f, amount: sum }));
+    syncAmountFromItems(customItems);
   };
 
   // ─── Top-Up Kuota (periode tetap) ───
@@ -568,7 +629,9 @@ const SuperAdminInvoicePage = () => {
     const school = schools.find(s => s.id === id);
     if (!school) return;
     const planKey = normalizePlanKey(school.plan || "basic");
-    const planInfo = calculatePlanInvoice(planKey, form.duration_months);
+    const dur = Math.max(1, Number(form.duration_months) || 12);
+    const planInfo = calculatePlanInvoice(planKey, dur);
+
     setForm(f => ({
       ...f,
       school_id: school.id,
@@ -578,16 +641,76 @@ const SuperAdminInvoicePage = () => {
       plan: planKey,
       amount: planInfo.amount,
     }));
+
+    if (customItemsEnabled) {
+      handleLoadDefaultCustomItems(planKey, dur);
+    }
+
+    if (rkasEnabled) {
+      setRkasData(r => ({
+        ...r,
+        activity_name: `Pelaksanaan Evaluasi / Asesmen Pembelajaran Siswa Berbasis Komputer CBT (${planInfo.planLabel} - ${dur} Bulan)`,
+      }));
+    }
   };
 
   const handlePlanChange = (plan: string) => {
-    const planInfo = calculatePlanInvoice(plan, form.duration_months);
-    setForm(f => ({ ...f, plan: planInfo.planKey, amount: planInfo.amount }));
+    const dur = Math.max(1, Number(form.duration_months) || 1);
+    const planInfo = calculatePlanInvoice(plan, dur);
+
+    if (customItemsEnabled) {
+      const def = buildDefaultLineItems(planInfo.planKey, dur, planInfo.amount);
+      const merged = customItems.length > 2
+        ? [def[0], def[1], ...customItems.slice(2)]
+        : def;
+      setCustomItems(merged);
+      const sum = merged.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
+      setForm(f => ({ ...f, plan: planInfo.planKey, amount: sum }));
+    } else {
+      setForm(f => ({ ...f, plan: planInfo.planKey, amount: planInfo.amount }));
+    }
+
+    if (rkasEnabled) {
+      setRkasData(r => ({
+        ...r,
+        activity_name: `Pelaksanaan Evaluasi / Asesmen Pembelajaran Siswa Berbasis Komputer CBT (${planInfo.planLabel} - ${dur} Bulan)`,
+      }));
+    }
   };
 
   const handleDurationChange = (months: number) => {
-    const planInfo = calculatePlanInvoice(form.plan, months);
-    setForm(f => ({ ...f, duration_months: months, amount: planInfo.amount }));
+    const validMonths = Math.max(1, Math.round(Number(months) || 1));
+    const planInfo = calculatePlanInvoice(form.plan, validMonths);
+
+    if (customItemsEnabled) {
+      setCustomItems(prev => {
+        if (prev.length > 0) {
+          const first = {
+            ...prev[0],
+            qty: validMonths,
+            total: validMonths * (prev[0].price || Math.round(planInfo.amount / validMonths)),
+          };
+          const updated = [first, ...prev.slice(1)];
+          const sum = updated.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
+          setForm(f => ({ ...f, duration_months: validMonths, amount: sum }));
+          return updated;
+        } else {
+          const def = buildDefaultLineItems(form.plan, validMonths, planInfo.amount);
+          setForm(f => ({ ...f, duration_months: validMonths, amount: planInfo.amount }));
+          return def;
+        }
+      });
+    } else {
+      setForm(f => ({ ...f, duration_months: validMonths, amount: planInfo.amount }));
+    }
+
+    if (rkasEnabled) {
+      const planLabel = PLAN_PRICING[normalizePlanKey(form.plan)]?.label || form.plan;
+      setRkasData(r => ({
+        ...r,
+        activity_name: `Pelaksanaan Evaluasi / Asesmen Pembelajaran Siswa Berbasis Komputer CBT (${planLabel} - ${validMonths} Bulan)`,
+      }));
+    }
   };
 
   const handleSave = async () => {
@@ -599,16 +722,20 @@ const SuperAdminInvoicePage = () => {
 
     setSaving(true);
     try {
-      const planInfo = calculatePlanInvoice(form.plan, Number(form.duration_months) || 1);
+      const dur = Math.max(1, Number(form.duration_months) || 1);
+      const planKey = normalizePlanKey(form.plan);
+      const planInfo = calculatePlanInvoice(planKey, dur);
+      const periodLabel = billingPeriodLabel(dur);
+
       const payload: Record<string, unknown> = {
         invoice_number: form.invoice_number.trim() || generateInvoiceNumber(),
         school_id: schoolId,
         school_name: schoolName,
         school_slug: form.school_slug.trim(),
-        plan: planInfo.planKey,
+        plan: planKey,
         plan_label: planInfo.planLabel,
-        duration_months: planInfo.durationMonths,
-        period_label: planInfo.periodLabel,
+        duration_months: dur,
+        period_label: periodLabel,
         amount: Number(form.amount) || planInfo.amount,
         status: form.status,
         due_date: form.due_date || undefined,
@@ -1239,36 +1366,92 @@ const SuperAdminInvoicePage = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Durasi</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-600">Durasi Langganan</label>
+                    <span className="text-[11px] text-blue-600 font-semibold">{billingPeriodLabel(form.duration_months)}</span>
+                  </div>
                   <div className="relative">
                     <Calendar size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <select
+                    <input
+                      type="number"
+                      min={1}
+                      max={120}
                       value={form.duration_months}
-                      onChange={e => handleDurationChange(Number(e.target.value))}
-                      className="w-full pl-8 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 appearance-none transition"
-                    >
-                      {[1, 2, 3, 6, 12].map(m => (
-                        <option key={m} value={m}>
-                          {m === 12 ? "1 tahun (12 bulan)" : m === 6 ? "1 semester (6 bulan)" : `${m} bulan`}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      onChange={e => handleDurationChange(parseInt(e.target.value) || 1)}
+                      className="w-full pl-8 pr-14 py-2.5 text-sm font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                      placeholder="12"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 pointer-events-none select-none">
+                      Bulan
+                    </span>
+                  </div>
+                  {/* Preset chips */}
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {[
+                      { m: 1, label: "1 Bln" },
+                      { m: 3, label: "3 Bln" },
+                      { m: 6, label: "6 Bln (1 Sem)" },
+                      { m: 12, label: "12 Bln (1 Thn)" },
+                      { m: 24, label: "24 Bln (2 Thn)" },
+                    ].map(chip => (
+                      <button
+                        key={chip.m}
+                        type="button"
+                        onClick={() => handleDurationChange(chip.m)}
+                        className={cn(
+                          "px-2 py-0.5 rounded-lg text-[10.5px] font-medium transition cursor-pointer",
+                          form.duration_months === chip.m
+                            ? "bg-blue-600 text-white font-semibold shadow-2xs"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                        )}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
 
-              {/* Amount (read + edit) */}
+              {/* Amount (read + edit with sync badge) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Jumlah Tagihan (Rp)</label>
-                <input
-                  type="number"
-                  value={form.amount}
-                  onChange={e => setForm(f => ({ ...f, amount: Number(e.target.value) }))}
-                  className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
-                  min={0}
-                />
-                <p className="text-[11px] text-slate-400 mt-1">{formatRupiah(form.amount)}</p>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Jumlah Tagihan (Rp)</label>
+                  {customItemsEnabled ? (
+                    <span className="text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                      <Check size={11} />
+                      Sinkron Otomatis dari Item Kustom
+                    </span>
+                  ) : (
+                    <span className="text-[10.5px] text-slate-400">
+                      Tarif Standar: {formatRupiah(calculatePlanInvoice(form.plan, form.duration_months).amount)}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                  <input
+                    type="number"
+                    value={form.amount}
+                    onChange={e => setForm(f => ({ ...f, amount: Number(e.target.value) }))}
+                    className="w-full pl-9 pr-3.5 py-2.5 text-sm font-bold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                    min={0}
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+                  <span>Terbilang: <strong className="text-slate-700">{formatRupiah(form.amount)}</strong></span>
+                  {!customItemsEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pi = calculatePlanInvoice(form.plan, form.duration_months);
+                        setForm(f => ({ ...f, amount: pi.amount }));
+                      }}
+                      className="text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
+                    >
+                      Reset ke Tarif Normal
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Status & Dates */}
@@ -1346,13 +1529,7 @@ const SuperAdminInvoicePage = () => {
                         <input
                           type="checkbox"
                           checked={customItemsEnabled}
-                          onChange={e => {
-                            const val = e.target.checked;
-                            setCustomItemsEnabled(val);
-                            if (val && customItems.length === 0) {
-                              handleLoadDefaultCustomItems();
-                            }
-                          }}
+                          onChange={e => handleToggleCustomItems(e.target.checked)}
                           className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                         />
                         <span className="text-xs font-semibold text-slate-700">
@@ -1363,10 +1540,10 @@ const SuperAdminInvoicePage = () => {
                       {customItemsEnabled && (
                         <button
                           type="button"
-                          onClick={handleLoadDefaultCustomItems}
-                          className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition"
+                          onClick={() => handleLoadDefaultCustomItems()}
+                          className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition cursor-pointer"
                         >
-                          + Muat Paket Default
+                          + Reset ke Paket Saat Ini
                         </button>
                       )}
                     </div>
@@ -1502,11 +1679,7 @@ const SuperAdminInvoicePage = () => {
                       <input
                         type="checkbox"
                         checked={rkasEnabled}
-                        onChange={e => {
-                          const val = e.target.checked;
-                          setRkasEnabled(val);
-                          setRkasData(r => ({ ...r, enabled: val }));
-                        }}
+                        onChange={e => handleToggleRkas(e.target.checked)}
                         className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
                       />
                       <span className="text-xs font-semibold text-slate-700">
@@ -1525,9 +1698,9 @@ const SuperAdminInvoicePage = () => {
                               onClick={() => setRkasData(r => ({
                                 ...r,
                                 budget_code: "5.1.02.02.01.0061",
-                                activity_name: "Belanja Sewa Lisensi Piranti Lunak / Aplikasi Ujian CBT",
+                                activity_name: `Belanja Sewa Lisensi Piranti Lunak / Software Ujian CBT (${PLAN_PRICING[normalizePlanKey(form.plan)]?.label || form.plan} - ${form.duration_months} Bulan)`,
                               }))}
-                              className="px-2.5 py-1 text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200/60 transition"
+                              className="px-2.5 py-1 text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200/60 transition cursor-pointer"
                             >
                               5.1.02.02.01.0061 (Sewa Lisensi Software CBT)
                             </button>
@@ -1536,9 +1709,9 @@ const SuperAdminInvoicePage = () => {
                               onClick={() => setRkasData(r => ({
                                 ...r,
                                 budget_code: "5.1.02.01.01.0024",
-                                activity_name: "Belanja Bahan Pelaksanaan Asesmen / Evaluasi Pembelajaran",
+                                activity_name: `Belanja Bahan Pelaksanaan Asesmen / Evaluasi Pembelajaran Siswa (${PLAN_PRICING[normalizePlanKey(form.plan)]?.label || form.plan})`,
                               }))}
-                              className="px-2.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition"
+                              className="px-2.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition cursor-pointer"
                             >
                               5.1.02.01.01.0024 (Bahan Asesmen Siswa)
                             </button>
@@ -1547,9 +1720,9 @@ const SuperAdminInvoicePage = () => {
                               onClick={() => setRkasData(r => ({
                                 ...r,
                                 budget_code: "5.1.02.02.01.0063",
-                                activity_name: "Belanja Jasa Pengelolaan Sistem Komputerisasi / Web Server Ujian",
+                                activity_name: `Belanja Jasa Pengelolaan Sistem Komputerisasi / Web Server Ujian (${form.duration_months} Bulan)`,
                               }))}
-                              className="px-2.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition"
+                              className="px-2.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition cursor-pointer"
                             >
                               5.1.02.02.01.0063 (Jasa Komputerisasi Server)
                             </button>
@@ -1569,7 +1742,17 @@ const SuperAdminInvoicePage = () => {
                             />
                           </div>
                           <div className="col-span-2">
-                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Uraian Kegiatan RKAS</label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-semibold text-slate-600">Uraian Kegiatan RKAS</label>
+                              <button
+                                type="button"
+                                onClick={handleSyncRkasActivityFromPlan}
+                                className="text-[10.5px] font-semibold text-emerald-600 hover:text-emerald-700 transition cursor-pointer"
+                                title="Sinkronkan uraian kegiatan dengan paket dan durasi saat ini"
+                              >
+                                🔄 Sinkronkan dari Paket Saat Ini
+                              </button>
+                            </div>
                             <input
                               type="text"
                               value={rkasData.activity_name || ""}

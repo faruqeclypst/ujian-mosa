@@ -134,11 +134,16 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
   const createdDate = formatDateIndo(inv.created || new Date().toISOString());
   const dueDate = formatDateIndo(inv.due_date);
   const paidDate = inv.paid_date ? formatDateIndo(inv.paid_date) : "-";
-  const terbilangText = terbilang(inv.amount);
 
   const customData = parseCustomData(inv.custom_data);
   const hasCustomItems = Boolean(customData?.items && customData.items.length > 0);
   const rkas = customData?.rkas?.enabled ? customData.rkas : null;
+
+  const customItemsSum = hasCustomItems && customData?.items
+    ? customData.items.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0)
+    : 0;
+  const finalAmount = hasCustomItems && customItemsSum > 0 ? customItemsSum : inv.amount;
+  const terbilangText = terbilang(finalAmount);
 
   const planQuota = PLAN_PRICING[normalizePlanKey(inv.plan)]?.quota;
   const quotaText = planQuota
@@ -580,7 +585,7 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
           <div class="totals-box">
             <div class="total-row">
               <span>Subtotal</span>
-              <span>${formatRupiah(inv.amount)}</span>
+              <span>${formatRupiah(finalAmount)}</span>
             </div>
             <div class="total-row">
               <span>Pajak (0%)</span>
@@ -588,7 +593,7 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
             </div>
             <div class="total-row grand-total">
               <span>Total Keseluruhan</span>
-              <span style="color:#0284c7;">${formatRupiah(inv.amount)}</span>
+              <span style="color:#0284c7;">${formatRupiah(finalAmount)}</span>
             </div>
           </div>
         </div>
@@ -671,9 +676,16 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
  */
 export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | null) {
   const createdDate = formatDateIndo(inv.paid_date || inv.created || new Date().toISOString());
-  const terbilangText = terbilang(inv.amount);
   const customData = parseCustomData(inv.custom_data);
   const rkas = customData?.rkas?.enabled ? customData.rkas : null;
+  const hasCustomItems = Boolean(customData?.items && customData.items.length > 0);
+
+  const customItemsSum = hasCustomItems && customData?.items
+    ? customData.items.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0)
+    : 0;
+  const finalAmount = hasCustomItems && customItemsSum > 0 ? customItemsSum : inv.amount;
+  const terbilangText = terbilang(finalAmount);
+  const planLabel = inv.plan_label || (inv.plan ? inv.plan.toUpperCase() : "STANDARD");
 
   const html = `
     <!DOCTYPE html>
@@ -868,7 +880,7 @@ export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | 
             <td class="label">Uang Sejumlah</td>
             <td class="sep">:</td>
             <td class="val">
-              <div class="nominal-badge">${formatRupiah(inv.amount)}</div>
+              <div class="nominal-badge">${formatRupiah(finalAmount)}</div>
             </td>
           </tr>
           <tr>
@@ -882,10 +894,39 @@ export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | 
             <td class="label">Untuk Pembayaran</td>
             <td class="sep">:</td>
             <td class="val" style="font-weight: 500;">
-              ${rkas?.activity_name || `Biaya Layanan Langganan Aplikasi Ujian CBT EXAMKU (${inv.plan_label || inv.plan.toUpperCase()}) Periode ${inv.duration_months} Bulan`}
+              <div>${rkas?.activity_name || "Pelaksanaan Evaluasi / Asesmen Pembelajaran Berbasis Komputer CBT"}</div>
+              <div style="font-size: 10.5px; color: #475569; margin-top: 3px; font-weight: 400;">
+                Biaya Layanan Aplikasi EXAMKU CBT (${planLabel}) &bull; ${Number(inv.duration_months) === 0 ? "Top-up Kuota" : `Durasi ${inv.duration_months} Bulan`}
+              </div>
             </td>
           </tr>
         </table>
+
+        ${hasCustomItems && customData?.items && customData.items.length > 0 ? `
+        <div style="margin-bottom: 20px;">
+          <div style="font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.5px;">Rincian Pengeluaran Belanja (Line Items):</div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid #cbd5e1;">
+            <thead>
+              <tr style="background: #f8fafc; border-bottom: 1px solid #cbd5e1; color: #334155;">
+                <th style="padding: 5px 8px; text-align: left;">Uraian Pekerjaan / Belanja</th>
+                <th style="padding: 5px 8px; text-align: center; width: 85px;">Volume</th>
+                <th style="padding: 5px 8px; text-align: right; width: 105px;">Harga Satuan</th>
+                <th style="padding: 5px 8px; text-align: right; width: 115px;">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${customData.items.map(it => `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 5px 8px;">${it.description}</td>
+                  <td style="padding: 5px 8px; text-align: center; font-weight: 600;">${it.qty} ${it.unit || "Paket"}</td>
+                  <td style="padding: 5px 8px; text-align: right;">${formatRupiah(it.price)}</td>
+                  <td style="padding: 5px 8px; text-align: right; font-weight: 700;">${formatRupiah(it.total || (it.qty * it.price))}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+        ` : ""}
 
         ${rkas ? `
         <div class="rkas-details-box">
