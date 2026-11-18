@@ -17,6 +17,7 @@ import { ToastProvider } from "./components/ui/toast";
 import { TenantProvider, useTenant } from "./context/TenantContext";
 import { StudentAuthProvider, useStudentAuth } from "./context/StudentAuthContext";
 import { AuthProvider } from "./context/AuthContext";
+import { masterPb } from "./lib/pocketbase";
 import ExambroGuard from "./components/auth/ExambroGuard";
 import AppVersionGuard from "./components/auth/AppVersionGuard";
 import OfflineServerGuard from "./components/auth/OfflineServerGuard";
@@ -87,6 +88,21 @@ const hidePreloader = () => {
   }
 };
 
+// Helper untuk memperbarui favicon tab browser secara dinamis sesuai identitas sekolah
+const updateFavicon = (url?: string | null) => {
+  if (typeof document === "undefined") return;
+  const targetHref = url && url.trim() ? url.trim() : "/favicon.png";
+  let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "icon";
+    document.head.appendChild(link);
+  }
+  if (link.getAttribute("href") !== targetHref) {
+    link.href = targetHref;
+  }
+};
+
 // ============================================================
 // Guards
 // ============================================================
@@ -110,18 +126,49 @@ const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
 const SchoolAppContent = () => {
   const { user, loading: adminLoading } = useAuth();
   const { student, loading: studentLoading } = useStudentAuth();
-  const { school, notFound, inactive, subscriptionStatus, loading: tenantLoading } = useTenant();
+  const { school, notFound, inactive, subscriptionStatus, loading: tenantLoading, pb } = useTenant();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   useEffect(() => {
     if (school) {
       document.title = `EXAMKU - ${school.name}`;
+      const logoUrl = school.logo_url
+        ? (school.logo_url.startsWith("http") || school.logo_url.startsWith("data:")
+            ? school.logo_url
+            : masterPb.files.getUrl(school as any, school.logo_url))
+        : null;
+
+      if (logoUrl) {
+        updateFavicon(logoUrl);
+      } else if (pb) {
+        pb.collection("settings").getList(1, 1).then((res) => {
+          if (res.items.length > 0) {
+            const s = res.items[0];
+            const tenantLogo = s.logoUrl || s.logo;
+            if (tenantLogo) {
+              const resolved = (tenantLogo.startsWith("http") || tenantLogo.startsWith("data:"))
+                ? tenantLogo
+                : pb.files.getUrl(s, tenantLogo);
+              updateFavicon(resolved);
+              return;
+            }
+          }
+          updateFavicon("/favicon.png");
+        }).catch(() => {
+          updateFavicon("/favicon.png");
+        });
+      } else {
+        updateFavicon("/favicon.png");
+      }
+    } else {
+      updateFavicon("/favicon.png");
     }
+
     if (Capacitor.isNativePlatform()) {
       SplashScreen.hide().catch(err => console.warn("Splash hide error:", err));
     }
-  }, [school]);
+  }, [school, pb]);
 
   const isStudentRoute = location.pathname.startsWith("/exam") || location.pathname.startsWith("/cbt") || location.pathname.startsWith("/minat-bakat");
   const isPublicRoute = location.pathname.startsWith("/verifikasi-kartu") || location.pathname.startsWith("/verify-card") || location.pathname.startsWith("/unduh") || location.pathname.startsWith("/token-view");
@@ -291,6 +338,7 @@ import PublicDocsPage from "./pages/docs/PublicDocsPage";
 const LandingContent = () => {
   useEffect(() => {
     document.title = "EXAMKU: Platform CBT Online & Mandiri untuk Sekolah";
+    updateFavicon("/favicon.png");
     if (Capacitor.isNativePlatform()) {
       SplashScreen.hide().catch(() => { });
     }

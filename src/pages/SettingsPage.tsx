@@ -733,32 +733,37 @@ const SettingsPage = () => {
       if (!isOfflineServer && currentSlug && currentSlug !== 'localhost' && currentSlug !== 'ujian' && currentSlug !== 'local') {
         try {
           console.log("Attempting sync to Master Registry for slug:", currentSlug);
-          const masterRecords = await masterPb.collection("schools").getList(1, 1, {
-            filter: `slug ~ "${currentSlug}"` // Use ~ for flexible matching
+          const syncRes = await masterPb.send<{ success: boolean; id: string }>("/api/tenant-branding-sync", {
+            method: "POST",
+            body: {
+              slug: currentSlug,
+              name: schoolName,
+              logo_url: finalLogoUrl,
+            },
           });
 
-          if (masterRecords.items.length > 0) {
-            const masterId = masterRecords.items[0].id;
-            await masterPb.collection("schools").update(masterId, {
-              name: schoolName,
-              logo_url: finalLogoUrl
-            });
-            console.log("Master Registry synced successfully for ID:", masterId);
+          if (syncRes?.success) {
+            console.log("Master Registry synced successfully for slug:", currentSlug);
             addToast({
               title: "Branding Disinkronkan",
-              description: "Logo di halaman pilih sekolah telah diperbarui.",
+              description: "Logo & nama sekolah di halaman pilih sekolah telah diperbarui.",
               type: "success"
             });
-          } else {
-            console.warn("School not found in Master Registry for slug:", currentSlug);
           }
         } catch (syncErr: any) {
-          console.error("Failed to sync to Master Registry:", syncErr);
-          addToast({
-            title: "Sinkronisasi Superadmin Gagal",
-            description: `Error: ${syncErr.message}. Pastikan API Rules 'schools' sudah benar.`,
-            type: "error"
-          });
+          console.error("Failed to sync to Master Registry via API endpoint:", syncErr);
+          // Fallback direct update jika user memiliki token master
+          try {
+            const masterRecords = await masterPb.collection("schools").getList(1, 1, {
+              filter: `slug ~ "${currentSlug}"`
+            });
+            if (masterRecords.items.length > 0) {
+              await masterPb.collection("schools").update(masterRecords.items[0].id, {
+                name: schoolName,
+                logo_url: finalLogoUrl
+              });
+            }
+          } catch (_) {}
         }
       }
 

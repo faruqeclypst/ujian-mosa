@@ -205,11 +205,21 @@ const SchoolAvatar = ({ name, logoUrl, className }: { name: string; logoUrl?: st
   const [error, setError] = useState(false);
   const initial = (name || "S").trim()[0]?.toUpperCase() || "S";
 
-  if (logoUrl && !error) {
+  useEffect(() => {
+    setError(false);
+  }, [logoUrl]);
+
+  const resolvedUrl = logoUrl
+    ? logoUrl.startsWith("http") || logoUrl.startsWith("data:")
+      ? logoUrl
+      : masterPb.files.getUrl({ id: "" } as any, logoUrl)
+    : "";
+
+  if (resolvedUrl && !error) {
     return (
       <div className={cn("w-9 h-9 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200", className)}>
         <img
-          src={logoUrl}
+          src={resolvedUrl}
           alt=""
           className="w-full h-full object-contain p-0.5"
           onError={() => setError(true)}
@@ -2038,6 +2048,7 @@ const AddEditSchoolModal = ({
     active_until: isEdit ? initialDate : getTrialDate(),
     server_host: school?.server_host || "127.0.0.1",
     is_active: school?.is_active ?? true,
+    logo_url: school?.logo_url || "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -2065,6 +2076,7 @@ const AddEditSchoolModal = ({
         active_until: parsedDate,
         server_host: school.server_host || "127.0.0.1",
         is_active: school.is_active ?? true,
+        logo_url: school.logo_url || "",
       });
     } else {
       setExpiryType("subscription");
@@ -2083,6 +2095,7 @@ const AddEditSchoolModal = ({
         active_until: trial,
         server_host: "127.0.0.1",
         is_active: true,
+        logo_url: "",
       });
     }
   }, [school]);
@@ -2205,6 +2218,7 @@ const AddEditSchoolModal = ({
 
     const finalForm = {
       ...form,
+      logo_url: (form.logo_url || "").trim(),
       server_host: resolvedServerHost.trim(),
       active_until: finalActiveUntil,
       custom_domain: cleanCustomDomain,
@@ -2451,6 +2465,41 @@ const AddEditSchoolModal = ({
                 )}
                 <p className="text-[11px] font-medium text-slate-500 mt-1.5 font-mono truncate px-1">
                   Final URL: {form.slug ? getSchoolDomain(form.slug) : `[nama]${getDomainSuffix()}`}
+                </p>
+              </div>
+
+              {/* URL Logo */}
+              <div>
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>URL Logo / Lambang Institusi</span>
+                  <span className="text-[11px] font-normal text-slate-400">Opsional</span>
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                    {form.logo_url ? (
+                      <img
+                        src={form.logo_url}
+                        alt="Preview"
+                        className="w-full h-full object-contain p-1"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/logo-default.webp";
+                        }}
+                      />
+                    ) : (
+                      <span className="text-slate-300 text-xs font-bold">Logo</span>
+                    )}
+                  </div>
+                  <input
+                    type="url"
+                    name="logo_url"
+                    value={form.logo_url}
+                    onChange={handleChange}
+                    placeholder="https://assets.examku.my.id/.../logo.webp"
+                    className="flex-1 h-11 border border-slate-200 rounded-xl px-4 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white transition-all shadow-sm"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Logo akan ditampilkan di favicon browser, kartu ujian siswa, halaman pilih sekolah, dan tabel superadmin.
                 </p>
               </div>
             </div>

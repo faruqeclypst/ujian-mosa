@@ -173,6 +173,73 @@ interface RecentServer {
   timestamp: number;
 }
 
+const SelectSchoolAvatar = ({ school }: { school: SchoolRecord }) => {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [school.logo_url]);
+
+  const rawLogo = school.logo_url;
+  const logoSrc = rawLogo
+    ? rawLogo.startsWith("http") || rawLogo.startsWith("data:")
+      ? rawLogo
+      : masterPb.files.getUrl(school as any, rawLogo)
+    : "";
+
+  if (logoSrc && !imgError) {
+    return (
+      <div className="w-12 h-12 shrink-0 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 flex items-center justify-center p-1.5 shadow-2xs overflow-hidden">
+        <img
+          src={logoSrc}
+          alt={school.name}
+          className="w-full h-full object-contain"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    );
+  }
+
+  // Refined fallback: dynamic initial badge with soft palette to avoid identical default logos
+  const getInitials = (name: string) => {
+    if (!name) return "EX";
+    const cleaned = name.replace(/^(SMA|SMK|SMP|MTSN|MAN|SD|MI)\s+(NEGERI|SWASTA)?\s*/i, "").trim();
+    const parts = (cleaned || name).split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return (name.trim().slice(0, 2)).toUpperCase();
+  };
+
+  const getBadgeStyle = (name: string) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colorSchemes = [
+      "bg-emerald-50 text-emerald-700 border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/60",
+      "bg-sky-50 text-sky-700 border-sky-200/90 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-800/60",
+      "bg-indigo-50 text-indigo-700 border-indigo-200/90 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/60",
+      "bg-violet-50 text-violet-700 border-violet-200/90 dark:bg-violet-950/40 dark:text-violet-400 dark:border-violet-800/60",
+      "bg-amber-50 text-amber-700 border-amber-200/90 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/60",
+      "bg-teal-50 text-teal-700 border-teal-200/90 dark:bg-teal-950/40 dark:text-teal-400 dark:border-teal-800/60",
+    ];
+    return colorSchemes[Math.abs(hash) % colorSchemes.length];
+  };
+
+  const initials = getInitials(school.name);
+  const colorClass = getBadgeStyle(school.name);
+
+  return (
+    <div
+      className={`w-12 h-12 shrink-0 rounded-xl border flex items-center justify-center font-bold text-sm tracking-tight shadow-2xs select-none ${colorClass}`}
+      title={school.name}
+    >
+      {initials}
+    </div>
+  );
+};
+
 const SelectSchoolPage = () => {
   // Tab pilihan server: 'online' | 'local'
   const [activeTab, setActiveTab] = useState<"online" | "local">("online");
@@ -713,20 +780,7 @@ const SelectSchoolPage = () => {
                       >
                         {/* Header Item: Logo + Info */}
                         <div className="flex items-center gap-3.5">
-                          <img
-                            src={
-                              school.logo_url
-                                ? school.logo_url.startsWith("http")
-                                  ? school.logo_url
-                                  : masterPb.files.getUrl(school as any, school.logo_url)
-                                : "/logo-default.webp"
-                            }
-                            alt={school.name}
-                            className="w-12 h-12 shrink-0 object-contain rounded-xl bg-slate-50 dark:bg-slate-800/80 p-1 border border-slate-100 dark:border-slate-800 drop-shadow-xs"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = "/logo-default.png";
-                            }}
-                          />
+                          <SelectSchoolAvatar school={school} />
                           <div className="flex-1 min-w-0">
                             <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-snug line-clamp-2">
                               {school.name}
