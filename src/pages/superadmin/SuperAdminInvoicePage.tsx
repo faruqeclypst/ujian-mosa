@@ -4,7 +4,7 @@ import {
   CheckCircle2, Clock, XCircle, Upload, X, ChevronDown, ChevronUp,
   Building2, Calendar, CreditCard, Printer, RefreshCw,
   AlertTriangle, Paperclip, ExternalLink, Trash2, Edit,
-  TrendingUp, Layers, BookOpen, Check
+  TrendingUp, Layers, BookOpen, Check, Percent
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -203,9 +203,36 @@ const SuperAdminInvoicePage = () => {
   const [showCustomItemsSection, setShowCustomItemsSection] = useState(false);
   const [showRkasSection, setShowRkasSection] = useState(false);
 
-  const syncAmountFromItems = (items: InvoiceLineItem[]) => {
+  // ─── PPN / Pajak State ───
+  const [taxEnabled, setTaxEnabled] = useState(false);
+  const [taxPercent, setTaxPercent] = useState<number>(11);
+
+  const syncAmountFromItems = (items: InvoiceLineItem[], isTax: boolean = taxEnabled, pct: number = taxPercent) => {
     const sum = items.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
-    setForm(f => ({ ...f, amount: sum }));
+    const taxAmt = isTax ? Math.round(sum * ((pct || 0) / 100)) : 0;
+    setForm(f => ({ ...f, amount: sum + taxAmt }));
+  };
+
+  const handleToggleTax = (checked: boolean) => {
+    setTaxEnabled(checked);
+    const baseSubtotal = customItemsEnabled && customItems.length > 0
+      ? customItems.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0)
+      : (taxEnabled ? Math.round(Number(form.amount) / (1 + (taxPercent / 100))) : Number(form.amount));
+
+    const taxAmt = checked ? Math.round(baseSubtotal * ((taxPercent || 11) / 100)) : 0;
+    setForm(f => ({ ...f, amount: baseSubtotal + taxAmt }));
+  };
+
+  const handleTaxPercentChange = (pct: number) => {
+    const valid = Math.max(0, Math.min(100, pct));
+    setTaxPercent(valid);
+    if (taxEnabled) {
+      const baseSubtotal = customItemsEnabled && customItems.length > 0
+        ? customItems.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0)
+        : Math.round(Number(form.amount) / (1 + (taxPercent / 100)));
+      const taxAmt = Math.round(baseSubtotal * (valid / 100));
+      setForm(f => ({ ...f, amount: baseSubtotal + taxAmt }));
+    }
   };
 
   const buildDefaultLineItems = (planKey: string, durationMonths: number, totalAmount: number): InvoiceLineItem[] => {
@@ -542,6 +569,8 @@ const SuperAdminInvoicePage = () => {
     setCustomItemsEnabled(false);
     setCustomItems([]);
     setRkasEnabled(false);
+    setTaxEnabled(false);
+    setTaxPercent(11);
     setRkasData({
       enabled: false,
       budget_code: "5.1.02.02.01.0061",
@@ -586,6 +615,14 @@ const SuperAdminInvoicePage = () => {
       setCustomItemsEnabled(false);
       setCustomItems([]);
       setShowCustomItemsSection(false);
+    }
+
+    if (parsedCustom?.tax?.enabled) {
+      setTaxEnabled(true);
+      setTaxPercent(parsedCustom.tax.rate_percent ?? 11);
+    } else {
+      setTaxEnabled(false);
+      setTaxPercent(11);
     }
 
     if (parsedCustom?.rkas?.enabled) {
@@ -665,9 +702,11 @@ const SuperAdminInvoicePage = () => {
         : def;
       setCustomItems(merged);
       const sum = merged.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
-      setForm(f => ({ ...f, plan: planInfo.planKey, amount: sum }));
+      const taxAmt = taxEnabled ? Math.round(sum * ((taxPercent || 11) / 100)) : 0;
+      setForm(f => ({ ...f, plan: planInfo.planKey, amount: sum + taxAmt }));
     } else {
-      setForm(f => ({ ...f, plan: planInfo.planKey, amount: planInfo.amount }));
+      const taxAmt = taxEnabled ? Math.round(planInfo.amount * ((taxPercent || 11) / 100)) : 0;
+      setForm(f => ({ ...f, plan: planInfo.planKey, amount: planInfo.amount + taxAmt }));
     }
 
     if (rkasEnabled) {
@@ -692,16 +731,19 @@ const SuperAdminInvoicePage = () => {
           };
           const updated = [first, ...prev.slice(1)];
           const sum = updated.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
-          setForm(f => ({ ...f, duration_months: validMonths, amount: sum }));
+          const taxAmt = taxEnabled ? Math.round(sum * ((taxPercent || 11) / 100)) : 0;
+          setForm(f => ({ ...f, duration_months: validMonths, amount: sum + taxAmt }));
           return updated;
         } else {
           const def = buildDefaultLineItems(form.plan, validMonths, planInfo.amount);
-          setForm(f => ({ ...f, duration_months: validMonths, amount: planInfo.amount }));
+          const taxAmt = taxEnabled ? Math.round(planInfo.amount * ((taxPercent || 11) / 100)) : 0;
+          setForm(f => ({ ...f, duration_months: validMonths, amount: planInfo.amount + taxAmt }));
           return def;
         }
       });
     } else {
-      setForm(f => ({ ...f, duration_months: validMonths, amount: planInfo.amount }));
+      const taxAmt = taxEnabled ? Math.round(planInfo.amount * ((taxPercent || 11) / 100)) : 0;
+      setForm(f => ({ ...f, duration_months: validMonths, amount: planInfo.amount + taxAmt }));
     }
 
     if (rkasEnabled) {
@@ -749,11 +791,23 @@ const SuperAdminInvoicePage = () => {
       if (contactEmail) payload.contact_email = contactEmail;
 
       let customPayload: InvoiceCustomData | null = null;
-      if (customItemsEnabled || rkasEnabled) {
+      if (customItemsEnabled || rkasEnabled || taxEnabled) {
+        const baseSubtotal = customItemsEnabled && customItems.length > 0
+          ? customItems.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0)
+          : (taxEnabled ? Math.round(Number(form.amount) / (1 + (taxPercent / 100))) : Number(form.amount));
+        const taxAmt = taxEnabled ? Math.round(baseSubtotal * ((taxPercent || 11) / 100)) : 0;
+
         customPayload = {
           is_custom: customItemsEnabled,
           items: customItemsEnabled ? customItems.filter(it => it.description.trim()) : undefined,
           rkas: rkasEnabled ? { ...rkasData, enabled: true } : undefined,
+          tax: taxEnabled ? {
+            enabled: true,
+            rate_percent: taxPercent,
+            tax_name: `PPN ${taxPercent}%`,
+            subtotal: baseSubtotal,
+            tax_amount: taxAmt,
+          } : undefined,
         };
       }
       payload.custom_data = customPayload ? JSON.stringify(customPayload) : "";
@@ -1050,6 +1104,29 @@ const SuperAdminInvoicePage = () => {
                         <td className="px-4 py-3">
                           <p className="font-mono text-xs font-bold text-slate-800">{inv.invoice_number}</p>
                           <p className="text-[10px] text-slate-400 mt-0.5">{formatDate(inv.created)}</p>
+                          {(() => {
+                            const cd = parseCustomData(inv.custom_data);
+                            if (!cd?.tax?.enabled && !cd?.rkas?.enabled && (!cd?.items || cd.items.length === 0)) return null;
+                            return (
+                              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                {cd.tax?.enabled && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200" title={`PPN ${cd.tax.rate_percent ?? 11}% Exclude`}>
+                                    PPN {cd.tax.rate_percent ?? 11}%
+                                  </span>
+                                )}
+                                {cd.rkas?.enabled && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" title="Format SPJ BOS Aktif">
+                                    SPJ BOS
+                                  </span>
+                                )}
+                                {cd.items && cd.items.length > 0 && (
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200" title={`${cd.items.length} Item Kustom`}>
+                                    {cd.items.length} Item
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3">
                           <p className="font-bold text-slate-900 text-xs truncate max-w-[180px]">{inv.school_name}</p>
@@ -1190,6 +1267,30 @@ const SuperAdminInvoicePage = () => {
                         {cfg.label}
                       </span>
                     </div>
+
+                    {(() => {
+                      const cd = parseCustomData(inv.custom_data);
+                      if (!cd?.tax?.enabled && !cd?.rkas?.enabled && (!cd?.items || cd.items.length === 0)) return null;
+                      return (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {cd.tax?.enabled && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                              PPN {cd.tax.rate_percent ?? 11}%
+                            </span>
+                          )}
+                          {cd.rkas?.enabled && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              SPJ BOS
+                            </span>
+                          )}
+                          {cd.items && cd.items.length > 0 && (
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              {cd.items.length} Item
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     <div>
                       <p className="font-bold text-slate-900 text-sm">{inv.school_name}</p>
@@ -1444,7 +1545,8 @@ const SuperAdminInvoicePage = () => {
                       type="button"
                       onClick={() => {
                         const pi = calculatePlanInvoice(form.plan, form.duration_months);
-                        setForm(f => ({ ...f, amount: pi.amount }));
+                        const taxAmt = taxEnabled ? Math.round(pi.amount * ((taxPercent || 11) / 100)) : 0;
+                        setForm(f => ({ ...f, amount: pi.amount + taxAmt }));
                       }}
                       className="text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
                     >
@@ -1453,6 +1555,75 @@ const SuperAdminInvoicePage = () => {
                   )}
                 </div>
               </div>
+
+              {/* ─── Pajak / PPN (+11% Exclude) Section ─── */}
+              {(() => {
+                const baseSubtotal = customItemsEnabled && customItems.length > 0
+                  ? customItems.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0)
+                  : (taxEnabled ? Math.round(Number(form.amount) / (1 + (taxPercent / 100))) : Number(form.amount));
+                const taxAmt = taxEnabled ? Math.round(baseSubtotal * ((taxPercent || 11) / 100)) : 0;
+
+                return (
+                  <div className={cn(
+                    "p-3.5 rounded-xl border transition",
+                    taxEnabled ? "bg-amber-50/60 border-amber-200" : "bg-slate-50 border-slate-200"
+                  )}>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="flex items-start gap-2.5 cursor-pointer select-none flex-1">
+                        <input
+                          type="checkbox"
+                          checked={taxEnabled}
+                          onChange={e => handleToggleTax(e.target.checked)}
+                          className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                        />
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <Percent size={13} className={taxEnabled ? "text-amber-600" : "text-slate-400"} />
+                            Kenakan PPN (+{taxPercent}% Exclude)
+                          </span>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Pajak ditambahkan di atas subtotal. <strong>Hak bersih Anda tetap utuh 100%</strong> ({formatRupiah(baseSubtotal)}), sekolah menyetor PPN ke kas negara (WAPU BOS).
+                          </p>
+                        </div>
+                      </label>
+                      {taxEnabled && (
+                        <div className="flex items-center gap-1.5 bg-white border border-amber-300 rounded-lg px-2.5 py-1 shadow-2xs shrink-0">
+                          <span className="text-xs font-semibold text-slate-600">Tarif:</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={taxPercent}
+                            onChange={e => handleTaxPercentChange(Number(e.target.value))}
+                            className="w-12 text-center text-xs font-bold border-b border-amber-400 focus:outline-none"
+                          />
+                          <span className="text-xs font-bold text-slate-700">%</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {taxEnabled && (
+                      <div className="mt-3 pt-3 border-t border-amber-200/80 grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-white p-2 rounded-lg border border-amber-200/60 shadow-2xs">
+                          <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Subtotal Layanan</div>
+                          <div className="text-xs font-bold text-slate-700 mt-0.5">{formatRupiah(baseSubtotal)}</div>
+                          <div className="text-[9.5px] text-emerald-600 font-semibold mt-0.5">Hak Bersih Penyedia</div>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-amber-200/60 shadow-2xs">
+                          <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">PPN ({taxPercent}%)</div>
+                          <div className="text-xs font-bold text-amber-700 mt-0.5">+ {formatRupiah(taxAmt)}</div>
+                          <div className="text-[9.5px] text-slate-400 mt-0.5">Disetor Kas Negara</div>
+                        </div>
+                        <div className="bg-amber-100/70 p-2 rounded-lg border border-amber-300/80 shadow-2xs">
+                          <div className="text-[10px] uppercase font-bold text-amber-900 tracking-wider">Total Tagihan</div>
+                          <div className="text-xs font-black text-amber-900 mt-0.5">{formatRupiah(baseSubtotal + taxAmt)}</div>
+                          <div className="text-[9.5px] text-amber-800 font-semibold mt-0.5">Ditagihkan ke Sekolah</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Status & Dates */}
               <div className="grid grid-cols-2 gap-3">
@@ -2067,10 +2238,10 @@ const SuperAdminInvoicePage = () => {
                 </div>
               </div>
 
-              {/* RKAS / Custom Items Preview */}
+              {/* RKAS / Tax / Custom Items Preview */}
               {(() => {
                 const cd = parseCustomData(detailInvoice.custom_data);
-                if (!cd?.rkas?.enabled && (!cd?.items || cd.items.length === 0)) return null;
+                if (!cd?.rkas?.enabled && (!cd?.items || cd.items.length === 0) && !cd?.tax?.enabled) return null;
                 return (
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
                     <div className="flex items-center justify-between">
@@ -2078,12 +2249,36 @@ const SuperAdminInvoicePage = () => {
                         <BookOpen size={14} className="text-emerald-600" />
                         Kelengkapan Dokumen RKAS / SPJ Dana BOS
                       </span>
-                      {cd.rkas?.enabled && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-                          Format SPJ BOS Aktif
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {cd.tax?.enabled && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                            PPN {cd.tax.rate_percent ?? 11}% Exclude
+                          </span>
+                        )}
+                        {cd.rkas?.enabled && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                            Format SPJ BOS Aktif
+                          </span>
+                        )}
+                      </div>
                     </div>
+
+                    {cd.tax?.enabled && (
+                      <div className="flex items-center justify-between text-xs bg-amber-50/80 border border-amber-200/80 rounded-lg p-2.5 text-amber-900">
+                        <div className="flex items-center gap-1.5">
+                          <Percent size={13} className="text-amber-700" />
+                          <span className="font-semibold">PPN {cd.tax.rate_percent ?? 11}% (Exclude WAPU)</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[11px] text-amber-800">
+                            Subtotal Hak Bersih: <strong>{formatRupiah(cd.tax.subtotal || (detailInvoice.amount - (cd.tax.tax_amount || 0)))}</strong>
+                          </div>
+                          <div className="font-bold text-xs text-amber-950">
+                            + PPN ({cd.tax.rate_percent ?? 11}%): {formatRupiah(cd.tax.tax_amount || 0)} &bull; Total: {formatRupiah(detailInvoice.amount)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {cd.rkas?.enabled && (
                       <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200/70">

@@ -64,10 +64,19 @@ export interface RkasMetadata {
   supplier_npwp?: string;     // NPWP Penyedia
 }
 
+export interface InvoiceTaxConfig {
+  enabled?: boolean;
+  rate_percent?: number;      // Persentase PPN (default: 11)
+  tax_name?: string;          // e.g. "PPN 11%"
+  tax_amount?: number;        // Nilai nominal PPN
+  subtotal?: number;          // Subtotal sebelum PPN (Hak bersih penyedia)
+}
+
 export interface InvoiceCustomData {
   is_custom?: boolean;
   items?: InvoiceLineItem[];
   rkas?: RkasMetadata;
+  tax?: InvoiceTaxConfig;
 }
 
 export interface InvoiceData {
@@ -138,12 +147,28 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
   const customData = parseCustomData(inv.custom_data);
   const hasCustomItems = Boolean(customData?.items && customData.items.length > 0);
   const rkas = customData?.rkas?.enabled ? customData.rkas : null;
+  const tax = customData?.tax?.enabled ? customData.tax : null;
 
   const customItemsSum = hasCustomItems && customData?.items
     ? customData.items.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0)
     : 0;
-  const finalAmount = hasCustomItems && customItemsSum > 0 ? customItemsSum : inv.amount;
-  const terbilangText = terbilang(finalAmount);
+
+  let subtotalAmount = 0;
+  let taxAmount = 0;
+  let finalGrandTotal = 0;
+
+  if (tax && tax.enabled) {
+    const rate = tax.rate_percent ?? 11;
+    subtotalAmount = hasCustomItems && customItemsSum > 0 ? customItemsSum : (tax.subtotal || inv.amount);
+    taxAmount = tax.tax_amount ?? Math.round(subtotalAmount * (rate / 100));
+    finalGrandTotal = subtotalAmount + taxAmount;
+  } else {
+    subtotalAmount = hasCustomItems && customItemsSum > 0 ? customItemsSum : inv.amount;
+    taxAmount = 0;
+    finalGrandTotal = subtotalAmount;
+  }
+
+  const terbilangText = terbilang(finalGrandTotal);
 
   const planQuota = PLAN_PRICING[normalizePlanKey(inv.plan)]?.quota;
   const quotaText = planQuota
@@ -585,15 +610,15 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
           <div class="totals-box">
             <div class="total-row">
               <span>Subtotal</span>
-              <span>${formatRupiah(finalAmount)}</span>
+              <span>${formatRupiah(subtotalAmount)}</span>
             </div>
             <div class="total-row">
-              <span>Pajak (0%)</span>
-              <span>Rp 0</span>
+              <span>${tax?.enabled ? `PPN (${tax.rate_percent ?? 11}%)` : 'Pajak (0% / Non-PKP)'}</span>
+              <span style="${tax?.enabled ? 'font-weight:700; color:#0f172a;' : ''}">${formatRupiah(taxAmount)}</span>
             </div>
             <div class="total-row grand-total">
               <span>Total Keseluruhan</span>
-              <span style="color:#0284c7;">${formatRupiah(finalAmount)}</span>
+              <span style="color:#0284c7;">${formatRupiah(finalGrandTotal)}</span>
             </div>
           </div>
         </div>
@@ -678,13 +703,29 @@ export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | 
   const createdDate = formatDateIndo(inv.paid_date || inv.created || new Date().toISOString());
   const customData = parseCustomData(inv.custom_data);
   const rkas = customData?.rkas?.enabled ? customData.rkas : null;
+  const tax = customData?.tax?.enabled ? customData.tax : null;
   const hasCustomItems = Boolean(customData?.items && customData.items.length > 0);
 
   const customItemsSum = hasCustomItems && customData?.items
     ? customData.items.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0)
     : 0;
-  const finalAmount = hasCustomItems && customItemsSum > 0 ? customItemsSum : inv.amount;
-  const terbilangText = terbilang(finalAmount);
+
+  let subtotalAmount = 0;
+  let taxAmount = 0;
+  let finalGrandTotal = 0;
+
+  if (tax && tax.enabled) {
+    const rate = tax.rate_percent ?? 11;
+    subtotalAmount = hasCustomItems && customItemsSum > 0 ? customItemsSum : (tax.subtotal || inv.amount);
+    taxAmount = tax.tax_amount ?? Math.round(subtotalAmount * (rate / 100));
+    finalGrandTotal = subtotalAmount + taxAmount;
+  } else {
+    subtotalAmount = hasCustomItems && customItemsSum > 0 ? customItemsSum : inv.amount;
+    taxAmount = 0;
+    finalGrandTotal = subtotalAmount;
+  }
+
+  const terbilangText = terbilang(finalGrandTotal);
   const planLabel = inv.plan_label || (inv.plan ? inv.plan.toUpperCase() : "STANDARD");
 
   const html = `
@@ -880,7 +921,7 @@ export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | 
             <td class="label">Uang Sejumlah</td>
             <td class="sep">:</td>
             <td class="val">
-              <div class="nominal-badge">${formatRupiah(finalAmount)}</div>
+              <div class="nominal-badge">${formatRupiah(finalGrandTotal)}</div>
             </td>
           </tr>
           <tr>
@@ -900,6 +941,18 @@ export function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | 
               </div>
             </td>
           </tr>
+          ${tax?.enabled ? `
+          <tr>
+            <td class="label">Keterangan Pajak</td>
+            <td class="sep">:</td>
+            <td class="val" style="font-weight: 600; color: #0f172a;">
+              Termasuk PPN ${tax.rate_percent ?? 11}% (${formatRupiah(taxAmount)}) &bull; Subtotal Hak Layanan: ${formatRupiah(subtotalAmount)}
+              <div style="font-size: 9.5px; color: #64748b; font-weight: 400; margin-top: 2px;">
+                * PPN dipungut dan disetorkan ke Kas Negara oleh Bendahara BOS selaku WAPU
+              </div>
+            </td>
+          </tr>
+          ` : ""}
         </table>
 
         ${hasCustomItems && customData?.items && customData.items.length > 0 ? `
