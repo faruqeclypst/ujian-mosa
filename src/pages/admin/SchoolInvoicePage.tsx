@@ -121,6 +121,12 @@ const POPULAR_BANKS = [
   { code: "SEABANK", name: "SeaBank", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f1/SeaBank_logo.png" },
 ];
 
+const isBosWapuInvoice = (inv: Invoice | null | undefined): boolean => {
+  if (!inv) return false;
+  const cd = parseCustomData(inv.custom_data);
+  return Boolean(cd?.tax?.enabled || cd?.rkas?.enabled);
+};
+
 const SchoolInvoicePage = () => {
   const { school, refreshSchool } = useTenant();
   const [activePricing, setActivePricing] = useState(() => ({ ...PLAN_PRICING }));
@@ -209,6 +215,10 @@ const SchoolInvoicePage = () => {
   }, [loadInvoices]);
 
   const handlePayWithQris = async (inv: Invoice) => {
+    if (isBosWapuInvoice(inv)) {
+      alert("Tagihan ini menggunakan format SPJ Dana BOS / Pajak WAPU. Sesuai ketentuan ARKAS perbendaharaan daerah, pembayaran wajib melalui Transfer Bank Resmi ke rekening yang tertera agar tidak ada selisih biaya audit dan pemotongan PPN dapat disetor secara mandiri.");
+      return;
+    }
     try {
       setPayingInvoiceId(inv.id);
       const res = await fetch("https://examku.my.id/api/sumopod/create-payment", {
@@ -551,68 +561,137 @@ const SchoolInvoicePage = () => {
               </button>
             </div>
           </NeonCard>
-        ) : activeUnpaidInvoice ? (
-          <NeonCard className="border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10">
-            <div className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1.5 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-900 dark:text-neutral-100">
-                    Tagihan Perpanjangan Resmi Siap Dibayar ({activeUnpaidInvoice.invoice_number})
-                  </h3>
-                </div>
-                <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed max-w-xl">
-                  SuperAdmin telah menerbitkan invoice perpanjangan untuk sekolah Anda sebesar <strong className="font-semibold text-neutral-900 dark:text-neutral-100">{formatRupiah(activeUnpaidInvoice.amount)}</strong>. Silakan bayar via QRIS instan atau transfer manual.
-                </p>
+        ) : activeUnpaidInvoice ? (() => {
+          const cd = parseCustomData(activeUnpaidInvoice.custom_data);
+          const isBosWapu = Boolean(cd?.tax?.enabled || cd?.rkas?.enabled);
 
-                {banks.length > 0 && (
-                  <div className="mt-2.5 p-3 bg-white dark:bg-neutral-850 rounded-xl border border-neutral-200 dark:border-neutral-750 text-xs">
-                    <p className="font-bold text-neutral-800 dark:text-neutral-200 mb-2 flex items-center gap-1.5">
-                      <Landmark className="h-3.5 w-3.5 text-neutral-500" /> Rekening Transfer Resmi:
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {banks.map((b, i) => (
-                        <div key={i} className="flex items-center gap-2.5 p-2 bg-neutral-50 dark:bg-neutral-900 rounded-lg border border-neutral-200/70 dark:border-neutral-800">
-                          <div className="w-8 h-8 rounded-md bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-750 flex items-center justify-center font-bold text-[10px] text-neutral-600 shrink-0">
-                            {b.bank_name.substring(0, 3)}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="font-bold text-neutral-800 dark:text-neutral-200 text-xs block truncate">
-                              {b.bank_name} - <span className="font-mono text-emerald-600 dark:text-emerald-400">{b.account_number}</span>
-                            </span>
-                            <span className="text-[11px] text-neutral-400 block truncate">a.n. {b.account_name}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+          return (
+            <NeonCard className={cn(
+              "border-amber-500/30",
+              isBosWapu ? "bg-amber-500/10 dark:bg-amber-500/15" : "bg-amber-500/5 dark:bg-amber-500/10"
+            )}>
+              <div className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-900 dark:text-neutral-100">
+                      Tagihan Perpanjangan Resmi Siap Dibayar ({activeUnpaidInvoice.invoice_number})
+                    </h3>
+                    {isBosWapu && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                        Format SPJ Dana BOS (WAPU)
+                      </span>
+                    )}
                   </div>
-                )}
-              </div>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed max-w-xl">
+                    SuperAdmin telah menerbitkan invoice perpanjangan untuk sekolah Anda sebesar <strong className="font-semibold text-neutral-900 dark:text-neutral-100">{formatRupiah(activeUnpaidInvoice.amount)}</strong>.
+                    {isBosWapu
+                      ? " Sesuai ketentuan SPJ Dana BOS / ARKAS (WAPU), pembayaran wajib dilakukan melalui Transfer Bank Resmi ke rekening di bawah ini."
+                      : " Silakan bayar via QRIS instan atau transfer manual ke rekening resmi."}
+                  </p>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => printDigitalInvoice(activeUnpaidInvoice, school)}
-                  className="h-8 px-3 text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  <span>Invoice PDF</span>
-                </Button>
+                  {/* Info Khusus SPJ BOS WAPU */}
+                  {isBosWapu && cd?.tax?.enabled && (
+                    <div className="mt-2.5 p-3 rounded-xl bg-white dark:bg-neutral-850 border border-amber-300/80 dark:border-amber-700/80 text-xs shadow-2xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-800">
+                        <div>
+                          <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block">Hak Bersih Layanan (Transfer ke Penyedia):</span>
+                          <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400 text-sm">
+                            {formatRupiah(cd.tax.subtotal || (activeUnpaidInvoice.amount - (cd.tax.tax_amount || 0)))}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block">PPN {cd.tax.rate_percent ?? 11}% (Disetor Bendahara via e-Billing):</span>
+                          <span className="font-bold font-mono text-amber-700 dark:text-amber-400 text-sm">
+                            {formatRupiah(cd.tax.tax_amount || 0)}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-2 leading-relaxed">
+                        💡 <strong>Catatan Bendahara BOS:</strong> Pembayaran melalui QRIS e-wallet dinonaktifkan khusus tagihan ini agar tidak ada biaya switching perbankan (MDR) dan pembukuan SPJ ARKAS klop 100%. Silakan transfer ke rekening bank resmi di bawah lalu unggah bukti transfer.
+                      </p>
+                    </div>
+                  )}
 
-                <Button
-                  type="button"
-                  onClick={() => handlePayWithQris(activeUnpaidInvoice)}
-                  disabled={payingInvoiceId === activeUnpaidInvoice.id}
-                  className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <QrCode className={cn("h-3.5 w-3.5", payingInvoiceId === activeUnpaidInvoice.id && "animate-spin")} />
-                  <span>Bayar QRIS</span>
-                </Button>
+                  {banks.length > 0 && (
+                    <div className="mt-2.5 p-3 bg-white dark:bg-neutral-850 rounded-xl border border-neutral-200 dark:border-neutral-750 text-xs">
+                      <p className="font-bold text-neutral-800 dark:text-neutral-200 mb-2 flex items-center gap-1.5">
+                        <Landmark className="h-3.5 w-3.5 text-neutral-500" /> Rekening Transfer Resmi:
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {banks.map((b, i) => (
+                          <div key={i} className="flex items-center gap-2.5 p-2 bg-neutral-50 dark:bg-neutral-900 rounded-lg border border-neutral-200/70 dark:border-neutral-800">
+                            <div className="w-8 h-8 rounded-md bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-750 flex items-center justify-center font-bold text-[10px] text-neutral-600 shrink-0">
+                              {b.bank_name.substring(0, 3)}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-neutral-800 dark:text-neutral-200 text-xs block truncate">
+                                {b.bank_name} - <span className="font-mono text-emerald-600 dark:text-emerald-400">{b.account_number}</span>
+                              </span>
+                              <span className="text-[11px] text-neutral-400 block truncate">a.n. {b.account_name}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-col sm:items-stretch">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => printDigitalInvoice(activeUnpaidInvoice, school)}
+                    className="h-8 px-3 text-xs font-semibold border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5 justify-center"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    <span>Invoice PDF</span>
+                  </Button>
+
+                  {(cd?.rkas?.enabled || cd?.tax?.enabled) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => printOfficialReceiptSpj(activeUnpaidInvoice, school)}
+                      className="h-8 px-3 text-xs font-semibold border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5 justify-center"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      <span>Kuitansi SPJ</span>
+                    </Button>
+                  )}
+
+                  {!isBosWapu ? (
+                    <Button
+                      type="button"
+                      onClick={() => handlePayWithQris(activeUnpaidInvoice)}
+                      disabled={payingInvoiceId === activeUnpaidInvoice.id}
+                      className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 justify-center"
+                    >
+                      <QrCode className={cn("h-3.5 w-3.5", payingInvoiceId === activeUnpaidInvoice.id && "animate-spin")} />
+                      <span>Bayar QRIS</span>
+                    </Button>
+                  ) : (
+                    <label className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 justify-center select-none">
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>Upload Bukti Transfer</span>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        disabled={uploadingProof}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handleProofUpload(activeUnpaidInvoice.id, file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
-            </div>
-          </NeonCard>
-        ) : (school && (school.plan === "free" || (daysLeftActive !== null && daysLeftActive <= 30))) ? (
+            </NeonCard>
+          );
+        })() : (school && (school.plan === "free" || (daysLeftActive !== null && daysLeftActive <= 30))) ? (
           <NeonCard className={cn(
             daysLeftActive !== null && daysLeftActive <= 3 && school.plan !== "free"
               ? "border-rose-500/30 bg-rose-500/5 dark:bg-rose-500/10"
@@ -726,6 +805,23 @@ const SchoolInvoicePage = () => {
                           <NeonBadge variant={cfg.variant} size="xs" icon={StatusIcon}>
                             {cfg.label}
                           </NeonBadge>
+                          {(() => {
+                            const cd = parseCustomData(inv.custom_data);
+                            return (
+                              <>
+                                {cd?.tax?.enabled && (
+                                  <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                    PPN {cd.tax.rate_percent ?? 11}%
+                                  </span>
+                                )}
+                                {cd?.rkas?.enabled && (
+                                  <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                    SPJ BOS
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                         <p className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
                           {PLAN_PRICES[inv.plan]?.label || inv.plan} Plan
@@ -743,9 +839,20 @@ const SchoolInvoicePage = () => {
 
                       {/* Right Amount & Actions */}
                       <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 shrink-0">
-                        <p className="font-mono font-bold text-base text-neutral-900 dark:text-neutral-100">
-                          {formatRupiah(inv.amount)}
-                        </p>
+                        <div className="sm:text-right">
+                          <p className="font-mono font-bold text-base text-neutral-900 dark:text-neutral-100">
+                            {formatRupiah(inv.amount)}
+                          </p>
+                          {(() => {
+                            const cd = parseCustomData(inv.custom_data);
+                            if (!cd?.tax?.enabled) return null;
+                            return (
+                              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">
+                                Hak bersih: {formatRupiah(cd.tax.subtotal || (inv.amount - (cd.tax.tax_amount || 0)))}
+                              </p>
+                            );
+                          })()}
+                        </div>
 
                         <div className="flex flex-wrap items-center gap-2">
                           <Button
@@ -784,20 +891,27 @@ const SchoolInvoicePage = () => {
 
                           {needsAction && (
                             <>
-                              <Button
-                                type="button"
-                                onClick={() => handlePayWithQris(inv)}
-                                disabled={payingInvoiceId === inv.id}
-                                className="h-7.5 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                              >
-                                <QrCode className={cn("h-3 w-3", payingInvoiceId === inv.id && "animate-spin")} />
-                                <span>{payingInvoiceId === inv.id ? "Memproses..." : "Bayar QRIS"}</span>
-                              </Button>
+                              {!isBosWapuInvoice(inv) ? (
+                                <Button
+                                  type="button"
+                                  onClick={() => handlePayWithQris(inv)}
+                                  disabled={payingInvoiceId === inv.id}
+                                  className="h-7.5 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                                >
+                                  <QrCode className={cn("h-3 w-3", payingInvoiceId === inv.id && "animate-spin")} />
+                                  <span>{payingInvoiceId === inv.id ? "Memproses..." : "Bayar QRIS"}</span>
+                                </Button>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700" title="Pembayaran SPJ BOS wajib via Transfer Bank Resmi">
+                                  <Landmark className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                  Transfer BOS
+                                </span>
+                              )}
 
                               {!hasProof && (
                                 <label className="h-7.5 px-2.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 rounded-lg cursor-pointer transition-colors shadow-2xs border border-neutral-200 dark:border-neutral-750 inline-flex items-center gap-1.5 select-none">
                                   <Upload className="h-3 w-3" />
-                                  <span>Upload</span>
+                                  <span>{isBosWapuInvoice(inv) ? "Upload Bukti Transfer" : "Upload"}</span>
                                   <input
                                     type="file"
                                     accept="image/*,.pdf"
@@ -1115,10 +1229,10 @@ const SchoolInvoicePage = () => {
                     </div>
                   )}
 
-                  {/* RKAS / Line Items Preview */}
+                  {/* RKAS / Tax / Line Items Preview */}
                   {(() => {
                     const cd = parseCustomData(detailInvoice.custom_data);
-                    if (!cd?.rkas?.enabled && (!cd?.items || cd.items.length === 0)) return null;
+                    if (!cd?.rkas?.enabled && (!cd?.items || cd.items.length === 0) && !cd?.tax?.enabled) return null;
                     return (
                       <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 text-xs space-y-2">
                         <div className="flex items-center justify-between">
@@ -1126,12 +1240,32 @@ const SchoolInvoicePage = () => {
                             <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                             Kelengkapan Dokumen RKAS / SPJ Dana BOS
                           </span>
-                          {cd.rkas?.enabled && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                              Format BOS SPJ
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            {cd.tax?.enabled && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                PPN {cd.tax.rate_percent ?? 11}% WAPU
+                              </span>
+                            )}
+                            {cd.rkas?.enabled && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                Format BOS SPJ
+                              </span>
+                            )}
+                          </div>
                         </div>
+
+                        {cd.tax?.enabled && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-900 dark:text-amber-200">
+                            <div>
+                              <span className="font-bold">PPN {cd.tax.rate_percent ?? 11}% (WAPU e-Billing)</span>
+                              <div className="text-[10.5px] text-neutral-500 dark:text-neutral-400">Hak Bersih Layanan: {formatRupiah(cd.tax.subtotal || (detailInvoice.amount - (cd.tax.tax_amount || 0)))}</div>
+                            </div>
+                            <div className="font-mono font-bold text-xs text-right">
+                              + {formatRupiah(cd.tax.tax_amount || 0)}
+                            </div>
+                          </div>
+                        )}
+
                         {cd.rkas?.enabled && (
                           <div className="grid grid-cols-2 gap-2 text-[11px] text-neutral-600 dark:text-neutral-400">
                             <div><span>Kode Rekening:</span> <span className="font-mono font-bold text-neutral-900 dark:text-neutral-100">{cd.rkas.budget_code || "-"}</span></div>
