@@ -6,6 +6,11 @@
 
 import QRCode from "qrcode";
 import { PLAN_PRICING, normalizePlanKey } from "./pricingHelper";
+import {
+  getDocumentVerifyUrl,
+  generateDocFingerprint,
+  DocumentVerificationPayload,
+} from "./documentVerifyHelper";
 
 export function terbilang(nominal: number): string {
   const n = Math.floor(Math.abs(nominal));
@@ -170,29 +175,6 @@ export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta 
   }
 
   const terbilangText = terbilang(finalGrandTotal);
-
-  const qrVerificationText = [
-    `DOKUMEN INVOICE EXAMKU CBT`,
-    `Invoice: ${inv.invoice_number}`,
-    `Penyedia: Alfaruq Asri (EXAMKU CBT)`,
-    `Institusi: ${school?.name || inv.school_name || "Sekolah"}`,
-    `Total: Rp ${finalGrandTotal.toLocaleString("id-ID")}`,
-    `Status: ${isPaid ? "LUNAS (PAID)" : "MENUNGGU PEMBAYARAN"}`,
-    `Jatuh Tempo: ${dueDate}`,
-    `Tautan: https://examku.my.id/admin/invoice`
-  ].join("\n");
-
-  let qrCodeDataUrl = "";
-  try {
-    qrCodeDataUrl = await QRCode.toDataURL(qrVerificationText, {
-      width: 140,
-      margin: 1,
-      color: { dark: "#0f172a", light: "#ffffff" }
-    });
-  } catch (e) {
-    console.error("Gagal membuat QR Code TTE:", e);
-  }
-
   const planQuota = PLAN_PRICING[normalizePlanKey(inv.plan)]?.quota;
   const quotaText = planQuota
     ? `${planQuota} Siswa`
@@ -201,6 +183,47 @@ export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta 
       : "Kuota Terdaftar";
   const planLabel = inv.plan_label || (inv.plan ? inv.plan.toUpperCase() : "STANDARD");
   const schoolDomain = school?.custom_domain || `${inv.school_slug}.examku.my.id`;
+
+  const docNumber = `#${inv.invoice_number}`;
+  const docFingerprint = generateDocFingerprint(docNumber, finalGrandTotal, createdDate);
+
+  const domainOrigin = typeof window !== "undefined" && window.location.origin.includes("examku.my.id")
+    ? window.location.origin
+    : "https://examku.my.id";
+
+  const verifyPayload: DocumentVerificationPayload = {
+    v: 1,
+    t: "invoice",
+    no: docNumber,
+    invId: inv.id,
+    sn: school?.name || inv.school_name || "Sekolah",
+    sl: inv.school_slug || school?.slug || "",
+    amt: finalGrandTotal,
+    dt: createdDate,
+    st: isPaid ? "paid" : (inv.status === "overdue" ? "overdue" : "unpaid"),
+    pr: "Alfaruq Asri (EXAMKU CBT)",
+    act: rkas?.activity_name || "Layanan Aplikasi & Lisensi EXAMKU CBT",
+    plan: planLabel,
+    tax: tax?.enabled ? {
+      rate: tax.rate_percent ?? 11,
+      amount: taxAmount,
+      subtotal: subtotalAmount,
+    } : undefined,
+    hash: docFingerprint,
+  };
+
+  const qrVerificationUrl = getDocumentVerifyUrl(verifyPayload, domainOrigin);
+
+  let qrCodeDataUrl = "";
+  try {
+    qrCodeDataUrl = await QRCode.toDataURL(qrVerificationUrl, {
+      width: 180,
+      margin: 1,
+      color: { dark: "#0f172a", light: "#ffffff" }
+    });
+  } catch (e) {
+    console.error("Gagal membuat QR Code TTE:", e);
+  }
 
   const html = `
     <!DOCTYPE html>
@@ -735,6 +758,7 @@ export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta 
  * Format standar pengeluaran kas pelaporan SPJ sekolah negeri & madrasah.
  */
 export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolMeta | null) {
+  const isPaid = inv.status === "paid" || Boolean(inv.paid_date);
   const createdDate = formatDateIndo(inv.paid_date || inv.created || new Date().toISOString());
   const customData = parseCustomData(inv.custom_data);
   const rkas = customData?.rkas?.enabled ? customData.rkas : null;
@@ -763,22 +787,40 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
   const terbilangText = terbilang(finalGrandTotal);
   const planLabel = inv.plan_label || (inv.plan ? inv.plan.toUpperCase() : "STANDARD");
 
-  const qrVerificationText = [
-    `DOKUMEN RESMI TTE EXAMKU CBT`,
-    `No. Kuitansi : KWT/BOS/${inv.invoice_number}`,
-    `Ref Invoice  : ${inv.invoice_number}`,
-    `Penyedia     : Alfaruq Asri (EXAMKU CBT)`,
-    `Institusi    : ${school?.name || inv.school_name || "Sekolah"}`,
-    `Nominal      : Rp ${finalGrandTotal.toLocaleString("id-ID")}`,
-    `Status       : LUNAS & TERVALIDASI ELEKTRONIK`,
-    `Tanggal      : ${createdDate}`,
-    `Verifikasi   : https://examku.my.id/admin/invoice`
-  ].join("\n");
+  const docNumber = `KWT/BOS/${inv.invoice_number}`;
+  const docFingerprint = generateDocFingerprint(docNumber, finalGrandTotal, createdDate);
+
+  const domainOrigin = typeof window !== "undefined" && window.location.origin.includes("examku.my.id")
+    ? window.location.origin
+    : "https://examku.my.id";
+
+  const verifyPayload: DocumentVerificationPayload = {
+    v: 1,
+    t: "receipt",
+    no: docNumber,
+    invId: inv.id,
+    sn: school?.name || inv.school_name || "Sekolah",
+    sl: inv.school_slug || school?.slug || "",
+    amt: finalGrandTotal,
+    dt: createdDate,
+    st: isPaid ? "paid" : "paid",
+    pr: "Alfaruq Asri (EXAMKU CBT)",
+    act: rkas?.activity_name || "Pelaksanaan Evaluasi / Asesmen Pembelajaran Berbasis Komputer CBT",
+    plan: planLabel,
+    tax: tax?.enabled ? {
+      rate: tax.rate_percent ?? 11,
+      amount: taxAmount,
+      subtotal: subtotalAmount,
+    } : undefined,
+    hash: docFingerprint,
+  };
+
+  const qrVerificationUrl = getDocumentVerifyUrl(verifyPayload, domainOrigin);
 
   let qrCodeDataUrl = "";
   try {
-    qrCodeDataUrl = await QRCode.toDataURL(qrVerificationText, {
-      width: 140,
+    qrCodeDataUrl = await QRCode.toDataURL(qrVerificationUrl, {
+      width: 180,
       margin: 1,
       color: { dark: "#0f172a", light: "#ffffff" }
     });

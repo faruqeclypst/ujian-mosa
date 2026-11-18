@@ -60,6 +60,7 @@ const SchoolInvoicePage = lazy(() => import("./pages/admin/SchoolInvoicePage"));
 const ServerStatusPage = lazy(() => import("./pages/admin/ServerStatusPage"));
 const ExamSimulatePage = lazy(() => import("./pages/admin/ExamSimulatePage"));
 const DownloadAppsPage = lazy(() => import("./pages/tenant/DownloadAppsPage"));
+const VerifyDocumentPage = lazy(() => import("./pages/public/VerifyDocumentPage"));
 
 // Landing & SaaS pages
 import LandingPage from "./pages/landing/LandingPage";
@@ -171,7 +172,7 @@ const SchoolAppContent = () => {
   }, [school, pb]);
 
   const isStudentRoute = location.pathname.startsWith("/exam") || location.pathname.startsWith("/cbt") || location.pathname.startsWith("/minat-bakat");
-  const isPublicRoute = location.pathname.startsWith("/verifikasi-kartu") || location.pathname.startsWith("/verify-card") || location.pathname.startsWith("/unduh") || location.pathname.startsWith("/token-view");
+  const isPublicRoute = location.pathname.startsWith("/verifikasi-kartu") || location.pathname.startsWith("/verify-card") || location.pathname.startsWith("/validasi-dokumen") || location.pathname.startsWith("/verify-doc") || location.pathname.startsWith("/unduh") || location.pathname.startsWith("/token-view");
 
   // Route-aware auth loading: Rute publik tidak perlu menunggu auth, rute siswa hanya menunggu studentLoading, rute admin hanya menunggu adminLoading
   const isCurrentAuthLoading = isPublicRoute ? false : isAdminRoute ? adminLoading : isStudentRoute ? studentLoading : (adminLoading && studentLoading);
@@ -312,6 +313,8 @@ const SchoolAppContent = () => {
             <Route path="/download" element={<Navigate to="/unduh" replace />} />
             <Route path="/verifikasi-kartu" element={<VerifyStudentCardPage />} />
             <Route path="/verify-card" element={<Navigate to="/verifikasi-kartu" replace />} />
+            <Route path="/validasi-dokumen" element={<VerifyDocumentPage />} />
+            <Route path="/verify-doc" element={<Navigate to="/validasi-dokumen" replace />} />
             {/* Simulasi ujian untuk guru — full-screen seperti CBT siswa, guard di dalam komponen */}
             <Route path="/admin/simulate/:examId" element={<ExamSimulatePage />} />
             <Route path="/auth/google/callback" element={<GoogleAuthCallbackPage />} />
@@ -364,6 +367,8 @@ const LandingContent = () => {
         <Route path="/superadmin/multi-vps-docs" element={<SuperAdminMultiVpsDocsPage />} />
         <Route path="/superadmin/docs" element={<Navigate to="/superadmin/multi-vps-docs" replace />} />
         <Route path="/docs" element={<PublicDocsPage />} />
+        <Route path="/validasi-dokumen" element={<VerifyDocumentPage />} />
+        <Route path="/verify-doc" element={<Navigate to="/validasi-dokumen" replace />} />
         <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
         <Route path="/pilih-sekolah" element={<SelectSchoolPage />} />
         <Route path="/pilih sekolah" element={<SelectSchoolPage />} />
@@ -410,7 +415,7 @@ const AppRouter = () => {
   if (isLandingDomain) {
     // Jika di mobile app, paksa ke halaman pilih sekolah (simulation mode untuk localhost tetap tersedia via /pilih-sekolah)
     const isAppMode = Capacitor.isNativePlatform();
-    const isSpecialRoute = location.pathname.startsWith('/superadmin') || location.pathname.startsWith('/super_admin') || location.pathname === '/daftar' || location.pathname === '/fitur' || location.pathname === '/browser';
+    const isSpecialRoute = location.pathname.startsWith('/superadmin') || location.pathname.startsWith('/super_admin') || location.pathname === '/daftar' || location.pathname === '/fitur' || location.pathname === '/browser' || location.pathname.startsWith('/validasi-dokumen') || location.pathname.startsWith('/verify-doc');
 
     if (isAppMode && location.pathname !== '/pilih-sekolah' && !isSpecialRoute) {
       return (
