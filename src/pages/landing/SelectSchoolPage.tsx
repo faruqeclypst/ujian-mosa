@@ -60,6 +60,37 @@ export const isLocalServer = (school: SchoolRecord): boolean => {
 };
 
 /**
+ * Memeriksa apakah sekolah aktif dan belum kedaluwarsa.
+ * Sekolah nonaktif (is_active = false) atau yang masa aktifnya (active_until) sudah lewat
+ * tidak boleh ditampilkan di halaman pilih unit sekolah.
+ */
+export const isSchoolActiveAndValid = (school: SchoolRecord): boolean => {
+  if (!school) return false;
+  if (school.is_active === false) return false;
+
+  // Jika tidak memiliki batas tanggal (active_until kosong), berarti langganan permanen -> aktif
+  if (!school.active_until || !school.active_until.trim()) return true;
+
+  try {
+    const match = school.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return true;
+    const expDate = new Date(
+      parseInt(match[1], 10),
+      parseInt(match[2], 10) - 1,
+      parseInt(match[3], 10),
+      23,
+      59,
+      59,
+      999
+    );
+    if (isNaN(expDate.getTime())) return true;
+    return expDate.getTime() >= Date.now();
+  } catch {
+    return true;
+  }
+};
+
+/**
  * Deteksi subnet LAN perangkat menggunakan Android Bridge atau WebRTC ICE candidate.
  */
 async function detectLanSubnet(): Promise<{ subnet: string | null; gateway: string | null }> {
@@ -446,6 +477,8 @@ const SelectSchoolPage = () => {
           filter: "is_active = true",
           sort: "name",
         });
+        // Filter sekolah: abaikan sekolah yang nonaktif atau masa aktifnya (active_until) sudah kadaluarsa
+        masterRecords = masterRecords.filter(isSchoolActiveAndValid);
         // Cache master schools di localStorage agar saat perangkat offline (di lab), daftar tetap bisa diakses!
         try {
           localStorage.setItem("cached_master_schools", JSON.stringify(masterRecords));
@@ -457,7 +490,8 @@ const SelectSchoolPage = () => {
         try {
           const cached = localStorage.getItem("cached_master_schools");
           if (cached) {
-            masterRecords = JSON.parse(cached);
+            const parsed = JSON.parse(cached);
+            masterRecords = Array.isArray(parsed) ? parsed.filter(isSchoolActiveAndValid) : [];
           }
         } catch {}
       }
@@ -560,6 +594,7 @@ const SelectSchoolPage = () => {
   };
 
   const filteredSchools = schools.filter((s) => {
+    if (!isSchoolActiveAndValid(s)) return false;
     const q = search.toLowerCase();
     return s.name.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q) || (s.npsn && s.npsn.includes(q));
   });
