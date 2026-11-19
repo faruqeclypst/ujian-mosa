@@ -87,6 +87,9 @@ export interface MultiPeriodConfig {
   pause_name?: string;      // e.g. "Masa Jeda / Non-Aktif (Agustus - Oktober)"
   pause_start?: string;     // "2026-08-01"
   pause_end?: string;       // "2026-10-31"
+  pause_months?: number;    // 3
+  hibernation_rate?: number; // 100000 (biaya per bulan masa jeda)
+  hibernation_total?: number; // 300000 (total biaya hibernasi)
   term_2_name?: string;     // e.g. "Periode 2 (Semester Ganjil: November, Desember, Januari)"
   term_2_months?: number;   // 3
   term_2_start?: string;    // "2026-11-01"
@@ -699,7 +702,12 @@ export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta 
               <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:8px 10px;">
                 <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">Masa Jeda (Hibernasi)</div>
                 <div style="font-weight:700; color:#475569; margin-top:2px;">${customData.multi_period.pause_name || 'Agustus – Oktober'}</div>
-                <div style="font-size:9.5px; color:#64748b; margin-top:2px;">Bank Soal & Data Terjaga Aman</div>
+                <div style="font-size:9.5px; color:#64748b; margin-top:2px;">
+                  ${customData.multi_period.hibernation_total
+                    ? `Pemeliharaan Server (${formatRupiah(customData.multi_period.hibernation_rate || 100000)}/bln)`
+                    : 'Bank Soal & Data Terjaga Aman'
+                  }
+                </div>
               </div>
               <div style="background:#ffffff; border:1px solid #bbf7d0; border-radius:8px; padding:8px 10px;">
                 <div style="font-size:10px; font-weight:700; color:#15803d; text-transform:uppercase;">Periode 2 (3 Bulan)</div>
@@ -1084,7 +1092,7 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
                 <div style="margin-top:6px; padding:6px 10px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; font-size:10px; color:#0369a1; line-height:1.5;">
                   <strong>Jadwal Pelaksanaan Multi-Periode:</strong><br/>
                   &bull; <strong>Periode 1 (3 Bulan):</strong> ${customData.multi_period.term_1_name || 'Mei, Juni, Juli (Semester Genap / PAT)'}<br/>
-                  &bull; <strong>Masa Jeda:</strong> ${customData.multi_period.pause_name || 'Agustus, September, Oktober (Non-aktif / Bank Soal Terjaga)'}<br/>
+                  &bull; <strong>Masa Jeda:</strong> ${customData.multi_period.pause_name || 'Agustus, September, Oktober'} ${customData.multi_period.hibernation_total ? `(Biaya Pemeliharaan Server: ${formatRupiah(customData.multi_period.hibernation_total)})` : '(Non-aktif / Bank Soal Terjaga)'}<br/>
                   &bull; <strong>Periode 2 (3 Bulan):</strong> ${customData.multi_period.term_2_name || 'November, Desember, Januari (Semester Ganjil / PAS)'}
                 </div>
               ` : ""}

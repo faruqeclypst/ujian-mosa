@@ -80,6 +80,37 @@ export const DEFAULT_PLAN_PRICING: Record<PlanKey, PlanPricingDetail> = {
   },
 };
 
+// ─── Tarif Universal Masa Jeda / Hibernasi Server (Rp / Bulan) ───
+export const DEFAULT_HIBERNATION_MONTHLY_RATE = 100000; // Rp 100.000 / bulan
+const HIBERNATION_STORAGE_KEY = "examku_hibernation_monthly_rate";
+
+let activeHibernationMonthlyRate: number = (() => {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const stored = localStorage.getItem(HIBERNATION_STORAGE_KEY);
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed >= 0) return parsed;
+      }
+    }
+  } catch {}
+  return DEFAULT_HIBERNATION_MONTHLY_RATE;
+})();
+
+export const getHibernationMonthlyRate = (): number => {
+  return activeHibernationMonthlyRate;
+};
+
+export const setHibernationMonthlyRate = (rate: number): void => {
+  const val = Math.max(0, Math.round(Number(rate) || 0));
+  activeHibernationMonthlyRate = val;
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem(HIBERNATION_STORAGE_KEY, String(val));
+    }
+  } catch {}
+};
+
 const PRICING_STORAGE_KEY = "examku_custom_pricing";
 
 const getInitialPricing = (): Record<PlanKey, PlanPricingDetail> => {
@@ -89,6 +120,9 @@ const getInitialPricing = (): Record<PlanKey, PlanPricingDetail> => {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object" && parsed.basic && parsed.pro && parsed.ultimate) {
+          if (parsed.hibernation_monthly_rate !== undefined) {
+            setHibernationMonthlyRate(parsed.hibernation_monthly_rate);
+          }
           return {
             free: DEFAULT_PLAN_PRICING.free,
             basic: { ...DEFAULT_PLAN_PRICING.basic, ...parsed.basic },
@@ -107,10 +141,18 @@ export const PLAN_PRICING: Record<PlanKey, PlanPricingDetail> = getInitialPricin
 export const applyDynamicPricing = (customPlans?: any): Record<PlanKey, PlanPricingDetail> => {
   if (!customPlans || typeof customPlans !== "object") {
     Object.assign(PLAN_PRICING, JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICING)));
+    setHibernationMonthlyRate(DEFAULT_HIBERNATION_MONTHLY_RATE);
     try {
-      if (typeof window !== "undefined") localStorage.removeItem(PRICING_STORAGE_KEY);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(PRICING_STORAGE_KEY);
+        localStorage.removeItem(HIBERNATION_STORAGE_KEY);
+      }
     } catch {}
     return PLAN_PRICING;
+  }
+
+  if (customPlans.hibernation_monthly_rate !== undefined) {
+    setHibernationMonthlyRate(customPlans.hibernation_monthly_rate);
   }
 
   const updated: Record<PlanKey, PlanPricingDetail> = {
@@ -125,7 +167,10 @@ export const applyDynamicPricing = (customPlans?: any): Record<PlanKey, PlanPric
 
   try {
     if (typeof window !== "undefined") {
-      localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify({
+        ...updated,
+        hibernation_monthly_rate: activeHibernationMonthlyRate,
+      }));
     }
   } catch {}
 
@@ -136,12 +181,20 @@ export const fetchAndApplyPricing = async (masterPbInstance: any): Promise<Recor
   if (!masterPbInstance) return PLAN_PRICING;
   try {
     const records = await masterPbInstance.collection("app_settings").getFullList({ limit: 1 });
-    if (records.length > 0 && records[0].pricing_plans) {
-      let plans = records[0].pricing_plans;
+    if (records.length > 0) {
+      const rec = records[0];
+      let plans = rec.pricing_plans;
       if (typeof plans === "string") {
         try { plans = JSON.parse(plans); } catch {}
       }
-      return applyDynamicPricing(plans);
+      if (plans && typeof plans === "object") {
+        if (rec.hibernation_monthly_rate !== undefined && plans.hibernation_monthly_rate === undefined) {
+          plans.hibernation_monthly_rate = rec.hibernation_monthly_rate;
+        }
+        return applyDynamicPricing(plans);
+      } else if (rec.hibernation_monthly_rate !== undefined) {
+        setHibernationMonthlyRate(rec.hibernation_monthly_rate);
+      }
     }
   } catch (err) {
     console.warn("Gagal fetch pricing dari app_settings Master PB:", err);
@@ -234,6 +287,45 @@ export const calculatePlanInvoice = (plan: string, durationMonths: number = 1): 
     planKey,
     planLabel: detail.label,
     quota: detail.quota,
+  };
+};
+
+export const calculateMultiPeriodInvoice = (
+  plan: string,
+  activeMonths: number = 6,
+  pauseMonths: number = 3,
+  customHibernationRate?: number
+): {
+  planKey: PlanKey;
+  planLabel: string;
+  activeMonths: number;
+  activeAmount: number;
+  pauseMonths: number;
+  hibernationRate: number;
+  hibernationAmount: number;
+  totalAmount: number;
+} => {
+  const planKey = normalizePlanKey(plan);
+  const detail = PLAN_PRICING[planKey] || DEFAULT_PLAN_PRICING[planKey];
+  const hibernationRate = customHibernationRate !== undefined ? customHibernationRate : getHibernationMonthlyRate();
+
+  // 6 bulan aktif (mengikuti rates[6] paket diskon semester, atau rate per bulan)
+  const activeAmount = activeMonths === 6
+    ? detail.rates[6]
+    : (detail.rates[1] || detail.monthlyRate) * activeMonths;
+
+  const hibernationAmount = Math.max(0, pauseMonths) * hibernationRate;
+  const totalAmount = activeAmount + hibernationAmount;
+
+  return {
+    planKey,
+    planLabel: detail.label,
+    activeMonths,
+    activeAmount,
+    pauseMonths,
+    hibernationRate,
+    hibernationAmount,
+    totalAmount,
   };
 };
 

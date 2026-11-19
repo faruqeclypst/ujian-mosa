@@ -12,7 +12,7 @@ import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { cn } from "../../lib/utils";
 import { getSchoolUrl, getSchoolDomain, getDomainSuffix } from "../../utils/domainHelper";
-import { calculatePlanInvoice, PLAN_PRICING, normalizePlanKey, addBillingPeriod } from "../../utils/pricingHelper";
+import { calculatePlanInvoice, PLAN_PRICING, normalizePlanKey, addBillingPeriod, getHibernationMonthlyRate, formatRupiah } from "../../utils/pricingHelper";
 import { ensureRenewalInvoice } from "../../utils/subscriptionHelper";
 import { parseCustomData, MultiPeriodConfig } from "../../utils/invoicePdfHelper";
 import { OneClickMigrationModal } from "./OneClickMigrationModal";
@@ -2477,6 +2477,7 @@ const AddEditSchoolModal = ({
     const currMonth = now.getMonth(); // 0 = Jan, 10 = Nov
     const isNovToJan = currMonth >= 9 || currMonth <= 1; // Okt - Feb
 
+    const hRate = getHibernationMonthlyRate();
     if (isNovToJan) {
       const year1 = currMonth <= 1 ? currYear - 1 : currYear;
       const year2 = year1 + 1;
@@ -2489,6 +2490,8 @@ const AddEditSchoolModal = ({
         pause_months: 3,
         pause_start: `${year2}-02-01`,
         pause_end: `${year2}-04-30`,
+        hibernation_rate: hRate,
+        hibernation_total: 3 * hRate,
         term_2_name: `Periode 2: Mei, Jun, Jul ${year2} (Semester Genap / PAT)`,
         term_2_months: 3,
         term_2_start: `${year2}-05-01`,
@@ -2506,6 +2509,8 @@ const AddEditSchoolModal = ({
         pause_months: 3,
         pause_start: `${year}-08-01`,
         pause_end: `${year}-10-31`,
+        hibernation_rate: hRate,
+        hibernation_total: 3 * hRate,
         term_2_name: `Periode 2: Nov, Des, Jan ${year}/${nextYear} (Semester Ganjil / PAS)`,
         term_2_months: 3,
         term_2_start: `${year}-11-01`,
@@ -2760,17 +2765,22 @@ const AddEditSchoolModal = ({
 
           const sched = getSmartMultiPeriodSchedule();
           const monthlyRate = PLAN_PRICING[targetPlanKey]?.rates[1] || PLAN_PRICING[targetPlanKey]?.monthlyRate || 380000;
-          const multiSubtotal = monthlyRate * 6;
+          const hibernationRate = getHibernationMonthlyRate();
+          const hibernationTotal = 3 * hibernationRate;
+          const multiSubtotal = (monthlyRate * 6) + hibernationTotal;
 
           const customDataObj = multiPeriodEnabled ? {
             multi_period: {
               is_multi_period: true,
               ...sched,
+              pause_months: 3,
+              hibernation_rate: hibernationRate,
+              hibernation_total: hibernationTotal,
             },
             items: [
               { name: sched.term_1_name, qty: 3, price: monthlyRate, total: monthlyRate * 3 },
               { name: sched.term_2_name, qty: 3, price: monthlyRate, total: monthlyRate * 3 },
-              { name: `${sched.pause_name} - Layanan disiapkan, server stand-by`, qty: 1, price: 0, total: 0 },
+              { name: `${sched.pause_name} - Pemeliharaan & Hibernasi Server (3 Bulan)`, qty: 3, price: hibernationRate, total: hibernationTotal },
             ],
           } : undefined;
 

@@ -17,6 +17,7 @@ import {
   PlanKey,
   fetchAndApplyPricing,
   billingPeriodLabel,
+  getHibernationMonthlyRate,
 } from "../../utils/pricingHelper";
 import { upgradeSchoolFromInvoice, calculateTopup, isTopupInvoice } from "../../utils/subscriptionHelper";
 import {
@@ -207,19 +208,25 @@ const SuperAdminInvoicePage = () => {
   // ─── Multi-Periode Ujian (Split 2 Periode & Masa Jeda / Hibernasi) ───
   const [multiPeriodEnabled, setMultiPeriodEnabled] = useState(false);
   const [showMultiPeriodSection, setShowMultiPeriodSection] = useState(false);
-  const [multiPeriodData, setMultiPeriodData] = useState<MultiPeriodConfig>({
-    is_multi_period: false,
-    term_1_name: `Periode 1: Mei, Juni, Juli ${new Date().getFullYear()} (Semester Genap / PAT)`,
-    term_1_months: 3,
-    term_1_start: `${new Date().getFullYear()}-05-01`,
-    term_1_end: `${new Date().getFullYear()}-07-31`,
-    pause_name: `Masa Jeda: Agustus, September, Oktober ${new Date().getFullYear()} (Hibernasi)`,
-    pause_start: `${new Date().getFullYear()}-08-01`,
-    pause_end: `${new Date().getFullYear()}-10-31`,
-    term_2_name: `Periode 2: November, Desember ${new Date().getFullYear()} - Januari ${new Date().getFullYear() + 1} (Semester Ganjil / PAS)`,
-    term_2_months: 3,
-    term_2_start: `${new Date().getFullYear()}-11-01`,
-    term_2_end: `${new Date().getFullYear() + 1}-01-31`,
+  const [multiPeriodData, setMultiPeriodData] = useState<MultiPeriodConfig>(() => {
+    const hRate = getHibernationMonthlyRate();
+    return {
+      is_multi_period: false,
+      term_1_name: `Periode 1: Mei, Juni, Juli ${new Date().getFullYear()} (Semester Genap / PAT)`,
+      term_1_months: 3,
+      term_1_start: `${new Date().getFullYear()}-05-01`,
+      term_1_end: `${new Date().getFullYear()}-07-31`,
+      pause_name: `Masa Jeda: Agustus, September, Oktober ${new Date().getFullYear()} (Hibernasi)`,
+      pause_start: `${new Date().getFullYear()}-08-01`,
+      pause_end: `${new Date().getFullYear()}-10-31`,
+      pause_months: 3,
+      hibernation_rate: hRate,
+      hibernation_total: 3 * hRate,
+      term_2_name: `Periode 2: November, Desember ${new Date().getFullYear()} - Januari ${new Date().getFullYear() + 1} (Semester Ganjil / PAS)`,
+      term_2_months: 3,
+      term_2_start: `${new Date().getFullYear()}-11-01`,
+      term_2_end: `${new Date().getFullYear() + 1}-01-31`,
+    };
   });
 
   const applyMultiPeriodPreset = (type: "smart" | "nov_may" | "may_nov" | "apr_oct" = "smart", planOverride?: string) => {
@@ -235,7 +242,10 @@ const SuperAdminInvoicePage = () => {
 
     const planKey = normalizePlanKey(planOverride || form.plan || "basic");
     const monthlyRate = PLAN_PRICES[planKey]?.monthly || 380000;
-    const subtotal = monthlyRate * 6;
+    const hibernationRate = getHibernationMonthlyRate();
+    const pauseMonths = 3;
+    const hibernationTotal = pauseMonths * hibernationRate;
+    const subtotal = (monthlyRate * 6) + hibernationTotal;
     const taxAmt = taxEnabled ? Math.round(subtotal * ((taxPercent || 11) / 100)) : 0;
 
     let t1Name = "";
@@ -307,7 +317,7 @@ const SuperAdminInvoicePage = () => {
       duration_months: 6,
       period_label: labelPeriod,
       amount: subtotal + taxAmt,
-      notes: `[MULTI-PERIODE] Langganan 6 bulan aktif 2 periode: ${t1Name.split("(")[0].trim()} dan ${t2Name.split("(")[0].trim()}. Masa jeda non-aktif pada ${pName.split("(")[0].trim()}. Bank soal dan akun tetap aman.`,
+      notes: `[MULTI-PERIODE] Langganan 6 bulan aktif 2 periode (${t1Name.split("(")[0].trim()} & ${t2Name.split("(")[0].trim()}) + pemeliharaan server masa jeda ${pauseMonths} bulan (${formatRupiah(hibernationTotal)}). Bank soal dan akun tetap aman.`,
     }));
 
     setMultiPeriodEnabled(true);
@@ -321,6 +331,9 @@ const SuperAdminInvoicePage = () => {
       pause_name: pName,
       pause_start: pStart,
       pause_end: pEnd,
+      pause_months: pauseMonths,
+      hibernation_rate: hibernationRate,
+      hibernation_total: hibernationTotal,
       term_2_name: t2Name,
       term_2_months: 3,
       term_2_start: t2Start,
@@ -346,10 +359,10 @@ const SuperAdminInvoicePage = () => {
       },
       {
         description: pauseDesc,
-        qty: 1,
-        unit: "Paket",
-        price: 0,
-        total: 0,
+        qty: pauseMonths,
+        unit: "Bulan",
+        price: hibernationRate,
+        total: hibernationTotal,
       }
     ]);
   };
@@ -2413,6 +2426,38 @@ const SuperAdminInvoicePage = () => {
                               />
                             </div>
                           </div>
+                          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-amber-200/60">
+                            <div>
+                              <label className="block text-[10px] font-medium text-slate-500 mb-0.5">Biaya Hibernasi / Bulan (Rp)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="10000"
+                                value={multiPeriodData.hibernation_rate ?? getHibernationMonthlyRate()}
+                                onChange={e => {
+                                  const rate = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                  const pMonths = multiPeriodData.pause_months || 3;
+                                  const total = rate * pMonths;
+                                  setMultiPeriodData(d => ({ ...d, hibernation_rate: rate, hibernation_total: total }));
+                                  setCustomItems(items => items.map(it => {
+                                    if (it.description.toLowerCase().includes("hibernasi") || it.description.toLowerCase().includes("jeda")) {
+                                      return { ...it, price: rate, total: rate * it.qty };
+                                    }
+                                    return it;
+                                  }));
+                                }}
+                                className="w-full px-2 py-1 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-medium text-slate-500 mb-0.5">
+                                Total Biaya Hibernasi ({multiPeriodData.pause_months || 3} Bulan)
+                              </label>
+                              <div className="w-full px-2 py-1 text-xs font-bold text-amber-900 bg-amber-100/70 rounded-lg border border-amber-200 flex items-center h-[26px]">
+                                {formatRupiah(multiPeriodData.hibernation_total ?? ((multiPeriodData.pause_months || 3) * (multiPeriodData.hibernation_rate ?? getHibernationMonthlyRate())))}
+                              </div>
+                            </div>
+                          </div>
                         </div>
 
                         {/* Periode 2 */}
@@ -2741,6 +2786,9 @@ const SuperAdminInvoicePage = () => {
                             <div className="text-[9.5px] font-bold text-amber-700 uppercase">Masa Jeda (Hibernasi)</div>
                             <div className="font-semibold text-slate-800 mt-0.5">{cd.multi_period.pause_name || "Agustus – Oktober"}</div>
                             <div className="text-[10px] text-slate-400 mt-0.5">{cd.multi_period.pause_start || "-"} s/d {cd.multi_period.pause_end || "-"}</div>
+                            <div className="text-[10px] font-bold text-amber-800 mt-1">
+                              Biaya: {formatRupiah(cd.multi_period.hibernation_total ?? ((cd.multi_period.pause_months || 3) * (cd.multi_period.hibernation_rate || getHibernationMonthlyRate())))}
+                            </div>
                           </div>
                           <div className="bg-white p-2 rounded border border-purple-200/60">
                             <div className="text-[9.5px] font-bold text-blue-700 uppercase">Periode 2 (3 Bln)</div>

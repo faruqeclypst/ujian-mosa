@@ -8,14 +8,19 @@ import {
   Calculator,
   Sparkles,
   Users,
+  Moon,
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
+import { cn } from "../../lib/utils";
 import {
   DEFAULT_PLAN_PRICING,
+  DEFAULT_HIBERNATION_MONTHLY_RATE,
   PlanKey,
   PlanPricingDetail,
   formatRupiah,
   applyDynamicPricing,
+  getHibernationMonthlyRate,
+  setHibernationMonthlyRate,
 } from "../../utils/pricingHelper";
 
 const PAID_PLANS: { key: PlanKey; color: string; badge: string; description: string }[] = [
@@ -43,6 +48,7 @@ export const PricingSettings: React.FC = () => {
   const [plans, setPlans] = useState<Record<PlanKey, PlanPricingDetail>>(() =>
     JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICING))
   );
+  const [hibernationMonthlyRate, setHibernationMonthlyRateState] = useState<number>(() => getHibernationMonthlyRate());
   const [appSettingRecordId, setAppSettingRecordId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,6 +70,8 @@ export const PricingSettings: React.FC = () => {
         if (rawPricing) {
           const parsed = typeof rawPricing === "string" ? JSON.parse(rawPricing) : rawPricing;
           if (parsed && typeof parsed === "object") {
+            const hRate = parsed.hibernation_monthly_rate ?? records[0].hibernation_monthly_rate ?? DEFAULT_HIBERNATION_MONTHLY_RATE;
+            setHibernationMonthlyRateState(Number(hRate) || DEFAULT_HIBERNATION_MONTHLY_RATE);
             const merged = {
               free: DEFAULT_PLAN_PRICING.free,
               basic: { ...DEFAULT_PLAN_PRICING.basic, ...(parsed.basic || {}) },
@@ -71,12 +79,13 @@ export const PricingSettings: React.FC = () => {
               ultimate: { ...DEFAULT_PLAN_PRICING.ultimate, ...(parsed.ultimate || {}) },
             };
             setPlans(merged);
-            applyDynamicPricing(merged);
+            applyDynamicPricing({ ...merged, hibernation_monthly_rate: hRate });
             return;
           }
         }
       }
       setPlans(JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICING)));
+      setHibernationMonthlyRateState(DEFAULT_HIBERNATION_MONTHLY_RATE);
     } catch (err: any) {
       console.warn("Gagal memuat pricing_plans dari Master PB:", err);
       setErrorMsg("Gagal memuat setelan tarif dari server master. Menggunakan tarif standar.");
@@ -158,7 +167,10 @@ export const PricingSettings: React.FC = () => {
 
     try {
       const payload = {
-        pricing_plans: plans,
+        pricing_plans: {
+          ...plans,
+          hibernation_monthly_rate: hibernationMonthlyRate,
+        },
       };
 
       if (appSettingRecordId) {
@@ -174,9 +186,10 @@ export const PricingSettings: React.FC = () => {
       }
 
       // Sinkronkan ke in-memory & localStorage client
-      applyDynamicPricing(plans);
+      setHibernationMonthlyRate(hibernationMonthlyRate);
+      applyDynamicPricing({ ...plans, hibernation_monthly_rate: hibernationMonthlyRate });
 
-      setSuccessMsg("Tarif layanan berhasil disimpan ke Master DB! Seluruh kalkulasi invoice baru akan otomatis mengikuti tarif ini.");
+      setSuccessMsg("Tarif layanan & biaya hibernasi berhasil disimpan ke Master DB! Berlaku universal untuk seluruh invoice & pendaftaran baru.");
       setTimeout(() => setSuccessMsg(""), 5000);
     } catch (err: any) {
       console.error("Gagal simpan pricing:", err);
@@ -189,6 +202,7 @@ export const PricingSettings: React.FC = () => {
   const handleResetToDefault = () => {
     if (window.confirm("Kembalikan semua tarif dan kuota ke pengaturan bawaan awal?")) {
       setPlans(JSON.parse(JSON.stringify(DEFAULT_PLAN_PRICING)));
+      setHibernationMonthlyRateState(DEFAULT_HIBERNATION_MONTHLY_RATE);
       setSuccessMsg("Form dikembalikan ke tarif bawaan. Jangan lupa klik 'Simpan Tarif Layanan' untuk menerapkan ke server.");
     }
   };
@@ -255,6 +269,85 @@ export const PricingSettings: React.FC = () => {
             <span>{errorMsg}</span>
           </div>
         )}
+      </div>
+
+      {/* Universal Hibernation Rate Setting Card */}
+      <div className="bg-gradient-to-r from-amber-50/70 via-white to-purple-50/50 border border-amber-200/90 rounded-2xl p-5 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+              <Moon size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-sm font-bold text-slate-900">Tarif Hibernasi & Pemeliharaan Server</h4>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                  Universal / Global
+                </span>
+                <span className="text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                  Masa Jeda Multi-Periode
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-2xl">
+                Biaya perawatan server cloud, database, dan pengamanan bank soal per bulan selama masa jeda (hibernasi) ujian.
+                Berlaku secara universal untuk kalkulasi formulir pendaftaran dan pembuatan invoice paket multi-periode.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 bg-white/90 p-3 rounded-xl border border-amber-200/80 shadow-2xs">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Tarif Hibernasi per Bulan
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="10000"
+                  value={hibernationMonthlyRate}
+                  onChange={(e) => setHibernationMonthlyRateState(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  className="w-36 pl-8 pr-3 py-1.5 text-xs font-bold border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 flex items-center gap-1.5">
+              {[50000, 100000, 150000].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setHibernationMonthlyRateState(preset)}
+                  className={cn(
+                    "px-2 py-1 text-[10px] font-bold rounded-lg border transition cursor-pointer",
+                    hibernationMonthlyRate === preset
+                      ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  )}
+                >
+                  {formatRupiah(preset).replace("Rp ", "")}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Simulation Banner */}
+        <div className="mt-3.5 pt-3 border-t border-amber-200/60 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-600 gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-semibold text-slate-800">💡 Simulasi Masa Jeda 3 Bulan:</span>
+            <span>
+              3 bulan × {formatRupiah(hibernationMonthlyRate)}/bln ={" "}
+              <strong className="text-amber-800 font-extrabold bg-amber-100/70 px-1.5 py-0.5 rounded">
+                {formatRupiah(hibernationMonthlyRate * 3)}
+              </strong>
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400">
+            Bank soal, akun guru, dan histori nilai tetap aman tersimpan di cloud
+          </span>
+        </div>
       </div>
 
       {/* Grid Paket Berbayar */}

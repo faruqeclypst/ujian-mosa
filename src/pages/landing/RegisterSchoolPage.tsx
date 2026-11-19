@@ -37,6 +37,7 @@ import {
   calculatePlanInvoice,
   formatRupiah,
   normalizePlanKey,
+  getHibernationMonthlyRate,
 } from "../../utils/pricingHelper";
 
 const getPricingEstimate = (
@@ -62,13 +63,14 @@ const getPricingEstimate = (
   }
 
   if (mode === "2 Periode Ujian") {
-    const normal6 = baseMonthly * 6;
-    const diff = normal6 - detail.rates[6];
-    const pct = normal6 > 0 && diff > 0 ? Math.round((diff / normal6) * 100) : 0;
+    const hRate = getHibernationMonthlyRate();
+    const hCost = 3 * hRate;
+    const activeCost = detail.rates[6];
+    const total = activeCost + hCost;
     return {
-      total: formatRupiah(detail.rates[6]),
-      period: "6 Bulan (2 Periode Ujian)",
-      detail: pct > 0 ? `Hemat ${pct}% (Split 2 Periode Ujian & Jeda)` : "Split 2 Periode Ujian & Jeda",
+      total: formatRupiah(total),
+      period: "6 Bulan Aktif (2 Periode) + 3 Bulan Jeda",
+      detail: `Lisensi 2 Periode (${formatRupiah(activeCost)}) + Pemeliharaan Server Jeda 3 Bln (${formatRupiah(hCost)})`,
     };
   }
 
@@ -624,7 +626,7 @@ const RegisterSchoolPage = () => {
                                 </span>
                               </div>
                               <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                                Didesain khusus bagi sekolah yang menggunakan CBT pada saat musim ujian semester. Masa aktif 6 bulan dipecah menjadi 2 periode ujian dengan masa jeda (hibernasi) gratis di antaranya tanpa biaya server tambahan.
+                                Didesain khusus bagi sekolah yang menggunakan CBT pada saat musim ujian semester. Masa aktif 6 bulan dipecah menjadi 2 periode ujian dengan biaya pemeliharaan cloud & hibernasi server hemat Rp 100.000/bulan pada masa jeda.
                               </p>
                             </div>
                           </div>
@@ -643,13 +645,18 @@ const RegisterSchoolPage = () => {
                             </div>
 
                             <div className="p-3 bg-white border border-amber-200 rounded-xl shadow-2xs">
-                              <div className="flex items-center gap-1.5 text-amber-700 font-extrabold text-xs mb-1">
-                                <Moon size={14} />
-                                <span>Masa Jeda (3 Bulan)</span>
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-1.5 text-amber-700 font-extrabold text-xs">
+                                  <Moon size={14} />
+                                  <span>Masa Jeda (3 Bulan)</span>
+                                </div>
+                                <span className="text-[9.5px] font-extrabold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                                  {formatRupiah(getHibernationMonthlyRate())}/bln
+                                </span>
                               </div>
-                              <p className="text-[11px] font-bold text-slate-800">Hibernasi Akun (Gratis)</p>
+                              <p className="text-[11px] font-bold text-slate-800">Hibernasi Server & Data</p>
                               <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                                Di luar musim ujian, server diistirahatkan. Seluruh bank soal, data guru, & siswa tetap aman tersimpan tanpa biaya.
+                                Di luar musim ujian, server diistirahatkan dengan biaya pemeliharaan cloud minim. Seluruh bank soal, data guru, & siswa dijamin tetap aman.
                               </p>
                             </div>
 
