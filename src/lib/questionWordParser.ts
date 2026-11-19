@@ -105,15 +105,17 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
     return `<p style="margin-left:${indentLevel * 2}em">`;
   });
 
-  // Step 2c: Fix ordered lists inside table cells — mammoth always uses decimal,
-  // but Word's a) b) c) style should render as lower-alpha.
-  // Since CSS list-style-type may be overridden, we convert <ol><li> to explicit lettered paragraphs.
+  // Step 2c: Fix ordered lists — preserve numeric list markers (e.g. 1) 2) 3))
+  // Since CSS list-style-type may be overridden, convert <ol><li> to explicit numbered paragraphs.
   html = html.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/g, (match, content) => {
     let index = 0;
     const items = content.replace(/<li[^>]*>([\s\S]*?)<\/li>/g, (_: string, inner: string) => {
-      const letter = String.fromCharCode(97 + index); // a, b, c, ...
+      const trimmed = inner.trim();
       index++;
-      return `<p style="margin-left:1.5em;">${letter}) ${inner.trim()}</p>`;
+      if (/^\(?[0-9a-zA-Z]{1,3}[\.\)]/.test(trimmed)) {
+        return `<p style="margin-left:1.5em;">${trimmed}</p>`;
+      }
+      return `<p style="margin-left:1.5em;">${index}) ${trimmed}</p>`;
     });
     return items;
   });
@@ -177,6 +179,7 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
   let currentQuestion: Partial<ParsedQuestion> | null = null;
   let currentChoices: Record<string, { text: string; imageUrl?: string; isCorrect: boolean }> = {};
   let currentAnswerKey = "";
+  let inSubStatementList = false;
 
   let currentGroupId: string | undefined = undefined;
   let currentGroupText: string | undefined = undefined;
@@ -276,146 +279,196 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
     }
   }
 
-  // ─── PRE-PROCESS: Handle "per-question table" format ───────────────────
-  // Format: each question is its own table (may span multiple tables if page-broken):
-  //   Row: | 21 | Question text with a) b) c) list |
-  //   Row: | A  | a – b – c |
-  //   Row: | B  | b – c – d |
-  //   ...
-  //   Row: |    | Kunci Jawaban: E |
+  // ─── PRE-PROCESS: Handle structured exam tables ──────────────────────────
+  // Supports:
+  // 1. Multi-question tables (an entire exam of 40-50 questions in one or more tables,
+  //    with optional header metadata rows at the top: "Nama Guru : ...", "Kelas : ...").
+  // 2. Per-question tables (one table per question).
+  // 3. Tables broken across page boundaries.
   const topLevelTables = allTables.filter(t => !t.parentElement?.closest('table'));
 
-  // Helper: extract all rows from a table (direct children only)
   const getTableRows = (table: Element) =>
     Array.from(table.querySelectorAll(':scope > tbody > tr, :scope > tr'));
 
-  // Detect if a table is a "question table" — first row has a number in col 0
-  const isQuestionTable = (table: Element): boolean => {
-    const rows = getTableRows(table);
-    if (rows.length < 1) return false;
-    const firstCells = Array.from(rows[0].querySelectorAll(':scope > td, :scope > th'));
-    if (firstCells.length < 1) return false;
-    return !!firstCells[0].textContent?.trim().match(/^\d+$/);
-  };
-
-  // Detect if a table is a "continuation table" — starts with A-E (choices) or Kunci
-  const isContinuationTable = (table: Element): boolean => {
-    const rows = getTableRows(table);
-    if (rows.length < 1) return false;
-    const firstCells = Array.from(rows[0].querySelectorAll(':scope > td, :scope > th'));
-    if (firstCells.length < 1) return false;
-    const c = firstCells[0].textContent?.trim() || "";
-    return !!(c.match(/^[A-Ea-e]$/) || c.match(/^kunci/i) || rows[0].textContent?.match(/kunci\s*jawaban/i));
-  };
-
-  // Group tables: merge question table with any following continuation tables
-  const tableGroups: Element[][] = [];
-  let i = 0;
-  while (i < topLevelTables.length) {
-    const t = topLevelTables[i];
-    if (isQuestionTable(t)) {
-      const group = [t];
-      let j = i + 1;
-      // Merge following tables that are continuations (choices/kunci)
-      while (j < topLevelTables.length && isContinuationTable(topLevelTables[j])) {
-        group.push(topLevelTables[j]);
-        j++;
-      }
-      tableGroups.push(group);
-      i = j;
-    } else {
-      i++;
-    }
-  }
-
   const processedTableQuestions: ParsedQuestion[] = [];
 
-  tableGroups.forEach(group => {
-    let qText = "";
-    let qKey = "";
-    const qChoices: Record<string, { text: string; isCorrect: boolean }> = {};
-    let questionRowDone = false;
+  let curQText = "";
+  let curQChoices: Record<string, { text: string; imageUrl?: string; isCorrect: boolean }> = {};
+  let curQKey = "";
+  let curQImage: string | undefined = undefined;
 
-    group.forEach(table => {
-      const rows = getTableRows(table);
-
-      rows.forEach(row => {
-        const cells = Array.from(row.querySelectorAll(':scope > td, :scope > th'));
-        if (cells.length < 1) return;
-
-        const cellA = cells[0]?.textContent?.trim() || "";
-        const cellB = cells.length >= 2 ? (cells[1]?.textContent?.trim() || "") : "";
-        const cellBHtml = cells.length >= 2 ? (cells[1]?.innerHTML?.trim() || "") : "";
-        const fullText = cells.map(c => c.textContent?.trim()).join(" ").trim();
-
-        // Answer key row — check first
-        const answerMatch = fullText.match(/kunci\s*jawaban\s*[:\s]+([A-Ea-e])/i);
-        if (answerMatch) {
-          qKey = answerMatch[1].toLowerCase();
-          return;
-        }
-
-        // Question number row
-        if (!questionRowDone && cellA.match(/^\d+$/)) {
-          if (cells.length >= 2) {
-            qText = (cells[1] as HTMLElement)?.innerHTML?.trim() || cellB;
-          } else {
-            qText = cellBHtml || cellA;
-          }
-          questionRowDone = true;
-          return;
-        }
-
-        // UPPERCASE A-E → choice row
-        if (questionRowDone && cellA.match(/^[A-E]$/)) {
-          const letter = cellA.toLowerCase();
-          const choiceHtml = cells.length >= 2 ? (cells[1]?.innerHTML?.trim() || "") : "";
-          const choiceText = cells.length >= 2 ? (cells[1]?.textContent?.trim() || "") : "";
-          qChoices[letter] = { text: choiceHtml || choiceText, isCorrect: false };
-          return;
-        }
-
-        // lowercase a-e: treat as list item inside question text (before choices)
-        // OR treat as choice if after uppercase choices already collected
-        if (questionRowDone && cellA.match(/^[a-e]$/)) {
-          if (Object.keys(qChoices).length === 0) {
-            // Still in question context — append as list item
-            const itemHtml = cells.length >= 2 ? (cells[1]?.innerHTML?.trim() || "") : "";
-            const itemText = cells.length >= 2 ? (cells[1]?.textContent?.trim() || "") : "";
-            if (itemText) qText += `<br>${cellA}) ${itemHtml || itemText}`;
-          } else {
-            // After choices started — treat as choice
-            const letter = cellA;
-            const choiceHtml = cells.length >= 2 ? (cells[1]?.innerHTML?.trim() || "") : "";
-            const choiceText = cells.length >= 2 ? (cells[1]?.textContent?.trim() || "") : "";
-            qChoices[letter] = { text: choiceHtml || choiceText, isCorrect: false };
-          }
-          return;
-        }
-
-        // Continuation of question text (no letter, not number, choices not started)
-        if (questionRowDone && !Object.keys(qChoices).length && cellA && !cellA.match(/^[A-Ea-e\d]$/)) {
-          qText += "<br>" + (cellBHtml || cellB || cellA);
-        }
-      });
-    });
-
-    if (qText && Object.keys(qChoices).length >= 2) {
-      if (qKey && qChoices[qKey]) {
-        qChoices[qKey].isCorrect = true;
+  const commitCurrentTableQuestion = () => {
+    if (!curQText || !curQText.trim()) return;
+    const choiceKeys = Object.keys(curQChoices);
+    if (choiceKeys.length >= 2) {
+      if (curQKey && curQChoices[curQKey]) {
+        curQChoices[curQKey].isCorrect = true;
       }
       processedTableQuestions.push({
-        text: qText,
+        text: curQText.trim(),
         type: "pilihan_ganda",
-        choices: qChoices,
-        answerKey: qKey,
+        choices: { ...curQChoices },
+        answerKey: curQKey || undefined,
+        imageUrl: curQImage,
       });
+    } else if (includeEssay) {
+      const textOnly = curQText.replace(/<[^>]*>/g, '').trim();
+      const isShort = textOnly.length < 80 && !curQText.includes('<li') && !curQText.includes('•');
+      processedTableQuestions.push({
+        text: curQText.trim(),
+        type: isShort ? "isian_singkat" : "uraian",
+        choices: {},
+        answerKey: curQKey || undefined,
+        imageUrl: curQImage,
+      });
+    }
+    curQText = "";
+    curQChoices = {};
+    curQKey = "";
+    curQImage = undefined;
+  };
+
+  // Collect all direct rows across all top-level tables
+  const allRows: Element[] = [];
+  topLevelTables.forEach(table => {
+    const rows = getTableRows(table);
+    allRows.push(...rows);
+  });
+
+  allRows.forEach(row => {
+    const cells = Array.from(row.querySelectorAll(':scope > td, :scope > th'));
+    if (cells.length === 0) return;
+
+    const fullRowText = cells.map(c => c.textContent?.trim() || "").join(" ").trim();
+    if (!fullRowText) return;
+
+    // A. Check for metadata / header rows to ignore
+    // e.g. "Nama Guru : RN", "Mata Pelajaran : PJOK", "Kelas : XII", "No | Soal | Kunci"
+    if (/^(?:Nama\s*Guru|Mata\s*Pelajaran|Mapel|Kelas|Hari\s*\/\s*Tanggal|Waktu|Petunjuk)\s*[:]/i.test(fullRowText)) {
+      return;
+    }
+    const c0 = cells[0]?.textContent?.trim() || "";
+    const c1 = cells.length >= 2 ? (cells[1]?.textContent?.trim() || "") : "";
+    if (/^(?:no|nomor)$/i.test(c0) && /^(?:soal|pertanyaan|uraian\s*soal|item)/i.test(c1)) {
+      return;
+    }
+
+    // B. Check for Answer Key Row (e.g. "Kunci Jawaban: A" or cell 0 "Kunci" cell 1 "A")
+    const keyMatch = fullRowText.match(/^(?:kunci(?:\s*jawaban)?|jawaban|answer|key)\s*[:\.\s]+([A-Ea-e])\b/i) ||
+                     fullRowText.match(/\bkunci\s*(?:jawaban)?\s*[:\.\s]+([A-Ea-e])\b/i);
+    if (keyMatch && (curQText || Object.keys(curQChoices).length > 0)) {
+      curQKey = keyMatch[1].toLowerCase();
+      if (curQChoices[curQKey]) {
+        curQChoices[curQKey].isCorrect = true;
+      }
+      return;
+    }
+
+    // C. Check for Question Number Row
+    // Col 0 has question number: "1.", "1", "1)", "(1)", "No. 1", "No 1", "Nomor 1", "40."
+    const qNumMatch = c0.match(/^(?:no[\.\s]*|nomor[\.\s]*)?\(?(\d{1,4})\)?[\.\)]*$/i);
+    if (qNumMatch && cells.length >= 2) {
+      // Commit previous question if any
+      commitCurrentTableQuestion();
+
+      const cell1Html = (cells[1] as HTMLElement)?.innerHTML?.trim() || "";
+      const cell1Text = cells[1]?.textContent?.trim() || "";
+      curQText = cell1Html || cell1Text;
+
+      const qImgs = extractImages(cells[1]);
+      if (qImgs.length > 0) curQImage = qImgs[0];
+
+      // Check if 3-column table has key in col 2 (e.g. | 1 | Soal... | A |)
+      if (cells.length >= 3) {
+        const c2 = cells[2]?.textContent?.trim() || "";
+        const m2 = c2.match(/^([A-Ea-e])$/i) || c2.match(/kunci\s*[:\.\s]*([A-Ea-e])/i);
+        if (m2) curQKey = m2[1].toLowerCase();
+      }
+      return;
+    }
+
+    // D. Check for Horizontal Choice Row (e.g. 4-5 cells: A: ... | B: ... | C: ...)
+    if (curQText && cells.length >= 4) {
+      let matchedChoicesInRow = 0;
+      cells.forEach(cell => {
+        const txt = cell.textContent?.trim() || "";
+        const m = txt.match(/^([A-Ea-e])[\.\)\s]+(.*)/s);
+        if (m) {
+          matchedChoicesInRow++;
+          const letter = m[1].toLowerCase();
+          const cHtml = cell.innerHTML.replace(/^[\s\S]*?[A-Ea-e][\.\)\s]+/, '').trim();
+          const cImgs = extractImages(cell);
+          curQChoices[letter] = {
+            text: cHtml || m[2].trim(),
+            imageUrl: cImgs.length > 0 ? cImgs[0] : undefined,
+            isCorrect: false,
+          };
+        }
+      });
+      if (matchedChoicesInRow >= 3) return;
+    }
+
+    // E. Check for Single Choice Row
+    // Col 0 has choice letter: "A", "B", "C", "D", "E", "A.", "(A)", "a)"
+    const choiceMatch = c0.match(/^\(?([A-Ea-e])\)?[\.\)]*$/);
+    if (curQText && choiceMatch) {
+      const letter = choiceMatch[1].toLowerCase();
+      const choiceHtml = cells.length >= 2 ? ((cells[1] as HTMLElement)?.innerHTML?.trim() || "") : "";
+      const choiceText = cells.length >= 2 ? (cells[1]?.textContent?.trim() || "") : "";
+      const cImgs = cells.length >= 2 ? extractImages(cells[1]) : [];
+      const isMarked = cells.length >= 2 ? hasCorrectMarker(cells[1], choiceHtml) : false;
+
+      curQChoices[letter] = {
+        text: choiceHtml || choiceText,
+        imageUrl: cImgs.length > 0 ? cImgs[0] : undefined,
+        isCorrect: false,
+      };
+      if (isMarked && !curQKey) curQKey = letter;
+      return;
+    }
+
+    // F. Continuation of Question Text
+    // If we're inside a question and choices haven't started yet:
+    if (curQText && Object.keys(curQChoices).length === 0) {
+      const cell1Html = cells.length >= 2 ? ((cells[1] as HTMLElement)?.innerHTML?.trim() || "") : "";
+      const rowContent = cell1Html || fullRowText;
+      curQText += "<br>" + rowContent;
+      const rImgs = extractImages(row);
+      if (rImgs.length > 0 && !curQImage) curQImage = rImgs[0];
+      return;
     }
   });
 
-  // If we found per-question tables, return them
+  // Commit the last table question
+  commitCurrentTableQuestion();
+
+  // If table questions were successfully parsed:
   if (processedTableQuestions.length > 0) {
-    return processedTableQuestions;
+    // Apply trailing answer keys if present and inline keys were missing
+    if (trailingAnswerKeys.size > 0) {
+      processedTableQuestions.forEach((q, index) => {
+        const questionNum = index + 1;
+        const key = trailingAnswerKeys.get(questionNum);
+        if (key && q.choices[key]) {
+          const hasInlineAnswer = Object.values(q.choices).some(c => c.isCorrect);
+          if (!hasInlineAnswer) {
+            Object.keys(q.choices).forEach(k => { q.choices[k].isCorrect = false; });
+            q.choices[key].isCorrect = true;
+            q.answerKey = key;
+          }
+        }
+      });
+    }
+
+    const finalTableQuestions = includeEssay
+      ? processedTableQuestions
+      : processedTableQuestions.filter(q => q.type === "pilihan_ganda");
+    finalTableQuestions.forEach(q => {
+      q.text = (q.text || "").trim();
+    });
+    if (finalTableQuestions.length > 0) {
+      return finalTableQuestions;
+    }
   }
 
   // ─── MAIN PARSE ──────────────────────────────────────────────────────
@@ -718,6 +771,50 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
       }
     }
 
+    // Check if this paragraph is a numbered sub-statement of the CURRENT question
+    // (e.g. "1) ...", "2) ...", "(1) ...", "[1] ...", Roman numerals "I. ...")
+    // When a question has started, has no choices yet, and hasn't ended with an answer key,
+    // these statements belong to the question body, NOT a new question!
+    const isSubStatement = Boolean(
+      currentQuestion &&
+      currentQuestion.text &&
+      Object.keys(currentChoices).length === 0 &&
+      !currentAnswerKey &&
+      (
+        // Sub-statement with parenthesis: "1) ...", "(1) ...", "[1] ..."
+        textOnly.match(/^[\(]?\d{1,3}\)\s*.*$/) ||
+        textOnly.match(/^\(\d{1,3}\)\s*.*$/) ||
+        textOnly.match(/^\[\d{1,3}\]\s*.*$/) ||
+        // Roman numerals "I. ...", "II) ..."
+        textOnly.match(/^[\(]?[IVXLCDM]{1,6}[\.\)\s]+\S/i) ||
+        // Lowercase letter sub-points "a) ...", "b) ..." before choices start
+        textOnly.match(/^[a-z]\)\s*.*$/) ||
+        // Sub-statement numbered "1. ..." when current question already has text (cannot be question 1 starting twice)
+        textOnly.match(/^1[\.\)]\s+\S/) ||
+        // Following numbered statements in a sequence (2., 3., etc.) if already inside a sub-statement list
+        (inSubStatementList && textOnly.match(/^\d{1,3}[\.\)]\s*.*$/)) ||
+        // Prompt ended with colon ":" followed by numbered item
+        (currentQuestion.text.trim().replace(/<[^>]*>/g, '').trim().endsWith(":") && textOnly.match(/^[\(]?\d{1,3}[\.\)]\s*.*$/))
+      )
+    );
+
+    if (isSubStatement && currentQuestion) {
+      inSubStatementList = true;
+      const htmlContent = (line && line !== textOnly) ? line : textOnly;
+      const pStyle = p.tagName === 'P' && p.getAttribute('style') ? ` style="${p.getAttribute('style')}"` : '';
+      if (pStyle) {
+        currentQuestion.text += `<p${pStyle}>${htmlContent}</p>`;
+      } else {
+        currentQuestion.text += "<br>" + htmlContent;
+      }
+      if (firstImage && !currentQuestion.imageUrl) currentQuestion.imageUrl = firstImage;
+      else if (firstImage) currentQuestion.text += `<br><img src="${firstImage}" />`;
+      return;
+    }
+
+    // Not a sub-statement: reset the sub-statement list sequence flag
+    inSubStatementList = false;
+
     // A. Detect Question Start
     const questionMatch = textOnly.match(/^[\(]?(\d+)[\.\s\)]+(.*)/);
     const isJustNumber = textOnly.match(/^[\(]?(\d+)[\.\s\)]?$/);
@@ -748,6 +845,7 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
       currentQuestion = { text, imageUrl: firstImage || undefined };
       currentChoices = {};
       currentAnswerKey = "";
+      inSubStatementList = false;
       pendingNumber = questionMatch ? null : (isJustNumber![1]);
       pendingLetter = null;
       return;
@@ -758,6 +856,7 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
     const isJustLetter = textOnly.match(/^([A-Ea-e])$/);
 
     if (choiceMatch || isJustLetter) {
+      inSubStatementList = false;
       if (currentQuestion) {
         const letter = choiceMatch ? choiceMatch[1].toLowerCase() : isJustLetter![1].toLowerCase();
         const text = choiceMatch ? choiceMatch[2].trim() : "";
