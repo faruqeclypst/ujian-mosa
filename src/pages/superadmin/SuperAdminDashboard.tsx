@@ -42,14 +42,14 @@ const addLog = (type: LogType, message: string, target: string) => {
     };
     const updated = [entry, ...existing].slice(0, MAX_LOGS);
     localStorage.setItem(LOG_KEY, JSON.stringify(updated));
-  } catch {}
+  } catch { }
 };
 
 const getLogs = (): ActivityLog[] => {
   try { return JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); } catch { return []; }
 };
 
-const clearLogs = () => { try { localStorage.removeItem(LOG_KEY); } catch {} };
+const clearLogs = () => { try { localStorage.removeItem(LOG_KEY); } catch { } };
 
 const timeAgo = (iso: string): string => {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -60,13 +60,13 @@ const timeAgo = (iso: string): string => {
 };
 
 const LOG_STYLE: Record<LogType, { icon: typeof CheckCircle2; color: string; bg: string; border: string }> = {
-  create:     { icon: Plus,          color: "text-emerald-700", bg: "bg-emerald-50",  border: "border-emerald-200" },
-  update:     { icon: Edit,          color: "text-blue-700",    bg: "bg-blue-50",     border: "border-blue-200" },
-  delete:     { icon: Trash2,        color: "text-red-700",     bg: "bg-red-50",      border: "border-red-200" },
-  approve:    { icon: CheckCircle2,  color: "text-emerald-700", bg: "bg-emerald-50",  border: "border-emerald-200" },
-  reject:     { icon: XCircle,       color: "text-red-700",     bg: "bg-red-50",      border: "border-red-200" },
-  activate:   { icon: Zap,           color: "text-amber-700",   bg: "bg-amber-50",   border: "border-amber-200" },
-  deactivate: { icon: AlertTriangle, color: "text-slate-600",   bg: "bg-slate-100",  border: "border-slate-200" },
+  create: { icon: Plus, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
+  update: { icon: Edit, color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200" },
+  delete: { icon: Trash2, color: "text-red-700", bg: "bg-red-50", border: "border-red-200" },
+  approve: { icon: CheckCircle2, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
+  reject: { icon: XCircle, color: "text-red-700", bg: "bg-red-50", border: "border-red-200" },
+  activate: { icon: Zap, color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
+  deactivate: { icon: AlertTriangle, color: "text-slate-600", bg: "bg-slate-100", border: "border-slate-200" },
 };
 // ─────────────────────────────────────────────────────────────
 
@@ -122,7 +122,7 @@ const formatToDateInput = (val?: string): string => {
       const date = String(d.getDate()).padStart(2, "0");
       return `${year}-${month}-${date}`;
     }
-  } catch {}
+  } catch { }
   return "";
 };
 
@@ -189,7 +189,7 @@ const getActiveUntilInfo = (dateStr?: string) => {
     const isExpired = d.getTime() < now.getTime();
     const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     const formatted = d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
-    
+
     if (isExpired) {
       return { isExpired: true, label: `Kadaluarsa (${formatted})`, isPermanent: false };
     }
@@ -262,20 +262,20 @@ const computeMultiPeriodStatus = (
         schoolSlug: school.slug,
         invoiceId: invId,
         invoiceNumber: invNum,
-        term1Name: mp.term_1_name || "Termin 1",
+        term1Name: mp.term_1_name || "Periode 1",
         term1Start: t1Start,
         term1End: t1End,
         pauseName: mp.pause_name || "Masa Jeda",
         pauseStart: pStart,
         pauseEnd: pEnd,
-        term2Name: mp.term_2_name || "Termin 2",
+        term2Name: mp.term_2_name || "Periode 2",
         term2Start: t2Start,
         term2End: t2End,
         status: "approaching_term_2",
         daysRemaining: diffT2Start,
-        badgeLabel: `Termin 2 Mulai dalam ${diffT2Start} Hari`,
+        badgeLabel: `Periode 2 Mulai dalam ${diffT2Start} Hari`,
         badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
-        actionText: "Aktifkan Termin 2 Sekarang",
+        actionText: "Aktifkan Periode 2 Sekarang",
         actionType: "resume_t2"
       };
     }
@@ -285,25 +285,25 @@ const computeMultiPeriodStatus = (
       schoolSlug: school.slug,
       invoiceId: invId,
       invoiceNumber: invNum,
-      term1Name: mp.term_1_name || "Termin 1",
+      term1Name: mp.term_1_name || "Periode 1",
       term1Start: t1Start,
       term1End: t1End,
       pauseName: mp.pause_name || "Masa Jeda",
       pauseStart: pStart,
       pauseEnd: pEnd,
-      term2Name: mp.term_2_name || "Termin 2",
+      term2Name: mp.term_2_name || "Periode 2",
       term2Start: t2Start,
       term2End: t2End,
       status: "in_pause",
       daysRemaining: diffT2Start,
       badgeLabel: `Masa Jeda (Aktif: ${t2Start ? new Date(t2Start).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"})`,
       badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
-      actionText: "Aktifkan Termin 2 Sekarang",
+      actionText: "Aktifkan Periode 2 Sekarang",
       actionType: "resume_t2"
     };
   }
 
-  // 2. Dalam Termin 1 (sebelum / mendekati jeda)
+  // 2. Dalam Periode 1 (sebelum / mendekati jeda)
   if (todayStr <= t1End) {
     if (diffT1End <= 14 && diffT1End >= 0) {
       return {
@@ -312,18 +312,18 @@ const computeMultiPeriodStatus = (
         schoolSlug: school.slug,
         invoiceId: invId,
         invoiceNumber: invNum,
-        term1Name: mp.term_1_name || "Termin 1",
+        term1Name: mp.term_1_name || "Periode 1",
         term1Start: t1Start,
         term1End: t1End,
         pauseName: mp.pause_name || "Masa Jeda",
         pauseStart: pStart,
         pauseEnd: pEnd,
-        term2Name: mp.term_2_name || "Termin 2",
+        term2Name: mp.term_2_name || "Periode 2",
         term2Start: t2Start,
         term2End: t2End,
         status: "approaching_pause",
         daysRemaining: diffT1End,
-        badgeLabel: `Termin 1 Berakhir dlm ${diffT1End} Hari`,
+        badgeLabel: `Periode 1 Berakhir dlm ${diffT1End} Hari`,
         badgeColor: "bg-amber-50 text-amber-700 border-amber-200",
         actionText: "Setel Hibernasi Sekarang",
         actionType: "pause_now"
@@ -335,23 +335,23 @@ const computeMultiPeriodStatus = (
       schoolSlug: school.slug,
       invoiceId: invId,
       invoiceNumber: invNum,
-      term1Name: mp.term_1_name || "Termin 1",
+      term1Name: mp.term_1_name || "Periode 1",
       term1Start: t1Start,
       term1End: t1End,
       pauseName: mp.pause_name || "Masa Jeda",
       pauseStart: pStart,
       pauseEnd: pEnd,
-      term2Name: mp.term_2_name || "Termin 2",
+      term2Name: mp.term_2_name || "Periode 2",
       term2Start: t2Start,
       term2End: t2End,
       status: "in_term_1",
       daysRemaining: diffT1End,
-      badgeLabel: `Termin 1 Aktif (s/d ${t1End ? new Date(t1End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"})`,
+      badgeLabel: `Periode 1 Aktif (s/d ${t1End ? new Date(t1End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"})`,
       badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
     };
   }
 
-  // 3. Dalam Termin 2
+  // 3. Dalam Periode 2
   if (todayStr >= t2Start && todayStr <= t2End) {
     return {
       schoolId: school.id,
@@ -359,18 +359,18 @@ const computeMultiPeriodStatus = (
       schoolSlug: school.slug,
       invoiceId: invId,
       invoiceNumber: invNum,
-      term1Name: mp.term_1_name || "Termin 1",
+      term1Name: mp.term_1_name || "Periode 1",
       term1Start: t1Start,
       term1End: t1End,
       pauseName: mp.pause_name || "Masa Jeda",
       pauseStart: pStart,
       pauseEnd: pEnd,
-      term2Name: mp.term_2_name || "Termin 2",
+      term2Name: mp.term_2_name || "Periode 2",
       term2Start: t2Start,
       term2End: t2End,
       status: "in_term_2",
       daysRemaining: diffT2End,
-      badgeLabel: `Termin 2 Aktif (s/d ${t2End ? new Date(t2End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"})`,
+      badgeLabel: `Periode 2 Aktif (s/d ${t2End ? new Date(t2End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"})`,
       badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
     };
   }
@@ -382,13 +382,13 @@ const computeMultiPeriodStatus = (
     schoolSlug: school.slug,
     invoiceId: invId,
     invoiceNumber: invNum,
-    term1Name: mp.term_1_name || "Termin 1",
+    term1Name: mp.term_1_name || "Periode 1",
     term1Start: t1Start,
     term1End: t1End,
     pauseName: mp.pause_name || "Masa Jeda",
     pauseStart: pStart,
     pauseEnd: pEnd,
-    term2Name: mp.term_2_name || "Termin 2",
+    term2Name: mp.term_2_name || "Periode 2",
     term2Start: t2Start,
     term2End: t2End,
     status: "completed",
@@ -506,12 +506,12 @@ const SuperAdminDashboard = () => {
         is_active: true,
         active_until: endStr,
       });
-      addLog("activate", `Mengaktifkan Termin 2 (s/d ${item.term2End})`, item.schoolName);
+      addLog("activate", `Mengaktifkan Periode 2 (s/d ${item.term2End})`, item.schoolName);
       refreshLogs();
       await loadData();
-      alert(`Sukses mengaktifkan kembali akses untuk ${item.schoolName}. Termin 2 aktif s/d ${item.term2End}.`);
+      alert(`Sukses mengaktifkan kembali akses untuk ${item.schoolName}. Periode 2 aktif s/d ${item.term2End}.`);
     } catch {
-      alert("Gagal mengaktifkan Termin 2.");
+      alert("Gagal mengaktifkan Periode 2.");
     }
   };
 
@@ -636,7 +636,7 @@ const SuperAdminDashboard = () => {
             const oldPlanPricePerMonth = calculatePlanInvoice(currentPlan, 1).amount;
             const pricePerDay = oldPlanPricePerMonth / 30;
             const remainingCredit = Math.floor(diffDays * pricePerDay);
-            
+
             if (remainingCredit > 0) {
               finalAmount = Math.max(0, finalAmount - remainingCredit);
               const creditRp = remainingCredit.toLocaleString("id-ID");
@@ -957,7 +957,7 @@ const SuperAdminDashboard = () => {
                   </span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Pantau tenant paket 6 bulan musim ujian, jadwal hibernasi non-aktif, dan tanggal aktif kembali untuk Termin 2.
+                  Pantau tenant paket 6 bulan musim ujian, jadwal hibernasi non-aktif, dan tanggal aktif kembali untuk Periode 2.
                 </p>
               </div>
             </div>
@@ -977,10 +977,10 @@ const SuperAdminDashboard = () => {
                     isHibernation
                       ? "border-purple-300 bg-purple-50/30 ring-1 ring-purple-200/50"
                       : isUpcomingResume
-                      ? "border-blue-300 bg-blue-50/30 ring-1 ring-blue-200/50"
-                      : isUpcomingPause
-                      ? "border-amber-300 bg-amber-50/30 ring-1 ring-amber-200/50"
-                      : "border-slate-200"
+                        ? "border-blue-300 bg-blue-50/30 ring-1 ring-blue-200/50"
+                        : isUpcomingPause
+                          ? "border-amber-300 bg-amber-50/30 ring-1 ring-amber-200/50"
+                          : "border-slate-200"
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -999,7 +999,7 @@ const SuperAdminDashboard = () => {
 
                   <div className="text-[10.5px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100 space-y-1">
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Termin 1:</span>
+                      <span className="text-slate-400">Periode 1:</span>
                       <span className="font-medium text-slate-700">{item.term1Name.split("(")[0].trim()}</span>
                     </div>
                     <div className="flex justify-between">
@@ -1007,7 +1007,7 @@ const SuperAdminDashboard = () => {
                       <span className="font-medium text-purple-700">{item.pauseName.split("(")[0].trim()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Termin 2:</span>
+                      <span className="text-slate-400">Periode 2:</span>
                       <span className="font-medium text-blue-700">{item.term2Name.split("(")[0].trim()}</span>
                     </div>
                   </div>
@@ -1340,9 +1340,9 @@ const SuperAdminDashboard = () => {
                             <span className={cn(
                               "inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border tracking-wide",
                               school.plan === "pro" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                              school.plan === "ultimate" ? "bg-purple-50 text-purple-700 border-purple-200" :
-                              school.plan === "offline" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                              "bg-slate-100 text-slate-600 border-slate-200"
+                                school.plan === "ultimate" ? "bg-purple-50 text-purple-700 border-purple-200" :
+                                  school.plan === "offline" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                    "bg-slate-100 text-slate-600 border-slate-200"
                             )}>
                               {PLAN_CONFIG[school.plan || "free"]?.label || school.plan || "Free"}
                             </span>
@@ -1360,7 +1360,7 @@ const SuperAdminDashboard = () => {
                             if (mpItem && mpItem.status === "in_term_1") {
                               return (
                                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1" title={mpItem.term1Name}>
-                                  <Calendar size={10} className="text-emerald-600" /> Termin 1: s/d {mpItem.term1End ? new Date(mpItem.term1End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"}
+                                  <Calendar size={10} className="text-emerald-600" /> Periode 1: s/d {mpItem.term1End ? new Date(mpItem.term1End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"}
                                 </span>
                               );
                             }
@@ -1423,10 +1423,10 @@ const SuperAdminDashboard = () => {
                                   type="button"
                                   onClick={() => handleResumeTerm2(mpItem)}
                                   className="px-2.5 py-1 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-all flex items-center gap-1 text-[11px] font-bold shadow-2xs whitespace-nowrap cursor-pointer"
-                                  title={`Aktifkan Termin 2 (${mpItem.term2Name}) sampai ${mpItem.term2End}`}
+                                  title={`Aktifkan Periode 2 (${mpItem.term2Name}) sampai ${mpItem.term2End}`}
                                 >
                                   <Zap size={11} className="text-emerald-600" />
-                                  <span>Aktifkan T2</span>
+                                  <span>Aktifkan P2</span>
                                 </button>
                               );
                             }
@@ -1436,7 +1436,7 @@ const SuperAdminDashboard = () => {
                                   type="button"
                                   onClick={() => handleSetHibernation(mpItem)}
                                   className="px-2 py-1 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 transition-all flex items-center gap-1 text-[11px] font-bold shadow-2xs whitespace-nowrap cursor-pointer"
-                                  title="Termin 1 selesai. Masuk masa jeda terjadwal."
+                                  title="Periode 1 selesai. Masuk masa jeda terjadwal."
                                 >
                                   <Moon size={11} className="text-amber-600" />
                                   <span>Setel Jeda</span>
@@ -1578,7 +1578,7 @@ const SuperAdminDashboard = () => {
                       if (mpItem && mpItem.status === "in_term_1") {
                         return (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1">
-                            <Calendar size={9} /> Termin 1: s/d {mpItem.term1End ? new Date(mpItem.term1End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"}
+                            <Calendar size={9} /> Periode 1: s/d {mpItem.term1End ? new Date(mpItem.term1End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"}
                           </span>
                         );
                       }
@@ -2169,72 +2169,72 @@ const SuperAdminDashboard = () => {
             </div>
           ) : (
             <>
-            <div className="divide-y divide-slate-50">
-              {pagedLogs.map((log, idx) => {
-                const style = LOG_STYLE[log.type];
-                const Icon = style.icon;
-                const dateStr = new Date(log.timestamp).toLocaleString("id-ID", {
-                  day: "numeric", month: "short", year: "numeric",
-                  hour: "2-digit", minute: "2-digit"
-                });
-                return (
-                  <div key={log.id} className="flex items-start gap-4 px-5 py-4 hover:bg-slate-50/60 transition-colors">
-                    {/* Timeline line */}
-                    <div className="flex flex-col items-center flex-shrink-0">
-                      <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center border", style.bg, style.border)}>
-                        <Icon size={14} className={style.color} />
-                      </div>
-                      {idx < pagedLogs.length - 1 && (
-                        <div className="w-px h-full min-h-[20px] bg-slate-100 mt-1" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0 pt-0.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-[13px] font-semibold text-slate-800">{log.message}</p>
-                          <p className="text-[12px] text-slate-500 mt-0.5 truncate">
-                            <span className={cn("font-bold", style.color)}>{log.target}</span>
-                          </p>
+              <div className="divide-y divide-slate-50">
+                {pagedLogs.map((log, idx) => {
+                  const style = LOG_STYLE[log.type];
+                  const Icon = style.icon;
+                  const dateStr = new Date(log.timestamp).toLocaleString("id-ID", {
+                    day: "numeric", month: "short", year: "numeric",
+                    hour: "2-digit", minute: "2-digit"
+                  });
+                  return (
+                    <div key={log.id} className="flex items-start gap-4 px-5 py-4 hover:bg-slate-50/60 transition-colors">
+                      {/* Timeline line */}
+                      <div className="flex flex-col items-center flex-shrink-0">
+                        <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center border", style.bg, style.border)}>
+                          <Icon size={14} className={style.color} />
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-[11px] text-slate-400 font-medium whitespace-nowrap">{timeAgo(log.timestamp)}</p>
-                          <p className="text-[10px] text-slate-300 mt-0.5 whitespace-nowrap">{dateStr}</p>
+                        {idx < pagedLogs.length - 1 && (
+                          <div className="w-px h-full min-h-[20px] bg-slate-100 mt-1" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-[13px] font-semibold text-slate-800">{log.message}</p>
+                            <p className="text-[12px] text-slate-500 mt-0.5 truncate">
+                              <span className={cn("font-bold", style.color)}>{log.target}</span>
+                            </p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-[11px] text-slate-400 font-medium whitespace-nowrap">{timeAgo(log.timestamp)}</p>
+                            <p className="text-[10px] text-slate-300 mt-0.5 whitespace-nowrap">{dateStr}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-            {/* Pagination Log */}
-            {logTotalPages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
-                <p className="text-[11px] text-slate-500 font-medium">
-                  Halaman {logPage} dari {logTotalPages} • {logEntries.length} aktivitas
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setLogPage(p => Math.max(1, p - 1))}
-                    disabled={logPage === 1}
-                    className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  >
-                    ‹
-                  </button>
-                  <span className="text-xs font-bold text-slate-700 px-2">
-                    {logPage} / {logTotalPages}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setLogPage(p => Math.min(logTotalPages, p + 1))}
-                    disabled={logPage === logTotalPages}
-                    className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  >
-                    ›
-                  </button>
-                </div>
+                  );
+                })}
               </div>
-            )}
+              {/* Pagination Log */}
+              {logTotalPages > 1 && (
+                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Halaman {logPage} dari {logTotalPages} • {logEntries.length} aktivitas
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setLogPage(p => Math.max(1, p - 1))}
+                      disabled={logPage === 1}
+                      className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      ‹
+                    </button>
+                    <span className="text-xs font-bold text-slate-700 px-2">
+                      {logPage} / {logTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setLogPage(p => Math.min(logTotalPages, p + 1))}
+                      disabled={logPage === logTotalPages}
+                      className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -2481,7 +2481,7 @@ const AddEditSchoolModal = ({
       const year1 = currMonth <= 1 ? currYear - 1 : currYear;
       const year2 = year1 + 1;
       return {
-        term_1_name: `Termin 1: Nov, Des, Jan ${year1}/${year2} (Semester Ganjil / PAS)`,
+        term_1_name: `Periode 1: Nov, Des, Jan ${year1}/${year2} (Semester Ganjil / PAS)`,
         term_1_months: 3,
         term_1_start: `${year1}-11-01`,
         term_1_end: `${year2}-01-31`,
@@ -2489,7 +2489,7 @@ const AddEditSchoolModal = ({
         pause_months: 3,
         pause_start: `${year2}-02-01`,
         pause_end: `${year2}-04-30`,
-        term_2_name: `Termin 2: Mei, Jun, Jul ${year2} (Semester Genap / PAT)`,
+        term_2_name: `Periode 2: Mei, Jun, Jul ${year2} (Semester Genap / PAT)`,
         term_2_months: 3,
         term_2_start: `${year2}-05-01`,
         term_2_end: `${year2}-07-31`,
@@ -2498,7 +2498,7 @@ const AddEditSchoolModal = ({
       const year = currYear;
       const nextYear = currYear + 1;
       return {
-        term_1_name: `Termin 1: Mei, Juni, Juli ${year} (Semester Genap / PAT)`,
+        term_1_name: `Periode 1: Mei, Juni, Juli ${year} (Semester Genap / PAT)`,
         term_1_months: 3,
         term_1_start: `${year}-05-01`,
         term_1_end: `${year}-07-31`,
@@ -2506,7 +2506,7 @@ const AddEditSchoolModal = ({
         pause_months: 3,
         pause_start: `${year}-08-01`,
         pause_end: `${year}-10-31`,
-        term_2_name: `Termin 2: Nov, Des, Jan ${year}/${nextYear} (Semester Ganjil / PAS)`,
+        term_2_name: `Periode 2: Nov, Des, Jan ${year}/${nextYear} (Semester Ganjil / PAS)`,
         term_2_months: 3,
         term_2_start: `${year}-11-01`,
         term_2_end: `${nextYear}-01-31`,
@@ -2783,7 +2783,7 @@ const AddEditSchoolModal = ({
             plan: targetPlanKey,
             plan_label: planInfo.planLabel,
             duration_months: multiPeriodEnabled ? 6 : planInfo.durationMonths,
-            period_label: multiPeriodEnabled ? "6 Bulan (2 Termin Ujian)" : planInfo.periodLabel,
+            period_label: multiPeriodEnabled ? "6 Bulan (2 Periode Ujian)" : planInfo.periodLabel,
             amount: isTrial ? 0 : (multiPeriodEnabled ? multiSubtotal : planInfo.amount),
             status: isInvoicePaid ? "paid" : "unpaid",
             due_date: dueDate.toISOString().slice(0, 10),
@@ -2792,7 +2792,7 @@ const AddEditSchoolModal = ({
             notes: isTrial
               ? "Akun Free Trial 14 Hari (Otomatis Aktif)"
               : multiPeriodEnabled
-                ? `Tagihan Perdana Paket Multi-Periode 6 Bulan (2 Termin Ujian & Jeda) - ${isInvoicePaid ? "Lunas" : "Menunggu Pembayaran"}`
+                ? `Tagihan Perdana Paket Multi-Periode 6 Bulan (2 Periode Ujian & Jeda) - ${isInvoicePaid ? "Lunas" : "Menunggu Pembayaran"}`
                 : initialPaymentStatus === "paid"
                   ? `Tagihan Perdana Paket ${planInfo.planLabel} (${planInfo.periodLabel}) - Lunas`
                   : `Tagihan Perdana Paket ${planInfo.planLabel} (${planInfo.periodLabel}) - Menunggu Pembayaran`,
@@ -2864,7 +2864,7 @@ const AddEditSchoolModal = ({
 
         {/* Scrollable Body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-6 space-y-6 bg-slate-50/30">
-          
+
           {error && (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-xl flex items-start gap-2.5 font-bold shadow-sm">
               <AlertTriangle size={18} className="flex-shrink-0 mt-0.5 text-rose-600" />
@@ -3086,7 +3086,7 @@ const AddEditSchoolModal = ({
               </div>
             )}
 
-            {/* Opsi Skema Multi-Periode (2 Termin Ujian & Masa Jeda) */}
+            {/* Opsi Skema Multi-Periode (2 Periode Ujian & Masa Jeda) */}
             {!isEdit && form.plan !== "free" && (
               <div className="mt-4 p-3.5 rounded-xl border border-purple-200/90 bg-purple-50/60 transition-all">
                 <div className="flex items-center justify-between gap-3">
@@ -3096,7 +3096,7 @@ const AddEditSchoolModal = ({
                     </div>
                     <div>
                       <p className="text-[13px] font-bold text-purple-950 leading-tight">
-                        Skema Multi-Periode (Split 2 Termin Ujian)
+                        Skema Multi-Periode (Split 2 Periode Ujian)
                       </p>
                       <p className="text-[11px] text-purple-700 mt-0.5 leading-snug">
                         Untuk sekolah paket 6 bulan yang dibagi ke 2 semester ujian (dengan masa jeda)
@@ -3123,7 +3123,7 @@ const AddEditSchoolModal = ({
                 {multiPeriodEnabled && (
                   <div className="mt-3 pt-3 border-t border-purple-200/80 text-[11px] text-purple-900 grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div className="bg-white p-2 rounded-lg border border-purple-200 shadow-2xs">
-                      <span className="font-extrabold text-blue-700 block">Termin 1 (3 Bln)</span>
+                      <span className="font-extrabold text-blue-700 block">Periode 1 (3 Bln)</span>
                       <span className="text-[10px] text-slate-500 font-mono">{getSmartMultiPeriodSchedule().term_1_start} s/d {getSmartMultiPeriodSchedule().term_1_end}</span>
                     </div>
                     <div className="bg-white p-2 rounded-lg border border-amber-200 shadow-2xs">
@@ -3131,7 +3131,7 @@ const AddEditSchoolModal = ({
                       <span className="text-[10px] text-slate-500 font-mono">{getSmartMultiPeriodSchedule().pause_start} s/d {getSmartMultiPeriodSchedule().pause_end}</span>
                     </div>
                     <div className="bg-white p-2 rounded-lg border border-purple-200 shadow-2xs">
-                      <span className="font-extrabold text-purple-700 block">Termin 2 (3 Bln)</span>
+                      <span className="font-extrabold text-purple-700 block">Periode 2 (3 Bln)</span>
                       <span className="text-[10px] text-slate-500 font-mono">{getSmartMultiPeriodSchedule().term_2_start} s/d {getSmartMultiPeriodSchedule().term_2_end}</span>
                     </div>
                   </div>
@@ -3349,8 +3349,8 @@ const AddEditSchoolModal = ({
           <button
             type="submit"
             onClick={(e) => {
-               e.preventDefault();
-               handleSubmit(e as any);
+              e.preventDefault();
+              handleSubmit(e as any);
             }}
             disabled={loading}
             className="flex-[2] h-12 bg-blue-600 text-white rounded-xl text-[13px] font-bold hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"

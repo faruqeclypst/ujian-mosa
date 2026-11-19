@@ -68,7 +68,7 @@ const getPricingEstimate = (
     return {
       total: formatRupiah(detail.rates[6]),
       period: "6 Bulan (2 Periode Ujian)",
-      detail: pct > 0 ? `Hemat ${pct}% (Split 2 Semester & Jeda)` : "Split 2 Semester & Jeda",
+      detail: pct > 0 ? `Hemat ${pct}% (Split 2 Periode Ujian & Jeda)` : "Split 2 Periode Ujian & Jeda",
     };
   }
 
@@ -624,7 +624,7 @@ const RegisterSchoolPage = () => {
                                 </span>
                               </div>
                               <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                                Didesain khusus bagi sekolah yang menggunakan CBT pada saat musim ujian semester. Masa aktif 6 bulan dipecah menjadi 2 termin ujian dengan masa jeda (hibernasi) gratis di antaranya tanpa biaya server tambahan.
+                                Didesain khusus bagi sekolah yang menggunakan CBT pada saat musim ujian semester. Masa aktif 6 bulan dipecah menjadi 2 periode ujian dengan masa jeda (hibernasi) gratis di antaranya tanpa biaya server tambahan.
                               </p>
                             </div>
                           </div>
@@ -634,7 +634,7 @@ const RegisterSchoolPage = () => {
                             <div className="p-3 bg-white border border-blue-200 rounded-xl shadow-2xs">
                               <div className="flex items-center gap-1.5 text-blue-700 font-extrabold text-xs mb-1">
                                 <CheckCircle2 size={14} />
-                                <span>Termin 1 (3 Bulan)</span>
+                                <span>Periode 1 (3 Bulan)</span>
                               </div>
                               <p className="text-[11px] font-bold text-slate-800">Ujian Semester Ganjil</p>
                               <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
@@ -656,7 +656,7 @@ const RegisterSchoolPage = () => {
                             <div className="p-3 bg-white border border-purple-200 rounded-xl shadow-2xs">
                               <div className="flex items-center gap-1.5 text-purple-700 font-extrabold text-xs mb-1">
                                 <CheckCircle2 size={14} />
-                                <span>Termin 2 (3 Bulan)</span>
+                                <span>Periode 2 (3 Bulan)</span>
                               </div>
                               <p className="text-[11px] font-bold text-slate-800">Ujian Semester Genap</p>
                               <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
@@ -668,7 +668,7 @@ const RegisterSchoolPage = () => {
                           <div className="flex items-center gap-2 px-3 py-2 bg-purple-100/70 rounded-xl text-[11px] text-purple-900 font-medium">
                             <Info size={14} className="text-purple-700 shrink-0" />
                             <span>
-                              Dokumen tagihan dan <strong>Kuitansi Resmi SPJ</strong> langsung tercetak dengan rincian 2 termin untuk kemudahan pelaporan pertanggungjawaban dana BOS/BOP sekolah.
+                              Dokumen tagihan dan <strong>Kuitansi Resmi SPJ</strong> langsung tercetak dengan rincian 2 periode ujian untuk kemudahan pelaporan pertanggungjawaban dana BOS/BOP sekolah.
                             </span>
                           </div>
                         </div>

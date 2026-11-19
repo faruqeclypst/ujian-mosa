@@ -204,19 +204,19 @@ const SuperAdminInvoicePage = () => {
   const [showCustomItemsSection, setShowCustomItemsSection] = useState(false);
   const [showRkasSection, setShowRkasSection] = useState(false);
 
-  // ─── Multi-Periode Ujian (Split Termin & Masa Jeda / Hibernasi) ───
+  // ─── Multi-Periode Ujian (Split 2 Periode & Masa Jeda / Hibernasi) ───
   const [multiPeriodEnabled, setMultiPeriodEnabled] = useState(false);
   const [showMultiPeriodSection, setShowMultiPeriodSection] = useState(false);
   const [multiPeriodData, setMultiPeriodData] = useState<MultiPeriodConfig>({
     is_multi_period: false,
-    term_1_name: `Termin 1: Mei, Juni, Juli ${new Date().getFullYear()} (Semester Genap / PAT)`,
+    term_1_name: `Periode 1: Mei, Juni, Juli ${new Date().getFullYear()} (Semester Genap / PAT)`,
     term_1_months: 3,
     term_1_start: `${new Date().getFullYear()}-05-01`,
     term_1_end: `${new Date().getFullYear()}-07-31`,
     pause_name: `Masa Jeda: Agustus, September, Oktober ${new Date().getFullYear()} (Hibernasi)`,
     pause_start: `${new Date().getFullYear()}-08-01`,
     pause_end: `${new Date().getFullYear()}-10-31`,
-    term_2_name: `Termin 2: November, Desember ${new Date().getFullYear()} - Januari ${new Date().getFullYear() + 1} (Semester Ganjil / PAS)`,
+    term_2_name: `Periode 2: November, Desember ${new Date().getFullYear()} - Januari ${new Date().getFullYear() + 1} (Semester Ganjil / PAS)`,
     term_2_months: 3,
     term_2_start: `${new Date().getFullYear()}-11-01`,
     term_2_end: `${new Date().getFullYear() + 1}-01-31`,
@@ -256,47 +256,47 @@ const SuperAdminInvoicePage = () => {
       // Skenario 1: Daftar di Bulan November (Musim Ujian Semester Ganjil / PAS)
       const nextYear = currMonth <= 1 ? currYear : currYear + 1;
       const baseYear = currMonth <= 1 ? currYear - 1 : currYear;
-      t1Name = `Termin 1: November, Desember ${baseYear} - Januari ${nextYear} (Semester Ganjil / PAS)`;
+      t1Name = `Periode 1: November, Desember ${baseYear} - Januari ${nextYear} (Semester Ganjil / PAS)`;
       t1Start = `${baseYear}-11-01`;
       t1End = `${nextYear}-01-31`;
       pName = `Masa Jeda: Februari, Maret, April ${nextYear} (Hibernasi Pasca Ujian)`;
       pStart = `${nextYear}-02-01`;
       pEnd = `${nextYear}-04-30`;
-      t2Name = `Termin 2: Mei, Juni, Juli ${nextYear} (Semester Genap / PAT)`;
+      t2Name = `Periode 2: Mei, Juni, Juli ${nextYear} (Semester Genap / PAT)`;
       t2Start = `${nextYear}-05-01`;
       t2End = `${nextYear}-07-31`;
-      labelPeriod = `6 Bulan Custom (Termin 1: Nov-Jan & Termin 2: Mei-Jul)`;
+      labelPeriod = `6 Bulan Custom (Periode 1: Nov-Jan & Periode 2: Mei-Jul)`;
       line1Desc = `Lisensi CBT Periode Semester Ganjil (${PLAN_PRICES[planKey]?.label || form.plan}: November – Januari)`;
       line2Desc = `Lisensi CBT Periode Semester Genap (${PLAN_PRICES[planKey]?.label || form.plan}: Mei – Juli)`;
       pauseDesc = `Infrastruktur Server & Hibernasi Data Bank Soal (Masa Jeda: Februari – April)`;
     } else if (selectedType === "apr_oct") {
       // Skenario 2: Periode April - Juni & Oktober - Desember
-      t1Name = `Termin 1: April, Mei, Juni ${currYear} (Semester Genap)`;
+      t1Name = `Periode 1: April, Mei, Juni ${currYear} (Semester Genap)`;
       t1Start = `${currYear}-04-01`;
       t1End = `${currYear}-06-30`;
       pName = `Masa Jeda: Juli, Agustus, September ${currYear} (Hibernasi)`;
       pStart = `${currYear}-07-01`;
       pEnd = `${currYear}-09-30`;
-      t2Name = `Termin 2: Oktober, November, Desember ${currYear} (Semester Ganjil)`;
+      t2Name = `Periode 2: Oktober, November, Desember ${currYear} (Semester Ganjil)`;
       t2Start = `${currYear}-10-01`;
       t2End = `${currYear}-12-31`;
-      labelPeriod = `6 Bulan Custom (Termin 1: Apr-Jun & Termin 2: Okt-Des)`;
+      labelPeriod = `6 Bulan Custom (Periode 1: Apr-Jun & Periode 2: Okt-Des)`;
       line1Desc = `Lisensi CBT Periode Semester Genap (${PLAN_PRICES[planKey]?.label || form.plan}: April – Juni)`;
       line2Desc = `Lisensi CBT Periode Semester Ganjil (${PLAN_PRICES[planKey]?.label || form.plan}: Oktober – Desember)`;
       pauseDesc = `Infrastruktur Server & Hibernasi Data Bank Soal (Masa Jeda: Juli – September)`;
     } else {
       // Skenario 3: Daftar di Bulan Mei (Musim Ujian Semester Genap / PAT)
       const nextYear = currYear + 1;
-      t1Name = `Termin 1: Mei, Juni, Juli ${currYear} (Semester Genap / PAT)`;
+      t1Name = `Periode 1: Mei, Juni, Juli ${currYear} (Semester Genap / PAT)`;
       t1Start = `${currYear}-05-01`;
       t1End = `${currYear}-07-31`;
       pName = `Masa Jeda: Agustus, September, Oktober ${currYear} (Hibernasi)`;
       pStart = `${currYear}-08-01`;
       pEnd = `${currYear}-10-31`;
-      t2Name = `Termin 2: November, Desember ${currYear} - Januari ${nextYear} (Semester Ganjil / PAS)`;
+      t2Name = `Periode 2: November, Desember ${currYear} - Januari ${nextYear} (Semester Ganjil / PAS)`;
       t2Start = `${currYear}-11-01`;
       t2End = `${nextYear}-01-31`;
-      labelPeriod = `6 Bulan Custom (Termin 1: Mei-Juli & Termin 2: Nov-Jan)`;
+      labelPeriod = `6 Bulan Custom (Periode 1: Mei-Juli & Periode 2: Nov-Jan)`;
       line1Desc = `Lisensi CBT Periode Semester Genap (${PLAN_PRICES[planKey]?.label || form.plan}: Mei – Juli)`;
       line2Desc = `Lisensi CBT Periode Semester Ganjil (${PLAN_PRICES[planKey]?.label || form.plan}: November – Januari)`;
       pauseDesc = `Infrastruktur Server & Hibernasi Data Bank Soal (Masa Jeda: Agustus – Oktober)`;
@@ -307,7 +307,7 @@ const SuperAdminInvoicePage = () => {
       duration_months: 6,
       period_label: labelPeriod,
       amount: subtotal + taxAmt,
-      notes: `[MULTI-PERIODE] Langganan 6 bulan aktif 2 termin: ${t1Name.split("(")[0].trim()} dan ${t2Name.split("(")[0].trim()}. Masa jeda non-aktif pada ${pName.split("(")[0].trim()}. Bank soal dan akun tetap aman.`,
+      notes: `[MULTI-PERIODE] Langganan 6 bulan aktif 2 periode: ${t1Name.split("(")[0].trim()} dan ${t2Name.split("(")[0].trim()}. Masa jeda non-aktif pada ${pName.split("(")[0].trim()}. Bank soal dan akun tetap aman.`,
     }));
 
     setMultiPeriodEnabled(true);
@@ -907,7 +907,7 @@ const SuperAdminInvoicePage = () => {
     const validMonths = Math.max(1, Math.round(Number(months) || 1));
     const planInfo = calculatePlanInvoice(form.plan, validMonths);
 
-    // Jika sebelumnya dalam mode multi-periode split 2 termin dan user memilih durasi standar (misal 1 bulan),
+    // Jika sebelumnya dalam mode multi-periode split 2 periode dan user memilih durasi standar (misal 1 bulan),
     // kembalikan ke perhitungan durasi standar & bersihkan mode multi-periode
     if (multiPeriodEnabled) {
       setMultiPeriodEnabled(false);
@@ -1330,7 +1330,7 @@ const SuperAdminInvoicePage = () => {
                                   </span>
                                 )}
                                 {cd.multi_period?.is_multi_period && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 inline-flex items-center gap-0.5" title="Paket Multi-Periode (Split 2 Termin Ujian & Masa Jeda)">
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 inline-flex items-center gap-0.5" title="Paket Multi-Periode (Split 2 Periode Ujian & Masa Jeda)">
                                     <Sparkles size={8} /> Multi-Periode
                                   </span>
                                 )}
@@ -1736,10 +1736,10 @@ const SuperAdminInvoicePage = () => {
                           ? "bg-purple-600 text-white shadow-2xs"
                           : "bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/80"
                       )}
-                      title="Paket 6 Bulan Custom Split 2 Termin Ujian dengan Masa Jeda"
+                      title="Paket 6 Bulan Custom Split 2 Periode Ujian dengan Masa Jeda"
                     >
                       <Sparkles size={11} className={multiPeriodEnabled ? "text-amber-200" : "text-purple-600"} />
-                      6 Bln Custom (Split 2 Termin)
+                      6 Bln Custom (2 Periode Ujian)
                     </button>
                   </div>
                 </div>
@@ -2259,10 +2259,10 @@ const SuperAdminInvoicePage = () => {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-800">Paket Multi-Periode Ujian (Split Termin)</span>
+                        <span className="text-xs font-bold text-slate-800">Paket Multi-Periode Ujian (Split 2 Periode)</span>
                         {multiPeriodEnabled && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 flex items-center gap-1">
-                            <Sparkles size={10} /> Aktif (2 Termin)
+                            <Sparkles size={10} /> Aktif (2 Periode)
                           </span>
                         )}
                       </div>
@@ -2329,24 +2329,24 @@ const SuperAdminInvoicePage = () => {
                         <div className="text-[10px] text-slate-500 bg-slate-50 border border-slate-200/80 rounded-lg p-2.5">
                           💡 <strong>Fleksibel & Bebas Diubah:</strong> Tombol preset di atas membantu memilih pola umum. Anda dapat mengubah nama bulan dan tanggal mulai/selesai di bawah ini secara bebas sesuai tanggal ujian sekolah yang mendaftar.
                         </div>
-                        {/* Termin 1 */}
+                        {/* Periode 1 */}
                         <div className="p-3 bg-emerald-50/60 border border-emerald-200/80 rounded-xl space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                              Termin 1 (Ujian Semester Genap / PAT)
+                              Periode 1 (Ujian Semester Genap / PAT)
                             </span>
                             <span className="text-[10.5px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
                               Durasi 3 Bulan
                             </span>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-medium text-slate-500 mb-0.5">Uraian / Nama Termin</label>
+                            <label className="block text-[10px] font-medium text-slate-500 mb-0.5">Uraian / Nama Periode</label>
                             <input
                               type="text"
                               value={multiPeriodData.term_1_name || ""}
                               onChange={e => setMultiPeriodData(d => ({ ...d, term_1_name: e.target.value }))}
-                              placeholder="Termin 1: Mei, Juni, Juli (Semester Genap / PAT)"
+                              placeholder="Periode 1: Mei, Juni, Juli (Semester Genap / PAT)"
                               className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
                             />
                           </div>
@@ -2415,24 +2415,24 @@ const SuperAdminInvoicePage = () => {
                           </div>
                         </div>
 
-                        {/* Termin 2 */}
+                        {/* Periode 2 */}
                         <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-xl space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-blue-500" />
-                              Termin 2 (Ujian Semester Ganjil / PAS)
+                              Periode 2 (Ujian Semester Ganjil / PAS)
                             </span>
                             <span className="text-[10.5px] font-semibold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
                               Durasi 3 Bulan
                             </span>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-medium text-slate-500 mb-0.5">Uraian / Nama Termin</label>
+                            <label className="block text-[10px] font-medium text-slate-500 mb-0.5">Uraian / Nama Periode</label>
                             <input
                               type="text"
                               value={multiPeriodData.term_2_name || ""}
                               onChange={e => setMultiPeriodData(d => ({ ...d, term_2_name: e.target.value }))}
-                              placeholder="Termin 2: November, Desember, Januari (Semester Ganjil / PAS)"
+                              placeholder="Periode 2: November, Desember, Januari (Semester Ganjil / PAS)"
                               className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                           </div>
@@ -2725,7 +2725,7 @@ const SuperAdminInvoicePage = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
                             <Sparkles size={12} className="text-purple-600" />
-                            Skema Multi-Periode (Split 2 Termin Ujian)
+                            Skema Multi-Periode (Split 2 Periode Ujian)
                           </span>
                           <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
                             Total 6 Bulan
@@ -2733,7 +2733,7 @@ const SuperAdminInvoicePage = () => {
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-[11px]">
                           <div className="bg-white p-2 rounded border border-purple-200/60">
-                            <div className="text-[9.5px] font-bold text-emerald-700 uppercase">Termin 1 (3 Bln)</div>
+                            <div className="text-[9.5px] font-bold text-emerald-700 uppercase">Periode 1 (3 Bln)</div>
                             <div className="font-semibold text-slate-800 mt-0.5">{cd.multi_period.term_1_name || "Mei – Juli"}</div>
                             <div className="text-[10px] text-slate-400 mt-0.5">{cd.multi_period.term_1_start || "-"} s/d {cd.multi_period.term_1_end || "-"}</div>
                           </div>
@@ -2743,7 +2743,7 @@ const SuperAdminInvoicePage = () => {
                             <div className="text-[10px] text-slate-400 mt-0.5">{cd.multi_period.pause_start || "-"} s/d {cd.multi_period.pause_end || "-"}</div>
                           </div>
                           <div className="bg-white p-2 rounded border border-purple-200/60">
-                            <div className="text-[9.5px] font-bold text-blue-700 uppercase">Termin 2 (3 Bln)</div>
+                            <div className="text-[9.5px] font-bold text-blue-700 uppercase">Periode 2 (3 Bln)</div>
                             <div className="font-semibold text-slate-800 mt-0.5">{cd.multi_period.term_2_name || "Nov – Jan"}</div>
                             <div className="text-[10px] text-slate-400 mt-0.5">{cd.multi_period.term_2_start || "-"} s/d {cd.multi_period.term_2_end || "-"}</div>
                           </div>

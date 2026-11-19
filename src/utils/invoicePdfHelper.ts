@@ -80,14 +80,14 @@ export interface InvoiceTaxConfig {
 
 export interface MultiPeriodConfig {
   is_multi_period?: boolean;
-  term_1_name?: string;     // e.g. "Termin 1 (Semester Genap: Mei, Juni, Juli)"
+  term_1_name?: string;     // e.g. "Periode 1 (Semester Genap: Mei, Juni, Juli)"
   term_1_months?: number;   // 3
   term_1_start?: string;    // "2026-05-01"
   term_1_end?: string;      // "2026-07-31"
   pause_name?: string;      // e.g. "Masa Jeda / Non-Aktif (Agustus - Oktober)"
   pause_start?: string;     // "2026-08-01"
   pause_end?: string;       // "2026-10-31"
-  term_2_name?: string;     // e.g. "Termin 2 (Semester Ganjil: November, Desember, Januari)"
+  term_2_name?: string;     // e.g. "Periode 2 (Semester Ganjil: November, Desember, Januari)"
   term_2_months?: number;   // 3
   term_2_start?: string;    // "2026-11-01"
   term_2_end?: string;      // "2027-01-31"
@@ -688,11 +688,11 @@ export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta 
         ${customData?.multi_period?.is_multi_period ? `
           <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:12px 16px; margin-top:14px; font-size:11px; color:#166534;">
             <div style="font-weight:800; font-size:11.5px; text-transform:uppercase; letter-spacing:0.5px; color:#15803d; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-              <span>📅</span> JADWAL LISENSI MULTI-PERIODE (SPLIT 2 TERMIN UJIAN)
+              <span>📅</span> JADWAL LISENSI MULTI-PERIODE (SPLIT 2 PERIODE UJIAN)
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
               <div style="background:#ffffff; border:1px solid #bbf7d0; border-radius:8px; padding:8px 10px;">
-                <div style="font-size:10px; font-weight:700; color:#15803d; text-transform:uppercase;">Termin 1 (3 Bulan)</div>
+                <div style="font-size:10px; font-weight:700; color:#15803d; text-transform:uppercase;">Periode 1 (3 Bulan)</div>
                 <div style="font-weight:700; color:#0f172a; margin-top:2px;">${customData.multi_period.term_1_name || 'Mei – Juli'}</div>
                 <div style="font-size:9.5px; color:#64748b; margin-top:2px;">Ujian Semester Genap / PAT</div>
               </div>
@@ -702,7 +702,7 @@ export async function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta 
                 <div style="font-size:9.5px; color:#64748b; margin-top:2px;">Bank Soal & Data Terjaga Aman</div>
               </div>
               <div style="background:#ffffff; border:1px solid #bbf7d0; border-radius:8px; padding:8px 10px;">
-                <div style="font-size:10px; font-weight:700; color:#15803d; text-transform:uppercase;">Termin 2 (3 Bulan)</div>
+                <div style="font-size:10px; font-weight:700; color:#15803d; text-transform:uppercase;">Periode 2 (3 Bulan)</div>
                 <div style="font-weight:700; color:#0f172a; margin-top:2px;">${customData.multi_period.term_2_name || 'November – Januari'}</div>
                 <div style="font-size:9.5px; color:#64748b; margin-top:2px;">Ujian Semester Ganjil / PAS</div>
               </div>
@@ -1076,16 +1076,16 @@ export async function printOfficialReceiptSpj(inv: InvoiceData, school?: SchoolM
               <div style="font-size: 10.5px; color: #475569; margin-top: 2px;">
                 Biaya Layanan Aplikasi EXAMKU CBT (${planLabel}) &bull; ${
                   customData?.multi_period?.is_multi_period
-                    ? "Paket 6 Bulan Custom Multi-Periode (Split 2 Termin Ujian)"
+                    ? "Paket 6 Bulan Custom Multi-Periode (Split 2 Periode Ujian)"
                     : (Number(inv.duration_months) === 0 ? "Top-up Kuota" : `Durasi ${inv.duration_months} Bulan`)
                 }
               </div>
               ${customData?.multi_period?.is_multi_period ? `
                 <div style="margin-top:6px; padding:6px 10px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; font-size:10px; color:#0369a1; line-height:1.5;">
                   <strong>Jadwal Pelaksanaan Multi-Periode:</strong><br/>
-                  &bull; <strong>Termin 1 (3 Bulan):</strong> ${customData.multi_period.term_1_name || 'Mei, Juni, Juli (Semester Genap / PAT)'}<br/>
+                  &bull; <strong>Periode 1 (3 Bulan):</strong> ${customData.multi_period.term_1_name || 'Mei, Juni, Juli (Semester Genap / PAT)'}<br/>
                   &bull; <strong>Masa Jeda:</strong> ${customData.multi_period.pause_name || 'Agustus, September, Oktober (Non-aktif / Bank Soal Terjaga)'}<br/>
-                  &bull; <strong>Termin 2 (3 Bulan):</strong> ${customData.multi_period.term_2_name || 'November, Desember, Januari (Semester Ganjil / PAS)'}
+                  &bull; <strong>Periode 2 (3 Bulan):</strong> ${customData.multi_period.term_2_name || 'November, Desember, Januari (Semester Ganjil / PAS)'}
                 </div>
               ` : ""}
             </td>

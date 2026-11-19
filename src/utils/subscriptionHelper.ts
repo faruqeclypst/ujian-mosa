@@ -291,7 +291,7 @@ export const upgradeSchoolFromInvoice = async (invoice: {
       is_active: true,
     };
 
-    // Cek apakah invoice memiliki konfigurasi multi-periode custom (misal 6 bulan split 2 termin ujian)
+    // Cek apakah invoice memiliki konfigurasi multi-periode custom (misal 6 bulan split 2 periode ujian)
     const customData = parseCustomData((invoice as any).custom_data);
     const multiPeriod = customData?.multi_period;
     if (multiPeriod?.is_multi_period && multiPeriod.term_1_end) {
