@@ -21,6 +21,9 @@ import {
   Calendar,
   Minus,
   Plus,
+  Moon,
+  CheckCircle2,
+  Info,
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
@@ -38,7 +41,7 @@ import {
 
 const getPricingEstimate = (
   planName: string,
-  mode: "2 Bulan" | "6 Bulan" | "1 Tahun" | "custom",
+  mode: "2 Bulan" | "2 Periode Ujian" | "6 Bulan" | "1 Tahun" | "custom",
   months: number,
   pricingData: typeof PLAN_PRICING
 ) => {
@@ -55,6 +58,17 @@ const getPricingEstimate = (
       total: formatRupiah(rate2),
       period: "2 Bulan",
       detail: `2 × ${formatRupiah(baseMonthly)} / bln (Min. Berlangganan)`,
+    };
+  }
+
+  if (mode === "2 Periode Ujian") {
+    const normal6 = baseMonthly * 6;
+    const diff = normal6 - detail.rates[6];
+    const pct = normal6 > 0 && diff > 0 ? Math.round((diff / normal6) * 100) : 0;
+    return {
+      total: formatRupiah(detail.rates[6]),
+      period: "6 Bulan (2 Periode Ujian)",
+      detail: pct > 0 ? `Hemat ${pct}% (Split 2 Semester & Jeda)` : "Split 2 Semester & Jeda",
     };
   }
 
@@ -141,7 +155,7 @@ const RegisterSchoolPage = () => {
     return activePricing[k]?.label || (k === "basic" ? "Paket Berkembang" : k === "pro" ? "Paket Lanjutan" : "Paket Premium");
   };
 
-  const [durationMode, setDurationMode] = useState<"2 Bulan" | "6 Bulan" | "1 Tahun" | "custom">("1 Tahun");
+  const [durationMode, setDurationMode] = useState<"2 Bulan" | "2 Periode Ujian" | "6 Bulan" | "1 Tahun" | "custom">("1 Tahun");
   const [customMonths, setCustomMonths] = useState<number>(2);
 
   const [form, setForm] = useState({
@@ -182,7 +196,10 @@ const RegisterSchoolPage = () => {
         const planClean = sp.replace(/\s*\([^)]+\)/, "").trim();
         const durRaw = matchDuration ? matchDuration[1] : "1 Tahun";
 
-        if (durRaw.includes("1 Bulan") || durRaw.includes("2 Bulan")) {
+        if (durRaw.includes("periode") || durRaw.includes("termin") || durRaw.includes("split")) {
+          setDurationMode("2 Periode Ujian");
+          setForm(prev => ({ ...prev, plan: targetPlan, duration: "6 Bulan (2 Periode Ujian)" }));
+        } else if (durRaw.includes("1 Bulan") || durRaw.includes("2 Bulan")) {
           setDurationMode("2 Bulan");
           setForm(prev => ({ ...prev, plan: targetPlan, duration: "2 Bulan" }));
         } else if (durRaw.includes("6 Bulan") || durRaw.includes("semester")) {
@@ -208,10 +225,12 @@ const RegisterSchoolPage = () => {
     }
   }, [location.state]);
 
-  const handleDurationSelect = (mode: "2 Bulan" | "6 Bulan" | "1 Tahun" | "custom") => {
+  const handleDurationSelect = (mode: "2 Bulan" | "2 Periode Ujian" | "6 Bulan" | "1 Tahun" | "custom") => {
     setDurationMode(mode);
     if (mode === "custom") {
       setForm(prev => ({ ...prev, duration: `${customMonths} Bulan` }));
+    } else if (mode === "2 Periode Ujian") {
+      setForm(prev => ({ ...prev, duration: "6 Bulan (2 Periode Ujian)" }));
     } else {
       setForm(prev => ({ ...prev, duration: mode }));
     }
@@ -534,8 +553,8 @@ const RegisterSchoolPage = () => {
                         <span className="text-[11px] text-slate-400">Pilihan paket tetap atau atur durasi kustom</span>
                       </div>
 
-                      {/* 4 Duration Buttons: 2 Bulan (Min), 6 Bulan, 1 Tahun, Custom Bulan */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                      {/* 5 Duration Buttons: 2 Bulan, 2 Periode Ujian, 6 Bulan, 1 Tahun, Custom Bulan */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
                         {(() => {
                           const curPlan = activePricing[normalizePlanKey(form.plan)] || activePricing.basic;
                           const baseRate = curPlan.rates[1] || curPlan.monthlyRate || 0;
@@ -546,6 +565,7 @@ const RegisterSchoolPage = () => {
 
                           return [
                             { label: "2 Bulan", mode: "2 Bulan" as const, sub: "Min. Berlangganan", badge: "Minimal" },
+                            { label: "2 Periode Ujian", mode: "2 Periode Ujian" as const, sub: "Ganjil & Genap", badge: "2x Ujian" },
                             { label: "6 Bulan", mode: "6 Bulan" as const, sub: "1 Semester", badge: semDisc > 0 ? `Hemat ${semDisc}%` : undefined },
                             { label: "1 Tahun", mode: "1 Tahun" as const, sub: "12 Bulan", badge: yearDisc > 0 ? `Hemat ${yearDisc}%` : "Disarankan" },
                             { label: "Custom Bulan", mode: "custom" as const, sub: "Atur Sendiri", badge: "Kustom" },
@@ -559,29 +579,100 @@ const RegisterSchoolPage = () => {
                                 className={cn(
                                   "p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center relative cursor-pointer min-h-[66px]",
                                   isSelected
-                                    ? "bg-blue-50 border-blue-600 text-blue-700 ring-2 ring-blue-600/20 shadow-xs"
+                                    ? d.mode === "2 Periode Ujian"
+                                      ? "bg-purple-50 border-purple-600 text-purple-800 ring-2 ring-purple-600/20 shadow-xs"
+                                      : "bg-blue-50 border-blue-600 text-blue-700 ring-2 ring-blue-600/20 shadow-xs"
                                     : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50"
                                 )}
                               >
                                 {d.badge && (
                                   <span className={cn(
                                     "text-[8px] font-black uppercase tracking-wider mb-1 px-1.5 py-0.5 rounded",
-                                    d.mode === "1 Tahun"
-                                      ? "bg-blue-100 text-blue-700"
-                                      : d.mode === "6 Bulan"
-                                        ? "bg-emerald-100 text-emerald-700"
-                                        : "bg-amber-100 text-amber-800"
+                                    d.mode === "2 Periode Ujian"
+                                      ? "bg-purple-100 text-purple-700 font-extrabold"
+                                      : d.mode === "1 Tahun"
+                                        ? "bg-blue-100 text-blue-700"
+                                        : d.mode === "6 Bulan"
+                                          ? "bg-emerald-100 text-emerald-700"
+                                          : "bg-amber-100 text-amber-800"
                                   )}>
                                     {d.badge}
                                   </span>
                                 )}
-                                <span className="text-xs font-extrabold">{d.label}</span>
-                                <span className="text-[10px] font-medium text-slate-400 mt-0.5">{d.sub}</span>
+                                <span className="text-xs font-extrabold whitespace-nowrap">{d.label}</span>
+                                <span className="text-[10px] font-medium text-slate-400 mt-0.5 whitespace-nowrap">{d.sub}</span>
                               </button>
                             );
                           });
                         })()}
                       </div>
+
+                      {/* Box Penjelasan Skema 2 Periode Ujian */}
+                      {durationMode === "2 Periode Ujian" && (
+                        <div className="mt-3 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-purple-50/90 via-white to-blue-50/40 border border-purple-200 shadow-2xs space-y-3.5 animate-in fade-in">
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                              <Sparkles size={16} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-xs sm:text-sm font-extrabold text-purple-950">
+                                  Skema Paket 2 Periode Ujian (Semester Ganjil & Genap)
+                                </h4>
+                                <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">
+                                  Total 6 Bulan Aktif
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                                Didesain khusus bagi sekolah yang menggunakan CBT pada saat musim ujian semester. Masa aktif 6 bulan dipecah menjadi 2 termin ujian dengan masa jeda (hibernasi) gratis di antaranya tanpa biaya server tambahan.
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* 3 Tahap Alur Periode Ujian */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                            <div className="p-3 bg-white border border-blue-200 rounded-xl shadow-2xs">
+                              <div className="flex items-center gap-1.5 text-blue-700 font-extrabold text-xs mb-1">
+                                <CheckCircle2 size={14} />
+                                <span>Termin 1 (3 Bulan)</span>
+                              </div>
+                              <p className="text-[11px] font-bold text-slate-800">Ujian Semester Ganjil</p>
+                              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                                Persiapan bank soal, simulasi, PTS/STS, & PAS/SAS Ganjil hingga cetak nilai rapor.
+                              </p>
+                            </div>
+
+                            <div className="p-3 bg-white border border-amber-200 rounded-xl shadow-2xs">
+                              <div className="flex items-center gap-1.5 text-amber-700 font-extrabold text-xs mb-1">
+                                <Moon size={14} />
+                                <span>Masa Jeda (3 Bulan)</span>
+                              </div>
+                              <p className="text-[11px] font-bold text-slate-800">Hibernasi Akun (Gratis)</p>
+                              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                                Di luar musim ujian, server diistirahatkan. Seluruh bank soal, data guru, & siswa tetap aman tersimpan tanpa biaya.
+                              </p>
+                            </div>
+
+                            <div className="p-3 bg-white border border-purple-200 rounded-xl shadow-2xs">
+                              <div className="flex items-center gap-1.5 text-purple-700 font-extrabold text-xs mb-1">
+                                <CheckCircle2 size={14} />
+                                <span>Termin 2 (3 Bulan)</span>
+                              </div>
+                              <p className="text-[11px] font-bold text-slate-800">Ujian Semester Genap</p>
+                              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                                Diaktifkan kembali saat PTS/STS Genap, PAT/SAS Akhir, Ujian Sekolah, hingga kelulusan siswa.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 px-3 py-2 bg-purple-100/70 rounded-xl text-[11px] text-purple-900 font-medium">
+                            <Info size={14} className="text-purple-700 shrink-0" />
+                            <span>
+                              Dokumen tagihan dan <strong>Kuitansi Resmi SPJ</strong> langsung tercetak dengan rincian 2 termin untuk kemudahan pelaporan pertanggungjawaban dana BOS/BOP sekolah.
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Box Custom Bulan */}
                       {durationMode === "custom" && (

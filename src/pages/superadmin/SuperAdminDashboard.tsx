@@ -701,10 +701,14 @@ const SuperAdminDashboard = () => {
         targetQuota = 250;
       }
 
+      let isMulti = false;
       if (targetPlan !== 'free' && req.duration) {
         const d = req.duration.toLowerCase();
+        isMulti = d.includes("periode") || d.includes("termin") || d.includes("split");
         const monthMatch = d.match(/(\d+)\s*bulan/);
-        if (monthMatch) {
+        if (isMulti) {
+          durationMonths = 6;
+        } else if (monthMatch) {
           durationMonths = parseInt(monthMatch[1], 10);
         } else if (d.includes("6 bulan") || d.includes("semester")) {
           durationMonths = 6;
@@ -732,7 +736,8 @@ const SuperAdminDashboard = () => {
         plan: targetPlan,
         student_quota: targetQuota,
         active_until: expDate.toISOString(),
-      });
+        _isMultiPeriodInitial: isMulti,
+      } as any);
       setApprovingRequestId(req.id);
       setShowAddModal(true);
     } catch {
@@ -2466,24 +2471,6 @@ const AddEditSchoolModal = ({
     setTimeout(() => setCopiedSetupCmd(false), 2000);
   };
 
-  const [form, setForm] = useState({
-    name: school?.name || "",
-    slug: school?.slug || "",
-    custom_domain: school?.custom_domain || "",
-    pb_url: school?.pb_url || "",
-    type: school?.type || "school",
-    contact_email: school?.contact_email || "",
-    student_quota: school?.student_quota || 50,
-    plan: school?.plan || "free",
-    active_until: isEdit ? initialDate : getTrialDate(),
-    server_host: school?.server_host || "127.0.0.1",
-    is_active: school?.is_active ?? true,
-    logo_url: school?.logo_url || "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [multiPeriodEnabled, setMultiPeriodEnabled] = useState<boolean>(false);
-
   const getSmartMultiPeriodSchedule = () => {
     const now = new Date();
     const currYear = now.getFullYear();
@@ -2526,6 +2513,26 @@ const AddEditSchoolModal = ({
       };
     }
   };
+
+  const [form, setForm] = useState({
+    name: school?.name || "",
+    slug: school?.slug || "",
+    custom_domain: school?.custom_domain || "",
+    pb_url: school?.pb_url || "",
+    type: school?.type || "school",
+    contact_email: school?.contact_email || "",
+    student_quota: school?.student_quota || 50,
+    plan: school?.plan || "free",
+    active_until: isEdit ? initialDate : ((school as any)?._isMultiPeriodInitial ? getSmartMultiPeriodSchedule().term_1_end : getTrialDate()),
+    server_host: school?.server_host || "127.0.0.1",
+    is_active: school?.is_active ?? true,
+    logo_url: school?.logo_url || "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [multiPeriodEnabled, setMultiPeriodEnabled] = useState<boolean>(() => {
+    return Boolean((school as any)?._isMultiPeriodInitial);
+  });
 
   const isSchoolCurrentlyActive = Boolean(
     school?.active_until && getDiffDays(school.active_until) > 0
