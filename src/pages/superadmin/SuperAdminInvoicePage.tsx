@@ -4,7 +4,7 @@ import {
   CheckCircle2, Clock, XCircle, Upload, X, ChevronDown, ChevronUp,
   Building2, Calendar, CreditCard, Printer, RefreshCw,
   AlertTriangle, Paperclip, ExternalLink, Trash2, Edit,
-  TrendingUp, Layers, BookOpen, Check, Percent
+  TrendingUp, Layers, BookOpen, Check, Percent, Sparkles, Moon, Sun
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -25,6 +25,7 @@ import {
   InvoiceCustomData,
   InvoiceLineItem,
   RkasMetadata,
+  MultiPeriodConfig,
   parseCustomData
 } from "../../utils/invoicePdfHelper";
 
@@ -202,6 +203,113 @@ const SuperAdminInvoicePage = () => {
   });
   const [showCustomItemsSection, setShowCustomItemsSection] = useState(false);
   const [showRkasSection, setShowRkasSection] = useState(false);
+
+  // ─── Multi-Periode Ujian (Split Termin & Masa Jeda / Hibernasi) ───
+  const [multiPeriodEnabled, setMultiPeriodEnabled] = useState(false);
+  const [showMultiPeriodSection, setShowMultiPeriodSection] = useState(false);
+  const [multiPeriodData, setMultiPeriodData] = useState<MultiPeriodConfig>({
+    is_multi_period: false,
+    term_1_name: `Termin 1: Mei, Juni, Juli ${new Date().getFullYear()} (Semester Genap / PAT)`,
+    term_1_months: 3,
+    term_1_start: `${new Date().getFullYear()}-05-01`,
+    term_1_end: `${new Date().getFullYear()}-07-31`,
+    pause_name: `Masa Jeda: Agustus, September, Oktober ${new Date().getFullYear()} (Hibernasi)`,
+    pause_start: `${new Date().getFullYear()}-08-01`,
+    pause_end: `${new Date().getFullYear()}-10-31`,
+    term_2_name: `Termin 2: November, Desember ${new Date().getFullYear()} - Januari ${new Date().getFullYear() + 1} (Semester Ganjil / PAS)`,
+    term_2_months: 3,
+    term_2_start: `${new Date().getFullYear()}-11-01`,
+    term_2_end: `${new Date().getFullYear() + 1}-01-31`,
+  });
+
+  const applyMultiPeriodPreset = (type: "may_nov" | "apr_oct" = "may_nov") => {
+    const currYear = new Date().getFullYear();
+    const planKey = normalizePlanKey(form.plan || "basic");
+    const monthlyRate = PLAN_PRICES[planKey]?.monthly || 380000;
+    const subtotal = monthlyRate * 6;
+    const taxAmt = taxEnabled ? Math.round(subtotal * ((taxPercent || 11) / 100)) : 0;
+
+    let t1Name = `Termin 1: Mei, Juni, Juli ${currYear} (Semester Genap / PAT)`;
+    let t1Start = `${currYear}-05-01`;
+    let t1End = `${currYear}-07-31`;
+    let pName = `Masa Jeda: Agustus, September, Oktober ${currYear} (Hibernasi)`;
+    let pStart = `${currYear}-08-01`;
+    let pEnd = `${currYear}-10-31`;
+    let t2Name = `Termin 2: November, Desember ${currYear} - Januari ${currYear + 1} (Semester Ganjil / PAS)`;
+    let t2Start = `${currYear}-11-01`;
+    let t2End = `${currYear + 1}-01-31`;
+    let labelPeriod = `6 Bulan Custom (Termin 1: Mei-Juli & Termin 2: Nov-Jan)`;
+    let line1Desc = `Lisensi CBT Periode Semester Genap (${PLAN_PRICES[planKey]?.label || form.plan}: Mei – Juli)`;
+    let line2Desc = `Lisensi CBT Periode Semester Ganjil (${PLAN_PRICES[planKey]?.label || form.plan}: November – Januari)`;
+    let pauseDesc = `Infrastruktur Server & Hibernasi Data Bank Soal (Masa Jeda: Agustus – Oktober)`;
+
+    if (type === "apr_oct") {
+      t1Name = `Termin 1: April, Mei, Juni ${currYear} (Semester Genap)`;
+      t1Start = `${currYear}-04-01`;
+      t1End = `${currYear}-06-30`;
+      pName = `Masa Jeda: Juli, Agustus, September ${currYear} (Hibernasi)`;
+      pStart = `${currYear}-07-01`;
+      pEnd = `${currYear}-09-30`;
+      t2Name = `Termin 2: Oktober, November, Desember ${currYear} (Semester Ganjil)`;
+      t2Start = `${currYear}-10-01`;
+      t2End = `${currYear}-12-31`;
+      labelPeriod = `6 Bulan Custom (Termin 1: Apr-Jun & Termin 2: Okt-Des)`;
+      line1Desc = `Lisensi CBT Periode Semester Genap (${PLAN_PRICES[planKey]?.label || form.plan}: April – Juni)`;
+      line2Desc = `Lisensi CBT Periode Semester Ganjil (${PLAN_PRICES[planKey]?.label || form.plan}: Oktober – Desember)`;
+      pauseDesc = `Infrastruktur Server & Hibernasi Data Bank Soal (Masa Jeda: Juli – September)`;
+    }
+
+    setForm(f => ({
+      ...f,
+      duration_months: 6,
+      period_label: labelPeriod,
+      amount: subtotal + taxAmt,
+      notes: `[MULTI-PERIODE] Langganan 6 bulan aktif 2 termin: ${t1Name.split("(")[0].trim()} dan ${t2Name.split("(")[0].trim()}. Masa jeda non-aktif pada ${pName.split("(")[0].trim()}. Bank soal dan akun tetap aman.`,
+    }));
+
+    setMultiPeriodEnabled(true);
+    setShowMultiPeriodSection(true);
+    setMultiPeriodData({
+      is_multi_period: true,
+      term_1_name: t1Name,
+      term_1_months: 3,
+      term_1_start: t1Start,
+      term_1_end: t1End,
+      pause_name: pName,
+      pause_start: pStart,
+      pause_end: pEnd,
+      term_2_name: t2Name,
+      term_2_months: 3,
+      term_2_start: t2Start,
+      term_2_end: t2End,
+    });
+
+    setCustomItemsEnabled(true);
+    setShowCustomItemsSection(true);
+    setCustomItems([
+      {
+        description: line1Desc,
+        qty: 3,
+        unit: "Bulan",
+        price: monthlyRate,
+        total: monthlyRate * 3,
+      },
+      {
+        description: line2Desc,
+        qty: 3,
+        unit: "Bulan",
+        price: monthlyRate,
+        total: monthlyRate * 3,
+      },
+      {
+        description: pauseDesc,
+        qty: 1,
+        unit: "Paket",
+        price: 0,
+        total: 0,
+      }
+    ]);
+  };
 
   // ─── PPN / Pajak State ───
   const [taxEnabled, setTaxEnabled] = useState(false);
@@ -583,6 +691,8 @@ const SuperAdminInvoicePage = () => {
       treasurer_nip: "",
       supplier_npwp: "",
     });
+    setMultiPeriodEnabled(false);
+    setShowMultiPeriodSection(false);
     setShowCustomItemsSection(false);
     setShowRkasSection(false);
     setShowModal(true);
@@ -647,6 +757,15 @@ const SuperAdminInvoicePage = () => {
         supplier_npwp: parsedCustom?.rkas?.supplier_npwp || "",
       });
       setShowRkasSection(false);
+    }
+
+    if (parsedCustom?.multi_period?.is_multi_period) {
+      setMultiPeriodEnabled(true);
+      setShowMultiPeriodSection(true);
+      setMultiPeriodData(parsedCustom.multi_period);
+    } else {
+      setMultiPeriodEnabled(false);
+      setShowMultiPeriodSection(false);
     }
 
     setShowModal(true);
@@ -791,7 +910,7 @@ const SuperAdminInvoicePage = () => {
       if (contactEmail) payload.contact_email = contactEmail;
 
       let customPayload: InvoiceCustomData | null = null;
-      if (customItemsEnabled || rkasEnabled || taxEnabled) {
+      if (customItemsEnabled || rkasEnabled || taxEnabled || multiPeriodEnabled) {
         const baseSubtotal = customItemsEnabled && customItems.length > 0
           ? customItems.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0)
           : (taxEnabled ? Math.round(Number(form.amount) / (1 + (taxPercent / 100))) : Number(form.amount));
@@ -807,6 +926,10 @@ const SuperAdminInvoicePage = () => {
             tax_name: `PPN ${taxPercent}%`,
             subtotal: baseSubtotal,
             tax_amount: taxAmt,
+          } : undefined,
+          multi_period: multiPeriodEnabled ? {
+            ...multiPeriodData,
+            is_multi_period: true,
           } : undefined,
         };
       }
@@ -1117,6 +1240,11 @@ const SuperAdminInvoicePage = () => {
                                 {cd.rkas?.enabled && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" title="Format SPJ BOS Aktif">
                                     SPJ BOS
+                                  </span>
+                                )}
+                                {cd.multi_period?.is_multi_period && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 inline-flex items-center gap-0.5" title="Paket Multi-Periode (Split 2 Termin Ujian & Masa Jeda)">
+                                    <Sparkles size={8} /> Multi-Periode
                                   </span>
                                 )}
                                 {cd.items && cd.items.length > 0 && (
@@ -1487,7 +1615,7 @@ const SuperAdminInvoicePage = () => {
                     </span>
                   </div>
                   {/* Preset chips */}
-                  <div className="flex flex-wrap gap-1 mt-1.5">
+                  <div className="flex flex-wrap items-center gap-1 mt-1.5">
                     {[
                       { m: 1, label: "1 Bln" },
                       { m: 3, label: "3 Bln" },
@@ -1498,10 +1626,13 @@ const SuperAdminInvoicePage = () => {
                       <button
                         key={chip.m}
                         type="button"
-                        onClick={() => handleDurationChange(chip.m)}
+                        onClick={() => {
+                          if (multiPeriodEnabled) setMultiPeriodEnabled(false);
+                          handleDurationChange(chip.m);
+                        }}
                         className={cn(
                           "px-2 py-0.5 rounded-lg text-[10.5px] font-medium transition cursor-pointer",
-                          form.duration_months === chip.m
+                          form.duration_months === chip.m && !multiPeriodEnabled
                             ? "bg-blue-600 text-white font-semibold shadow-2xs"
                             : "bg-slate-100 hover:bg-slate-200 text-slate-600"
                         )}
@@ -1509,6 +1640,20 @@ const SuperAdminInvoicePage = () => {
                         {chip.label}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => applyMultiPeriodPreset("may_nov")}
+                      className={cn(
+                        "px-2 py-0.5 rounded-lg text-[10.5px] font-semibold transition cursor-pointer flex items-center gap-1",
+                        multiPeriodEnabled
+                          ? "bg-purple-600 text-white shadow-2xs"
+                          : "bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/80"
+                      )}
+                      title="Paket 6 Bulan Custom Split 2 Termin Ujian (Mei-Juli & Nov-Jan) dengan Masa Jeda"
+                    >
+                      <Sparkles size={11} className={multiPeriodEnabled ? "text-amber-200" : "text-purple-600"} />
+                      6 Bln Custom (Split 2 Termin)
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2015,6 +2160,214 @@ const SuperAdminInvoicePage = () => {
                 )}
               </div>
 
+              {/* ─── PENGATURAN MULTI-PERIODE & MASA JEDA ─── */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+                <div
+                  className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-100/60 transition select-none"
+                  onClick={() => setShowMultiPeriodSection(!showMultiPeriodSection)}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                      <Calendar size={14} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-800">Paket Multi-Periode Ujian (Split Termin)</span>
+                        {multiPeriodEnabled && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 flex items-center gap-1">
+                            <Sparkles size={10} /> Aktif (2 Termin)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400">Jadwalkan langganan terpisah (misal Mei–Juli & Nov–Jan) dengan masa jeda / hibernasi non-aktif</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-400">
+                    {showMultiPeriodSection ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                </div>
+
+                {showMultiPeriodSection && (
+                  <div className="p-4 border-t border-slate-200 bg-white space-y-3.5">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={multiPeriodEnabled}
+                          onChange={e => {
+                            const val = e.target.checked;
+                            setMultiPeriodEnabled(val);
+                            if (val && !multiPeriodData.is_multi_period) {
+                              applyMultiPeriodPreset("may_nov");
+                            }
+                          }}
+                          className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                        />
+                        <span className="text-xs font-semibold text-slate-700">
+                          Aktifkan Skema Multi-Periode di Dokumen & Sistem Pengingat
+                        </span>
+                      </label>
+
+                      {multiPeriodEnabled && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => applyMultiPeriodPreset("may_nov")}
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 transition"
+                          >
+                            Preset: Mei-Jul & Nov-Jan
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyMultiPeriodPreset("apr_oct")}
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition"
+                          >
+                            Preset: Apr-Jun & Okt-Des
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {multiPeriodEnabled ? (
+                      <div className="space-y-3">
+                        {/* Termin 1 */}
+                        <div className="p-3 bg-emerald-50/60 border border-emerald-200/80 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                              Termin 1 (Ujian Semester Genap / PAT)
+                            </span>
+                            <span className="text-[10.5px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                              Durasi 3 Bulan
+                            </span>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-500 mb-0.5">Uraian / Nama Termin</label>
+                            <input
+                              type="text"
+                              value={multiPeriodData.term_1_name || ""}
+                              onChange={e => setMultiPeriodData(d => ({ ...d, term_1_name: e.target.value }))}
+                              placeholder="Termin 1: Mei, Juni, Juli (Semester Genap / PAT)"
+                              className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] text-slate-500 mb-0.5">Mulai Aktif</label>
+                              <input
+                                type="date"
+                                value={multiPeriodData.term_1_start || ""}
+                                onChange={e => setMultiPeriodData(d => ({ ...d, term_1_start: e.target.value }))}
+                                className="w-full px-2 py-1 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-slate-500 mb-0.5">Berakhir (Mulai Jeda)</label>
+                              <input
+                                type="date"
+                                value={multiPeriodData.term_1_end || ""}
+                                onChange={e => setMultiPeriodData(d => ({ ...d, term_1_end: e.target.value }))}
+                                className="w-full px-2 py-1 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Masa Jeda */}
+                        <div className="p-3 bg-amber-50/60 border border-amber-200/80 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                              <Moon size={12} className="text-amber-600" />
+                              Masa Jeda / Non-Aktif (Hibernasi Terjadwal)
+                            </span>
+                            <span className="text-[10px] font-semibold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full">
+                              Data & Bank Soal Aman
+                            </span>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-500 mb-0.5">Keterangan Masa Jeda</label>
+                            <input
+                              type="text"
+                              value={multiPeriodData.pause_name || ""}
+                              onChange={e => setMultiPeriodData(d => ({ ...d, pause_name: e.target.value }))}
+                              placeholder="Masa Jeda: Agustus, September, Oktober (Hibernasi)"
+                              className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] text-slate-500 mb-0.5">Awal Masa Jeda</label>
+                              <input
+                                type="date"
+                                value={multiPeriodData.pause_start || ""}
+                                onChange={e => setMultiPeriodData(d => ({ ...d, pause_start: e.target.value }))}
+                                className="w-full px-2 py-1 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-slate-500 mb-0.5">Akhir Masa Jeda</label>
+                              <input
+                                type="date"
+                                value={multiPeriodData.pause_end || ""}
+                                onChange={e => setMultiPeriodData(d => ({ ...d, pause_end: e.target.value }))}
+                                className="w-full px-2 py-1 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Termin 2 */}
+                        <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-blue-500" />
+                              Termin 2 (Ujian Semester Ganjil / PAS)
+                            </span>
+                            <span className="text-[10.5px] font-semibold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
+                              Durasi 3 Bulan
+                            </span>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-500 mb-0.5">Uraian / Nama Termin</label>
+                            <input
+                              type="text"
+                              value={multiPeriodData.term_2_name || ""}
+                              onChange={e => setMultiPeriodData(d => ({ ...d, term_2_name: e.target.value }))}
+                              placeholder="Termin 2: November, Desember, Januari (Semester Ganjil / PAS)"
+                              className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] text-slate-500 mb-0.5">Mulai Aktif Kembali</label>
+                              <input
+                                type="date"
+                                value={multiPeriodData.term_2_start || ""}
+                                onChange={e => setMultiPeriodData(d => ({ ...d, term_2_start: e.target.value }))}
+                                className="w-full px-2 py-1 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-slate-500 mb-0.5">Selesai Berlangganan</label>
+                              <input
+                                type="date"
+                                value={multiPeriodData.term_2_end || ""}
+                                onChange={e => setMultiPeriodData(d => ({ ...d, term_2_end: e.target.value }))}
+                                className="w-full px-2 py-1 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">
+                        Default: Langganan reguler berjalan berurutan setiap bulan. Aktifkan fitur ini jika sekolah memesan paket khusus musim ujian (misal 3 bulan semester genap dan 3 bulan semester ganjil) agar ada pengingat masa jeda dan tanggal aktif kembali.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Notes */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Catatan (opsional)</label>
@@ -2241,15 +2594,20 @@ const SuperAdminInvoicePage = () => {
               {/* RKAS / Tax / Custom Items Preview */}
               {(() => {
                 const cd = parseCustomData(detailInvoice.custom_data);
-                if (!cd?.rkas?.enabled && (!cd?.items || cd.items.length === 0) && !cd?.tax?.enabled) return null;
+                if (!cd?.rkas?.enabled && (!cd?.items || cd.items.length === 0) && !cd?.tax?.enabled && !cd?.multi_period?.is_multi_period) return null;
                 return (
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <BookOpen size={14} className="text-emerald-600" />
-                        Kelengkapan Dokumen RKAS / SPJ Dana BOS
+                        Kelengkapan Dokumen & Konfigurasi Khusus
                       </span>
                       <div className="flex items-center gap-1.5">
+                        {cd.multi_period?.is_multi_period && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center gap-1">
+                            <Sparkles size={10} /> Multi-Periode
+                          </span>
+                        )}
                         {cd.tax?.enabled && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
                             PPN {cd.tax.rate_percent ?? 11}% Exclude
@@ -2262,6 +2620,37 @@ const SuperAdminInvoicePage = () => {
                         )}
                       </div>
                     </div>
+
+                    {cd.multi_period?.is_multi_period && (
+                      <div className="bg-purple-50/70 border border-purple-200/90 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                            <Sparkles size={12} className="text-purple-600" />
+                            Skema Multi-Periode (Split 2 Termin Ujian)
+                          </span>
+                          <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                            Total 6 Bulan
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-[11px]">
+                          <div className="bg-white p-2 rounded border border-purple-200/60">
+                            <div className="text-[9.5px] font-bold text-emerald-700 uppercase">Termin 1 (3 Bln)</div>
+                            <div className="font-semibold text-slate-800 mt-0.5">{cd.multi_period.term_1_name || "Mei – Juli"}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{cd.multi_period.term_1_start || "-"} s/d {cd.multi_period.term_1_end || "-"}</div>
+                          </div>
+                          <div className="bg-white p-2 rounded border border-amber-200/60">
+                            <div className="text-[9.5px] font-bold text-amber-700 uppercase">Masa Jeda (Hibernasi)</div>
+                            <div className="font-semibold text-slate-800 mt-0.5">{cd.multi_period.pause_name || "Agustus – Oktober"}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{cd.multi_period.pause_start || "-"} s/d {cd.multi_period.pause_end || "-"}</div>
+                          </div>
+                          <div className="bg-white p-2 rounded border border-purple-200/60">
+                            <div className="text-[9.5px] font-bold text-blue-700 uppercase">Termin 2 (3 Bln)</div>
+                            <div className="font-semibold text-slate-800 mt-0.5">{cd.multi_period.term_2_name || "Nov – Jan"}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{cd.multi_period.term_2_start || "-"} s/d {cd.multi_period.term_2_end || "-"}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {cd.tax?.enabled && (
                       <div className="flex items-center justify-between text-xs bg-amber-50/80 border border-amber-200/80 rounded-lg p-2.5 text-amber-900">

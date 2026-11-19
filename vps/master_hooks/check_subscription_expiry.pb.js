@@ -61,6 +61,24 @@ cronAdd("checkSubscriptionExpiry", "0 8 * * *", () => {
 
                 console.log("[Subscription Expiry Cron] " + schoolName + " status diffDays: " + diffDays);
 
+                // Cek apakah sekolah memiliki paket multi-periode terjadwal (misal split termin ujian + masa jeda)
+                let isMultiPeriodScheduled = false;
+                try {
+                    const paidInvs = $app.findRecordsByFilter("invoices", "school_id = '" + schoolId + "' && status = 'paid'", "-created", 3);
+                    for (let pIdx = 0; pIdx < paidInvs.length; pIdx++) {
+                        const rawCd = (paidInvs[pIdx].get("custom_data") || "").trim();
+                        if (rawCd.includes('"is_multi_period":true') || rawCd.includes('"is_multi_period": true')) {
+                            isMultiPeriodScheduled = true;
+                            break;
+                        }
+                    }
+                } catch (mpErr) {}
+
+                if (isMultiPeriodScheduled) {
+                    console.log("[Subscription Expiry Cron] " + schoolName + " memiliki jadwal multi-periode aktif. Lewati pembuatan invoice otomatis & suspensi.");
+                    continue; // Lewati sekolah ini, biarkan mengikuti jadwal multi-periode
+                }
+
                 // 1. Cek apakah sudah ada invoice unpaid untuk sekolah ini
                 let existingInvoices = [];
                 try {

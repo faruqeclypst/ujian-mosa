@@ -1,4 +1,5 @@
 import { masterPb } from "../lib/pocketbase";
+import { parseCustomData } from "./invoicePdfHelper";
 import {
   calculatePlanInvoice,
   normalizePlanKey,
@@ -289,6 +290,26 @@ export const upgradeSchoolFromInvoice = async (invoice: {
       student_quota: Math.max(school.student_quota || 0, targetQuota),
       is_active: true,
     };
+
+    // Cek apakah invoice memiliki konfigurasi multi-periode custom (misal 6 bulan split 2 termin ujian)
+    const customData = parseCustomData((invoice as any).custom_data);
+    const multiPeriod = customData?.multi_period;
+    if (multiPeriod?.is_multi_period && multiPeriod.term_1_end) {
+      const term2StartMatch = multiPeriod.term_2_start?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const term2EndMatch = multiPeriod.term_2_end?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+      let targetEnd = multiPeriod.term_1_end;
+      if (term2StartMatch && term2EndMatch) {
+        const t2Start = new Date(parseInt(term2StartMatch[1], 10), parseInt(term2StartMatch[2], 10) - 1, parseInt(term2StartMatch[3], 10));
+        if (now.getTime() >= t2Start.getTime()) {
+          targetEnd = multiPeriod.term_2_end!;
+        }
+      }
+
+      payload.active_until = `${targetEnd.trim().slice(0, 10)} 23:59:59.000Z`;
+      keepCurrentExpiry = true;
+    }
+
     if (!keepCurrentExpiry) {
       const newExp = addBillingPeriod(baseDate, months);
       newExp.setHours(23, 59, 59, 999);

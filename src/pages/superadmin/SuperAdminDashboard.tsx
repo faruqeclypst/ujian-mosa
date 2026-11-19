@@ -6,7 +6,7 @@ import {
   Search, Trash2, Monitor, Zap, Server, ChevronDown,
   Building2, Globe, Sparkles, ShieldCheck, Calendar, Cpu, BookOpen, HardDrive,
   Activity, CheckCircle2, XCircle, AlertTriangle, Info, KeyRound, ChevronRight,
-  Database, ExternalLink, Lock, Copy
+  Database, ExternalLink, Lock, Copy, Moon
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -14,6 +14,7 @@ import { cn } from "../../lib/utils";
 import { getSchoolUrl, getSchoolDomain, getDomainSuffix } from "../../utils/domainHelper";
 import { calculatePlanInvoice, PLAN_PRICING, normalizePlanKey, addBillingPeriod } from "../../utils/pricingHelper";
 import { ensureRenewalInvoice } from "../../utils/subscriptionHelper";
+import { parseCustomData, MultiPeriodConfig } from "../../utils/invoicePdfHelper";
 import { OneClickMigrationModal } from "./OneClickMigrationModal";
 import { OfflineLicenseModal } from "../../components/dialogs/OfflineLicenseModal";
 import { SchoolNpsnSearch } from "../../components/common/SchoolNpsnSearch";
@@ -201,6 +202,202 @@ const getActiveUntilInfo = (dateStr?: string) => {
   }
 };
 
+export interface MultiPeriodSchoolStatus {
+  schoolId: string;
+  schoolName: string;
+  schoolSlug: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  term1Name: string;
+  term1Start: string;
+  term1End: string;
+  pauseName: string;
+  pauseStart: string;
+  pauseEnd: string;
+  term2Name: string;
+  term2Start: string;
+  term2End: string;
+  status: "in_term_1" | "approaching_pause" | "in_pause" | "approaching_term_2" | "in_term_2" | "completed";
+  daysRemaining: number;
+  badgeLabel: string;
+  badgeColor: string;
+  actionText?: string;
+  actionType?: "resume_t2" | "pause_now";
+}
+
+const computeMultiPeriodStatus = (
+  school: SchoolRecord,
+  mp: MultiPeriodConfig,
+  invId: string,
+  invNum: string
+): MultiPeriodSchoolStatus | null => {
+  if (!mp.is_multi_period) return null;
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+
+  const t1Start = mp.term_1_start || "";
+  const t1End = mp.term_1_end || "";
+  const pStart = mp.pause_start || "";
+  const pEnd = mp.pause_end || "";
+  const t2Start = mp.term_2_start || "";
+  const t2End = mp.term_2_end || "";
+
+  const diffDaysFromToday = (targetDateStr: string) => {
+    const match = targetDateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return 999;
+    const d = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10), 23, 59, 59);
+    return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const diffT1End = diffDaysFromToday(t1End);
+  const diffT2Start = diffDaysFromToday(t2Start);
+  const diffT2End = diffDaysFromToday(t2End);
+
+  // 1. Sedang dalam Masa Jeda (antara t1End s/d t2Start)
+  if (todayStr > t1End && todayStr < t2Start) {
+    if (diffT2Start <= 14 && diffT2Start > 0) {
+      return {
+        schoolId: school.id,
+        schoolName: school.name,
+        schoolSlug: school.slug,
+        invoiceId: invId,
+        invoiceNumber: invNum,
+        term1Name: mp.term_1_name || "Termin 1",
+        term1Start: t1Start,
+        term1End: t1End,
+        pauseName: mp.pause_name || "Masa Jeda",
+        pauseStart: pStart,
+        pauseEnd: pEnd,
+        term2Name: mp.term_2_name || "Termin 2",
+        term2Start: t2Start,
+        term2End: t2End,
+        status: "approaching_term_2",
+        daysRemaining: diffT2Start,
+        badgeLabel: `Termin 2 Mulai dalam ${diffT2Start} Hari`,
+        badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
+        actionText: "Aktifkan Termin 2 Sekarang",
+        actionType: "resume_t2"
+      };
+    }
+    return {
+      schoolId: school.id,
+      schoolName: school.name,
+      schoolSlug: school.slug,
+      invoiceId: invId,
+      invoiceNumber: invNum,
+      term1Name: mp.term_1_name || "Termin 1",
+      term1Start: t1Start,
+      term1End: t1End,
+      pauseName: mp.pause_name || "Masa Jeda",
+      pauseStart: pStart,
+      pauseEnd: pEnd,
+      term2Name: mp.term_2_name || "Termin 2",
+      term2Start: t2Start,
+      term2End: t2End,
+      status: "in_pause",
+      daysRemaining: diffT2Start,
+      badgeLabel: `Masa Jeda (Aktif: ${t2Start ? new Date(t2Start).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"})`,
+      badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
+      actionText: "Aktifkan Termin 2 Sekarang",
+      actionType: "resume_t2"
+    };
+  }
+
+  // 2. Dalam Termin 1 (sebelum / mendekati jeda)
+  if (todayStr <= t1End) {
+    if (diffT1End <= 14 && diffT1End >= 0) {
+      return {
+        schoolId: school.id,
+        schoolName: school.name,
+        schoolSlug: school.slug,
+        invoiceId: invId,
+        invoiceNumber: invNum,
+        term1Name: mp.term_1_name || "Termin 1",
+        term1Start: t1Start,
+        term1End: t1End,
+        pauseName: mp.pause_name || "Masa Jeda",
+        pauseStart: pStart,
+        pauseEnd: pEnd,
+        term2Name: mp.term_2_name || "Termin 2",
+        term2Start: t2Start,
+        term2End: t2End,
+        status: "approaching_pause",
+        daysRemaining: diffT1End,
+        badgeLabel: `Termin 1 Berakhir dlm ${diffT1End} Hari`,
+        badgeColor: "bg-amber-50 text-amber-700 border-amber-200",
+        actionText: "Setel Hibernasi Sekarang",
+        actionType: "pause_now"
+      };
+    }
+    return {
+      schoolId: school.id,
+      schoolName: school.name,
+      schoolSlug: school.slug,
+      invoiceId: invId,
+      invoiceNumber: invNum,
+      term1Name: mp.term_1_name || "Termin 1",
+      term1Start: t1Start,
+      term1End: t1End,
+      pauseName: mp.pause_name || "Masa Jeda",
+      pauseStart: pStart,
+      pauseEnd: pEnd,
+      term2Name: mp.term_2_name || "Termin 2",
+      term2Start: t2Start,
+      term2End: t2End,
+      status: "in_term_1",
+      daysRemaining: diffT1End,
+      badgeLabel: `Termin 1 Aktif (s/d ${t1End ? new Date(t1End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"})`,
+      badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    };
+  }
+
+  // 3. Dalam Termin 2
+  if (todayStr >= t2Start && todayStr <= t2End) {
+    return {
+      schoolId: school.id,
+      schoolName: school.name,
+      schoolSlug: school.slug,
+      invoiceId: invId,
+      invoiceNumber: invNum,
+      term1Name: mp.term_1_name || "Termin 1",
+      term1Start: t1Start,
+      term1End: t1End,
+      pauseName: mp.pause_name || "Masa Jeda",
+      pauseStart: pStart,
+      pauseEnd: pEnd,
+      term2Name: mp.term_2_name || "Termin 2",
+      term2Start: t2Start,
+      term2End: t2End,
+      status: "in_term_2",
+      daysRemaining: diffT2End,
+      badgeLabel: `Termin 2 Aktif (s/d ${t2End ? new Date(t2End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"})`,
+      badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    };
+  }
+
+  // 4. Selesai
+  return {
+    schoolId: school.id,
+    schoolName: school.name,
+    schoolSlug: school.slug,
+    invoiceId: invId,
+    invoiceNumber: invNum,
+    term1Name: mp.term_1_name || "Termin 1",
+    term1Start: t1Start,
+    term1End: t1End,
+    pauseName: mp.pause_name || "Masa Jeda",
+    pauseStart: pStart,
+    pauseEnd: pEnd,
+    term2Name: mp.term_2_name || "Termin 2",
+    term2Start: t2Start,
+    term2End: t2End,
+    status: "completed",
+    daysRemaining: 0,
+    badgeLabel: "Multi-Periode Selesai",
+    badgeColor: "bg-slate-100 text-slate-600 border-slate-200",
+  };
+};
+
 const SchoolAvatar = ({ name, logoUrl, className }: { name: string; logoUrl?: string; className?: string }) => {
   const [error, setError] = useState(false);
 
@@ -249,6 +446,7 @@ const SuperAdminDashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sendingRenewalId, setSendingRenewalId] = useState<string | null>(null);
+  const [multiPeriodSchools, setMultiPeriodSchools] = useState<MultiPeriodSchoolStatus[]>([]);
   const [confirmData, setConfirmData] = useState<{
     title: string;
     message: string;
@@ -270,18 +468,66 @@ const SuperAdminDashboard = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [schoolList, requestList] = await Promise.all([
+      const [schoolList, requestList, paidInvoices] = await Promise.all([
         masterPb.collection("schools").getFullList<SchoolRecord>({ sort: "-created" }),
         masterPb.collection("school_requests").getFullList<SchoolRequest>({ sort: "-created" }),
+        masterPb.collection("invoices").getFullList({ sort: "-created", filter: "status = 'paid'" }).catch(() => []),
       ]);
       setSchools(schoolList);
       setRequests(requestList);
+
+      const mpList: MultiPeriodSchoolStatus[] = [];
+      const seenSchoolIds = new Set<string>();
+      for (const inv of paidInvoices) {
+        const cd = parseCustomData(inv.custom_data);
+        if (cd?.multi_period?.is_multi_period && inv.school_id && !seenSchoolIds.has(inv.school_id)) {
+          const matchedSchool = schoolList.find(s => s.id === inv.school_id);
+          if (matchedSchool) {
+            seenSchoolIds.add(inv.school_id);
+            const statusObj = computeMultiPeriodStatus(matchedSchool, cd.multi_period, inv.id, inv.invoice_number);
+            if (statusObj) {
+              mpList.push(statusObj);
+            }
+          }
+        }
+      }
+      setMultiPeriodSchools(mpList);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handleResumeTerm2 = async (item: MultiPeriodSchoolStatus) => {
+    try {
+      const endStr = `${item.term2End.trim().slice(0, 10)} 23:59:59.000Z`;
+      await masterPb.collection("schools").update(item.schoolId, {
+        is_active: true,
+        active_until: endStr,
+      });
+      addLog("activate", `Mengaktifkan Termin 2 (s/d ${item.term2End})`, item.schoolName);
+      refreshLogs();
+      await loadData();
+      alert(`Sukses mengaktifkan kembali akses untuk ${item.schoolName}. Termin 2 aktif s/d ${item.term2End}.`);
+    } catch {
+      alert("Gagal mengaktifkan Termin 2.");
+    }
+  };
+
+  const handleSetHibernation = async (item: MultiPeriodSchoolStatus) => {
+    try {
+      await masterPb.collection("schools").update(item.schoolId, {
+        is_active: false,
+      });
+      addLog("deactivate", `Menyetel status hibernasi masa jeda terjadwal`, item.schoolName);
+      refreshLogs();
+      await loadData();
+      alert(`Status hibernasi aktif untuk ${item.schoolName}. Server di-pause sementara dengan bank soal tetap aman.`);
+    } catch {
+      alert("Gagal menyetel hibernasi.");
+    }
+  };
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -690,6 +936,108 @@ const SuperAdminDashboard = () => {
         ))}
       </div>
 
+      {/* Pengingat Jadwal Multi-Periode & Hibernasi */}
+      {multiPeriodSchools.length > 0 && (
+        <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-purple-50/80 via-indigo-50/40 to-white border border-purple-200/90 shadow-xs">
+          <div className="flex items-center justify-between mb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                <Calendar size={16} />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  Pengingat Jadwal Multi-Periode & Masa Jeda Ujian
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
+                    {multiPeriodSchools.length} Sekolah Terjadwal
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pantau tenant paket 6 bulan musim ujian, jadwal hibernasi non-aktif, dan tanggal aktif kembali untuk Termin 2.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {multiPeriodSchools.map((item) => {
+              const isHibernation = item.status === "in_pause";
+              const isUpcomingResume = item.status === "approaching_term_2";
+              const isUpcomingPause = item.status === "approaching_pause";
+
+              return (
+                <div
+                  key={item.schoolId}
+                  className={cn(
+                    "p-3 rounded-xl border bg-white transition-all shadow-2xs space-y-2.5",
+                    isHibernation
+                      ? "border-purple-300 bg-purple-50/30 ring-1 ring-purple-200/50"
+                      : isUpcomingResume
+                      ? "border-blue-300 bg-blue-50/30 ring-1 ring-blue-200/50"
+                      : isUpcomingPause
+                      ? "border-amber-300 bg-amber-50/30 ring-1 ring-amber-200/50"
+                      : "border-slate-200"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-900 truncate max-w-[170px]">{item.schoolName}</h4>
+                      <p className="text-[10px] font-mono text-purple-600">{item.schoolSlug}.examku.my.id</p>
+                    </div>
+                    <span className={cn(
+                      "text-[9.5px] font-bold px-2 py-0.5 rounded-full border shrink-0 inline-flex items-center gap-1",
+                      item.badgeColor
+                    )}>
+                      {isHibernation ? <Moon size={9} /> : <Clock size={9} />}
+                      {item.badgeLabel}
+                    </span>
+                  </div>
+
+                  <div className="text-[10.5px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100 space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Termin 1:</span>
+                      <span className="font-medium text-slate-700">{item.term1Name.split("(")[0].trim()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Masa Jeda:</span>
+                      <span className="font-medium text-purple-700">{item.pauseName.split("(")[0].trim()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Termin 2:</span>
+                      <span className="font-medium text-blue-700">{item.term2Name.split("(")[0].trim()}</span>
+                    </div>
+                  </div>
+
+                  {item.actionText && (
+                    <div className="pt-1 flex items-center justify-end">
+                      {item.actionType === "resume_t2" && (
+                        <button
+                          type="button"
+                          onClick={() => handleResumeTerm2(item)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Zap size={12} />
+                          {item.actionText}
+                        </button>
+                      )}
+                      {item.actionType === "pause_now" && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetHibernation(item)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Moon size={12} />
+                          {item.actionText}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Tab + Action bar */}
       <div className="flex flex-col gap-3 mb-4">
         {/* Baris 1: Tabs */}
@@ -996,6 +1344,21 @@ const SuperAdminDashboard = () => {
                             <span className="text-[11px] font-bold text-slate-700">{school.student_quota || 0} Siswa</span>
                           </div>
                           {(() => {
+                            const mpItem = multiPeriodSchools.find(m => m.schoolId === school.id);
+                            if (mpItem && (mpItem.status === "in_pause" || mpItem.status === "approaching_term_2")) {
+                              return (
+                                <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 inline-flex items-center gap-1" title={mpItem.pauseName}>
+                                  <Moon size={10} className="text-purple-600" /> Aktif: {mpItem.term2Start ? new Date(mpItem.term2Start).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"}
+                                </span>
+                              );
+                            }
+                            if (mpItem && mpItem.status === "in_term_1") {
+                              return (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1" title={mpItem.term1Name}>
+                                  <Calendar size={10} className="text-emerald-600" /> Termin 1: s/d {mpItem.term1End ? new Date(mpItem.term1End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"}
+                                </span>
+                              );
+                            }
                             const info = getActiveUntilInfo(school.active_until);
                             if (info.isPermanent) {
                               return (
@@ -1019,22 +1382,62 @@ const SuperAdminDashboard = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={cn(
-                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors",
-                          school.is_active
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200/80"
-                            : "bg-slate-100 text-slate-500 border-slate-200"
-                        )}>
-                          <span className={cn(
-                            "w-1.5 h-1.5 rounded-full",
-                            school.is_active ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
-                          )} />
-                          {school.is_active ? "Aktif" : "Nonaktif"}
-                        </span>
+                        {(() => {
+                          const mpItem = multiPeriodSchools.find(m => m.schoolId === school.id);
+                          if (mpItem && mpItem.status === "in_pause") {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-purple-50 text-purple-700 border-purple-200 shadow-2xs">
+                                <Moon size={11} className="text-purple-600 animate-pulse" />
+                                Masa Jeda
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className={cn(
+                              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors",
+                              school.is_active
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200/80"
+                                : "bg-slate-100 text-slate-500 border-slate-200"
+                            )}>
+                              <span className={cn(
+                                "w-1.5 h-1.5 rounded-full",
+                                school.is_active ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
+                              )} />
+                              {school.is_active ? "Aktif" : "Nonaktif"}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {(() => {
+                            const mpItem = multiPeriodSchools.find(m => m.schoolId === school.id);
+                            if (mpItem && (mpItem.status === "in_pause" || mpItem.status === "approaching_term_2")) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => handleResumeTerm2(mpItem)}
+                                  className="px-2.5 py-1 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-all flex items-center gap-1 text-[11px] font-bold shadow-2xs whitespace-nowrap cursor-pointer"
+                                  title={`Aktifkan Termin 2 (${mpItem.term2Name}) sampai ${mpItem.term2End}`}
+                                >
+                                  <Zap size={11} className="text-emerald-600" />
+                                  <span>Aktifkan T2</span>
+                                </button>
+                              );
+                            }
+                            if (mpItem && mpItem.status === "approaching_pause") {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetHibernation(mpItem)}
+                                  className="px-2 py-1 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 transition-all flex items-center gap-1 text-[11px] font-bold shadow-2xs whitespace-nowrap cursor-pointer"
+                                  title="Termin 1 selesai. Masuk masa jeda terjadwal."
+                                >
+                                  <Moon size={11} className="text-amber-600" />
+                                  <span>Setel Jeda</span>
+                                </button>
+                              );
+                            }
                             const pendingRenewal = requests.find(r => (r.slug_request === school.slug || r.school_name?.toLowerCase() === school.name?.toLowerCase()) && r.type === "renewal" && r.status === "pending");
                             if (pendingRenewal) {
                               return (
@@ -1048,7 +1451,7 @@ const SuperAdminDashboard = () => {
                                 </button>
                               );
                             }
-                            if (school.active_until && getDiffDays(school.active_until) <= 14) {
+                            if (!mpItem && school.active_until && getDiffDays(school.active_until) <= 14) {
                               return (
                                 <button
                                   onClick={() => handleSendRenewalInvoice(school)}
@@ -1131,13 +1534,26 @@ const SuperAdminDashboard = () => {
                         <p className="text-xs text-slate-400 truncate">{school.contact_email || "–"}</p>
                       </div>
                     </div>
-                    <div className={cn(
-                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0",
-                      school.is_active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"
-                    )}>
-                      <span className={cn("w-1.5 h-1.5 rounded-full", school.is_active ? "bg-emerald-500" : "bg-slate-400")} />
-                      {school.is_active ? "Aktif" : "Nonaktif"}
-                    </div>
+                    {(() => {
+                      const mpItem = multiPeriodSchools.find(m => m.schoolId === school.id);
+                      if (mpItem && mpItem.status === "in_pause") {
+                        return (
+                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border flex-shrink-0 bg-purple-50 text-purple-700 border-purple-200 shadow-2xs">
+                            <Moon size={10} className="text-purple-600 animate-pulse" />
+                            Masa Jeda
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className={cn(
+                          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0",
+                          school.is_active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"
+                        )}>
+                          <span className={cn("w-1.5 h-1.5 rounded-full", school.is_active ? "bg-emerald-500" : "bg-slate-400")} />
+                          {school.is_active ? "Aktif" : "Nonaktif"}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
@@ -1146,6 +1562,21 @@ const SuperAdminDashboard = () => {
                     </span>
                     <span className="text-[10px] text-slate-500">{school.student_quota || 100} Siswa</span>
                     {(() => {
+                      const mpItem = multiPeriodSchools.find(m => m.schoolId === school.id);
+                      if (mpItem && (mpItem.status === "in_pause" || mpItem.status === "approaching_term_2")) {
+                        return (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200 inline-flex items-center gap-1">
+                            <Moon size={9} /> Aktif: {mpItem.term2Start ? new Date(mpItem.term2Start).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"}
+                          </span>
+                        );
+                      }
+                      if (mpItem && mpItem.status === "in_term_1") {
+                        return (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1">
+                            <Calendar size={9} /> Termin 1: s/d {mpItem.term1End ? new Date(mpItem.term1End).toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "-"}
+                          </span>
+                        );
+                      }
                       const info = getActiveUntilInfo(school.active_until);
                       if (info.isPermanent) return null;
                       return (
