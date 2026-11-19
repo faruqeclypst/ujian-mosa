@@ -302,21 +302,21 @@ const LandingPage = () => {
         pricing: {
           "1bulan": {
             price: formatNumber(activePricing.basic.rates[1] || activePricing.basic.monthlyRate),
-            oldPrice: undefined,
+            oldPrice: formatNumber(Math.round(((activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 1.05) / 10000) * 10000),
             period: "/ bulan",
             discountBadge: "1 Bulan",
             subtext: "Dibayar bulanan fleksibel",
           },
           "2bulan": {
             price: formatNumber(activePricing.basic.rates[2] || (activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 2),
-            oldPrice: undefined,
+            oldPrice: formatNumber(Math.round(((activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 2 * 1.05) / 10000) * 10000),
             period: "/ 2 bulan",
             discountBadge: "Kustom 2 Bulan",
             subtext: `2 × Rp ${formatNumber(activePricing.basic.rates[1] || activePricing.basic.monthlyRate)} / bulan`,
           },
           "3bulan": {
             price: formatNumber(activePricing.basic.rates[3] || (activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 3),
-            oldPrice: undefined,
+            oldPrice: formatNumber(Math.round(((activePricing.basic.rates[1] || activePricing.basic.monthlyRate) * 3 * 1.05) / 10000) * 10000),
             period: "/ 3 bulan",
             discountBadge: "Kustom 3 Bulan",
             subtext: `3 × Rp ${formatNumber(activePricing.basic.rates[1] || activePricing.basic.monthlyRate)} / bulan`,
@@ -365,21 +365,21 @@ const LandingPage = () => {
         pricing: {
           "1bulan": {
             price: formatNumber(activePricing.pro.rates[1] || activePricing.pro.monthlyRate),
-            oldPrice: undefined,
+            oldPrice: formatNumber(Math.round(((activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 1.05) / 10000) * 10000),
             period: "/ bulan",
             discountBadge: "1 Bulan",
             subtext: "Dibayar bulanan fleksibel",
           },
           "2bulan": {
             price: formatNumber(activePricing.pro.rates[2] || (activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 2),
-            oldPrice: undefined,
+            oldPrice: formatNumber(Math.round(((activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 2 * 1.05) / 10000) * 10000),
             period: "/ 2 bulan",
             discountBadge: "Kustom 2 Bulan",
             subtext: `2 × Rp ${formatNumber(activePricing.pro.rates[1] || activePricing.pro.monthlyRate)} / bulan`,
           },
           "3bulan": {
             price: formatNumber(activePricing.pro.rates[3] || (activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 3),
-            oldPrice: undefined,
+            oldPrice: formatNumber(Math.round(((activePricing.pro.rates[1] || activePricing.pro.monthlyRate) * 3 * 1.05) / 10000) * 10000),
             period: "/ 3 bulan",
             discountBadge: "Kustom 3 Bulan",
             subtext: `3 × Rp ${formatNumber(activePricing.pro.rates[1] || activePricing.pro.monthlyRate)} / bulan`,
@@ -427,21 +427,21 @@ const LandingPage = () => {
         pricing: {
           "1bulan": {
             price: formatNumber(activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate),
-            oldPrice: undefined,
+            oldPrice: formatNumber(Math.round(((activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 1.05) / 10000) * 10000),
             period: "/ bulan",
             discountBadge: "1 Bulan",
             subtext: "Dibayar bulanan fleksibel",
           },
           "2bulan": {
             price: formatNumber(activePricing.ultimate.rates[2] || (activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 2),
-            oldPrice: undefined,
+            oldPrice: formatNumber(Math.round(((activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 2 * 1.05) / 10000) * 10000),
             period: "/ 2 bulan",
             discountBadge: "Kustom 2 Bulan",
             subtext: `2 × Rp ${formatNumber(activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate)} / bulan`,
           },
           "3bulan": {
             price: formatNumber(activePricing.ultimate.rates[3] || (activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 3),
-            oldPrice: undefined,
+            oldPrice: formatNumber(Math.round(((activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate) * 3 * 1.05) / 10000) * 10000),
             period: "/ 3 bulan",
             discountBadge: "Kustom 3 Bulan",
             subtext: `3 × Rp ${formatNumber(activePricing.ultimate.rates[1] || activePricing.ultimate.monthlyRate)} / bulan`,
