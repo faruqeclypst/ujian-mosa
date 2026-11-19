@@ -24,6 +24,7 @@ import {
   Moon,
   CheckCircle2,
   Info,
+  FileText,
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
@@ -40,12 +41,22 @@ import {
   getHibernationMonthlyRate,
 } from "../../utils/pricingHelper";
 
+export interface PricingEstimateResult {
+  total: string;
+  period: string;
+  detail: string;
+  isMultiPeriod?: boolean;
+  activeCostFormatted?: string;
+  hibernationCostFormatted?: string;
+  hibernationRateFormatted?: string;
+}
+
 const getPricingEstimate = (
   planName: string,
   mode: "2 Bulan" | "2 Periode Ujian" | "6 Bulan" | "1 Tahun" | "custom",
   months: number,
   pricingData: typeof PLAN_PRICING
-) => {
+): PricingEstimateResult | null => {
   const planKey = normalizePlanKey(planName);
   if (planKey === "free") return null;
   const detail = pricingData[planKey] || PLAN_PRICING[planKey];
@@ -69,8 +80,12 @@ const getPricingEstimate = (
     const total = activeCost + hCost;
     return {
       total: formatRupiah(total),
-      period: "6 Bulan Aktif (2 Periode) + 3 Bulan Jeda",
-      detail: `Lisensi 2 Periode (${formatRupiah(activeCost)}) + Pemeliharaan Server Jeda 3 Bln (${formatRupiah(hCost)})`,
+      period: "Total 9 Bulan Layanan",
+      detail: `Lisensi 2 Periode (${formatRupiah(activeCost)}) + Pemeliharaan Jeda (${formatRupiah(hCost)})`,
+      isMultiPeriod: true,
+      activeCostFormatted: formatRupiah(activeCost),
+      hibernationCostFormatted: formatRupiah(hCost),
+      hibernationRateFormatted: formatRupiah(hRate),
     };
   }
 
@@ -611,71 +626,101 @@ const RegisterSchoolPage = () => {
 
                       {/* Box Penjelasan Skema 2 Periode Ujian */}
                       {durationMode === "2 Periode Ujian" && (
-                        <div className="mt-3 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-purple-50/90 via-white to-blue-50/40 border border-purple-200 shadow-2xs space-y-3.5 animate-in fade-in">
-                          <div className="flex items-start gap-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
-                              <Sparkles size={16} />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="text-xs sm:text-sm font-extrabold text-purple-950">
+                        <div className="mt-3.5 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/30 border border-purple-200/80 shadow-xs space-y-4 animate-in fade-in duration-200">
+                          {/* Header Skema */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-100 pb-3.5">
+                            <div className="flex items-start sm:items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-purple-600/20">
+                                <Sparkles size={17} />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-extrabold text-purple-950 tracking-tight">
                                   Skema Paket 2 Periode Ujian (Semester Ganjil & Genap)
                                 </h4>
-                                <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">
-                                  Total 6 Bulan Aktif
+                                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                  Dipecah menjadi 2 musim ujian aktif dengan perlindungan data saat jeda
+                                </p>
+                              </div>
+                            </div>
+                            <span className="self-start sm:self-center text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200/80 px-2.5 py-1 rounded-full whitespace-nowrap">
+                              Total 6 Bln Aktif + 3 Bln Jeda
+                            </span>
+                          </div>
+
+                          {/* 3 Tahap Visual Cards */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {/* Tahap 1 */}
+                            <div className="bg-white border border-blue-200/90 rounded-xl shadow-2xs overflow-hidden flex flex-col justify-between">
+                              <div className="bg-blue-50/70 border-b border-blue-100 px-3 py-2 flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-blue-700">
+                                  Tahap 1 • Aktif
+                                </span>
+                                <span className="text-[10px] font-bold bg-white text-blue-700 border border-blue-200/70 px-2 py-0.5 rounded-md shadow-2xs">
+                                  3 Bulan
                                 </span>
                               </div>
-                              <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                                Didesain khusus bagi sekolah yang menggunakan CBT pada saat musim ujian semester. Masa aktif 6 bulan dipecah menjadi 2 periode ujian dengan biaya pemeliharaan cloud & hibernasi server hemat Rp 100.000/bulan pada masa jeda.
-                              </p>
+                              <div className="p-3.5 flex-1">
+                                <p className="text-xs font-bold text-slate-900">Ujian Semester Ganjil</p>
+                                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                                  Persiapan bank soal, simulasi CBT, STS/PTS, hingga SAS/PAS Ganjil & cetak nilai rapor.
+                                </p>
+                              </div>
+                              <div className="px-3.5 py-2 bg-slate-50/60 border-t border-slate-100 flex items-center gap-1.5 text-[10.5px] font-semibold text-emerald-700">
+                                <CheckCircle2 size={13} className="shrink-0 text-emerald-600" />
+                                <span>Server Cloud Aktif Penuh</span>
+                              </div>
+                            </div>
+
+                            {/* Tahap 2 */}
+                            <div className="bg-white border border-amber-200/90 rounded-xl shadow-2xs overflow-hidden flex flex-col justify-between">
+                              <div className="bg-amber-50/70 border-b border-amber-100 px-3 py-2 flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-800">
+                                  Tahap 2 • Masa Jeda
+                                </span>
+                                <span className="text-[10px] font-bold bg-white text-amber-700 border border-amber-200/70 px-2 py-0.5 rounded-md shadow-2xs">
+                                  3 Bulan
+                                </span>
+                              </div>
+                              <div className="p-3.5 flex-1">
+                                <p className="text-xs font-bold text-slate-900">Hibernasi Server & Data</p>
+                                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                                  Server diistirahatkan di luar musim ujian. Data bank soal, guru, & siswa tetap aman 100%.
+                                </p>
+                              </div>
+                              <div className="px-3.5 py-2 bg-amber-50/40 border-t border-amber-100 flex items-center gap-1.5 text-[10.5px] font-bold text-amber-800">
+                                <Moon size={13} className="shrink-0 text-amber-600" />
+                                <span>Biaya: {formatRupiah(getHibernationMonthlyRate())}/bln</span>
+                              </div>
+                            </div>
+
+                            {/* Tahap 3 */}
+                            <div className="bg-white border border-purple-200/90 rounded-xl shadow-2xs overflow-hidden flex flex-col justify-between">
+                              <div className="bg-purple-50/70 border-b border-purple-100 px-3 py-2 flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-purple-700">
+                                  Tahap 3 • Aktif
+                                </span>
+                                <span className="text-[10px] font-bold bg-white text-purple-700 border border-purple-200/70 px-2 py-0.5 rounded-md shadow-2xs">
+                                  3 Bulan
+                                </span>
+                              </div>
+                              <div className="p-3.5 flex-1">
+                                <p className="text-xs font-bold text-slate-900">Ujian Semester Genap</p>
+                                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                                  Server aktif kembali untuk STS/PTS Genap, SAS/PAT Akhir, Ujian Sekolah, hingga kelulusan.
+                                </p>
+                              </div>
+                              <div className="px-3.5 py-2 bg-slate-50/60 border-t border-slate-100 flex items-center gap-1.5 text-[10.5px] font-semibold text-emerald-700">
+                                <CheckCircle2 size={13} className="shrink-0 text-emerald-600" />
+                                <span>Server Cloud Aktif Penuh</span>
+                              </div>
                             </div>
                           </div>
 
-                          {/* 3 Tahap Alur Periode Ujian */}
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                            <div className="p-3 bg-white border border-blue-200 rounded-xl shadow-2xs">
-                              <div className="flex items-center gap-1.5 text-blue-700 font-extrabold text-xs mb-1">
-                                <CheckCircle2 size={14} />
-                                <span>Periode 1 (3 Bulan)</span>
-                              </div>
-                              <p className="text-[11px] font-bold text-slate-800">Ujian Semester Ganjil</p>
-                              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                                Persiapan bank soal, simulasi, PTS/STS, & PAS/SAS Ganjil hingga cetak nilai rapor.
-                              </p>
-                            </div>
-
-                            <div className="p-3 bg-white border border-amber-200 rounded-xl shadow-2xs">
-                              <div className="flex items-center justify-between mb-1">
-                                <div className="flex items-center gap-1.5 text-amber-700 font-extrabold text-xs">
-                                  <Moon size={14} />
-                                  <span>Masa Jeda (3 Bulan)</span>
-                                </div>
-                                <span className="text-[9.5px] font-extrabold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
-                                  {formatRupiah(getHibernationMonthlyRate())}/bln
-                                </span>
-                              </div>
-                              <p className="text-[11px] font-bold text-slate-800">Hibernasi Server & Data</p>
-                              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                                Di luar musim ujian, server diistirahatkan dengan biaya pemeliharaan cloud minim. Seluruh bank soal, data guru, & siswa dijamin tetap aman.
-                              </p>
-                            </div>
-
-                            <div className="p-3 bg-white border border-purple-200 rounded-xl shadow-2xs">
-                              <div className="flex items-center gap-1.5 text-purple-700 font-extrabold text-xs mb-1">
-                                <CheckCircle2 size={14} />
-                                <span>Periode 2 (3 Bulan)</span>
-                              </div>
-                              <p className="text-[11px] font-bold text-slate-800">Ujian Semester Genap</p>
-                              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                                Diaktifkan kembali saat PTS/STS Genap, PAT/SAS Akhir, Ujian Sekolah, hingga kelulusan siswa.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 px-3 py-2 bg-purple-100/70 rounded-xl text-[11px] text-purple-900 font-medium">
-                            <Info size={14} className="text-purple-700 shrink-0" />
-                            <span>
-                              Dokumen tagihan dan <strong>Kuitansi Resmi SPJ</strong> langsung tercetak dengan rincian 2 periode ujian untuk kemudahan pelaporan pertanggungjawaban dana BOS/BOP sekolah.
+                          {/* Notice SPJ */}
+                          <div className="flex items-start sm:items-center gap-2.5 px-3.5 py-2.5 bg-purple-100/60 border border-purple-200/70 rounded-xl text-xs text-purple-950">
+                            <FileText size={15} className="text-purple-700 shrink-0 mt-0.5 sm:mt-0" />
+                            <span className="leading-relaxed font-medium">
+                              <strong className="font-bold text-purple-900">Kuitansi Resmi SPJ:</strong> Dokumen tagihan dan kuitansi resmi langsung tercetak dengan rincian 2 periode ujian untuk mempermudah pelaporan pertanggungjawaban dana BOS/BOP sekolah.
                             </span>
                           </div>
                         </div>
@@ -753,21 +798,50 @@ const RegisterSchoolPage = () => {
 
                       {/* Pricing Info Card */}
                       {pricingEstimate && (
-                        <div className="mt-3 p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="mt-3.5 p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                           <div>
-                            <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Perkiraan Biaya Layanan</p>
-                            <div className="flex items-baseline gap-1.5 mt-1">
-                              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                            <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">
+                              Perkiraan Biaya Layanan
+                            </p>
+                            <div className="flex items-baseline gap-2 mt-1">
+                              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                                 {pricingEstimate.total}
                               </span>
-                              <span className="text-xs text-slate-500 font-semibold">/ {pricingEstimate.period}</span>
+                              <span className="text-xs text-slate-500 font-semibold">
+                                / {pricingEstimate.period}
+                              </span>
                             </div>
+                            {pricingEstimate.isMultiPeriod && (
+                              <p className="text-[11px] text-purple-700 font-semibold mt-0.5">
+                                Paket Khusus 2 Musim Ujian Semester (Ganjil & Genap)
+                              </p>
+                            )}
                           </div>
-                          <div className="text-left sm:text-right">
-                            <span className="inline-block text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-lg shadow-2xs">
-                              {pricingEstimate.detail}
-                            </span>
-                          </div>
+
+                          {pricingEstimate.isMultiPeriod ? (
+                            <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-3 space-y-2 text-xs min-w-[280px] sm:min-w-[340px]">
+                              <div className="flex items-center justify-between gap-3 text-slate-700">
+                                <span className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-blue-600 inline-block shrink-0" />
+                                  <span className="font-medium">Lisensi 2 Periode (6 Bln Aktif)</span>
+                                </span>
+                                <span className="font-extrabold text-slate-900">{pricingEstimate.activeCostFormatted}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-700 border-t border-slate-200/60 pt-2">
+                                <span className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-amber-500 inline-block shrink-0" />
+                                  <span className="font-medium">Server Masa Jeda (3 Bln @ {pricingEstimate.hibernationRateFormatted})</span>
+                                </span>
+                                <span className="font-extrabold text-slate-900">{pricingEstimate.hibernationCostFormatted}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-left lg:text-right">
+                              <span className="inline-block text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-lg shadow-2xs">
+                                {pricingEstimate.detail}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
