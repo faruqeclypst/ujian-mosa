@@ -222,28 +222,55 @@ const SuperAdminInvoicePage = () => {
     term_2_end: `${new Date().getFullYear() + 1}-01-31`,
   });
 
-  const applyMultiPeriodPreset = (type: "may_nov" | "apr_oct" = "may_nov") => {
-    const currYear = new Date().getFullYear();
+  const applyMultiPeriodPreset = (type: "smart" | "nov_may" | "may_nov" | "apr_oct" = "smart") => {
+    const now = new Date();
+    const currYear = now.getFullYear();
+    const currMonth = now.getMonth(); // 0 = Jan, 10 = Nov
+
+    let selectedType = type;
+    if (selectedType === "smart") {
+      // Jika dibuat pada musim semester ganjil (Okt, Nov, Des, Jan, Feb), otomatis default ke nov_may
+      selectedType = (currMonth >= 9 || currMonth <= 1) ? "nov_may" : "may_nov";
+    }
+
     const planKey = normalizePlanKey(form.plan || "basic");
     const monthlyRate = PLAN_PRICES[planKey]?.monthly || 380000;
     const subtotal = monthlyRate * 6;
     const taxAmt = taxEnabled ? Math.round(subtotal * ((taxPercent || 11) / 100)) : 0;
 
-    let t1Name = `Termin 1: Mei, Juni, Juli ${currYear} (Semester Genap / PAT)`;
-    let t1Start = `${currYear}-05-01`;
-    let t1End = `${currYear}-07-31`;
-    let pName = `Masa Jeda: Agustus, September, Oktober ${currYear} (Hibernasi)`;
-    let pStart = `${currYear}-08-01`;
-    let pEnd = `${currYear}-10-31`;
-    let t2Name = `Termin 2: November, Desember ${currYear} - Januari ${currYear + 1} (Semester Ganjil / PAS)`;
-    let t2Start = `${currYear}-11-01`;
-    let t2End = `${currYear + 1}-01-31`;
-    let labelPeriod = `6 Bulan Custom (Termin 1: Mei-Juli & Termin 2: Nov-Jan)`;
-    let line1Desc = `Lisensi CBT Periode Semester Genap (${PLAN_PRICES[planKey]?.label || form.plan}: Mei – Juli)`;
-    let line2Desc = `Lisensi CBT Periode Semester Ganjil (${PLAN_PRICES[planKey]?.label || form.plan}: November – Januari)`;
-    let pauseDesc = `Infrastruktur Server & Hibernasi Data Bank Soal (Masa Jeda: Agustus – Oktober)`;
+    let t1Name = "";
+    let t1Start = "";
+    let t1End = "";
+    let pName = "";
+    let pStart = "";
+    let pEnd = "";
+    let t2Name = "";
+    let t2Start = "";
+    let t2End = "";
+    let labelPeriod = "";
+    let line1Desc = "";
+    let line2Desc = "";
+    let pauseDesc = "";
 
-    if (type === "apr_oct") {
+    if (selectedType === "nov_may") {
+      // Skenario 1: Daftar di Bulan November (Musim Ujian Semester Ganjil / PAS)
+      const nextYear = currMonth <= 1 ? currYear : currYear + 1;
+      const baseYear = currMonth <= 1 ? currYear - 1 : currYear;
+      t1Name = `Termin 1: November, Desember ${baseYear} - Januari ${nextYear} (Semester Ganjil / PAS)`;
+      t1Start = `${baseYear}-11-01`;
+      t1End = `${nextYear}-01-31`;
+      pName = `Masa Jeda: Februari, Maret, April ${nextYear} (Hibernasi Pasca Ujian)`;
+      pStart = `${nextYear}-02-01`;
+      pEnd = `${nextYear}-04-30`;
+      t2Name = `Termin 2: Mei, Juni, Juli ${nextYear} (Semester Genap / PAT)`;
+      t2Start = `${nextYear}-05-01`;
+      t2End = `${nextYear}-07-31`;
+      labelPeriod = `6 Bulan Custom (Termin 1: Nov-Jan & Termin 2: Mei-Jul)`;
+      line1Desc = `Lisensi CBT Periode Semester Ganjil (${PLAN_PRICES[planKey]?.label || form.plan}: November – Januari)`;
+      line2Desc = `Lisensi CBT Periode Semester Genap (${PLAN_PRICES[planKey]?.label || form.plan}: Mei – Juli)`;
+      pauseDesc = `Infrastruktur Server & Hibernasi Data Bank Soal (Masa Jeda: Februari – April)`;
+    } else if (selectedType === "apr_oct") {
+      // Skenario 2: Periode April - Juni & Oktober - Desember
       t1Name = `Termin 1: April, Mei, Juni ${currYear} (Semester Genap)`;
       t1Start = `${currYear}-04-01`;
       t1End = `${currYear}-06-30`;
@@ -257,6 +284,22 @@ const SuperAdminInvoicePage = () => {
       line1Desc = `Lisensi CBT Periode Semester Genap (${PLAN_PRICES[planKey]?.label || form.plan}: April – Juni)`;
       line2Desc = `Lisensi CBT Periode Semester Ganjil (${PLAN_PRICES[planKey]?.label || form.plan}: Oktober – Desember)`;
       pauseDesc = `Infrastruktur Server & Hibernasi Data Bank Soal (Masa Jeda: Juli – September)`;
+    } else {
+      // Skenario 3: Daftar di Bulan Mei (Musim Ujian Semester Genap / PAT)
+      const nextYear = currYear + 1;
+      t1Name = `Termin 1: Mei, Juni, Juli ${currYear} (Semester Genap / PAT)`;
+      t1Start = `${currYear}-05-01`;
+      t1End = `${currYear}-07-31`;
+      pName = `Masa Jeda: Agustus, September, Oktober ${currYear} (Hibernasi)`;
+      pStart = `${currYear}-08-01`;
+      pEnd = `${currYear}-10-31`;
+      t2Name = `Termin 2: November, Desember ${currYear} - Januari ${nextYear} (Semester Ganjil / PAS)`;
+      t2Start = `${currYear}-11-01`;
+      t2End = `${nextYear}-01-31`;
+      labelPeriod = `6 Bulan Custom (Termin 1: Mei-Juli & Termin 2: Nov-Jan)`;
+      line1Desc = `Lisensi CBT Periode Semester Genap (${PLAN_PRICES[planKey]?.label || form.plan}: Mei – Juli)`;
+      line2Desc = `Lisensi CBT Periode Semester Ganjil (${PLAN_PRICES[planKey]?.label || form.plan}: November – Januari)`;
+      pauseDesc = `Infrastruktur Server & Hibernasi Data Bank Soal (Masa Jeda: Agustus – Oktober)`;
     }
 
     setForm(f => ({
@@ -1642,14 +1685,14 @@ const SuperAdminInvoicePage = () => {
                     ))}
                     <button
                       type="button"
-                      onClick={() => applyMultiPeriodPreset("may_nov")}
+                      onClick={() => applyMultiPeriodPreset("smart")}
                       className={cn(
                         "px-2 py-0.5 rounded-lg text-[10.5px] font-semibold transition cursor-pointer flex items-center gap-1",
                         multiPeriodEnabled
                           ? "bg-purple-600 text-white shadow-2xs"
                           : "bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/80"
                       )}
-                      title="Paket 6 Bulan Custom Split 2 Termin Ujian (Mei-Juli & Nov-Jan) dengan Masa Jeda"
+                      title="Paket 6 Bulan Custom Split 2 Termin Ujian dengan Masa Jeda"
                     >
                       <Sparkles size={11} className={multiPeriodEnabled ? "text-amber-200" : "text-purple-600"} />
                       6 Bln Custom (Split 2 Termin)
@@ -2198,7 +2241,7 @@ const SuperAdminInvoicePage = () => {
                             const val = e.target.checked;
                             setMultiPeriodEnabled(val);
                             if (val && !multiPeriodData.is_multi_period) {
-                              applyMultiPeriodPreset("may_nov");
+                              applyMultiPeriodPreset("smart");
                             }
                           }}
                           className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
@@ -2209,20 +2252,29 @@ const SuperAdminInvoicePage = () => {
                       </label>
 
                       {multiPeriodEnabled && (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => applyMultiPeriodPreset("nov_may")}
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition"
+                            title="Daftar di musim Semester Ganjil: Nov–Jan & Mei–Jul (Masa Jeda: Feb–Apr)"
+                          >
+                            Daftar Nov (Nov-Jan & Mei-Jul)
+                          </button>
                           <button
                             type="button"
                             onClick={() => applyMultiPeriodPreset("may_nov")}
-                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 transition"
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition"
+                            title="Daftar di musim Semester Genap: Mei–Jul & Nov–Jan (Masa Jeda: Agu–Okt)"
                           >
-                            Preset: Mei-Jul & Nov-Jan
+                            Daftar Mei (Mei-Jul & Nov-Jan)
                           </button>
                           <button
                             type="button"
                             onClick={() => applyMultiPeriodPreset("apr_oct")}
                             className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition"
                           >
-                            Preset: Apr-Jun & Okt-Des
+                            Apr-Jun & Okt-Des
                           </button>
                         </div>
                       )}
@@ -2230,6 +2282,9 @@ const SuperAdminInvoicePage = () => {
 
                     {multiPeriodEnabled ? (
                       <div className="space-y-3">
+                        <div className="text-[10px] text-slate-500 bg-slate-50 border border-slate-200/80 rounded-lg p-2.5">
+                          💡 <strong>Fleksibel & Bebas Diubah:</strong> Tombol preset di atas membantu memilih pola umum. Anda dapat mengubah nama bulan dan tanggal mulai/selesai di bawah ini secara bebas sesuai tanggal ujian sekolah yang mendaftar.
+                        </div>
                         {/* Termin 1 */}
                         <div className="p-3 bg-emerald-50/60 border border-emerald-200/80 rounded-xl space-y-2">
                           <div className="flex items-center justify-between">
