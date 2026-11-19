@@ -222,7 +222,7 @@ const SuperAdminInvoicePage = () => {
     term_2_end: `${new Date().getFullYear() + 1}-01-31`,
   });
 
-  const applyMultiPeriodPreset = (type: "smart" | "nov_may" | "may_nov" | "apr_oct" = "smart") => {
+  const applyMultiPeriodPreset = (type: "smart" | "nov_may" | "may_nov" | "apr_oct" = "smart", planOverride?: string) => {
     const now = new Date();
     const currYear = now.getFullYear();
     const currMonth = now.getMonth(); // 0 = Jan, 10 = Nov
@@ -233,7 +233,7 @@ const SuperAdminInvoicePage = () => {
       selectedType = (currMonth >= 9 || currMonth <= 1) ? "nov_may" : "may_nov";
     }
 
-    const planKey = normalizePlanKey(form.plan || "basic");
+    const planKey = normalizePlanKey(planOverride || form.plan || "basic");
     const monthlyRate = PLAN_PRICES[planKey]?.monthly || 380000;
     const subtotal = monthlyRate * 6;
     const taxAmt = taxEnabled ? Math.round(subtotal * ((taxPercent || 11) / 100)) : 0;
@@ -830,6 +830,19 @@ const SuperAdminInvoicePage = () => {
     const planKey = normalizePlanKey(school.plan || "basic");
     const dur = Math.max(1, Number(form.duration_months) || 12);
     const planInfo = calculatePlanInvoice(planKey, dur);
+    const taxAmt = taxEnabled ? Math.round(planInfo.amount * ((taxPercent || 11) / 100)) : 0;
+
+    if (multiPeriodEnabled) {
+      setForm(f => ({
+        ...f,
+        school_id: school.id,
+        school_name: school.name,
+        school_slug: school.slug,
+        contact_email: school.contact_email || f.contact_email || "",
+      }));
+      applyMultiPeriodPreset("smart", planKey);
+      return;
+    }
 
     setForm(f => ({
       ...f,
@@ -838,7 +851,7 @@ const SuperAdminInvoicePage = () => {
       school_slug: school.slug,
       contact_email: school.contact_email || f.contact_email || "",
       plan: planKey,
-      amount: planInfo.amount,
+      amount: planInfo.amount + taxAmt,
     }));
 
     if (customItemsEnabled) {
@@ -857,15 +870,26 @@ const SuperAdminInvoicePage = () => {
     const dur = Math.max(1, Number(form.duration_months) || 1);
     const planInfo = calculatePlanInvoice(plan, dur);
 
+    if (multiPeriodEnabled) {
+      applyMultiPeriodPreset("smart", plan);
+      return;
+    }
+
     if (customItemsEnabled) {
-      const def = buildDefaultLineItems(planInfo.planKey, dur, planInfo.amount);
-      const merged = customItems.length > 2
-        ? [def[0], def[1], ...customItems.slice(2)]
-        : def;
-      setCustomItems(merged);
-      const sum = merged.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
-      const taxAmt = taxEnabled ? Math.round(sum * ((taxPercent || 11) / 100)) : 0;
-      setForm(f => ({ ...f, plan: planInfo.planKey, amount: sum + taxAmt }));
+      const isDefaultStructure = customItems.length <= 2;
+      if (isDefaultStructure) {
+        const def = buildDefaultLineItems(planInfo.planKey, dur, planInfo.amount);
+        setCustomItems(def);
+        const taxAmt = taxEnabled ? Math.round(planInfo.amount * ((taxPercent || 11) / 100)) : 0;
+        setForm(f => ({ ...f, plan: planInfo.planKey, amount: planInfo.amount + taxAmt }));
+      } else {
+        const def = buildDefaultLineItems(planInfo.planKey, dur, planInfo.amount);
+        const updated = [def[0], ...customItems.slice(1)];
+        setCustomItems(updated);
+        const sum = updated.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
+        const taxAmt = taxEnabled ? Math.round(sum * ((taxPercent || 11) / 100)) : 0;
+        setForm(f => ({ ...f, plan: planInfo.planKey, amount: sum + taxAmt }));
+      }
     } else {
       const taxAmt = taxEnabled ? Math.round(planInfo.amount * ((taxPercent || 11) / 100)) : 0;
       setForm(f => ({ ...f, plan: planInfo.planKey, amount: planInfo.amount + taxAmt }));
@@ -883,26 +907,46 @@ const SuperAdminInvoicePage = () => {
     const validMonths = Math.max(1, Math.round(Number(months) || 1));
     const planInfo = calculatePlanInvoice(form.plan, validMonths);
 
+    // Jika sebelumnya dalam mode multi-periode split 2 termin dan user memilih durasi standar (misal 1 bulan),
+    // kembalikan ke perhitungan durasi standar & bersihkan mode multi-periode
+    if (multiPeriodEnabled) {
+      setMultiPeriodEnabled(false);
+      setShowMultiPeriodSection(false);
+      setCustomItemsEnabled(false);
+      setShowCustomItemsSection(false);
+      const def = buildDefaultLineItems(form.plan, validMonths, planInfo.amount);
+      setCustomItems(def);
+      const taxAmt = taxEnabled ? Math.round(planInfo.amount * ((taxPercent || 11) / 100)) : 0;
+      setForm(f => ({
+        ...f,
+        duration_months: validMonths,
+        period_label: planInfo.periodLabel,
+        amount: planInfo.amount + taxAmt,
+        notes: "",
+      }));
+      return;
+    }
+
     if (customItemsEnabled) {
-      setCustomItems(prev => {
-        if (prev.length > 0) {
-          const first = {
-            ...prev[0],
-            qty: validMonths,
-            total: validMonths * (prev[0].price || Math.round(planInfo.amount / validMonths)),
-          };
-          const updated = [first, ...prev.slice(1)];
-          const sum = updated.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
-          const taxAmt = taxEnabled ? Math.round(sum * ((taxPercent || 11) / 100)) : 0;
-          setForm(f => ({ ...f, duration_months: validMonths, amount: sum + taxAmt }));
-          return updated;
-        } else {
-          const def = buildDefaultLineItems(form.plan, validMonths, planInfo.amount);
-          const taxAmt = taxEnabled ? Math.round(planInfo.amount * ((taxPercent || 11) / 100)) : 0;
-          setForm(f => ({ ...f, duration_months: validMonths, amount: planInfo.amount + taxAmt }));
-          return def;
-        }
-      });
+      const isDefaultStructure = customItems.length <= 2;
+      if (isDefaultStructure) {
+        const def = buildDefaultLineItems(form.plan, validMonths, planInfo.amount);
+        setCustomItems(def);
+        const taxAmt = taxEnabled ? Math.round(planInfo.amount * ((taxPercent || 11) / 100)) : 0;
+        setForm(f => ({ ...f, duration_months: validMonths, amount: planInfo.amount + taxAmt }));
+      } else {
+        const first = {
+          ...customItems[0],
+          qty: validMonths,
+          price: Math.round(planInfo.amount / validMonths),
+          total: planInfo.amount,
+        };
+        const updated = [first, ...customItems.slice(1)];
+        setCustomItems(updated);
+        const sum = updated.reduce((acc, it) => acc + (it.total || (it.qty * it.price)), 0);
+        const taxAmt = taxEnabled ? Math.round(sum * ((taxPercent || 11) / 100)) : 0;
+        setForm(f => ({ ...f, duration_months: validMonths, amount: sum + taxAmt }));
+      }
     } else {
       const taxAmt = taxEnabled ? Math.round(planInfo.amount * ((taxPercent || 11) / 100)) : 0;
       setForm(f => ({ ...f, duration_months: validMonths, amount: planInfo.amount + taxAmt }));
