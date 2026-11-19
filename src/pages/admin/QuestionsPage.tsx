@@ -1589,7 +1589,7 @@ const QuestionsPage = () => {
   const neonColumns: NeonTableColumn<QuestionData>[] = useMemo(
     () =>
       getQuestionColumns({
-        questions,
+        questions: displayQuestions.length > 0 ? displayQuestions : questions,
         inspectedQuestion,
         canEdit,
         onPreview: (item, index) => {
@@ -1600,7 +1600,7 @@ const QuestionsPage = () => {
         onEdit: handleEditClick,
         onDelete: handleDeleteClick,
       }),
-    [questions, inspectedQuestion, canEdit, handleEditClick, handleDeleteClick]
+    [displayQuestions, questions, inspectedQuestion, canEdit, handleEditClick, handleDeleteClick]
   );
 
   const columns = neonColumns;
@@ -2839,7 +2839,8 @@ const QuestionsPage = () => {
                         variant="secondary"
                         icon={Search}
                         onClick={() => {
-                          const idx = questions.findIndex(q => q.id === inspectedQuestion.id);
+                          const list = displayQuestions.length > 0 ? displayQuestions : questions;
+                          const idx = list.findIndex(q => q.id === inspectedQuestion.id);
                           setPreviewIndex(idx >= 0 ? idx : 0);
                           setPreviewQuestion(inspectedQuestion);
                           setIsPreviewOpen(true);
@@ -3072,6 +3073,20 @@ const QuestionsPage = () => {
         <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
         {/* MODAL PUSAT BANTUAN PENULISAN STEM */}
         <MathGuideDialog open={isMathGuideOpen} onOpenChange={setIsMathGuideOpen} />
+
+        {/* Dialog Preview Soal (CBT Look) */}
+        <QuestionPreviewDialog
+          open={isPreviewOpen}
+          onOpenChange={setIsPreviewOpen}
+          questions={displayQuestions.length > 0 ? displayQuestions : questions}
+          previewQuestion={previewQuestion}
+          previewIndex={previewIndex}
+          onNavigate={(newIdx) => {
+            const list = displayQuestions.length > 0 ? displayQuestions : questions;
+            setPreviewIndex(newIdx);
+            setPreviewQuestion(list[newIdx]);
+          }}
+        />
         {/* Hidden inputs for imports moved here for reliability */}
         <input id="unified-import-input" type="file" className="hidden" accept=".xlsx,.xls,.docx,.docm,.json" onChange={(e) => {
           const file = e.target.files?.[0];

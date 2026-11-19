@@ -205,8 +205,12 @@ export function getQuestionColumns({
             <button
               type="button"
               className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors shadow-2xs cursor-pointer shrink-0"
-              onClick={() => onPreview(item, idx >= 0 ? idx : 0)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPreview(item, idx >= 0 ? idx : 0);
+              }}
               title="Pratinjau Soal"
+              aria-label="Pratinjau Soal"
             >
               <Search className="h-3.5 w-3.5" />
             </button>
