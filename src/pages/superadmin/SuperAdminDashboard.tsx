@@ -2482,6 +2482,50 @@ const AddEditSchoolModal = ({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [multiPeriodEnabled, setMultiPeriodEnabled] = useState<boolean>(false);
+
+  const getSmartMultiPeriodSchedule = () => {
+    const now = new Date();
+    const currYear = now.getFullYear();
+    const currMonth = now.getMonth(); // 0 = Jan, 10 = Nov
+    const isNovToJan = currMonth >= 9 || currMonth <= 1; // Okt - Feb
+
+    if (isNovToJan) {
+      const year1 = currMonth <= 1 ? currYear - 1 : currYear;
+      const year2 = year1 + 1;
+      return {
+        term_1_name: `Termin 1: Nov, Des, Jan ${year1}/${year2} (Semester Ganjil / PAS)`,
+        term_1_months: 3,
+        term_1_start: `${year1}-11-01`,
+        term_1_end: `${year2}-01-31`,
+        pause_name: `Masa Jeda: Feb, Mar, Apr ${year2} (Hibernasi)`,
+        pause_months: 3,
+        pause_start: `${year2}-02-01`,
+        pause_end: `${year2}-04-30`,
+        term_2_name: `Termin 2: Mei, Jun, Jul ${year2} (Semester Genap / PAT)`,
+        term_2_months: 3,
+        term_2_start: `${year2}-05-01`,
+        term_2_end: `${year2}-07-31`,
+      };
+    } else {
+      const year = currYear;
+      const nextYear = currYear + 1;
+      return {
+        term_1_name: `Termin 1: Mei, Juni, Juli ${year} (Semester Genap / PAT)`,
+        term_1_months: 3,
+        term_1_start: `${year}-05-01`,
+        term_1_end: `${year}-07-31`,
+        pause_name: `Masa Jeda: Ags, Sep, Okt ${year} (Hibernasi)`,
+        pause_months: 3,
+        pause_start: `${year}-08-01`,
+        pause_end: `${year}-10-31`,
+        term_2_name: `Termin 2: Nov, Des, Jan ${year}/${nextYear} (Semester Ganjil / PAS)`,
+        term_2_months: 3,
+        term_2_start: `${year}-11-01`,
+        term_2_end: `${nextYear}-01-31`,
+      };
+    }
+  };
 
   const isSchoolCurrentlyActive = Boolean(
     school?.active_until && getDiffDays(school.active_until) > 0
@@ -2683,11 +2727,15 @@ const AddEditSchoolModal = ({
             active_until: `${trialDate} 23:59:59.000Z`,
           };
         } else if (!isTrial && initialPaymentStatus === "paid") {
+          const sched = getSmartMultiPeriodSchedule();
+          const finalActive = multiPeriodEnabled
+            ? `${sched.term_1_end} 23:59:59.000Z`
+            : finalActiveUntil;
           schoolPayload = {
             ...finalForm,
             plan: targetPlanKey,
             student_quota: Number(form.student_quota) || planInfo.quota,
-            active_until: finalActiveUntil,
+            active_until: finalActive,
           };
         }
 
@@ -2703,6 +2751,22 @@ const AddEditSchoolModal = ({
           dueDate.setDate(dueDate.getDate() + 14);
           const isInvoicePaid = isTrial || initialPaymentStatus === "paid";
 
+          const sched = getSmartMultiPeriodSchedule();
+          const monthlyRate = PLAN_PRICING[targetPlanKey]?.rates[1] || PLAN_PRICING[targetPlanKey]?.monthlyRate || 380000;
+          const multiSubtotal = monthlyRate * 6;
+
+          const customDataObj = multiPeriodEnabled ? {
+            multi_period: {
+              is_multi_period: true,
+              ...sched,
+            },
+            items: [
+              { name: sched.term_1_name, qty: 3, price: monthlyRate, total: monthlyRate * 3 },
+              { name: sched.term_2_name, qty: 3, price: monthlyRate, total: monthlyRate * 3 },
+              { name: `${sched.pause_name} - Layanan disiapkan, server stand-by`, qty: 1, price: 0, total: 0 },
+            ],
+          } : undefined;
+
           await masterPb.collection("invoices").create({
             invoice_number: invNum,
             school_id: createdSchool?.id || "",
@@ -2711,17 +2775,20 @@ const AddEditSchoolModal = ({
             contact_email: form.contact_email || "",
             plan: targetPlanKey,
             plan_label: planInfo.planLabel,
-            duration_months: planInfo.durationMonths,
-            period_label: planInfo.periodLabel,
-            amount: isTrial ? 0 : planInfo.amount,
+            duration_months: multiPeriodEnabled ? 6 : planInfo.durationMonths,
+            period_label: multiPeriodEnabled ? "6 Bulan (2 Termin Ujian)" : planInfo.periodLabel,
+            amount: isTrial ? 0 : (multiPeriodEnabled ? multiSubtotal : planInfo.amount),
             status: isInvoicePaid ? "paid" : "unpaid",
             due_date: dueDate.toISOString().slice(0, 10),
             paid_date: isInvoicePaid ? now.toISOString().slice(0, 10) : "",
+            custom_data: customDataObj ? JSON.stringify(customDataObj) : "",
             notes: isTrial
               ? "Akun Free Trial 14 Hari (Otomatis Aktif)"
-              : initialPaymentStatus === "paid"
-                ? `Tagihan Perdana Paket ${planInfo.planLabel} (${planInfo.periodLabel}) - Lunas`
-                : `Tagihan Perdana Paket ${planInfo.planLabel} (${planInfo.periodLabel}) - Menunggu Pembayaran`,
+              : multiPeriodEnabled
+                ? `Tagihan Perdana Paket Multi-Periode 6 Bulan (2 Termin Ujian & Jeda) - ${isInvoicePaid ? "Lunas" : "Menunggu Pembayaran"}`
+                : initialPaymentStatus === "paid"
+                  ? `Tagihan Perdana Paket ${planInfo.planLabel} (${planInfo.periodLabel}) - Lunas`
+                  : `Tagihan Perdana Paket ${planInfo.planLabel} (${planInfo.periodLabel}) - Menunggu Pembayaran`,
           });
         } catch (invErr) {
           console.error("Gagal membuat auto invoice:", invErr);
@@ -2737,7 +2804,6 @@ const AddEditSchoolModal = ({
 
   const PRESET_DURATIONS = [
     { label: "14 Hari", sub: "Trial", days: 14 },
-    { label: "1 Bulan", sub: "30 hr", days: 30 },
     { label: "2 Bulan", sub: "60 hr", days: 60 },
     { label: "3 Bulan", sub: "Triwulan", days: 90 },
     { label: "6 Bulan", sub: "Semester", days: 180 },
@@ -3010,6 +3076,59 @@ const AddEditSchoolModal = ({
                     </div>
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* Opsi Skema Multi-Periode (2 Termin Ujian & Masa Jeda) */}
+            {!isEdit && form.plan !== "free" && (
+              <div className="mt-4 p-3.5 rounded-xl border border-purple-200/90 bg-purple-50/60 transition-all">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <Sparkles size={16} />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-bold text-purple-950 leading-tight">
+                        Skema Multi-Periode (Split 2 Termin Ujian)
+                      </p>
+                      <p className="text-[11px] text-purple-700 mt-0.5 leading-snug">
+                        Untuk sekolah paket 6 bulan yang dibagi ke 2 semester ujian (dengan masa jeda)
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={multiPeriodEnabled}
+                      onChange={e => {
+                        const val = e.target.checked;
+                        setMultiPeriodEnabled(val);
+                        if (val) {
+                          const sched = getSmartMultiPeriodSchedule();
+                          setForm(prev => ({ ...prev, active_until: sched.term_1_end }));
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
+                  </label>
+                </div>
+                {multiPeriodEnabled && (
+                  <div className="mt-3 pt-3 border-t border-purple-200/80 text-[11px] text-purple-900 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="bg-white p-2 rounded-lg border border-purple-200 shadow-2xs">
+                      <span className="font-extrabold text-blue-700 block">Termin 1 (3 Bln)</span>
+                      <span className="text-[10px] text-slate-500 font-mono">{getSmartMultiPeriodSchedule().term_1_start} s/d {getSmartMultiPeriodSchedule().term_1_end}</span>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-amber-200 shadow-2xs">
+                      <span className="font-extrabold text-amber-700 block">Masa Jeda (3 Bln)</span>
+                      <span className="text-[10px] text-slate-500 font-mono">{getSmartMultiPeriodSchedule().pause_start} s/d {getSmartMultiPeriodSchedule().pause_end}</span>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-purple-200 shadow-2xs">
+                      <span className="font-extrabold text-purple-700 block">Termin 2 (3 Bln)</span>
+                      <span className="text-[10px] text-slate-500 font-mono">{getSmartMultiPeriodSchedule().term_2_start} s/d {getSmartMultiPeriodSchedule().term_2_end}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
