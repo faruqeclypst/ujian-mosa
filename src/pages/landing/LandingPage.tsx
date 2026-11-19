@@ -22,7 +22,7 @@ const LandingPage = () => {
   const [activeFaqCategory, setActiveFaqCategory] = useState<string>("semua");
   const [faqSearchQuery, setFaqSearchQuery] = useState<string>("");
   const [showAllFaqs, setShowAllFaqs] = useState(false);
-  const [billingCycle, setBillingCycle] = useState<"1bulan" | "2bulan" | "3bulan" | "semester" | "tahunan">("1bulan");
+  const [billingCycle, setBillingCycle] = useState<"2bulan" | "3bulan" | "semester" | "tahunan">("semester");
   const [activePricing, setActivePricing] = useState(() => ({ ...PLAN_PRICING }));
 
   useEffect(() => {
@@ -1237,15 +1237,15 @@ const LandingPage = () => {
               Pilihan Paket Langganan CBT Sekolah
             </h2>
             <p className="text-slate-600 text-sm sm:text-base mt-3 leading-relaxed">
-              Semua paket sudah termasuk Cloudflare CDN, aplikasi APK Kiosk anti-contek, dan proteksi server anti-lag. Pilihan fleksibel bulanan, paket per semester (6 bulan), dan paket hemat 1 tahun.
+              Semua paket sudah termasuk Cloudflare CDN, aplikasi APK Kiosk anti-contek, dan proteksi server anti-lag. Pilihan fleksibel mulai 2 bulan, paket per semester (6 bulan), dan paket hemat 1 tahun.
             </p>
           </div>
 
-          {/* Billing Cycle Selector (1 Bulan, Semester, 1 Tahun) */}
+          {/* Billing Cycle Selector (2 Bulan, Semester, 1 Tahun) */}
           <div className="flex flex-col items-center justify-center mb-8 sm:mb-12 px-2 w-full">
             <div className="w-full max-w-xl grid grid-cols-3 p-1 sm:p-1.5 bg-slate-200/80 backdrop-blur-xs rounded-2xl border border-slate-300/80 shadow-inner gap-1">
               {[
-                { id: "1bulan", label: "1 Bulan", sub: "Fleksibel" },
+                { id: "2bulan", label: "2 Bulan", sub: "Min. Berlangganan" },
                 { id: "semester", label: "6 Bulan", sub: "1 Semester", badge: semesterDiscountPct > 0 ? `Hemat ${semesterDiscountPct}%` : undefined },
                 { id: "tahunan", label: "1 Tahun", sub: "12 Bulan", badge: yearDiscountPct > 0 ? `Hemat ${yearDiscountPct}%` : undefined },
               ].map(tab => (
@@ -1272,7 +1272,7 @@ const LandingPage = () => {
             </div>
 
             <p className="text-xs text-slate-500 font-medium mt-3 text-center">
-              Butuh durasi fleksibel lainnya (2 bulan, 3 bulan, dll)? Atur durasi kustom langsung di{" "}
+              Butuh durasi fleksibel lainnya (3 bulan, 4 bulan, dll)? Atur durasi kustom langsung di{" "}
               <button
                 type="button"
                 onClick={() => navigate("/daftar")}
@@ -1286,7 +1286,7 @@ const LandingPage = () => {
           {/* Pricing Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             {plans.map((plan, i) => {
-              const currentPricing = plan.pricing[billingCycle] || plan.pricing["1bulan"];
+              const currentPricing = plan.pricing[billingCycle] || plan.pricing["2bulan"];
               return (
                 <div
                   key={i}
@@ -1350,8 +1350,8 @@ const LandingPage = () => {
                   <button
                     onClick={() => {
                       const cycleLabel =
-                        billingCycle === "1bulan"
-                          ? "1 Bulan"
+                        billingCycle === "2bulan"
+                          ? "2 Bulan"
                           : billingCycle === "semester"
                             ? "6 Bulan"
                             : "1 Tahun";

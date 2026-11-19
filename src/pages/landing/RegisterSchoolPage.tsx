@@ -38,7 +38,7 @@ import {
 
 const getPricingEstimate = (
   planName: string,
-  mode: "1 Bulan" | "6 Bulan" | "1 Tahun" | "custom",
+  mode: "2 Bulan" | "6 Bulan" | "1 Tahun" | "custom",
   months: number,
   pricingData: typeof PLAN_PRICING
 ) => {
@@ -49,11 +49,12 @@ const getPricingEstimate = (
 
   const baseMonthly = detail.rates[1] || detail.monthlyRate;
 
-  if (mode === "1 Bulan") {
+  if (mode === "2 Bulan") {
+    const rate2 = detail.rates[2] || (baseMonthly * 2);
     return {
-      total: formatRupiah(detail.rates[1] || baseMonthly),
-      period: "1 Bulan",
-      detail: "Tarif bulanan fleksibel",
+      total: formatRupiah(rate2),
+      period: "2 Bulan",
+      detail: `2 × ${formatRupiah(baseMonthly)} / bln (Min. Berlangganan)`,
     };
   }
 
@@ -140,7 +141,7 @@ const RegisterSchoolPage = () => {
     return activePricing[k]?.label || (k === "basic" ? "Paket Berkembang" : k === "pro" ? "Paket Lanjutan" : "Paket Premium");
   };
 
-  const [durationMode, setDurationMode] = useState<"1 Bulan" | "6 Bulan" | "1 Tahun" | "custom">("1 Tahun");
+  const [durationMode, setDurationMode] = useState<"2 Bulan" | "6 Bulan" | "1 Tahun" | "custom">("1 Tahun");
   const [customMonths, setCustomMonths] = useState<number>(2);
 
   const [form, setForm] = useState({
@@ -181,9 +182,9 @@ const RegisterSchoolPage = () => {
         const planClean = sp.replace(/\s*\([^)]+\)/, "").trim();
         const durRaw = matchDuration ? matchDuration[1] : "1 Tahun";
 
-        if (durRaw.includes("1 Bulan")) {
-          setDurationMode("1 Bulan");
-          setForm(prev => ({ ...prev, plan: targetPlan, duration: "1 Bulan" }));
+        if (durRaw.includes("1 Bulan") || durRaw.includes("2 Bulan")) {
+          setDurationMode("2 Bulan");
+          setForm(prev => ({ ...prev, plan: targetPlan, duration: "2 Bulan" }));
         } else if (durRaw.includes("6 Bulan") || durRaw.includes("semester")) {
           setDurationMode("6 Bulan");
           setForm(prev => ({ ...prev, plan: targetPlan, duration: "6 Bulan" }));
@@ -191,7 +192,7 @@ const RegisterSchoolPage = () => {
           setDurationMode("1 Tahun");
           setForm(prev => ({ ...prev, plan: targetPlan, duration: "1 Tahun" }));
         } else {
-          // Tangani custom bulan misalnya "2 Bulan", "3 Bulan", dll
+          // Tangani custom bulan misalnya "2 Bulan", "3 Bulan", dll (minimal 2 bulan)
           const mMatch = durRaw.match(/(\d+)\s*bulan/i);
           const parsedM = mMatch ? parseInt(mMatch[1], 10) : 2;
           const validM = Math.min(36, Math.max(2, parsedM));
@@ -207,7 +208,7 @@ const RegisterSchoolPage = () => {
     }
   }, [location.state]);
 
-  const handleDurationSelect = (mode: "1 Bulan" | "6 Bulan" | "1 Tahun" | "custom") => {
+  const handleDurationSelect = (mode: "2 Bulan" | "6 Bulan" | "1 Tahun" | "custom") => {
     setDurationMode(mode);
     if (mode === "custom") {
       setForm(prev => ({ ...prev, duration: `${customMonths} Bulan` }));
@@ -533,7 +534,7 @@ const RegisterSchoolPage = () => {
                         <span className="text-[11px] text-slate-400">Pilihan paket tetap atau atur durasi kustom</span>
                       </div>
 
-                      {/* 4 Duration Buttons: 1 Bulan, 6 Bulan, 1 Tahun, Custom Bulan */}
+                      {/* 4 Duration Buttons: 2 Bulan (Min), 6 Bulan, 1 Tahun, Custom Bulan */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
                         {(() => {
                           const curPlan = activePricing[normalizePlanKey(form.plan)] || activePricing.basic;
@@ -544,7 +545,7 @@ const RegisterSchoolPage = () => {
                           const yearDisc = baseRate > 0 && s12Rate < baseRate * 12 ? Math.round(((baseRate * 12 - s12Rate) / (baseRate * 12)) * 100) : 0;
 
                           return [
-                            { label: "1 Bulan", mode: "1 Bulan" as const, sub: "Fleksibel" },
+                            { label: "2 Bulan", mode: "2 Bulan" as const, sub: "Min. Berlangganan", badge: "Minimal" },
                             { label: "6 Bulan", mode: "6 Bulan" as const, sub: "1 Semester", badge: semDisc > 0 ? `Hemat ${semDisc}%` : undefined },
                             { label: "1 Tahun", mode: "1 Tahun" as const, sub: "12 Bulan", badge: yearDisc > 0 ? `Hemat ${yearDisc}%` : "Disarankan" },
                             { label: "Custom Bulan", mode: "custom" as const, sub: "Atur Sendiri", badge: "Kustom" },
@@ -592,7 +593,7 @@ const RegisterSchoolPage = () => {
                                 <span className="text-xs font-bold text-slate-900">Atur Durasi Kustom</span>
                               </div>
                               <p className="text-[11px] text-slate-500 mt-0.5">
-                                Tarif flat bulanan {getPlanLabel(form.plan)} (khusus durasi 6 bulan otomatis menggunakan harga hemat semester).
+                                Tarif bulanan {getPlanLabel(form.plan)} (minimal 2 bulan langganan, khusus durasi 6 bulan otomatis harga hemat semester).
                               </p>
                             </div>
 

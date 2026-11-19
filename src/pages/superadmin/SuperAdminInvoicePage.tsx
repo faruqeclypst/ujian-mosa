@@ -1704,7 +1704,7 @@ const SuperAdminInvoicePage = () => {
                   {/* Preset chips */}
                   <div className="flex flex-wrap items-center gap-1 mt-1.5">
                     {[
-                      { m: 1, label: "1 Bln" },
+                      { m: 2, label: "2 Bln (Min)" },
                       { m: 3, label: "3 Bln" },
                       { m: 6, label: "6 Bln (1 Sem)" },
                       { m: 12, label: "12 Bln (1 Thn)" },

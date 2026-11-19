@@ -1079,13 +1079,12 @@ const SchoolInvoicePage = () => {
                     <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200">Durasi Perpanjangan</label>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       {[
-                        { months: 1, label: "1 Bulan" },
-                        { months: 2, label: "2 Bulan" },
+                        { months: 2, label: "2 Bulan (Min)" },
                         { months: 3, label: "3 Bulan" },
                         { months: 4, label: "4 Bulan" },
                         { months: 5, label: "5 Bulan" },
-                        { months: 6, label: "6 Bulan" },
-                        { months: 12, label: "12 Bulan" },
+                        { months: 6, label: "6 Bulan (1 Sem)" },
+                        { months: 12, label: "12 Bulan (1 Thn)" },
                       ].map(d => (
                         <button
                           key={d.months}
