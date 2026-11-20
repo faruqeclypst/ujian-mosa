@@ -74,7 +74,7 @@ export const TeacherTable = ({
               </span>
               <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5 min-w-0">
                 <span className="font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
-                  @{teacher.username || teacher.code || "guru"}
+                  {teacher.username || teacher.code || "guru"}
                 </span>
                 <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
                 <span className="hidden sm:inline">Kode: {teacher.code || "-"}</span>

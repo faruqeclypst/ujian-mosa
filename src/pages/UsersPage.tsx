@@ -432,7 +432,7 @@ const UsersPage = () => {
                 </span>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
-                <span className="font-mono">@{u.username || "pengguna"}</span>
+                <span className="font-mono">{u.username || "pengguna"}</span>
                 {u.email && (
                   <>
                     <span className="text-neutral-300 dark:text-neutral-700 hidden sm:inline">•</span>
@@ -720,7 +720,7 @@ const UsersPage = () => {
                       {inspectedUser.name}
                     </div>
                     <div className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400 truncate">
-                      @{inspectedUser.username || "pengguna"}
+                      {inspectedUser.username || "pengguna"}
                     </div>
                     <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                       {getRoleBadge(inspectedUser.role)}

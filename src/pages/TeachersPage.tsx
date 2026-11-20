@@ -761,7 +761,7 @@ const TeachersPage = () => {
                         {inspectedTeacher.name}
                       </span>
                       <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
-                        @{inspectedTeacher.username || inspectedTeacher.code || "guru"}
+                        {inspectedTeacher.username || inspectedTeacher.code || "guru"}
                       </span>
                     </div>
                   </div>

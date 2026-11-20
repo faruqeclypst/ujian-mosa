@@ -118,7 +118,7 @@ export const StudentTable = ({
               </span>
               <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5 min-w-0">
                 <span className="font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
-                  @{student.nisn || "---"}
+                  {student.nisn || "---"}
                 </span>
                 {/* Info Kelas di mobile saat kolom kelas disembunyikan */}
                 <span className="sm:hidden text-neutral-700 dark:text-neutral-300 font-sans font-medium truncate max-w-[120px]">
