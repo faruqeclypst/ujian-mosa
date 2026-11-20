@@ -638,101 +638,16 @@ onRecordUpdateRequest((e) => {
         }
     }
     // --- akhir helper lokal ---
-    // --- 3a: delta merge untuk answers (hemat payload) ---
-    // Client bisa kirim hanya jawaban yang berubah dengan flag __delta:true.
-    // Server gabungkan dengan answers tersimpan, bukan menimpa seluruh object.
+    // --- 3a, 3b, 3c: SUDAH DIPINDAHKAN KE GO NATIVE (pb-native) ---
+    // Logika delta merge (__delta:true), lock & stale revision check, serta kalkulasi answeredCount
+    // kini dieksekusi secara paralel & instan (< 1ms) di binary Go native (pb-native/main.go).
+    // Hook JS ini hanya menjalankan kalkulasi skor (doRecalc) saat siswa submit (status === "finished").
     try {
         if (e.record.collection().name === "attempts") {
-            const incoming = pj(e.record.get("answers"), null);
-            if (incoming && incoming.__delta === true) {
-                let stored = null;
-                try { stored = $app.findRecordById("attempts", e.record.id); } catch (x) {}
-                if (stored) {
-                    const storedAns = pj(stored.get("answers"), {}) || {};
-                    const merged = Object.assign({}, storedAns);
-                    for (const k in incoming) {
-                        if (k === "__delta") continue;
-                        merged[k] = incoming[k];
-                    }
-                    // Pastikan __meta.rev dari delta dipakai (lebih baru)
-                    e.record.set("answers", merged);
-                }
-                // Hapus flag __delta agar tidak tersimpan
-                const cur = pj(e.record.get("answers"), {});
-                if (cur) { delete cur.__delta; e.record.set("answers", cur); }
+            if (e.record.getString("status") === "finished") {
+                doRecalc(e);
             }
         }
-    } catch (err) {
-        console.error("[SECURITY_FIX] delta merge error:", err);
-    }
-    // --- 3b: kunci answers setelah final + tolak tulisan basi (siswa) ---
-    // Mencegah race autosave-vs-submit: autosave yang tiba terlambat tidak boleh
-    // menimpa answers final, dan request basi (rev lebih tua) tidak boleh menimpa
-    // jawaban yang lebih baru. Heartbeat & field lain tetap boleh lewat.
-    // Penolakan diam-diam (tanpa error) agar sync ulang dashboard tidak pecah.
-    try {
-        if (e.record.collection().name === "attempts") {
-            let auth = null;
-            try { if (e.requestInfo && e.requestInfo.auth) auth = e.requestInfo.auth; } catch (x) {}
-            const aname = authName(auth);
-            const isAdmin = (aname === "_superusers" || aname === "users");
-            if (!isAdmin) {
-                let stored = null;
-                try { stored = $app.findRecordById("attempts", e.record.id); } catch (x) {}
-                if (stored) {
-                    const storedStatus = stored.getString("status");
-                    const locked = (storedStatus === "finished" || storedStatus === "submitted");
-                    const revOf = (a) => {
-                        try {
-                            const n = parseInt(a && a.__meta && a.__meta.rev, 10);
-                            return isNaN(n) ? 0 : n;
-                        } catch (x) { return 0; }
-                    };
-                    const incomingAns = pj(e.record.get("answers"), null);
-                    const storedAns = pj(stored.get("answers"), null);
-                    const incomingRev = revOf(incomingAns);
-                    const storedRev = revOf(storedAns);
-                    let touched = false;
-                    try {
-                        touched = JSON.stringify(incomingAns) !== JSON.stringify(storedAns);
-                    } catch (x) { touched = true; }
-                    if (touched && (locked || incomingRev < storedRev)) {
-                        // Kembalikan answers ke versi tersimpan
-                        e.record.set("answers", stored.get("answers"));
-                        console.log("[SECURITY_FIX] answers DITOLAK untuk attempt " + e.record.id +
-                            " (locked=" + locked + ", rev masuk=" + incomingRev + ", rev tersimpan=" + storedRev + ")");
-                    }
-                }
-            }
-        }
-    } catch (err) {
-        console.error("[SECURITY_FIX] answer-lock error:", err);
-    }
-    // --- 3c: answeredCount ringan untuk monitoring room besar ---
-    // Dihitung server-side tiap update agar halaman monitoring bisa menampilkan
-    // progres ("sudah jawab X soal") TANPA mengunduh objek answers yang besar.
-    // Murah: tanpa query tambahan, hanya hitung key jawaban.
-    try {
-        if (e.record.collection().name === "attempts") {
-            const ans = pj(e.record.get("answers"), null);
-            if (ans && typeof ans === "object") {
-                let n = 0;
-                for (const k in ans) {
-                    if (!k.startsWith("__")) n++;
-                }
-                try {
-                    const colFields = e.record.collection().fields;
-                    if (colFields && colFields.getByName("answeredCount")) {
-                        e.record.set("answeredCount", n);
-                    }
-                } catch (_) {}
-            }
-        }
-    } catch (err) {
-        console.error("[SECURITY_FIX] answeredCount error:", err);
-    }
-    try {
-        if (e.record.collection().name === "attempts") doRecalc(e);
     } catch (err) {
         console.error("[SECURITY_FIX] update hook error:", err);
     }

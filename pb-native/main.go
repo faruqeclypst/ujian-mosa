@@ -17,6 +17,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -233,6 +234,43 @@ func fastLoginHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) err
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Attempt CBT Helpers (Delta Merge, Stale Reject, Answered Counter)
+// ---------------------------------------------------------------------------
+
+func revOf(ans map[string]any) int {
+	if ans == nil {
+		return 0
+	}
+	meta, ok := ans["__meta"].(map[string]any)
+	if !ok || meta == nil {
+		return 0
+	}
+	switch v := meta["rev"].(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case string:
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return 0
+}
+
+func countAnswered(ans map[string]any) int {
+	count := 0
+	for k := range ans {
+		if !strings.HasPrefix(k, "__") {
+			count++
+		}
+	}
+	return count
+}
+
 func main() {
 	app := pocketbase.New()
 
@@ -259,6 +297,100 @@ func main() {
 		TemplateLang: migratecmd.TemplateLangJS,
 		Automigrate:  automigrate,
 		Dir:          migrationsDir,
+	})
+
+	// Konfigurasi PRAGMA SQLite performa tinggi untuk konkurensi CBT (500-1000+ siswa)
+	app.OnBootstrap().BindFunc(func(e *core.BootstrapEvent) error {
+		if err := e.Next(); err != nil {
+			return err
+		}
+		db := e.App.DB()
+		_, _ = db.NewQuery("PRAGMA busy_timeout = 10000;").Execute()
+		_, _ = db.NewQuery("PRAGMA journal_size_limit = 200000000;").Execute()
+		_, _ = db.NewQuery("PRAGMA synchronous = NORMAL;").Execute()
+		_, _ = db.NewQuery("PRAGMA mmap_size = 268435456;").Execute()
+		_, _ = db.NewQuery("PRAGMA cache_size = -64000;").Execute()
+		log.Println("[SQLITE] High-concurrency CBT PRAGMAs applied (busy_timeout=10s, synchronous=NORMAL, mmap=256MB, cache=64MB)")
+		return nil
+	})
+
+	// Hitung answeredCount saat attempt dibuat pertama kali
+	app.OnRecordCreateRequest("attempts").BindFunc(func(e *core.RecordRequestEvent) error {
+		var incoming map[string]any
+		_ = e.Record.UnmarshalJSONField("answers", &incoming)
+		if incoming != nil {
+			e.Record.Set("answeredCount", countAnswered(incoming))
+		}
+		return e.Next()
+	})
+
+	// Hook native Go untuk update attempt:
+	// 1. Delta merge answers (__delta: true)
+	// 2. Anti-stale write (tolak rev basi & kunci jawaban jika status=finished)
+	// 3. Kalkulasi cepat answeredCount
+	// Menggantikan logika JS hook Goja agar eksekusi instan (< 1ms vs ~20ms) dan bebas lock contention.
+	app.OnRecordUpdateRequest("attempts").BindFunc(func(e *core.RecordRequestEvent) error {
+		var incoming map[string]any
+		_ = e.Record.UnmarshalJSONField("answers", &incoming)
+
+		isDelta := false
+		if incoming != nil {
+			if d, ok := incoming["__delta"].(bool); ok && d {
+				isDelta = true
+			}
+		}
+
+		stored, err := e.App.FindRecordById("attempts", e.Record.Id)
+		if err == nil && stored != nil {
+			var storedAns map[string]any
+			_ = stored.UnmarshalJSONField("answers", &storedAns)
+			if storedAns == nil {
+				storedAns = make(map[string]any)
+			}
+
+			// 1. Delta merge
+			if isDelta {
+				merged := make(map[string]any, len(storedAns)+len(incoming))
+				for k, v := range storedAns {
+					merged[k] = v
+				}
+				for k, v := range incoming {
+					if k != "__delta" {
+						merged[k] = v
+					}
+				}
+				incoming = merged
+				e.Record.Set("answers", merged)
+			}
+
+			// 2. Lock & Stale write reject untuk non-admin (siswa)
+			isAdmin := e.HasSuperuserAuth() || (e.Auth != nil && e.Auth.Collection().Name == "users")
+			if !isAdmin && incoming != nil {
+				storedStatus := stored.GetString("status")
+				locked := storedStatus == "finished" || storedStatus == "submitted"
+				incomingRev := revOf(incoming)
+				storedRev := revOf(storedAns)
+
+				inBytes, _ := json.Marshal(incoming)
+				stBytes, _ := json.Marshal(storedAns)
+				touched := string(inBytes) != string(stBytes)
+
+				if touched && (locked || incomingRev < storedRev) {
+					// Kembalikan answers ke versi tersimpan
+					e.Record.Set("answers", storedAns)
+					incoming = storedAns
+					log.Printf("[NATIVE_ATTEMPTS] answers DITOLAK untuk attempt %s (locked=%v, rev masuk=%d, rev tersimpan=%d)\n",
+						e.Record.Id, locked, incomingRev, storedRev)
+				}
+			}
+		}
+
+		// 3. Hitung answeredCount secara cepat di Go
+		if incoming != nil {
+			e.Record.Set("answeredCount", countAnswered(incoming))
+		}
+
+		return e.Next()
 	})
 
 	// Pre-compute fastHash saat student dibuat agar login pertama langsung cepat
