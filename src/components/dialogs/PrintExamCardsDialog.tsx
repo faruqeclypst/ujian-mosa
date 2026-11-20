@@ -17,20 +17,21 @@ import {
   CheckCircle2,
   Calendar,
   Building,
-  Sparkles,
   KeyRound,
   Check,
-  Loader2
+  Loader2,
+  RefreshCw
 } from "lucide-react";
 import { Dialog, DialogContent } from "../ui/dialog";
 import { NeonButton } from "../ui/NeonButton";
+import { NeonConfirmModal } from "../ui/NeonConfirmModal";
 import { Input } from "../ui/input";
 import { Select } from "../ui/select";
 import { cn } from "../../lib/utils";
 import type { StudentData, ClassData } from "../../types/exam";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
-import { generateExamUsername, generateExamPassword } from "../../utils/examCredentials";
+import { generateExamUsername } from "../../utils/examCredentials";
 import { getStudentPortalOrigin, encodeStudentCardVerifyPayload } from "../../utils/domainHelper";
 
 export interface PrintExamCardsDialogProps {
@@ -52,7 +53,7 @@ export const PrintExamCardsDialog = ({
   filterClassId = "ALL",
   isStandalonePage = false,
 }: PrintExamCardsDialogProps) => {
-  const { school, terminology } = useTenant();
+  const { school, terminology, pb } = useTenant();
   const { regenerateExamCredentialsBatch } = useExamData();
 
   // Pengaturan Kredensial Ujian (Alternatif Login Bebas Lupa Password)
@@ -61,7 +62,6 @@ export const PrintExamCardsDialog = ({
   const [isGeneratingCreds, setIsGeneratingCreds] = useState(false);
   const [isPreparingPrint, setIsPreparingPrint] = useState(false);
   const [credSaveNotice, setCredSaveNotice] = useState<string | null>(null);
-  const cachedExamPasswords = useRef<Record<string, string>>({});
   const qrCacheRef = useRef<Map<string, string>>(new Map());
 
   const getStudentQrText = (st: StudentData) => {
@@ -128,6 +128,45 @@ export const PrintExamCardsDialog = ({
   const [rightLogoType, setRightLogoType] = useState<"school" | "custom" | "none">("school");
   const [customRightLogoUrl, setCustomRightLogoUrl] = useState<string>("");
   const [schoolLogoFailed, setSchoolLogoFailed] = useState(false);
+  const [resolvedSchoolLogoUrl, setResolvedSchoolLogoUrl] = useState<string>("");
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false);
+
+  // Logo sekolah untuk kartu diambil dari record settings tenant — sumber
+  // yang sama dengan logo sidebar (components/layout/logo.tsx). Field
+  // logo_url pada registri master sering kosong atau hanya berisi nama
+  // file tanpa URL lengkap, sehingga logo kanan tidak pernah muncul bila
+  // hanya mengandalkan field tersebut.
+  useEffect(() => {
+    let cancelled = false;
+    const resolveLogo = async () => {
+      const direct = (school as any)?.logo_url || (school as any)?.logo || "";
+      if (direct && (direct.startsWith("http") || direct.startsWith("data:"))) {
+        if (!cancelled) {
+          setResolvedSchoolLogoUrl(direct);
+          setSchoolLogoFailed(false);
+        }
+        return;
+      }
+      if (!pb) return;
+      try {
+        const records = await pb.collection("settings").getFullList({ sort: "created" });
+        const data: any = records[0];
+        if (!data || cancelled) return;
+        let url = data.logoUrl || data.logo || "";
+        if (url && !url.startsWith("http") && !url.startsWith("data:")) {
+          url = pb.files.getUrl(data, url);
+        }
+        if (!cancelled) {
+          setResolvedSchoolLogoUrl(url || "");
+          setSchoolLogoFailed(false);
+        }
+      } catch (err) {
+        console.warn("Gagal memuat logo sekolah untuk kartu:", err);
+      }
+    };
+    resolveLogo();
+    return () => { cancelled = true; };
+  }, [pb, school]);
 
   // Zoom Pratinjau
   const [previewZoom, setPreviewZoom] = useState(0.8);
@@ -181,6 +220,33 @@ export const PrintExamCardsDialog = ({
       setIsGeneratingCreds(false);
     }
   };
+
+  // Kredensial sesi dibuat & disimpan OTOMATIS untuk siswa yang belum punya.
+  // Kartu yang tampil/tercetak harus selalu sama dengan yang tersimpan di
+  // server — tanpa langkah ini sandi di kartu hanya karangan lokal dan
+  // siswa tidak bisa login sebelum admin menekan tombol generate manual.
+  const autoCredSigRef = useRef<string>("");
+  useEffect(() => {
+    if (!isOpen || credentialMode !== "exam" || isGeneratingCreds) return;
+    const missing = studentsToPrint.filter(s => !s.examUsername || !s.examPassword);
+    if (missing.length === 0) return;
+    const sig = examPrefix + "|" + missing.map(s => s.id).sort().join(",");
+    if (autoCredSigRef.current === sig) return;
+    autoCredSigRef.current = sig;
+    (async () => {
+      setIsGeneratingCreds(true);
+      try {
+        await regenerateExamCredentialsBatch(missing.map(s => s.id), examPrefix);
+        setCredSaveNotice(`Sandi sesi otomatis dibuat & disimpan untuk ${missing.length} siswa.`);
+        setTimeout(() => setCredSaveNotice(null), 4000);
+      } catch (err) {
+        console.error("Gagal membuat sandi sesi otomatis:", err);
+      } finally {
+        setIsGeneratingCreds(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, credentialMode, studentsToPrint, examPrefix]);
 
   const is4Cards = layoutMode === "4";
   const cardsPerPage = is4Cards ? 4 : 6;
@@ -353,7 +419,7 @@ export const PrintExamCardsDialog = ({
     if (type === "none") return null;
 
     if (type === "school") {
-      const schoolLogoUrl = (school as any)?.logo_url || (school as any)?.logo;
+      const schoolLogoUrl = resolvedSchoolLogoUrl;
       if (schoolLogoUrl && !schoolLogoFailed) {
         return (
           <img
@@ -544,13 +610,13 @@ export const PrintExamCardsDialog = ({
       ? (student.examUsername || generateExamUsername(student.nisn || (student as any).username || student.id.substring(0, 8), examPrefix))
       : (student.examNumber || (student as any).username || student.nisn);
 
-    if (isExamCred && !student.examPassword && !cachedExamPasswords.current[student.id]) {
-      cachedExamPasswords.current[student.id] = generateExamPassword();
-    }
-
+    // Sandi sesi HANYA ditampilkan dari data server. Jangan pernah mengarang
+    // sandi lokal di kartu — kartu tercetak harus selalu bisa dipakai login.
+    // Siswa yang belum punya sandi sesi sedang dibuatkan otomatis oleh
+    // effect auto-generate; selama proses itu tampilkan penanda.
     const displayPassword = showPassword
       ? (isExamCred
-        ? (student.examPassword || cachedExamPasswords.current[student.id] || "28327*")
+        ? (student.examPassword || "MENYIAPKAN…")
         : (student.password || "12345678"))
       : "*********";
     const birthText = formatBirthInfo(student.birthPlace, student.birthDate);
@@ -1147,9 +1213,6 @@ export const PrintExamCardsDialog = ({
                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
                     Format Kredensial Login
                   </label>
-                  <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                    {credentialMode === "exam" ? "Anti Lupa Sandi" : "Akun Standar"}
-                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-1 bg-neutral-200/70 dark:bg-neutral-800/70 p-1 rounded-xl border border-neutral-200/80 dark:border-neutral-700/60">
@@ -1159,11 +1222,11 @@ export const PrintExamCardsDialog = ({
                     className={cn(
                       "h-7 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
                       credentialMode === "exam"
-                        ? "bg-indigo-600 text-white shadow-2xs font-bold"
+                        ? "bg-white dark:bg-neutral-850 text-neutral-900 dark:text-white shadow-2xs font-bold"
                         : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
                     )}
                   >
-                    <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
+                    <KeyRound className="w-3 h-3 shrink-0" />
                     <span>Sesi Ujian (TU)</span>
                   </button>
                   <button
@@ -1181,6 +1244,12 @@ export const PrintExamCardsDialog = ({
                   </button>
                 </div>
 
+                <p className="text-[10px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+                  {credentialMode === "exam"
+                    ? "Siswa login memakai username & sandi sesi yang tercetak di kartu. Sandi dibuat dan disimpan otomatis ke server, jadi kartu langsung bisa dipakai login."
+                    : "Kartu menampilkan username & password akun siswa yang sudah terdaftar."}
+                </p>
+
                 {credentialMode === "exam" && (
                   <div className="p-3 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5 shadow-2xs">
                     <div className="flex items-center justify-between gap-2">
@@ -1192,11 +1261,11 @@ export const PrintExamCardsDialog = ({
                         value={examPrefix}
                         onChange={(e) => setExamPrefix(e.target.value.toUpperCase())}
                         maxLength={6}
-                        className="h-7 w-16 text-center text-xs font-mono font-bold bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-indigo-600 dark:text-indigo-400 uppercase rounded-md"
+                        className="h-7 w-16 text-center text-xs font-mono font-bold bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-emerald-600 dark:text-emerald-400 uppercase rounded-md"
                       />
                     </div>
                     <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
-                      <span className="text-neutral-500 dark:text-neutral-400">Status Server:</span>
+                      <span className="text-neutral-500 dark:text-neutral-400">Sandi Tersimpan:</span>
                       <span className={cn(
                         "font-mono font-bold text-xs flex items-center gap-1",
                         missingCredsCount === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
@@ -1208,8 +1277,8 @@ export const PrintExamCardsDialog = ({
                     <button
                       type="button"
                       disabled={isGeneratingCreds}
-                      onClick={handleGenerateAndSaveCreds}
-                      className="w-full h-7.5 px-2.5 rounded-lg text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      onClick={() => setShowRegenConfirm(true)}
+                      className="w-full h-7.5 px-2.5 rounded-lg text-[11px] font-semibold bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {isGeneratingCreds ? (
                         <>
@@ -1218,11 +1287,14 @@ export const PrintExamCardsDialog = ({
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Generate & Simpan ke Server</span>
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Buat Ulang Sandi Semua Siswa</span>
                         </>
                       )}
                     </button>
+                    <p className="text-[10px] leading-relaxed text-neutral-400">
+                      Sandi baru dibuat otomatis. Pakai tombol ini hanya bila ingin mengganti sandi seluruh siswa terpilih — sandi lama berhenti berlaku.
+                    </p>
                     {credSaveNotice && (
                       <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium text-center">
                         {credSaveNotice}
@@ -1694,6 +1766,22 @@ export const PrintExamCardsDialog = ({
           })}
         </div>
       )}
+      {/* Konfirmasi wajib sebelum membuat ulang sandi sesi: sandi lama
+          terhapus permanen dan kartu harus dibagikan ulang ke peserta. */}
+      <NeonConfirmModal
+        isOpen={showRegenConfirm}
+        onClose={() => setShowRegenConfirm(false)}
+        onConfirm={async () => {
+          setShowRegenConfirm(false);
+          await handleGenerateAndSaveCreds();
+        }}
+        type="warning"
+        title="Buat Ulang Sandi Sesi Ujian?"
+        description="Username dan sandi sesi yang lama akan terhapus secara permanen dan tidak dapat digunakan kembali. Proktor wajib mencetak ulang kartu login dan membagikannya kembali kepada seluruh peserta ujian sebelum ujian dimulai."
+        confirmLabel="Ya, Buat Ulang"
+        cancelLabel="Tidak"
+        isLoading={isGeneratingCreds}
+      />
     </div>
   );
 

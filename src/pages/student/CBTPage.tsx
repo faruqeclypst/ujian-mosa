@@ -1435,6 +1435,82 @@ const CBTPage = () => {
 
   useEffect(() => { loadExamData(); }, [loadExamData]);
 
+  // Preload SEMUA gambar ujian (gambar utama soal, gambar pilihan, hotspot,
+  // dan gambar inline di dalam teks soal/pilihan) segera setelah soal dimuat.
+  // Gambar diunduh bertahap di latar belakang dan disimpan di cache browser,
+  // sehingga saat siswa membuka soal mana pun gambarnya muncul seketika —
+  // tidak lagi menunggu unduhan di tengah ujian. Urutan prioritas dimulai
+  // dari soal yang sedang aktif.
+  const preloadedImagesRef = useRef<HTMLImageElement[]>([]);
+  useEffect(() => {
+    if (!questions || questions.length === 0) return;
+    const urls = new Set<string>();
+    const collectFromHtml = (html?: string) => {
+      if (!html) return;
+      const re = /<img[^>]+src=["']([^"']+)["']/gi;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(html)) !== null) urls.add(m[1]);
+    };
+    const ordered = [
+      ...questions.slice(currentQuestionIndex),
+      ...questions.slice(0, currentQuestionIndex),
+    ];
+    ordered.forEach((q) => {
+      if (q.imageUrl) urls.add(q.imageUrl);
+      if (q.hotspotImageUrl) urls.add(q.hotspotImageUrl);
+      collectFromHtml(q.text);
+      collectFromHtml(q.groupText);
+      collectFromHtml(q.rumpangText);
+      if (q.choices) {
+        Object.values(q.choices).forEach((c) => {
+          if (c?.imageUrl) urls.add(c.imageUrl);
+          collectFromHtml(c?.text);
+        });
+      }
+      if (q.items) {
+        q.items.forEach((it) => {
+          if (it?.imageUrl) urls.add(it.imageUrl);
+          collectFromHtml(it?.text);
+        });
+      }
+      if (q.pairs) {
+        q.pairs.forEach((p) => {
+          collectFromHtml(p?.left);
+          collectFromHtml(p?.right);
+        });
+      }
+      if (q.statements) {
+        q.statements.forEach((s) => collectFromHtml(s?.text));
+      }
+    });
+    const list = Array.from(urls).filter(
+      (u) => u && (u.startsWith("http") || u.startsWith("/"))
+    );
+    if (list.length === 0) return;
+    let cancelled = false;
+    const timers: number[] = [];
+    const BATCH = 6;
+    for (let i = 0; i < list.length; i += BATCH) {
+      const batch = list.slice(i, i + BATCH);
+      const t = window.setTimeout(() => {
+        if (cancelled) return;
+        batch.forEach((u) => {
+          const img = new Image();
+          img.src = u;
+          preloadedImagesRef.current.push(img);
+        });
+      }, 400 + Math.floor(i / BATCH) * 300);
+      timers.push(t);
+    }
+    return () => {
+      cancelled = true;
+      timers.forEach((t) => clearTimeout(t));
+    };
+    // Hanya bergantung pada daftar soal; currentQuestionIndex dibaca sekali
+    // sebagai titik awal prioritas saat effect pertama berjalan.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions]);
+
   // Keep latest state in refs to avoid resubscribing when they change
   const attemptRef = useRef(attempt);
   const roomDataRef = useRef(roomData);

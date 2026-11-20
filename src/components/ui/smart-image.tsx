@@ -36,6 +36,14 @@ export const SmartImage = ({
       
       {!isError ? (
         <img
+          ref={(el) => {
+            // Gambar yang sudah ada di cache browser (mis. hasil preload
+            // soal) bisa selesai dimuat sebelum handler onLoad terpasang —
+            // tandai langsung agar tidak terjebak di skeleton/opacity-0.
+            if (el && el.complete && el.naturalWidth > 0) {
+              setIsLoaded(true);
+            }
+          }}
           src={src}
           alt={alt || "Image"}
           loading="lazy"

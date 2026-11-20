@@ -30,7 +30,7 @@ const PrintExamCardsPage = () => {
           title="Cetak Kartu Peserta Ujian"
           subtitle="Studio pratinjau dan pencetakan lembar kartu ujian resmi ANBK/CBT presisi ukuran A4 siap potong."
           badge={
-            <NeonBadge variant="purple">
+            <NeonBadge variant="emerald">
               Dokumen Cetak
             </NeonBadge>
           }

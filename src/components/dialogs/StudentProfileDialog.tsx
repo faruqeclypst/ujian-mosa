@@ -195,9 +195,11 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
       });
 
       setSuccessMessage("Biodata berhasil disimpan.");
+      // Setelah tersimpan, modal langsung tertutup (permintaan siswa:
+      // klik Simpan = selesai, tidak perlu menutup manual).
       setTimeout(() => {
         setSuccessMessage(null);
-        setViewMode("view");
+        onClose();
       }, 700);
     } catch (err: any) {
       setErrorMessage(err.message || "Gagal menyimpan biodata.");
@@ -228,7 +230,7 @@ export const StudentProfileDialog: React.FC<StudentProfileDialogProps> = ({
       setConfirmPassword("");
       setTimeout(() => {
         setSuccessMessage(null);
-        setViewMode("view");
+        onClose();
       }, 1000);
     } catch (err: any) {
       setErrorMessage(err.message || "Gagal mengganti password.");
