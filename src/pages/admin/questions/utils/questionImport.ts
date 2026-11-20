@@ -39,6 +39,41 @@ export interface ImportResult {
   skippedByType?: number;
 }
 
+// Buat banyak soal sekaligus lewat endpoint bulk native (1 request + 1
+// transaksi di server) — jauh lebih cepat daripada create per-record.
+// Fallback ke create per-record HANYA bila endpoint belum ada (404),
+// agar tidak ada risiko soal ganda bila respons bulk hilang di tengah.
+async function createQuestionsBulkOrFallback(pb: any, payloads: any[]): Promise<number> {
+  if (!payloads.length) return 0;
+  try {
+    const res: any = await pb.send("/api/bulk/create", {
+      method: "POST",
+      body: { collection: "questions", records: payloads },
+    });
+    if (res?.ok) {
+      (res.errors || []).forEach((e: any) =>
+        console.error("Gagal membuat soal (bulk) pada urutan ke-", e.index, e.message));
+      return res.created || 0;
+    }
+    throw new Error("bulk create: respons tidak ok");
+  } catch (err: any) {
+    if (err?.status !== 404) {
+      console.error("Bulk create soal gagal (tanpa fallback):", err);
+      return 0;
+    }
+    let ok = 0;
+    for (const p of payloads) {
+      try {
+        await pb.collection("questions").create(p);
+        ok++;
+      } catch (createErr) {
+        console.error("Gagal membuat soal (fallback) pada order:", p?.order, createErr);
+      }
+    }
+    return ok;
+  }
+}
+
 export const importQuestionsFromWord = async ({
   file,
   pb,
@@ -125,6 +160,7 @@ export const importQuestionsFromWord = async ({
   for (let i = 0; i < uniqueParsed.length; i += chunkSize) {
     const chunk = uniqueParsed.slice(i, i + chunkSize);
 
+    const chunkPayloads: any[] = [];
     await Promise.all(
       chunk.map(async (q, index) => {
         const actualIndex = i + index;
@@ -166,14 +202,11 @@ export const importQuestionsFromWord = async ({
           imageUrl: imageUrl,
         };
 
-        try {
-          await pb.collection("questions").create(payload);
-          importedCount++;
-        } catch (createErr) {
-          console.error("Gagal membuat soal Word pada index:", actualIndex, createErr);
-        }
+        chunkPayloads.push(payload);
       })
     );
+
+    importedCount += await createQuestionsBulkOrFallback(pb, chunkPayloads);
 
     const currentProcessed = Math.min(i + chunkSize, uniqueParsed.length);
     const progress = Math.round((currentProcessed / uniqueParsed.length) * 100);
@@ -224,6 +257,7 @@ export const importQuestionsFromExcel = async ({
   for (let i = 0; i < parsed.length; i += chunkSize) {
     const chunk = parsed.slice(i, i + chunkSize);
 
+    const chunkPayloads: any[] = [];
     await Promise.all(
       chunk.map(async (q, index) => {
         const actualIndex = i + index;
@@ -268,14 +302,11 @@ export const importQuestionsFromExcel = async ({
           groupText: localizedGroupText,
         };
 
-        try {
-          await pb.collection("questions").create(payload);
-          importedCount++;
-        } catch (createErr) {
-          console.error("Gagal membuat soal Excel pada index:", actualIndex, createErr);
-        }
+        chunkPayloads.push(payload);
       })
     );
+
+    importedCount += await createQuestionsBulkOrFallback(pb, chunkPayloads);
 
     const currentProcessed = Math.min(i + chunkSize, parsed.length);
     const progress = Math.round((currentProcessed / parsed.length) * 100);
@@ -326,6 +357,7 @@ export const importQuestionsFromJson = async ({
   const jsonMaxOrder = existingForOrder.reduce((max: number, q: any) => Math.max(max, q.order || 0), 0);
 
   let importedCount = 0;
+  const pendingPayloads: any[] = [];
   for (let i = 0; i < questionsArr.length; i++) {
     const q = questionsArr[i];
     if (!q.text && !q.question) continue;
@@ -431,11 +463,9 @@ export const importQuestionsFromJson = async ({
 
     payload.answerKey = payload.correctAnswer;
 
-    try {
-      await pb.collection("questions").create(payload);
-      importedCount++;
-    } catch (createErr) {
-      console.error("Gagal membuat soal JSON pada index:", i, createErr);
+    pendingPayloads.push(payload);
+    if (pendingPayloads.length >= 100) {
+      importedCount += await createQuestionsBulkOrFallback(pb, pendingPayloads.splice(0));
     }
 
     const currentProcessed = i + 1;
@@ -448,6 +478,8 @@ export const importQuestionsFromJson = async ({
       percent: progress,
     });
   }
+
+  importedCount += await createQuestionsBulkOrFallback(pb, pendingPayloads.splice(0));
 
   return { importedCount };
 };

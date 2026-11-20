@@ -49,6 +49,7 @@ import { compressImage } from "../../lib/imageCompression";
 import { insertImageIntoQuestionText } from "../../lib/imageSearch";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
+import { bulkCreateOrFallback, bulkDeleteOrFallback } from "../../lib/bulkApi";
 import { exportQuestionsToWord } from "./questions/utils/questionExportWord";
 import { exportQuestionsToJson } from "./questions/utils/questionExportJson";
 import {
@@ -342,7 +343,7 @@ const QuestionsPage = () => {
       const chunkSize = 10;
       for (let i = 0; i < questionsToImport.length; i += chunkSize) {
         const chunk = questionsToImport.slice(i, i + chunkSize);
-        await Promise.all(
+        const chunkPayloads: any[] = await Promise.all(
           chunk.map((q, index) => {
             const qType = q.type || "pilihan_ganda";
             const fieldType = typeMap[qType] || "multiple_choice";
@@ -423,9 +424,10 @@ const QuestionsPage = () => {
               correct_answer: correctAnswer,
               order: (questions.length || 0) + i + index + 1
             };
-            return pb.collection("questions").create(payload);
+            return payload;
           })
         );
+        await bulkCreateOrFallback(pb, "questions", chunkPayloads);
 
         const currentProcessed = Math.min(i + chunkSize, questionsToImport.length);
         setBatchProgress(prev => ({
@@ -1431,22 +1433,16 @@ const QuestionsPage = () => {
         }
       }
 
-      // 3. Delete Questions in Parallel Chunks
+      // 3. Hapus semua soal sekaligus lewat bulk native (1 request + 1 transaksi)
       setBatchProgress(prev => ({ ...prev, message: "Menghapus data soal dari database..." }));
-      const chunkSize = 10;
-      for (let i = 0; i < allQ.length; i += chunkSize) {
-        const chunk = allQ.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(q => pb.collection('questions').delete(q.id)));
-
-        const currentProcessed = Math.min(i + chunkSize, allQ.length);
-        const progress = Math.round((currentProcessed / allQ.length) * 100);
-        setImportProgress(progress);
-        setBatchProgress(prev => ({
-          ...prev,
-          current: currentProcessed,
-          message: `Menghapus soal (${currentProcessed}/${allQ.length})`
-        }));
-      }
+      const delAllRes = await bulkDeleteOrFallback(pb, 'questions', allQ.map(q => q.id));
+      if (delAllRes.errors.length) console.warn("Sebagian soal gagal dihapus:", delAllRes.errors);
+      setImportProgress(100);
+      setBatchProgress(prev => ({
+        ...prev,
+        current: allQ.length,
+        message: `Menghapus soal (${allQ.length}/${allQ.length})`
+      }));
 
       loadQuestions();
       showAlert("Berhasil", "Semua soal berhasil dikosongkan.", "success");
@@ -1557,21 +1553,15 @@ const QuestionsPage = () => {
         }
       }
 
-      // 3. Parallel Delete Records
-      const chunkSize = 10;
-      for (let i = 0; i < selectedQuestions.length; i += chunkSize) {
-        const chunk = selectedQuestions.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(q => pb!.collection('questions').delete(q.id)));
-
-        const currentProcessed = Math.min(i + chunkSize, selectedQuestions.length);
-        const progress = Math.round((currentProcessed / selectedQuestions.length) * 100);
-        setImportProgress(progress);
-        setBatchProgress(prev => ({
-          ...prev,
-          current: currentProcessed,
-          message: `Menghapus soal (${currentProcessed}/${selectedQuestions.length})`
-        }));
-      }
+      // 3. Hapus soal terpilih sekaligus lewat bulk native (1 request + 1 transaksi)
+      const delSelRes = await bulkDeleteOrFallback(pb, 'questions', selectedQuestions.map(q => q.id));
+      if (delSelRes.errors.length) console.warn("Sebagian soal gagal dihapus:", delSelRes.errors);
+      setImportProgress(100);
+      setBatchProgress(prev => ({
+        ...prev,
+        current: selectedQuestions.length,
+        message: `Menghapus soal (${selectedQuestions.length}/${selectedQuestions.length})`
+      }));
 
       setSelectedIds([]);
       loadQuestions();

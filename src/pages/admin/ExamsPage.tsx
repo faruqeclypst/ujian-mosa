@@ -75,6 +75,7 @@ import { useToast } from "../../components/ui/toast";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
+import { bulkDeleteOrFallback } from "../../lib/bulkApi";
 import { latexToOmml } from "../../lib/latexToWordMath";
 
 export interface ExamData {
@@ -963,9 +964,7 @@ const ExamsPage = () => {
               const questions = await pb.collection('questions').getFullList({
                 filter: `examId = "${examId}"`
               });
-              for (const q of questions) {
-                await pb.collection('questions').delete(q.id);
-              }
+              await bulkDeleteOrFallback(pb, 'questions', questions.map(q => q.id));
               await pb.collection('exams').delete(examId);
             } catch (err) {
               console.error(`Gagal menghapus exam ${examId}:`, err);
@@ -1335,9 +1334,7 @@ const ExamsPage = () => {
           filter: `examId = "${examToDelete.id}"`
         });
 
-        for (const q of questions) {
-          await pb.collection('questions').delete(q.id);
-        }
+        await bulkDeleteOrFallback(pb, 'questions', questions.map(q => q.id));
 
         await pb.collection('exams').delete(examToDelete.id);
       } else {

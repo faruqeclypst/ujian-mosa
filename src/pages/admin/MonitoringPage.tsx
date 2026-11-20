@@ -1,4 +1,5 @@
 import { getOnlineFlag } from "../../lib/network";
+import { bulkDeleteOrFallback } from "../../lib/bulkApi";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   RefreshCw,
@@ -742,11 +743,7 @@ const MonitoringPage = () => {
             filter: `studentId = "${sisId}" && examRoomId = "${roomId}"`
           });
 
-          const chunkSize = 10;
-          for (let i = 0; i < related.length; i += chunkSize) {
-            const chunk = related.slice(i, i + chunkSize);
-            await Promise.all(chunk.map(r => pb.collection('attempts').delete(r.id)));
-          }
+          await bulkDeleteOrFallback(pb, 'attempts', related.map(r => r.id));
 
           showAlert("Berhasil", "Sesi direset.", "success");
         } catch (e) { showAlert("Gagal", "Error.", "danger"); }
@@ -769,11 +766,7 @@ const MonitoringPage = () => {
             filter: `examRoomId = "${roomId}"`
           });
 
-          const chunkSize = 10;
-          for (let i = 0; i < related.length; i += chunkSize) {
-            const chunk = related.slice(i, i + chunkSize);
-            await Promise.all(chunk.map(r => pb.collection('attempts').delete(r.id)));
-          }
+          await bulkDeleteOrFallback(pb, 'attempts', related.map(r => r.id));
 
           handleManualRefreshMonitor();
           showAlert("Berhasil", "Seluruh sesi di ruangan ini telah di-reset.", "success");

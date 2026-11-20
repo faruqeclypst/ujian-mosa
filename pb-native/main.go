@@ -418,6 +418,369 @@ func generateExamCredentialsHandler(app *pocketbase.PocketBase) func(e *core.Req
 }
 
 // ---------------------------------------------------------------------------
+// Start attempt native + bulk create/delete untuk import & hapus massal.
+// Jalur API record biasa mengantre di badai (LT45: create attempt p50 11 dtk)
+// dan loop per-record di frontend membuat import/hapus ribuan baris lambat.
+// Endpoint ini: auth token -> 1 transaksi -> respons ringkas.
+// ---------------------------------------------------------------------------
+
+// authFromHeader mengambil record auth dari header Authorization
+// (token mentah ala SDK PocketBase, atau skema Bearer).
+func authFromHeader(app *pocketbase.PocketBase, e *core.RequestEvent) *core.Record {
+	token := strings.TrimSpace(strings.TrimPrefix(e.Request.Header.Get("Authorization"), "Bearer "))
+	if token == "" {
+		return nil
+	}
+	rec, err := app.FindAuthRecordByToken(token)
+	if err != nil {
+		return nil
+	}
+	return rec
+}
+
+func isStaff(rec *core.Record) bool {
+	if rec == nil {
+		return false
+	}
+	name := rec.Collection().Name
+	return name == "_superusers" || name == "users"
+}
+
+// POST /api/student/start-attempt { examRoomId, answers?, startedAt? }
+// Membuat (atau memakai ulang) attempt ongoing siswa yang login.
+// Di server offline (di luar path cloud) endpoint menolak halus (403
+// NATIVE_UNAVAILABLE) agar klien fallback ke jalur lama tempat gerbang
+// lisensi offline ditegakkan — penegakan itu tidak boleh dilompati.
+func startAttemptHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		setExamCORS(e)
+
+		dataDir := app.DataDir()
+		if !strings.Contains(dataDir, "/opt/pocketbase") && !strings.Contains(dataDir, "/schools/") {
+			return e.JSON(http.StatusForbidden, map[string]any{
+				"ok": false, "code": "NATIVE_UNAVAILABLE",
+				"message": "Endpoint native tidak dipakai di server offline."})
+		}
+
+		authRec := authFromHeader(app, e)
+		if authRec == nil {
+			return e.JSON(http.StatusUnauthorized, map[string]any{
+				"ok": false, "message": "Sesi login tidak valid."})
+		}
+		if authRec.Collection().Name != "students" {
+			return e.JSON(http.StatusForbidden, map[string]any{
+				"ok": false, "message": "Hanya siswa yang dapat memulai attempt."})
+		}
+
+		var body struct {
+			ExamRoomID string         `json:"examRoomId"`
+			Answers    map[string]any `json:"answers"`
+			StartedAt  string         `json:"startedAt"`
+		}
+		_ = e.BindBody(&body)
+		roomID := strings.TrimSpace(body.ExamRoomID)
+		if roomID == "" {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"ok": false, "message": "examRoomId wajib diisi."})
+		}
+		if _, err := app.FindRecordById("exam_rooms", roomID); err != nil {
+			return e.JSON(http.StatusNotFound, map[string]any{
+				"ok": false, "message": "Ruang ujian tidak ditemukan."})
+		}
+
+		now := time.Now().UTC()
+		var result *core.Record
+		existing := false
+		err := app.RunInTransaction(func(txApp core.App) error {
+			// Dedupe: attempt ongoing siswa+ruang yang sama dipakai ulang
+			// (pengganti cek getFullList + create di klien).
+			found, ferr := txApp.FindFirstRecordByFilter("attempts",
+				"studentId = {:s} && examRoomId = {:r} && status = 'ongoing'",
+				dbx.Params{"s": authRec.Id, "r": roomID})
+			if ferr == nil && found != nil {
+				result = found
+				existing = true
+				return nil
+			}
+			coll, cerr := txApp.FindCollectionByNameOrId("attempts")
+			if cerr != nil {
+				return cerr
+			}
+			rec := core.NewRecord(coll)
+			rec.Set("examRoomId", roomID)
+			rec.Set("studentId", authRec.Id)
+			rec.Set("status", "ongoing")
+			rec.Set("cheatCount", 0)
+			if body.Answers != nil {
+				rec.Set("answers", body.Answers)
+			}
+			rec.Set("answeredCount", 0)
+			if strings.TrimSpace(body.StartedAt) != "" {
+				rec.Set("startedAt", body.StartedAt)
+			} else {
+				rec.Set("startedAt", now)
+			}
+			rec.Set("isOnline", true)
+			rec.Set("lastHeartbeat", now)
+			if err := txApp.Save(rec); err != nil {
+				return err
+			}
+			result = rec
+			return nil
+		})
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]any{
+				"ok": false, "message": "Gagal memulai attempt: " + err.Error()})
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"ok": true, "existing": existing, "record": result.PublicExport()})
+	}
+}
+
+var bulkCreateWhitelist = map[string]bool{
+	"questions": true, "students": true, "classes": true, "subjects": true,
+}
+
+var bulkDeleteWhitelist = map[string]bool{
+	"questions": true, "attempts": true, "exams": true, "exam_rooms": true,
+	"students": true, "classes": true, "subjects": true,
+}
+
+// POST /api/bulk/create { collection, records: [...] } — khusus staf.
+// Semua record dibuat dalam 1 transaksi; kegagalan per baris dilaporkan
+// per indeks tanpa membatalkan baris lain.
+func bulkCreateHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		setExamCORS(e)
+
+		if !isStaff(authFromHeader(app, e)) {
+			return e.JSON(http.StatusForbidden, map[string]any{
+				"ok": false, "message": "Hanya staf yang dapat memakai bulk create."})
+		}
+
+		var body struct {
+			Collection string           `json:"collection"`
+			Records    []map[string]any `json:"records"`
+		}
+		_ = e.BindBody(&body)
+		if !bulkCreateWhitelist[body.Collection] {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"ok": false, "message": "Collection tidak diizinkan untuk bulk create: " + body.Collection})
+		}
+		if len(body.Records) == 0 || len(body.Records) > 2000 {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"ok": false, "message": "Jumlah records harus 1..2000."})
+		}
+
+		type rowErr struct {
+			Index   int    `json:"index"`
+			Message string `json:"message"`
+		}
+		ids := make([]string, 0, len(body.Records))
+		rowErrs := make([]rowErr, 0)
+
+		err := app.RunInTransaction(func(txApp core.App) error {
+			coll, cerr := txApp.FindCollectionByNameOrId(body.Collection)
+			if cerr != nil {
+				return cerr
+			}
+			pepper := ""
+			if body.Collection == "students" {
+				pepper = getPepper(app)
+			}
+			for i, m := range body.Records {
+				rec := core.NewRecord(coll)
+				if body.Collection == "students" {
+					// Samakan perilaku jalur request: lengkapi passwordConfirm
+					// dan precompute fastHash agar login pertama langsung cepat.
+					if pw, ok := m["password"].(string); ok && pw != "" {
+						if _, has := m["passwordConfirm"]; !has {
+							m["passwordConfirm"] = pw
+						}
+						if pepper != "" {
+							if un, ok := m["username"].(string); ok && strings.TrimSpace(un) != "" {
+								if _, has := m["fastHash"]; !has {
+									m["fastHash"] = sha256Hex(pepper + strings.TrimSpace(un) + pw)
+								}
+							}
+						}
+					}
+				}
+				for k, v := range m {
+					rec.Set(k, v)
+				}
+				if err := txApp.Save(rec); err != nil {
+					rowErrs = append(rowErrs, rowErr{Index: i, Message: err.Error()})
+					continue
+				}
+				ids = append(ids, rec.Id)
+			}
+			return nil
+		})
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]any{
+				"ok": false, "message": "Bulk create gagal: " + err.Error()})
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"ok": true, "created": len(ids), "ids": ids, "errors": rowErrs})
+	}
+}
+
+var bulkUpdateWhitelist = map[string]bool{
+	"questions": true, "students": true, "classes": true, "subjects": true,
+}
+
+// POST /api/bulk/update { collection, records: [{id, ...fields}] } — khusus staf.
+// Semua update dalam 1 transaksi; baris yang id-nya tidak ditemukan atau
+// gagal validasi dilaporkan per indeks tanpa membatalkan baris lain.
+func bulkUpdateHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		setExamCORS(e)
+
+		if !isStaff(authFromHeader(app, e)) {
+			return e.JSON(http.StatusForbidden, map[string]any{
+				"ok": false, "message": "Hanya staf yang dapat memakai bulk update."})
+		}
+
+		var body struct {
+			Collection string           `json:"collection"`
+			Records    []map[string]any `json:"records"`
+		}
+		_ = e.BindBody(&body)
+		if !bulkUpdateWhitelist[body.Collection] {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"ok": false, "message": "Collection tidak diizinkan untuk bulk update: " + body.Collection})
+		}
+		if len(body.Records) == 0 || len(body.Records) > 2000 {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"ok": false, "message": "Jumlah records harus 1..2000."})
+		}
+
+		type rowErr struct {
+			Index   int    `json:"index"`
+			ID      string `json:"id"`
+			Message string `json:"message"`
+		}
+		rowErrs := make([]rowErr, 0)
+		updated := 0
+
+		err := app.RunInTransaction(func(txApp core.App) error {
+			pepper := ""
+			if body.Collection == "students" {
+				pepper = getPepper(app)
+			}
+			for i, m := range body.Records {
+				idVal, _ := m["id"].(string)
+				if strings.TrimSpace(idVal) == "" {
+					rowErrs = append(rowErrs, rowErr{Index: i, Message: "id kosong"})
+					continue
+				}
+				rec, ferr := txApp.FindRecordById(body.Collection, idVal)
+				if ferr != nil || rec == nil {
+					rowErrs = append(rowErrs, rowErr{Index: i, ID: idVal, Message: "record tidak ditemukan"})
+					continue
+				}
+				if body.Collection == "students" {
+					// Ganti password lewat bulk: lengkapi passwordConfirm +
+					// hitung ulang fastHash dengan username efektif.
+					if pw, ok := m["password"].(string); ok && pw != "" {
+						if _, has := m["passwordConfirm"]; !has {
+							m["passwordConfirm"] = pw
+						}
+						if pepper != "" {
+							un := rec.GetString("username")
+							if u2, ok := m["username"].(string); ok && strings.TrimSpace(u2) != "" {
+								un = strings.TrimSpace(u2)
+							}
+							m["fastHash"] = sha256Hex(pepper + un + pw)
+						}
+					}
+				}
+				for k, v := range m {
+					if k == "id" {
+						continue
+					}
+					rec.Set(k, v)
+				}
+				if err := txApp.Save(rec); err != nil {
+					rowErrs = append(rowErrs, rowErr{Index: i, ID: idVal, Message: err.Error()})
+					continue
+				}
+				updated++
+			}
+			return nil
+		})
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]any{
+				"ok": false, "message": "Bulk update gagal: " + err.Error()})
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"ok": true, "updated": updated, "errors": rowErrs})
+	}
+}
+
+// POST /api/bulk/delete { collection, ids: [...] } — khusus staf.
+// Semua penghapusan dalam 1 transaksi lewat app.Delete (hook model +
+// pembersihan file tetap berjalan), kegagalan per id dilaporkan.
+func bulkDeleteHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		setExamCORS(e)
+
+		if !isStaff(authFromHeader(app, e)) {
+			return e.JSON(http.StatusForbidden, map[string]any{
+				"ok": false, "message": "Hanya staf yang dapat memakai bulk delete."})
+		}
+
+		var body struct {
+			Collection string   `json:"collection"`
+			IDs        []string `json:"ids"`
+		}
+		_ = e.BindBody(&body)
+		if !bulkDeleteWhitelist[body.Collection] {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"ok": false, "message": "Collection tidak diizinkan untuk bulk delete: " + body.Collection})
+		}
+		if len(body.IDs) == 0 || len(body.IDs) > 5000 {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"ok": false, "message": "Jumlah ids harus 1..5000."})
+		}
+
+		type rowErr struct {
+			ID      string `json:"id"`
+			Message string `json:"message"`
+		}
+		rowErrs := make([]rowErr, 0)
+		deleted := 0
+
+		err := app.RunInTransaction(func(txApp core.App) error {
+			for _, id := range body.IDs {
+				rec, ferr := txApp.FindRecordById(body.Collection, id)
+				if ferr != nil || rec == nil {
+					rowErrs = append(rowErrs, rowErr{ID: id, Message: "record tidak ditemukan"})
+					continue
+				}
+				if err := txApp.Delete(rec); err != nil {
+					rowErrs = append(rowErrs, rowErr{ID: id, Message: err.Error()})
+					continue
+				}
+				deleted++
+			}
+			return nil
+		})
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]any{
+				"ok": false, "message": "Bulk delete gagal: " + err.Error()})
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"ok": true, "deleted": deleted, "errors": rowErrs})
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Attempt CBT Helpers (Delta Merge, Stale Reject, Answered Counter)
 // ---------------------------------------------------------------------------
 
@@ -625,6 +988,15 @@ func main() {
 		se.Router.POST("/api/student/generate-exam-credentials", generateExamCredentialsHandler(app))
 		se.Router.OPTIONS("/api/student/generate-exam-credentials", examOptionsHandler)
 		log.Println("[EXAM_LOGIN] go-native loaded: POST /api/student/exam-login + generate-exam-credentials (paralel)")
+		se.Router.POST("/api/student/start-attempt", startAttemptHandler(app))
+		se.Router.OPTIONS("/api/student/start-attempt", examOptionsHandler)
+		se.Router.POST("/api/bulk/create", bulkCreateHandler(app))
+		se.Router.OPTIONS("/api/bulk/create", examOptionsHandler)
+		se.Router.POST("/api/bulk/update", bulkUpdateHandler(app))
+		se.Router.OPTIONS("/api/bulk/update", examOptionsHandler)
+		se.Router.POST("/api/bulk/delete", bulkDeleteHandler(app))
+		se.Router.OPTIONS("/api/bulk/delete", examOptionsHandler)
+		log.Println("[START_ATTEMPT+BULK] go-native loaded: POST /api/student/start-attempt, /api/bulk/create, /api/bulk/update, /api/bulk/delete")
 		return se.Next()
 	})
 

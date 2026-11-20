@@ -1348,6 +1348,24 @@ const CBTPage = () => {
 
             // 3. ATOMIC SINGLE-WRITE dengan Auto-Retry
             att = await retryWithBackoff(async () => {
+              // Jalur cepat: endpoint native start-attempt (1 request ringan,
+              // dedupe attempt ongoing dikerjakan server dalam 1 transaksi).
+              try {
+                const res: any = await pb.send("/api/student/start-attempt", {
+                  method: "POST",
+                  body: {
+                    examRoomId: roomId,
+                    answers: initialAnswers,
+                    startedAt: new Date().toISOString()
+                  }
+                });
+                if (res?.record) return res.record;
+                throw new Error("start-attempt: respons tidak dikenal");
+              } catch (nativeErr) {
+                // Endpoint belum tersedia (tenant versi lama / server offline
+                // yang gerbang lisensinya di jalur lama) -> jalur lama di bawah.
+              }
+
               // Cek ulang untuk mencegah duplikasi jika double-click/multi-tab
               const secondCheck = await pb.collection("attempts").getFullList({
                 filter: `studentId = "${student.id}" && examRoomId = "${roomId}"`

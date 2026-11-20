@@ -33,6 +33,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { bulkCreateOrFallback, bulkUpdateOrFallback } from "../lib/bulkApi";
 import {
   NeonFilterPopover,
   NeonFilterField,
@@ -763,66 +764,65 @@ const StudentsPage = () => {
       let createdCount = 0;
       let updatedCount = 0;
 
-      // 1. Eksekusi Batch Update untuk siswa lama yang sudah terdaftar
-      const chunkSize = 10;
-      for (let i = 0; i < toUpdate.length; i += chunkSize) {
-        const chunk = toUpdate.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(async (item) => {
-          try {
-            const updatePayload: any = {};
-            if (item.row.name) updatePayload.name = item.row.name;
-            if (item.row.classId) updatePayload.classId = item.row.classId;
-            if (item.row.gender) updatePayload.gender = item.row.gender;
-            if (item.row.birthPlace !== undefined) updatePayload.birthPlace = item.row.birthPlace;
-            if (item.row.birthDate !== undefined) updatePayload.birthDate = item.row.birthDate;
-            if (item.row.room !== undefined) updatePayload.room = item.row.room;
-            if (item.row.session !== undefined) updatePayload.session = item.row.session;
-            if (item.row.examNumber !== undefined) updatePayload.examNumber = item.row.examNumber;
-
-            await updateStudent(item.student.id, updatePayload);
-            updatedCount++;
-          } catch (err: any) {
-            console.error(`Gagal update profil ${item.row.name} (${item.row.nisn}):`, err);
-            failures.push(`Update: ${item.row.name} (${item.row.nisn}) - ${err.message || "Error Database"}`);
+      // 1. Eksekusi Batch Update untuk siswa lama — bulk native (1 request + 1 transaksi)
+      if (toUpdate.length > 0) {
+        const updatePayloads = toUpdate.map((item) => {
+          const updatePayload: any = { id: item.student.id };
+          if (item.row.name) updatePayload.name = item.row.name;
+          if (item.row.classId) {
+            updatePayload.classId = item.row.classId;
+            updatePayload.classid = item.row.classId;
           }
-        }));
-
-        const currentProcessed = Math.min(i + chunkSize, toUpdate.length);
+          if (item.row.gender) updatePayload.gender = item.row.gender;
+          if (item.row.birthPlace !== undefined) updatePayload.birthPlace = item.row.birthPlace;
+          if (item.row.birthDate !== undefined) updatePayload.birthDate = item.row.birthDate;
+          if (item.row.room !== undefined) updatePayload.room = item.row.room;
+          if (item.row.session !== undefined) updatePayload.session = item.row.session;
+          if (item.row.examNumber !== undefined) updatePayload.examNumber = item.row.examNumber;
+          return updatePayload;
+        });
+        const updateRes = await bulkUpdateOrFallback(pb, "students", updatePayloads);
+        updatedCount = updateRes.updated;
+        updateRes.errors.forEach((e) => {
+          const item = toUpdate[e.index];
+          if (item) failures.push(`Update: ${item.row.name} (${item.row.nisn}) - ${e.message || "Error Database"}`);
+        });
         setBatchProgress(prev => ({
           ...prev,
-          current: currentProcessed,
-          message: `Memperbarui profil ${currentProcessed}/${totalOperations}...`
+          current: toUpdate.length,
+          message: `Memperbarui profil ${toUpdate.length}/${totalOperations}...`
         }));
       }
 
-      // 2. Eksekusi Create untuk siswa baru
-      for (let i = 0; i < toCreate.length; i += chunkSize) {
-        const chunk = toCreate.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(async (row) => {
-          try {
-            await createStudent({
-              nisn: String(row.nisn),
-              name: row.name,
-              gender: row.gender,
-              classId: row.classId,
-              birthPlace: (row as any).birthPlace || "",
-              birthDate: (row as any).birthDate || "",
-              room: (row as any).room || "",
-              session: (row as any).session || "",
-              examNumber: (row as any).examNumber || "",
-            });
-            createdCount++;
-          } catch (err: any) {
-            console.error(`Gagal import ${terminology.student.toLowerCase()} baru ${row.nisn}:`, err);
-            failures.push(`Baru: ${row.name} (${row.nisn}) - ${err.message || "Error Database"}`);
-          }
+      // 2. Eksekusi Create untuk siswa baru — bulk native (payload sama persis
+      // dengan createStudent di ExamDataContext, termasuk password bawaan)
+      if (toCreate.length > 0) {
+        const createPayloads = toCreate.map((row) => ({
+          username: String(row.nisn),
+          password: "12345678",
+          passwordConfirm: "12345678",
+          name: row.name,
+          gender: row.gender || "L",
+          classId: row.classId,
+          classid: row.classId,
+          hasChangedPassword: false,
+          photo: "",
+          birthPlace: (row as any).birthPlace || "",
+          birthDate: (row as any).birthDate || "",
+          room: (row as any).room || "",
+          session: (row as any).session || "",
+          examNumber: (row as any).examNumber || "",
         }));
-
-        const currentProcessed = toUpdate.length + Math.min(i + chunkSize, toCreate.length);
+        const createRes = await bulkCreateOrFallback(pb, "students", createPayloads);
+        createdCount = createRes.created;
+        createRes.errors.forEach((e) => {
+          const row = toCreate[e.index];
+          if (row) failures.push(`Baru: ${row.name} (${row.nisn}) - ${e.message || "Error Database"}`);
+        });
         setBatchProgress(prev => ({
           ...prev,
-          current: currentProcessed,
-          message: `Menambahkan siswa baru ${currentProcessed}/${totalOperations}...`
+          current: totalOperations,
+          message: `Menambahkan siswa baru ${totalOperations}/${totalOperations}...`
         }));
       }
 
