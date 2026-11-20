@@ -564,7 +564,7 @@ export const PrintExamCardsDialog = ({
             .card-item {
               border: 1.2px solid #000000;
               border-radius: 0px;
-              padding: ${is8Cards ? "6px 8px" : "8px 10px"};
+              padding: ${is8Cards ? "5px 8px" : "8px 10px"};
               display: flex;
               flex-direction: column;
               justify-content: space-between;
@@ -625,8 +625,8 @@ export const PrintExamCardsDialog = ({
     const sessionVal = student.session || defaultSession;
     const roomSessionDisplay = [roomVal, sessionVal].filter(Boolean).join(" / ");
 
-    const headerHeight = is8Cards ? 36 : 44;
-    const logoSlotWidth = is8Cards ? 38 : 46;
+    const headerHeight = is8Cards ? 32 : 44;
+    const logoSlotWidth = is8Cards ? 34 : 46;
     const leftLogoNode = renderLeftLogoNode(headerHeight);
     const rightLogoNode = renderLogoNode(rightLogoType, customRightLogoUrl, headerHeight);
     const hasLeft = showLeftLogo && Boolean(leftLogoNode);
@@ -644,9 +644,9 @@ export const PrintExamCardsDialog = ({
       if (len <= 36) return base - 2;
       return base - 3;
     };
-    const kopTitleFontSize = fitFontSize("KARTU TANDA PESERTA UJIAN", is8Cards ? 8 : 9.5);
-    const kopExamTitleFontSize = fitFontSize(examTitle || "", is8Cards ? 6.5 : 8);
-    const kopSchoolFontSize = fitFontSize(schoolNameText, is8Cards ? 8 : 9.5);
+    const kopTitleFontSize = fitFontSize("KARTU TANDA PESERTA UJIAN", is8Cards ? 7.5 : 9.5);
+    const kopExamTitleFontSize = fitFontSize(examTitle || "", is8Cards ? 6 : 8);
+    const kopSchoolFontSize = fitFontSize(schoolNameText, is8Cards ? 7.5 : 9.5);
 
     return (
       <div
@@ -659,7 +659,7 @@ export const PrintExamCardsDialog = ({
           fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif",
           border: "1.2px solid #000000",
           borderRadius: "0px",
-          padding: is8Cards ? "5px 8px" : "7px 10px",
+          padding: is8Cards ? "4px 8px" : "7px 10px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -669,7 +669,7 @@ export const PrintExamCardsDialog = ({
         }}
       >
         {/* 1. KOP KARTU RESMI KEDINASAN (TEKS TENGAH SELALU PERSIS DI TENGAH SECARA MATEMATIS) */}
-        <div style={{ marginBottom: is8Cards ? "4.5px" : "5px" }}>
+        <div style={{ marginBottom: is8Cards ? "4px" : "5px" }}>
           <div
             style={{
               display: "grid",
@@ -784,7 +784,7 @@ export const PrintExamCardsDialog = ({
           </div>
 
           {/* Garis Kop Ganda Kedinasan */}
-          <div style={{ marginTop: is8Cards ? "3.5px" : "4px" }}>
+          <div style={{ marginTop: is8Cards ? "3px" : "4px" }}>
             <div style={{ borderBottom: "1.8px solid #000000" }} />
             <div style={{ borderBottom: "0.5px solid #000000", marginTop: "1.5px" }} />
           </div>
@@ -796,14 +796,14 @@ export const PrintExamCardsDialog = ({
             display: "flex",
             alignItems: "flex-start",
             gap: is8Cards ? "7px" : "8px",
-            marginBottom: is8Cards ? "4.5px" : "5px"
+            marginBottom: is8Cards ? "4px" : "5px"
           }}
         >
           {/* Pasfoto 3x4 Formal */}
           <div
             style={{
-              width: is8Cards ? "17mm" : "20mm",
-              height: is8Cards ? "22mm" : "26mm",
+              width: is8Cards ? "15mm" : "20mm",
+              height: is8Cards ? "19mm" : "26mm",
               border: "1px solid #64748b",
               borderRadius: "0px",
               backgroundColor: "#f8fafc",
@@ -839,7 +839,7 @@ export const PrintExamCardsDialog = ({
               flex: 1,
               width: "100%",
               borderCollapse: "collapse",
-              fontSize: is8Cards ? "7.5px" : "8.5px",
+              fontSize: is8Cards ? "7px" : "8.5px",
               lineHeight: is8Cards ? "1.25" : "1.25"
             }}
           >
@@ -930,7 +930,7 @@ export const PrintExamCardsDialog = ({
             borderRadius: "0px",
             backgroundColor: "#f8fafc",
             padding: is8Cards ? "2px 6px" : "4px 8px",
-            marginBottom: is8Cards ? "4.5px" : "5px",
+            marginBottom: is8Cards ? "4px" : "5px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -973,16 +973,16 @@ export const PrintExamCardsDialog = ({
                 src={qrCodes[student.id]}
                 alt="QR Login"
                 style={{
-                  width: is8Cards ? "15mm" : "18mm",
-                  height: is8Cards ? "15mm" : "18mm",
+                  width: is8Cards ? "14mm" : "18mm",
+                  height: is8Cards ? "14mm" : "18mm",
                   display: "block"
                 }}
               />
             ) : (
               <div
                 style={{
-                  width: is8Cards ? "15mm" : "18mm",
-                  height: is8Cards ? "15mm" : "18mm",
+                  width: is8Cards ? "14mm" : "18mm",
+                  height: is8Cards ? "14mm" : "18mm",
                   border: "1px solid #cbd5e1"
                 }}
               />
@@ -1019,7 +1019,7 @@ export const PrintExamCardsDialog = ({
             <div style={{ fontSize: is8Cards ? "6px" : "7px", fontWeight: 800, color: "#000000", marginTop: "1px" }}>
               {signerRole},
             </div>
-            <div style={{ height: is8Cards ? "13px" : "18px" }} />
+            <div style={{ height: is8Cards ? "9px" : "18px" }} />
             <div style={{ fontSize: is8Cards ? "6px" : "7px", fontWeight: 800, textDecoration: "underline", color: "#000000" }}>
               {signerName || "( ........................................ )"}
             </div>

@@ -96,7 +96,13 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
   const { modifiedBuffer, equationMap } = await extractEquationsFromDocx(arrayBuffer);
   
   // Step 2: Convert to HTML with mammoth
-  const result = await mammoth.convertToHtml({ arrayBuffer: modifiedBuffer });
+  // Mammoth memetakan bold -> <strong>, italic -> <em>, coret -> <s>, dan
+  // super/subscript secara bawaan, TAPI membuang garis bawah. Petakan
+  // underline secara eksplisit ke <u> agar formatnya ikut terbawa.
+  const result = await mammoth.convertToHtml(
+    { arrayBuffer: modifiedBuffer },
+    { styleMap: ["u => u"] }
+  );
   let html = result.value;
 
   // Step 2b: Post-process — convert tab/nbsp indentation to margin-left style
@@ -247,6 +253,72 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
     if (isUnderlined) return true;
     
     return false;
+  };
+
+  // Helper: ambil innerHTML elemen dengan `count` karakter teks pertama
+  // dibuang — dipakai untuk membuang penanda nomor soal / huruf pilihan
+  // dari HTML TANPA menghilangkan format (bold/italic/underline) di sisa
+  // teksnya. Penanda bisa terpecah ke beberapa run/format, jadi penghapusan
+  // berjalan per simpul teks mengikuti urutan dokumen.
+  const stripLeadingCharsFromHtml = (el: Element, count: number): string => {
+    const clone = el.cloneNode(true) as Element;
+    clone.querySelectorAll("img").forEach(img => img.remove());
+    let remaining = count;
+    let started = false;
+    const visit = (node: Node): void => {
+      if (started && remaining <= 0) return;
+      if (node.nodeType === 3) {
+        let text = node.textContent || "";
+        if (!started) {
+          // Teks acuan (getCleanText) sudah di-trim: lewati spasi awal dulu
+          const trimmedStart = text.replace(/^\s+/, "");
+          if (trimmedStart.length === 0) {
+            node.textContent = "";
+            return;
+          }
+          node.textContent = trimmedStart;
+          text = trimmedStart;
+          started = true;
+        }
+        if (text.length <= remaining) {
+          remaining -= text.length;
+          node.textContent = "";
+        } else {
+          node.textContent = text.slice(remaining);
+          remaining = 0;
+        }
+        return;
+      }
+      Array.from(node.childNodes).forEach(visit);
+    };
+    visit(clone);
+    return (clone as HTMLElement).innerHTML?.trim() || "";
+  };
+
+  // Helper: bila SELURUH isi pilihan dibungkus bold atau underline, format
+  // itu adalah penanda kunci jawaban dari guru — bukan format isi soal.
+  // Lepas bungkusnya agar kunci tidak bocor terlihat oleh siswa. Format
+  // sebagian teks (mis. satu kata ditebalkan) tetap dipertahankan.
+  const unwrapMarkerFormatting = (html: string): string => {
+    if (!html) return html;
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    const totalText = (tmp.textContent || "").trim();
+    if (!totalText) return html;
+    ["strong, b", "u"].forEach((selector) => {
+      const nodes = Array.from(tmp.querySelectorAll(selector));
+      if (nodes.length === 0) return;
+      const wrappedText = nodes.map(n => (n.textContent || "").trim()).join("");
+      if (wrappedText.length > totalText.length * 0.6) {
+        nodes.forEach(n => {
+          const parent = n.parentNode;
+          if (!parent) return;
+          while (n.firstChild) parent.insertBefore(n.firstChild, n);
+          parent.removeChild(n);
+        });
+      }
+    });
+    return tmp.innerHTML.trim();
   };
 
   // ─── FIRST PASS: Detect trailing answer key section ────────────────────
@@ -841,7 +913,16 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
       // Reset flag for next question block
       literasiSetForCurrentBlock = false;
 
-      const text = questionMatch ? questionMatch[2] : "";
+      // Ambil isi soal dari HTML (bukan teks polos) agar format
+      // bold/italic/underline pada baris pertama soal ikut terbawa.
+      let text = questionMatch ? questionMatch[2] : "";
+      if (questionMatch) {
+        // Panjang penanda nomor = seluruh kecocokan dikurangi isi soal
+        // (match[0] mencakup keduanya).
+        const markerLength = questionMatch[0].length - questionMatch[2].length;
+        const htmlText = stripLeadingCharsFromHtml(p, markerLength);
+        if (htmlText.replace(/<[^>]*>/g, "").trim()) text = htmlText;
+      }
       currentQuestion = { text, imageUrl: firstImage || undefined };
       currentChoices = {};
       currentAnswerKey = "";
@@ -859,11 +940,21 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
       inSubStatementList = false;
       if (currentQuestion) {
         const letter = choiceMatch ? choiceMatch[1].toLowerCase() : isJustLetter![1].toLowerCase();
-        const text = choiceMatch ? choiceMatch[2].trim() : "";
-        
+        // Ambil isi pilihan dari HTML agar format bold/italic/underline
+        // di dalam pilihan ikut terbawa (dulu selalu teks polos).
+        let text = choiceMatch ? choiceMatch[2].trim() : "";
+        if (choiceMatch) {
+          const markerLength = choiceMatch[0].length - choiceMatch[2].length;
+          const htmlText = stripLeadingCharsFromHtml(p, markerLength);
+          if (htmlText.replace(/<[^>]*>/g, "").trim()) text = htmlText;
+        }
+
         // Store choice — don't mark correct yet, wait for explicit "Kunci Jawaban" line
         // Only use inline markers as fallback if no explicit key is found later
         const isMarkedCorrect = hasCorrectMarker(p, line);
+        // Bila pilihan ini ditandai guru sebagai kunci lewat bold/underline
+        // menyeluruh, lepas format penandanya agar tidak bocor ke siswa.
+        if (isMarkedCorrect) text = unwrapMarkerFormatting(text);
         
         currentChoices[letter] = { 
           text, 
@@ -916,13 +1007,13 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
     // E. Fragment Handling
     if (currentQuestion) {
       if (pendingNumber && !currentQuestion.text) {
-        currentQuestion.text = textOnly;
+        currentQuestion.text = (line && line !== textOnly) ? line : textOnly;
         if (firstImage && !currentQuestion.imageUrl) currentQuestion.imageUrl = firstImage;
         pendingNumber = null;
       } else if (pendingLetter) {
         const pendingChoice = currentChoices[pendingLetter];
         if (pendingChoice) {
-          pendingChoice.text = textOnly;
+          pendingChoice.text = (line && line !== textOnly) ? line : textOnly;
           if (firstImage && !pendingChoice.imageUrl) {
             pendingChoice.imageUrl = firstImage;
           }
@@ -948,7 +1039,7 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
         }
       }
     } else if (currentGroupText !== undefined) {
-      currentGroupText += " " + textOnly;
+      currentGroupText += " " + ((line && line !== textOnly) ? line : textOnly);
     }
   });
 
