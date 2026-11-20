@@ -1,4 +1,4 @@
-// pb-examku: PocketBase v0.36.9 dengan /api/fast-login native Go (paralel).
+// pb-examku: PocketBase v0.36.9 dengan endpoint auth native Go (paralel).
 //
 // Fast login untuk siswa — alternatif ringan pengganti bcrypt.
 // POST /api/fast-login { username, password }
@@ -8,8 +8,13 @@
 // Rate limit: 20/menit per-akun + 2000/menit per-IP (ramah NAT sekolah).
 // HANYA untuk collection "students".
 //
-// Dibangun untuk menggantikan pb_hooks/fast_login.pb.js yang serial
-// (goja single-threaded, ~20 req/detik). Versi Go ini paralel penuh.
+// Login kartu ujian juga native: POST /api/student/exam-login
+// { username|nisn, password } — verifikasi examPassword plain vs record
+// siswa (examUsername || username || examNumber), terbitkan token auth.
+// Plus POST /api/student/generate-exam-credentials untuk generate massal
+// kredensial kartu. Keduanya menggantikan pb_hooks/student_exam_login.pb.js
+// yang serial (goja) dan kolaps pada badai login (LT43: 2.155/2.500 gagal
+// di tahap attempt, instance OOM). Versi Go ini paralel penuh.
 package main
 
 import (
@@ -19,6 +24,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/jsvm"
@@ -235,6 +242,182 @@ func fastLoginHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) err
 }
 
 // ---------------------------------------------------------------------------
+// Login kartu ujian (exam-login) + generate kredensial — native Go.
+// Kontrak respons identik dengan hook JS lama agar frontend tidak berubah.
+// ---------------------------------------------------------------------------
+
+func setExamCORS(e *core.RequestEvent) {
+	h := e.Response.Header()
+	h.Set("Access-Control-Allow-Origin", "*")
+	h.Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	h.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Token")
+}
+
+func examOptionsHandler(e *core.RequestEvent) error {
+	setExamCORS(e)
+	return e.NoContent(http.StatusNoContent)
+}
+
+// POST /api/student/exam-login { username|nisn, password }
+// Siswa login dengan kredensial tercetak di kartu ujian (examUsername /
+// username NISN / examNumber + examPassword plain), terhubung ke akun
+// siswa sebenarnya tanpa password akun pribadi.
+func examLoginHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		setExamCORS(e)
+
+		var body struct {
+			Username string `json:"username"`
+			Nisn     string `json:"nisn"`
+			Password string `json:"password"`
+		}
+		_ = e.BindBody(&body) // body boleh kosong; validasi di bawah
+		username := strings.TrimSpace(body.Username)
+		if username == "" {
+			username = strings.TrimSpace(body.Nisn)
+		}
+		password := strings.TrimSpace(body.Password)
+
+		if username == "" || password == "" {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"ok": false, "message": "Username dan Password ujian wajib diisi."})
+		}
+
+		student, err := app.FindFirstRecordByFilter(
+			"students",
+			"examUsername = {:u} || username = {:u} || examNumber = {:u}",
+			dbx.Params{"u": username},
+		)
+		if err != nil || student == nil {
+			return e.JSON(http.StatusNotFound, map[string]any{
+				"ok": false, "message": "Akun peserta ujian tidak ditemukan."})
+		}
+
+		saved := student.GetString("examPassword")
+		if saved == "" || subtle.ConstantTimeCompare([]byte(saved), []byte(password)) != 1 {
+			return e.JSON(http.StatusUnauthorized, map[string]any{
+				"ok": false, "message": "Kredensial ujian tidak cocok. Pastikan username dan password sesuai dengan yang tercetak di kartu ujian."})
+		}
+
+		token, err := student.NewAuthToken()
+		if err != nil || token == "" {
+			return e.JSON(http.StatusInternalServerError, map[string]any{
+				"ok": false, "message": "Gagal membuat sesi login peserta ujian."})
+		}
+
+		// Samakan dengan fast-login: jangan bocorkan field sensitif.
+		out := student.PublicExport()
+		delete(out, "password")
+		delete(out, "tokenKey")
+		delete(out, "fastHash")
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"ok": true, "token": token, "record": out, "examLogin": true})
+	}
+}
+
+// POST /api/student/generate-exam-credentials { prefix?, studentIds?, onlyEmpty? }
+// Generate / regenerate examUsername + examPassword massal dalam 1 transaksi.
+func generateExamCredentialsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		setExamCORS(e)
+
+		var body struct {
+			Prefix     string   `json:"prefix"`
+			StudentIDs []string `json:"studentIds"`
+			OnlyEmpty  bool     `json:"onlyEmpty"`
+		}
+		_ = e.BindBody(&body)
+		prefix := strings.ToUpper(strings.TrimSpace(body.Prefix))
+		if prefix == "" {
+			prefix = "TU"
+		}
+
+		query := "SELECT id, username FROM students WHERE 1=1"
+		if body.OnlyEmpty {
+			query += " AND (examUsername = '' OR examUsername IS NULL OR examPassword = '' OR examPassword IS NULL)"
+		}
+
+		type credRow struct {
+			ID       string `db:"id"`
+			Username string `db:"username"`
+		}
+		rows := []credRow{}
+		if err := app.DB().NewQuery(query).All(&rows); err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]any{
+				"ok": false, "message": "Gagal menghasilkan kredensial ujian: " + err.Error()})
+		}
+
+		targets := rows
+		if len(body.StudentIDs) > 0 {
+			set := make(map[string]bool, len(body.StudentIDs))
+			for _, id := range body.StudentIDs {
+				set[id] = true
+			}
+			targets = nil
+			for _, r := range rows {
+				if set[r.ID] {
+					targets = append(targets, r)
+				}
+			}
+		}
+
+		type genCred struct {
+			ID           string `json:"id"`
+			ExamUsername string `json:"examUsername"`
+			ExamPassword string `json:"examPassword"`
+		}
+		generated := make([]genCred, 0, len(targets))
+		updated := 0
+
+		// Satu transaksi SQLite untuk seluruh siswa (1 fsync), seperti versi JS.
+		err := app.RunInTransaction(func(txApp core.App) error {
+			for _, r := range targets {
+				nisn := strings.TrimSpace(r.Username)
+				examUser := prefix + nisn
+				if nisn == "" {
+					short := r.ID
+					if len(short) > 8 {
+						short = short[:8]
+					}
+					examUser = prefix + short
+				}
+
+				// Password acak 5 digit angka + '*' (contoh: 28327*)
+				n, rerr := rand.Int(rand.Reader, big.NewInt(90000))
+				num := int64(10000)
+				if rerr == nil {
+					num += n.Int64()
+				}
+				examPass := strconv.FormatInt(num, 10) + "*"
+
+				if _, err := txApp.DB().NewQuery(
+					"UPDATE students SET examUsername = {:u}, examPassword = {:p} WHERE id = {:id}",
+				).Bind(dbx.Params{"u": examUser, "p": examPass, "id": r.ID}).Execute(); err != nil {
+					log.Println("[GENERATE_EXAM_CREDENTIALS_ERR] Student id:", r.ID, err)
+					continue
+				}
+				updated++
+				generated = append(generated, genCred{ID: r.ID, ExamUsername: examUser, ExamPassword: examPass})
+			}
+			return nil
+		})
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]any{
+				"ok": false, "message": "Gagal menghasilkan kredensial ujian: " + err.Error()})
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"ok":           true,
+			"message":      "Berhasil menghasilkan kredensial ujian untuk " + strconv.Itoa(updated) + " siswa dalam sekejap.",
+			"updatedCount": updated,
+			"prefix":       prefix,
+			"credentials":  generated,
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Attempt CBT Helpers (Delta Merge, Stale Reject, Answered Counter)
 // ---------------------------------------------------------------------------
 
@@ -437,6 +620,11 @@ func main() {
 			return e.NoContent(http.StatusNoContent)
 		})
 		log.Println("[FAST_LOGIN] go-native loaded: POST /api/fast-login (paralel)")
+		se.Router.POST("/api/student/exam-login", examLoginHandler(app))
+		se.Router.OPTIONS("/api/student/exam-login", examOptionsHandler)
+		se.Router.POST("/api/student/generate-exam-credentials", generateExamCredentialsHandler(app))
+		se.Router.OPTIONS("/api/student/generate-exam-credentials", examOptionsHandler)
+		log.Println("[EXAM_LOGIN] go-native loaded: POST /api/student/exam-login + generate-exam-credentials (paralel)")
 		return se.Next()
 	})
 
