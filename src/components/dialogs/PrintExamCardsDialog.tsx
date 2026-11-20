@@ -12,13 +12,11 @@ import {
   SlidersHorizontal,
   X,
   LayoutGrid,
-  Layers,
   Users,
   CheckCircle2,
   Calendar,
   Building,
   KeyRound,
-  Check,
   Loader2,
   RefreshCw
 } from "lucide-react";
@@ -90,7 +88,7 @@ export const PrintExamCardsDialog = ({
   };
 
   // Pengaturan Cepat
-  const [layoutMode, setLayoutMode] = useState<"4" | "6">("4"); // 4 kartu (2x2) atau 6 kartu (2x3)
+  const [layoutMode] = useState<"4" | "6">("6"); // Dikunci 6 kartu (2x3) — opsi 4 kartu dihapus atas permintaan pemilik
   const [printScope, setPrintScope] = useState<"selected" | "class" | "all">(
     selectedStudentIds.length > 0 ? "selected" : (filterClassId !== "ALL" ? "class" : "all")
   );
@@ -634,6 +632,20 @@ export const PrintExamCardsDialog = ({
     const isAnyLogoVisible = hasLeft || hasRight;
     const sideColWidth = isAnyLogoVisible ? `${logoSlotWidth}px` : "0px";
 
+    const schoolNameText = school?.name || "SATUAN PENDIDIKAN";
+    // Teks kop TIDAK boleh wrap: ukuran huruf menyesuaikan panjang teks
+    // agar selalu muat satu baris penuh di kop kartu.
+    const fitFontSize = (text: string, base: number) => {
+      const len = (text || "").length;
+      if (len <= 24) return base;
+      if (len <= 30) return base - 1;
+      if (len <= 36) return base - 2;
+      return base - 3;
+    };
+    const kopTitleFontSize = fitFontSize("KARTU TANDA PESERTA UJIAN", is4Cards ? 11.5 : 9.5);
+    const kopExamTitleFontSize = fitFontSize(examTitle || "", is4Cards ? 9.5 : 8);
+    const kopSchoolFontSize = fitFontSize(schoolNameText, is4Cards ? 11.5 : 9.5);
+
     return (
       <div
         key={student.id}
@@ -686,6 +698,7 @@ export const PrintExamCardsDialog = ({
             <div
               style={{
                 width: "100%",
+                minWidth: 0,
                 height: headerHeight + "px",
                 display: "flex",
                 flexDirection: "column",
@@ -696,38 +709,47 @@ export const PrintExamCardsDialog = ({
               }}
             >
               <div style={{
-                fontSize: is4Cards ? "11.5px" : "9.5px",
+                fontSize: kopTitleFontSize + "px",
                 fontWeight: 800,
                 textTransform: "uppercase",
                 letterSpacing: "0.5px",
                 color: "#000000",
                 lineHeight: 1,
                 margin: 0,
-                padding: 0
+                padding: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
               }}>
                 KARTU TANDA PESERTA UJIAN
               </div>
               <div style={{
-                fontSize: is4Cards ? "9.5px" : "8px",
+                fontSize: kopExamTitleFontSize + "px",
                 fontWeight: 700,
                 textTransform: "uppercase",
                 color: "#1e293b",
                 lineHeight: 1,
                 margin: 0,
-                padding: 0
+                padding: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
               }}>
                 {examTitle}
               </div>
               <div style={{
-                fontSize: is4Cards ? "11.5px" : "9.5px",
+                fontSize: kopSchoolFontSize + "px",
                 fontWeight: 800,
                 textTransform: "uppercase",
                 color: "#000000",
                 lineHeight: 1,
                 margin: 0,
-                padding: 0
+                padding: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
               }}>
-                {school?.name || "SATUAN PENDIDIKAN"}
+                {schoolNameText}
               </div>
               <div style={{
                 fontSize: is4Cards ? "8.5px" : "7px",
@@ -735,7 +757,10 @@ export const PrintExamCardsDialog = ({
                 color: "#475569",
                 lineHeight: 1,
                 margin: 0,
-                padding: 0
+                padding: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
               }}>
                 TAHUN PELAJARAN {academicYear}
               </div>
@@ -1133,69 +1158,7 @@ export const PrintExamCardsDialog = ({
                 </Select>
               </div>
 
-              {/* 2. Format Kertas A4 (Interactive Visual Cards) */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
-                  Format Kertas A4
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {/* 4 Kartu (2x2) */}
-                  <button
-                    type="button"
-                    onClick={() => setLayoutMode("4")}
-                    className={cn(
-                      "p-2.5 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between h-[68px]",
-                      layoutMode === "4"
-                        ? "border-emerald-500 bg-emerald-500/10 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500"
-                        : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850/60 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 text-neutral-700 dark:text-neutral-300"
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-1.5">
-                        <LayoutGrid className={cn("w-4 h-4", layoutMode === "4" ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-400")} />
-                        <span className="font-bold text-xs">4 Kartu</span>
-                      </div>
-                      {layoutMode === "4" && (
-                        <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                      Standar (2×2) • Lega
-                    </div>
-                  </button>
-
-                  {/* 6 Kartu (2x3) */}
-                  <button
-                    type="button"
-                    onClick={() => setLayoutMode("6")}
-                    className={cn(
-                      "p-2.5 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between h-[68px]",
-                      layoutMode === "6"
-                        ? "border-emerald-500 bg-emerald-500/10 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500"
-                        : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850/60 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 text-neutral-700 dark:text-neutral-300"
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-1.5">
-                        <Layers className={cn("w-4 h-4", layoutMode === "6" ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-400")} />
-                        <span className="font-bold text-xs">6 Kartu</span>
-                      </div>
-                      {layoutMode === "6" && (
-                        <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                      Hemat (2×3) • Irit Kertas
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* 3. Judul Ujian */}
+              {/* 2. Judul Ujian */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
                   Nama Asesmen / Ujian
@@ -1207,7 +1170,7 @@ export const PrintExamCardsDialog = ({
                   className="h-8.5 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-lg shadow-2xs font-semibold uppercase"
                 />
               </div>
-              {/* 4. Format Kredensial Login (Sesi Ujian vs Akun Siswa) */}
+              {/* 3. Format Kredensial Login (Sesi Ujian vs Akun Siswa) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
@@ -1304,7 +1267,7 @@ export const PrintExamCardsDialog = ({
                 )}
               </div>
 
-              {/* 5. Opsi Tampilkan Password */}
+              {/* 4. Opsi Tampilkan Password */}
               <div className="p-3 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 flex items-center justify-between shadow-2xs">
                 <div>
                   <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200">Tampilkan Password</div>
@@ -1325,7 +1288,7 @@ export const PrintExamCardsDialog = ({
                 </button>
               </div>
 
-              {/* 6. Ringkasan Cetak */}
+              {/* 5. Ringkasan Cetak */}
               <div className="p-3.5 rounded-xl bg-neutral-100/90 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 space-y-2 shadow-2xs">
                 <div className="flex justify-between items-center">
                   <span>Total Kartu:</span>
@@ -1337,7 +1300,7 @@ export const PrintExamCardsDialog = ({
                 </div>
                 <div className="flex justify-between items-center text-[10px] text-neutral-400 pt-1 border-t border-neutral-200 dark:border-neutral-800">
                   <span>Tata Letak:</span>
-                  <span className="font-semibold text-neutral-700 dark:text-neutral-300">{layoutMode === "4" ? "4 Kartu (2×2)" : "6 Kartu (2×3)"}</span>
+                  <span className="font-semibold text-neutral-700 dark:text-neutral-300">6 Kartu (2×3)</span>
                 </div>
               </div>
             </div>
@@ -1361,143 +1324,136 @@ export const PrintExamCardsDialog = ({
                 </div>
               </div>
 
-              {/* Logo Kiri & Logo Kanan */}
-              <div className="grid grid-cols-2 gap-2">
-                {/* 1. Pengaturan Logo Kiri */}
-                <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 space-y-2 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
-                      Logo Kiri
-                    </label>
-                    <button
+              {/* Logo pada Kop Kartu (Kiri & Kanan) — satu kartu, dua baris
+                  dengan pola yang sama: pratinjau, nama + status, kontrol. */}
+              <div className="p-3 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+                <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 mb-2.5">
+                  Logo pada Kop Kartu
+                </div>
+
+                {/* Baris Logo Kiri */}
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                    {showLeftLogo && customLeftLogoUrl ? (
+                      <img src={customLeftLogoUrl} alt="Logo Kiri" className="w-full h-full object-contain" />
+                    ) : (
+                      <span className="text-[8px] font-bold text-neutral-400 uppercase tracking-wide text-center leading-tight">
+                        Logo<br />Kiri
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">Logo Kiri</div>
+                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                      {!showLeftLogo
+                        ? "Tidak ditampilkan"
+                        : customLeftLogoUrl
+                          ? "Logo unggahan"
+                          : "Kotak kosong (placeholder)"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowLeftLogo(!showLeftLogo)}
+                    className={cn(
+                      "h-6 px-2.5 rounded-md text-[10px] font-semibold transition-colors cursor-pointer shrink-0",
+                      showLeftLogo
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200 dark:border-neutral-700"
+                    )}
+                  >
+                    {showLeftLogo ? "Aktif" : "Nonaktif"}
+                  </button>
+                </div>
+                {showLeftLogo && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <NeonButton
                       type="button"
-                      onClick={() => setShowLeftLogo(!showLeftLogo)}
-                      className={cn(
-                        "h-5 px-2 rounded-md text-[10px] font-semibold transition-colors cursor-pointer",
-                        showLeftLogo
-                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-                          : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200 dark:border-neutral-700"
-                      )}
+                      variant="secondary"
+                      size="xs"
+                      onClick={() => leftFileInputRef.current?.click()}
+                      className="flex-1 text-[10px] h-7 gap-1"
                     >
-                      {showLeftLogo ? "Aktif" : "Nonaktif"}
-                    </button>
+                      <Upload className="w-3 h-3" />
+                      <span>{customLeftLogoUrl ? "Ganti Logo" : "Unggah Logo"}</span>
+                    </NeonButton>
+                    {customLeftLogoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setCustomLeftLogoUrl("")}
+                        className="text-[10px] text-rose-600 dark:text-rose-400 hover:underline cursor-pointer shrink-0"
+                      >
+                        Pakai Default
+                      </button>
+                    )}
                   </div>
+                )}
+                <input
+                  type="file"
+                  ref={leftFileInputRef}
+                  accept="image/*"
+                  onChange={handleLeftLogoUpload}
+                  className="hidden"
+                />
 
-                  {showLeftLogo && (
-                    <div className="space-y-1.5 pt-1 border-t border-neutral-100 dark:border-neutral-800">
-                      {customLeftLogoUrl ? (
-                        <div className="flex items-center gap-2">
-                          <img
-                            src={customLeftLogoUrl}
-                            alt="Logo Kiri"
-                            className="w-8 h-8 object-contain rounded border border-neutral-200 dark:border-neutral-700 bg-white shrink-0"
-                          />
-                          <div className="flex-1 min-w-0 flex flex-col gap-1">
-                            <NeonButton
-                              type="button"
-                              variant="secondary"
-                              size="xs"
-                              onClick={() => leftFileInputRef.current?.click()}
-                              className="text-[10px] h-6 py-0"
-                            >
-                              Ganti
-                            </NeonButton>
-                            <button
-                              type="button"
-                              onClick={() => setCustomLeftLogoUrl("")}
-                              className="text-[10px] text-rose-600 dark:text-rose-400 hover:underline text-left cursor-pointer"
-                            >
-                              Pakai Default
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                            Mode: <span className="font-semibold text-neutral-700 dark:text-neutral-300">Placeholder</span>
-                          </div>
-                          <NeonButton
-                            type="button"
-                            variant="secondary"
-                            size="xs"
-                            onClick={() => leftFileInputRef.current?.click()}
-                            className="w-full text-[10px] h-7 gap-1"
-                          >
-                            <Upload className="w-3 h-3" />
-                            <span>Unggah Logo</span>
-                          </NeonButton>
-                        </div>
-                      )}
-                      <input
-                        type="file"
-                        ref={leftFileInputRef}
-                        accept="image/*"
-                        onChange={handleLeftLogoUpload}
-                        className="hidden"
-                      />
+                <div className="border-t border-neutral-100 dark:border-neutral-800 my-3" />
+
+                {/* Baris Logo Kanan */}
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                    {rightLogoType === "school" && resolvedSchoolLogoUrl ? (
+                      <img src={resolvedSchoolLogoUrl} alt="Logo Kanan" className="w-full h-full object-contain" />
+                    ) : rightLogoType === "custom" && customRightLogoUrl ? (
+                      <img src={customRightLogoUrl} alt="Logo Kanan" className="w-full h-full object-contain" />
+                    ) : (
+                      <span className="text-[8px] font-bold text-neutral-400 uppercase tracking-wide text-center leading-tight">
+                        Logo<br />Kanan
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">Logo Kanan</div>
+                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                      {rightLogoType === "none"
+                        ? "Tidak ditampilkan"
+                        : rightLogoType === "custom"
+                          ? "Logo unggahan"
+                          : resolvedSchoolLogoUrl
+                            ? "Logo sekolah dari Pengaturan"
+                            : "Logo sekolah belum diatur"}
                     </div>
-                  )}
+                  </div>
+                  <Select
+                    value={rightLogoType}
+                    onChange={(e) => setRightLogoType(e.target.value as any)}
+                    className="h-7 w-[92px] shrink-0 text-[11px] bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 rounded-md font-semibold cursor-pointer"
+                  >
+                    <option value="school">Sekolah</option>
+                    <option value="custom">Upload</option>
+                    <option value="none">Nonaktif</option>
+                  </Select>
                 </div>
-
-                {/* 2. Pengaturan Logo Kanan */}
-                <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 space-y-2 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
-                      Logo Kanan
-                    </label>
-                    <Select
-                      value={rightLogoType}
-                      onChange={(e) => setRightLogoType(e.target.value as any)}
-                      className="h-5 text-[10px] bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 text-neutral-900 dark:text-neutral-100 rounded-md py-0 px-1 font-semibold"
+                {rightLogoType === "custom" && (
+                  <div className="mt-2">
+                    <NeonButton
+                      type="button"
+                      variant="secondary"
+                      size="xs"
+                      onClick={() => rightFileInputRef.current?.click()}
+                      className="w-full text-[10px] h-7 gap-1"
                     >
-                      <option value="school">Sekolah</option>
-                      <option value="custom">Upload</option>
-                      <option value="none">Nonaktif</option>
-                    </Select>
+                      <Upload className="w-3 h-3" />
+                      <span>{customRightLogoUrl ? "Ganti Logo" : "Unggah Logo"}</span>
+                    </NeonButton>
                   </div>
-
-                  {rightLogoType === "custom" && (
-                    <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
-                      {customRightLogoUrl ? (
-                        <div className="flex items-center gap-2">
-                          <img
-                            src={customRightLogoUrl}
-                            alt="Logo Kanan"
-                            className="w-8 h-8 object-contain rounded border border-neutral-200 dark:border-neutral-700 bg-white shrink-0"
-                          />
-                          <NeonButton
-                            type="button"
-                            variant="secondary"
-                            size="xs"
-                            onClick={() => rightFileInputRef.current?.click()}
-                            className="text-[10px] h-6 py-0 flex-1"
-                          >
-                            Ganti
-                          </NeonButton>
-                        </div>
-                      ) : (
-                        <NeonButton
-                          type="button"
-                          variant="secondary"
-                          size="xs"
-                          onClick={() => rightFileInputRef.current?.click()}
-                          className="w-full text-[10px] h-7 gap-1"
-                        >
-                          <Upload className="w-3 h-3" />
-                          <span>Unggah Gambar</span>
-                        </NeonButton>
-                      )}
-                    </div>
-                  )}
-
-                  <input
-                    type="file"
-                    ref={rightFileInputRef}
-                    accept="image/*"
-                    onChange={handleRightLogoUpload}
-                    className="hidden"
-                  />
-                </div>
+                )}
+                <input
+                  type="file"
+                  ref={rightFileInputRef}
+                  accept="image/*"
+                  onChange={handleRightLogoUpload}
+                  className="hidden"
+                />
               </div>
 
               {/* Kolom Tambahan Biodata */}
