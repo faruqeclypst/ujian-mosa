@@ -718,7 +718,7 @@ const CBTPage = () => {
 
       // 2. BACKUP KE SERVER - dynamic berdasarkan ukuran room
       if (isLargeRoom) {
-        // LARGE ROOM (>500 siswa): batch setiap 10 jawaban untuk full answers
+        // LARGE ROOM (>1000 siswa): batch setiap 10 jawaban untuk full answers
         answerCountRef.current += 1;
         pendingAnswersRef.current[questionId] = value;
         // Simpan juga meta terbaru
@@ -765,7 +765,7 @@ const CBTPage = () => {
           }).catch(() => { /* progress sync gagal: diabaikan, batch answers tetap jalan */ });
         }, syncJitter(4000, 5000)); // Debounce 4 detik + jitter 0-1 detik untuk progress ringan (sebar beban)
       } else {
-        // SMALL ROOM (≤500 siswa): debounce 4 detik + jitter 0-1 detik (sebar beban).
+        // SMALL ROOM (≤1000 siswa): debounce 4 detik + jitter 0-1 detik (sebar beban).
         // Perubahan diakumulasi dulu: hanya kirim delta jawaban yang berubah sejak
         // sync terakhir (bukan full answers), agar jawaban cepat beruntun tidak hilang
         // saat timer debounce di-reset.
@@ -893,14 +893,17 @@ const CBTPage = () => {
       const ex = rData.expand?.examId;
       setRoomData({ ...rData, examTitle: rData.room_name || ex?.title || "CBT", subject: ex?.expand?.subjectId?.name || "Ujian", teacherName: ex?.expand?.teacherId?.name || "-" });
 
-      // Hitung total siswa aktif di SELURUH tenant untuk dynamic autosave: >500 = batch mode.
+      // Hitung total siswa aktif di SELURUH tenant untuk dynamic autosave: >1000 = batch mode.
+      // Ambang 1000 dipilih cari aman (keputusan pemilik 2026-11-21): load test 2C/2GB
+      // membuktikan mode per-jawaban nyaman sampai 1000 siswa bahkan pada pace ekstrem
+      // 10 menit; durasi ujian nyata >= 40 menit lajunya jauh lebih rendah.
       // Sengaja per-tenant (bukan per-room): 8 room x 500 siswa tetap 4000 write konkuren ke 1 DB SQLite.
       try {
         const activeAttempts = await pb.collection("attempts").getFullList({
           filter: 'status="ongoing"',
           fields: "id"
         });
-        setIsLargeRoom(activeAttempts.length > 500);
+        setIsLargeRoom(activeAttempts.length > 1000);
       } catch (e) {
         setIsLargeRoom(false);
       }
