@@ -96,6 +96,25 @@ export default function DashboardPage() {
   const { addToast } = useToast();
   const pb = tenantPb!;
 
+  // Agregasi hitungan dari backend (/api/dashboard-stats): COUNT(*) di SQL
+  // dalam satu request. Angka kartu dashboard tidak lagi dihitung dari
+  // getFullList ribuan record di frontend; fallback ke hitungan lokal hanya
+  // bila endpoint belum tersedia (tenant lama).
+  const [dashStats, setDashStats] = useState<{ students: number; teachers: number; classes: number; subjects: number; exams: number; questions: number; rooms: number; roomsActive: number; ongoingStudents: number } | null>(null);
+  useEffect(() => {
+    if (!pb) return;
+    let cancelled = false;
+    const loadDashStats = async () => {
+      try {
+        const st: any = await pb.send("/api/dashboard-stats", { method: "GET" });
+        if (!cancelled && st && typeof st.students === "number") setDashStats(st);
+      } catch (e) { /* endpoint belum tersedia: fallback hitungan lokal */ }
+    };
+    loadDashStats();
+    const timer = setInterval(loadDashStats, 30000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [pb]);
+
   // ── States ──
   const [exams, setExams] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
@@ -228,17 +247,18 @@ export default function DashboardPage() {
 
   // ── Derived Stats & Real CBT Tenant Metrics ──
   const activeRoomsList = useMemo(() => rooms.filter((r) => r.status !== "archive"), [rooms]);
-  const activeRooms = activeRoomsList.length;
-  const totalExams = exams.length;
-  const totalStudents = students.length;
+  const activeRooms = dashStats ? dashStats.roomsActive : activeRoomsList.length;
+  const totalExams = dashStats ? dashStats.exams : exams.length;
+  const totalStudents = dashStats ? dashStats.students : students.length;
 
-  const ongoingStudents = useMemo(() => {
+  const ongoingStudentsLocal = useMemo(() => {
     const set = new Set();
     attempts.forEach((a) => {
       if (a.status === "ongoing") set.add(a.studentId || a.student_id);
     });
     return set.size;
   }, [attempts]);
+  const ongoingStudents = dashStats ? dashStats.ongoingStudents : ongoingStudentsLocal;
 
   const finishedStudents = useMemo(() => {
     const set = new Set();
@@ -894,7 +914,7 @@ export default function DashboardPage() {
                   />
                   <InspectorField
                     label={`${terminology.teacher} & ${terminology.class}`}
-                    value={`${teachers.length} ${terminology.teacher.toLowerCase()} • ${classes.length} ${terminology.class.toLowerCase()}`}
+                    value={`${dashStats ? dashStats.teachers : teachers.length} ${terminology.teacher.toLowerCase()} • ${dashStats ? dashStats.classes : classes.length} ${terminology.class.toLowerCase()}`}
                   />
                   <InspectorField
                     label="Infrastruktur Node"

@@ -170,6 +170,12 @@ const MonitoringPage = () => {
   // Dipakai untuk kartu "Sedang Ujian"/"Selesai" tanpa menunggu fetch attempts.
   const [detailStats, setDetailStats] = useState<{ total: number; ongoing: number; finished: number } | null>(null);
 
+  // Roster peserta ruang dari backend (/api/room-participants): nama siswa +
+  // nama kelas digabung di SQL dalam satu request. Panel tidak lagi menunggu
+  // getFullList students global (10rb record) yang lambat/gagal saat server
+  // sibuk — itulah penyebab nama siswa tampil sebagai ID mentah di tabel.
+  const [roomRoster, setRoomRoster] = useState<{ roomId: string; list: any[] } | null>(null);
+
   // 📝 Real-time Live Score Calculator (Weighted: objective + essay)
   const getLiveScore = (sisAnswers: Record<string, any>, attOverrides: Record<string, boolean> = {}) => {
     if (!sisAnswers || monitorQuestions.length === 0) return 0;
@@ -331,6 +337,24 @@ const MonitoringPage = () => {
           setDetailStats({ total: Number(st.total) || 0, ongoing: Number(st.ongoing) || 0, finished: Number(st.finished) || 0 });
         }
       } catch (e) { /* endpoint belum tersedia: fallback ke hitungan lokal */ }
+      // 0b. Roster peserta ruang dari backend (nama + kelas hasil JOIN SQL) —
+      // sumber nama siswa untuk tabel monitoring, bukan daftar global.
+      try {
+        const rp: any = await pb.send(`/api/room-participants?roomId=${id}`, { method: "GET" });
+        if (rp && Array.isArray(rp.participants)) {
+          setRoomRoster({
+            roomId: id,
+            list: rp.participants.map((p: any) => ({
+              id: p.id,
+              name: p.name || p.username || p.id,
+              nisn: p.username || "",
+              username: p.username || "",
+              classId: p.classId || "",
+              className: p.className || "",
+            })),
+          });
+        }
+      } catch (e) { /* endpoint belum tersedia: fallback ke daftar students global */ }
       // 1. Ambil Data Ruangan jika belum ada
       let currentRoom = monitorRoom;
       if (!currentRoom) {
@@ -1239,10 +1263,18 @@ const MonitoringPage = () => {
     return names.length > 0 ? names.join(", ") : (ids.length > 0 ? `ID: ${String(ids[0]).substring(0, 5)}...` : "N/A");
   })();
 
+  // Sumber siswa untuk ruang yang sedang dibuka: roster backend bila sudah
+  // tiba (terikat roomId agar roster ruang lain tidak bocor), selain itu
+  // daftar global dari context sebagai fallback.
+  const effectiveStudents = useMemo(() => {
+    if (roomRoster && roomId && roomRoster.roomId === roomId && roomRoster.list.length > 0) return roomRoster.list;
+    return students;
+  }, [roomRoster, roomId, students]);
+
   // Filter and compute statistics
   const eligibleStudents = useMemo(() => {
-    if (!monitorRoom) return students;
-    return students.filter((s: any) => {
+    if (!monitorRoom) return effectiveStudents;
+    return effectiveStudents.filter((s: any) => {
       if (monitorRoom?.allClasses) {
         if (monitorClassFilter !== "all" && examClasses.find((c: any) => c.id === s.classId)?.name !== monitorClassFilter) return false;
         return true;
@@ -1252,7 +1284,7 @@ const MonitoringPage = () => {
       if (monitorClassFilter !== "all" && examClasses.find((c: any) => c.id === s.classId)?.name !== monitorClassFilter) return false;
       return true;
     });
-  }, [students, monitorRoom, monitorClassFilter, examClasses]);
+  }, [effectiveStudents, monitorRoom, monitorClassFilter, examClasses]);
 
   const eligibleIds = useMemo(() => new Set(eligibleStudents.map((s: any) => s.id)), [eligibleStudents]);
 
@@ -1276,7 +1308,7 @@ const MonitoringPage = () => {
 
   const inspectedStudent = useMemo(() => {
     if (inspectedStudentId) {
-      const found = students.find(s => s.id === inspectedStudentId);
+      const found = effectiveStudents.find(s => s.id === inspectedStudentId);
       if (found) {
         return {
           ...found,
@@ -1292,7 +1324,7 @@ const MonitoringPage = () => {
       };
     }
     return null;
-  }, [inspectedStudentId, students, eligibleStudents, examClasses]);
+  }, [inspectedStudentId, effectiveStudents, eligibleStudents, examClasses]);
 
   const inspectedAttempt = useMemo(() => {
     if (!inspectedStudent) return null;
@@ -1633,7 +1665,7 @@ const MonitoringPage = () => {
 
             {/* 5. Main Neon Table Section */}
             <StudentTable
-              students={students}
+              students={effectiveStudents}
               attempts={attempts}
               monitorQuestions={monitorQuestions}
               monitorRoom={monitorRoom}
@@ -1915,7 +1947,7 @@ const MonitoringPage = () => {
         open={quickGradeOpen}
         onOpenChange={setQuickGradeOpen}
         pb={pb}
-        students={students}
+        students={effectiveStudents}
         attempts={attempts}
         monitorQuestions={monitorQuestions}
         monitorRoom={monitorRoom}
