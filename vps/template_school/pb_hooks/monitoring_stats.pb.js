@@ -9,41 +9,31 @@
 // Auth: hanya admin (users dengan role admin / _superusers).
 console.log("[MONITOR] monitoring_stats hook loaded: /api/room-stats, /api/room-detail-stats");
 
-function msGetAuth(info) {
-    try {
-        if (info && info.auth) return info.auth;
-        const headers = info ? (info.headers || {}) : {};
-        let token = headers["authorization"] || headers["Authorization"] || headers["x-token"] || headers["X-Token"] || "";
-        if (typeof token === "string" && token.indexOf("Bearer ") === 0) {
-            token = token.substring(7);
-        }
-        if (token) {
-            return $app.findAuthRecordByToken(token);
-        }
-    } catch (e) {}
-    return null;
-}
-
-function msRequireAdminOrTeacher(e) {
-    const info = e.requestInfo();
-    const auth = (typeof msGetAuth === "function" ? msGetAuth : (globalThis.msGetAuth || msGetAuth))(info);
-    if (!auth) return null;
-    let col = "";
-    try { if (auth.collection) col = auth.collection().name; } catch (err) {}
-    if (col !== "_superusers" && col !== "users") return null;
-    return auth;
-}
-
-try {
-    globalThis.msGetAuth = msGetAuth;
-    globalThis.msRequireAdminOrTeacher = msRequireAdminOrTeacher;
-} catch (_) {}
+// CATATAN: helper auth TIDAK boleh didefinisikan di top-level file ini.
+// VM handler PocketBase tidak mewarisi function top-level, sehingga handler
+// yang memanggil helper top-level selalu melempar ReferenceError dan dibalas
+// 400 generik. Semua helper endpoint ini ditulis di dalam handler masing-masing.
 
 // ---------------------------------------------------------------------------
 // 1. GET /api/room-stats
 // ---------------------------------------------------------------------------
 routerAdd("GET", "/api/room-stats", (e) => {
-    const auth = msRequireAdminOrTeacher(e);
+    const auth = (() => {
+        try {
+            const info = e.requestInfo();
+            let rec = info ? info.auth : null;
+            if (!rec) {
+                const headers = (info && info.headers) || {};
+                let token = headers["authorization"] || headers["Authorization"] || headers["x-token"] || headers["X-Token"] || "";
+                if (typeof token === "string" && token.indexOf("Bearer ") === 0) token = token.substring(7);
+                if (token) rec = $app.findAuthRecordByToken(token);
+            }
+            if (!rec) return null;
+            let col = "";
+            try { if (rec.collection) col = rec.collection().name; } catch (err) {}
+            return (col === "_superusers" || col === "users") ? rec : null;
+        } catch (err) { return null; }
+    })();
     if (!auth) return e.json(401, { error: "Autentikasi diperlukan." });
     try {
         const tpl = new DynamicModel({ rid: "", st: "", c: 0 });
@@ -73,10 +63,27 @@ routerAdd("GET", "/api/room-stats", (e) => {
 // 2. GET /api/room-detail-stats?roomId=xxx
 // ---------------------------------------------------------------------------
 routerAdd("GET", "/api/room-detail-stats", (e) => {
-    const auth = msRequireAdminOrTeacher(e);
+    const auth = (() => {
+        try {
+            const info = e.requestInfo();
+            let rec = info ? info.auth : null;
+            if (!rec) {
+                const headers = (info && info.headers) || {};
+                let token = headers["authorization"] || headers["Authorization"] || headers["x-token"] || headers["X-Token"] || "";
+                if (typeof token === "string" && token.indexOf("Bearer ") === 0) token = token.substring(7);
+                if (token) rec = $app.findAuthRecordByToken(token);
+            }
+            if (!rec) return null;
+            let col = "";
+            try { if (rec.collection) col = rec.collection().name; } catch (err) {}
+            return (col === "_superusers" || col === "users") ? rec : null;
+        } catch (err) { return null; }
+    })();
     if (!auth) return e.json(401, { error: "Autentikasi diperlukan." });
     try {
-        const roomId = String(e.queryParam("roomId") || e.queryParam("roomid") || "");
+        const reqInfo = e.requestInfo();
+        const query = (reqInfo && reqInfo.query) || {};
+        const roomId = String(query["roomId"] || query["roomid"] || "");
         if (!roomId) return e.json(400, { error: "roomId wajib diisi" });
 
         // Ambil classIds room untuk eligibility (SQL langsung, bukan findRecordById)
