@@ -18,7 +18,9 @@ import {
   Info,
   Mail,
   Phone,
-  GraduationCap
+  GraduationCap,
+  AlertTriangle,
+  ArrowRight
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import {
@@ -39,7 +41,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel
 } from "../components/ui/dropdown-menu";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useExamData } from "../context/ExamDataContext";
 import { useTenant } from "../context/TenantContext";
 import { Button } from "../components/ui/button";
@@ -56,6 +58,7 @@ import type { Teacher } from "../types/exam";
 import { NeonStatGrid, NeonStatCard } from "../components/ui/NeonStats";
 
 const TeachersPage = () => {
+  const navigate = useNavigate();
   const { teachers, subjects, loading, createTeacher, updateTeacher, deleteTeacher, resetUserPassword } = useExamData();
   const { pb, terminology, school } = useTenant();
 
@@ -106,12 +109,6 @@ const TeachersPage = () => {
     setAlertDialog({ isOpen: true, title, description, type, onConfirm, showCancel, confirmLabel });
   };
 
-  const handleCreateClick = () => {
-    setDialogMode("create");
-    setSelectedTeacher(null);
-    setIsDialogOpen(true);
-  };
-
   const handleEditClick = (teacher: Teacher) => {
     setDialogMode("edit");
     setSelectedTeacher(teacher);
@@ -121,6 +118,23 @@ const TeachersPage = () => {
   const handleDeleteClick = (teacher: Teacher) => {
     setTeacherToDelete(teacher);
     setDeleteDialogOpen(true);
+  };
+
+  const handleCreateClick = () => {
+    if (subjects.length === 0) {
+      showAlert(
+        `Belum Ada Data ${terminology.subject}`,
+        `Anda belum memiliki data ${terminology.subject.toLowerCase()}. Data ${terminology.teacher.toLowerCase()} tidak dapat ditambahkan tanpa mata pelajaran. Silakan buat data ${terminology.subject.toLowerCase()} terlebih dahulu.`,
+        "warning",
+        () => navigate("/admin/subjects"),
+        true,
+        `Buat ${terminology.subject} Baru`
+      );
+      return;
+    }
+    setDialogMode("create");
+    setSelectedTeacher(null);
+    setIsDialogOpen(true);
   };
 
   const closeDialog = () => {
@@ -285,6 +299,17 @@ const TeachersPage = () => {
   };
 
   const handleImportTeachers = async (file: File) => {
+    if (subjects.length === 0) {
+      showAlert(
+        `Belum Ada Data ${terminology.subject}`,
+        `Tidak dapat mengimport data ${terminology.teacher.toLowerCase()} karena belum ada data ${terminology.subject.toLowerCase()}. Silakan buat data ${terminology.subject.toLowerCase()} terlebih dahulu.`,
+        "danger",
+        () => navigate("/admin/subjects"),
+        true,
+        `Buat ${terminology.subject} Baru`
+      );
+      return;
+    }
     setIsImporting(true);
     try {
       const parsed = await parseTeacherImportExcel(file);
@@ -620,6 +645,17 @@ const TeachersPage = () => {
                     <DropdownMenuItem
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                       onClick={() => {
+                        if (subjects.length === 0) {
+                          showAlert(
+                            `Belum Ada Data ${terminology.subject}`,
+                            `Tidak dapat mengimport data ${terminology.teacher.toLowerCase()} karena belum ada data ${terminology.subject.toLowerCase()}. Silakan buat data ${terminology.subject.toLowerCase()} terlebih dahulu di menu Data Master > ${terminology.subject}.`,
+                            "warning",
+                            () => navigate("/admin/subjects"),
+                            true,
+                            `Buat ${terminology.subject} Baru`
+                          );
+                          return;
+                        }
                         const input = document.getElementById("teacher-import-input") as HTMLInputElement;
                         if (input) input.click();
                       }}
@@ -667,10 +703,19 @@ const TeachersPage = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <Dialog 
+                  open={isDialogOpen} 
+                  onOpenChange={(open) => {
+                    if (open && !selectedTeacher && subjects.length === 0) {
+                      handleCreateClick();
+                      return;
+                    }
+                    setIsDialogOpen(open);
+                  }}
+                >
                   <DialogTrigger asChild>
                     <Button
-                      onClick={() => { setSelectedTeacher(null); setIsDialogOpen(true); }}
+                      onClick={handleCreateClick}
                       size="sm"
                       className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                     >
@@ -723,6 +768,32 @@ const TeachersPage = () => {
           />
         </NeonStatGrid>
 
+        {/* ── Banner Peringatan jika belum ada Mata Pelajaran ── */}
+        {subjects.length === 0 && !loading && (
+          <div className="p-4 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/90 dark:bg-amber-950/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-amber-900 dark:text-amber-100">
+                  Data {terminology.subject} Belum Tersedia
+                </p>
+                <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">
+                  Data {terminology.teacher.toLowerCase()} tidak dapat ditambahkan atau diimport sebelum minimal 1 {terminology.subject.toLowerCase()} dibuat.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/admin/subjects"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white shadow-xs transition-colors self-start sm:self-auto inline-flex items-center gap-1.5"
+            >
+              <span>Kelola {terminology.subject}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        )}
+
         {/* ── Main Content Grid: Table + Right Inspector ── */}
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-6 items-start">
           <div className="min-w-0 space-y-6">
@@ -736,6 +807,7 @@ const TeachersPage = () => {
               isLoading={loading}
               activeKey={inspectedTeacher?.id}
               onRowClick={(t) => setInspectedTeacherId(t.id)}
+              subjectsCount={subjects.length}
             />
           </div>
 

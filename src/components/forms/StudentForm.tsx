@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Camera, Trash2, Upload, Loader2, User } from "lucide-react";
+import { Camera, Trash2, Upload, Loader2, User, AlertTriangle } from "lucide-react";
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -200,6 +200,15 @@ export const StudentForm = ({
 
   return (
     <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
+      {sortedClasses.length === 0 && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-900 dark:text-amber-200 text-xs flex items-center gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>
+            Data {terminology.class.toLowerCase()} belum ada. Data {terminology.student.toLowerCase()} tidak dapat disimpan tanpa kelas.
+          </span>
+        </div>
+      )}
+
       {/* Bagian Foto Profil Siswa (Pas Foto 3x4 untuk Kartu Ujian) */}
       <div className="flex flex-col sm:flex-row items-center gap-4 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800">
         <div className="relative w-24 h-32 flex-shrink-0 rounded-lg overflow-hidden border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center shadow-inner">
@@ -359,8 +368,8 @@ export const StudentForm = ({
         )}
         <Button
           type="submit"
-          disabled={isSubmitting || isUploadingPhoto}
-          className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition-colors cursor-pointer px-5"
+          disabled={isSubmitting || isUploadingPhoto || sortedClasses.length === 0}
+          className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition-colors cursor-pointer px-5 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? "Menyimpan..." : submitLabel}
         </Button>

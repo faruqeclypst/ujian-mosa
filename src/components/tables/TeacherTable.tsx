@@ -22,6 +22,7 @@ interface TeacherTableProps {
   isLoading?: boolean;
   activeKey?: string;
   onRowClick?: (teacher: Teacher) => void;
+  subjectsCount?: number;
 }
 
 export const TeacherTable = ({ 
@@ -33,7 +34,8 @@ export const TeacherTable = ({
   onResetPassword,
   isLoading,
   activeKey,
-  onRowClick
+  onRowClick,
+  subjectsCount
 }: TeacherTableProps) => {
   const { terminology } = useTenant();
   const [search, setSearch] = useState("");
@@ -225,7 +227,10 @@ export const TeacherTable = ({
       pageSize={25}
       pageSizeOptions={[10, 25, 50, 100]}
       emptyTitle={`Belum ada data ${terminology.teacher.toLowerCase()}`}
-      emptySubtitle={`Tambahkan ${terminology.teacher.toLowerCase()} baru dengan klik tombol Tambah ${terminology.teacher} di atas.`}
+      emptySubtitle={subjectsCount === 0
+        ? `Buat data ${terminology.subject.toLowerCase()} terlebih dahulu di menu Data Master > ${terminology.subject} sebelum menambahkan data ${terminology.teacher.toLowerCase()}.`
+        : `Tambahkan ${terminology.teacher.toLowerCase()} baru dengan klik tombol Tambah ${terminology.teacher} di atas.`
+      }
       isLoading={isLoading}
     />
   );

@@ -8,6 +8,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import FormField from "./FormField";
 import { useTenant } from "../../context/TenantContext";
+import { AlertTriangle } from "lucide-react";
 
 export interface TeacherSubmitPayload {
   name: string;
@@ -95,6 +96,15 @@ export const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
 
   return (
     <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
+      {subjects.length === 0 && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-900 dark:text-amber-200 text-xs flex items-center gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>
+            Data {terminology.subject.toLowerCase()} belum ada. Data {terminology.teacher.toLowerCase()} tidak dapat disimpan tanpa mata pelajaran.
+          </span>
+        </div>
+      )}
+
       <FormField id="name" label={`Nama ${terminology.teacher}`} error={errors.name}>
         <Input id="name" placeholder={`Masukkan nama ${terminology.teacher.toLowerCase()}`} {...register("name")} />
       </FormField>
@@ -179,7 +189,7 @@ export const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
         <Button
           type="submit"
           disabled={isSubmitting || subjects.length === 0}
-          className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+          className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition-colors cursor-pointer px-5 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? "Menyimpan..." : submitLabel}
         </Button>

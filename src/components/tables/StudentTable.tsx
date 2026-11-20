@@ -303,7 +303,10 @@ export const StudentTable = ({
       onPageChange={serverSide ? onServerPageChange : undefined}
       onPageSizeChange={serverSide ? onServerPageSizeChange : undefined}
       emptyTitle={`Belum ada data ${terminology.student.toLowerCase()}`}
-      emptySubtitle={`Tambahkan data ${terminology.student.toLowerCase()} baru atau import dari file Excel.`}
+      emptySubtitle={classes.length === 0 
+        ? `Buat data ${terminology.class.toLowerCase()} terlebih dahulu di menu Data Master > ${terminology.class} sebelum menambahkan data ${terminology.student.toLowerCase()}.` 
+        : `Tambahkan data ${terminology.student.toLowerCase()} baru atau import dari file Excel.`
+      }
     />
   );
 };

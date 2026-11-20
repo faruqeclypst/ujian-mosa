@@ -28,7 +28,9 @@ import {
   Edit,
   Trash,
   Info,
-  ClipboardList
+  ClipboardList,
+  AlertTriangle,
+  ArrowRight
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import {
@@ -338,6 +340,17 @@ const StudentsPage = () => {
   }, [filterClassId, tableSearch, classes]);
 
   const handleCreateClick = () => {
+    if (classes.length === 0) {
+      showAlert(
+        `Belum Ada Data ${terminology.class}`,
+        `Anda belum memiliki data ${terminology.class.toLowerCase()}. Data ${terminology.student.toLowerCase()} tidak dapat ditambahkan tanpa kelas. Silakan buat data ${terminology.class.toLowerCase()} terlebih dahulu.`,
+        "warning",
+        () => navigate("/admin/classes"),
+        true,
+        `Buat ${terminology.class} Baru`
+      );
+      return;
+    }
     setDialogMode("create");
     setSelectedStudent(null);
     setIsDialogOpen(true);
@@ -683,6 +696,17 @@ const StudentsPage = () => {
   });
 
   const handleImportStudents = async (file: File) => {
+    if (classes.length === 0) {
+      showAlert(
+        `Belum Ada Data ${terminology.class}`,
+        `Tidak dapat mengimport data ${terminology.student.toLowerCase()} karena belum ada data ${terminology.class.toLowerCase()}. Silakan buat data ${terminology.class.toLowerCase()} terlebih dahulu.`,
+        "danger",
+        () => navigate("/admin/classes"),
+        true,
+        `Buat ${terminology.class} Baru`
+      );
+      return;
+    }
     setIsImporting(true);
     try {
       const { results, skipped } = await parseStudentImportExcel(file, classes);
@@ -1191,6 +1215,17 @@ const StudentsPage = () => {
                       <DropdownMenuItem
                         className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                         onClick={() => {
+                          if (classes.length === 0) {
+                            showAlert(
+                              `Belum Ada Data ${terminology.class}`,
+                              `Tidak dapat mengimport data ${terminology.student.toLowerCase()} karena belum ada data ${terminology.class.toLowerCase()}. Silakan buat data ${terminology.class.toLowerCase()} terlebih dahulu.`,
+                              "warning",
+                              () => navigate("/admin/classes"),
+                              true,
+                              `Buat ${terminology.class} Baru`
+                            );
+                            return;
+                          }
                           const input = document.getElementById("student-import-input") as HTMLInputElement;
                           if (input) input.click();
                         }}
@@ -1307,7 +1342,16 @@ const StudentsPage = () => {
                 )}
 
                 {role === "admin" && (
-                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <Dialog 
+                    open={isDialogOpen} 
+                    onOpenChange={(open) => {
+                      if (open && dialogMode === "create" && classes.length === 0) {
+                        handleCreateClick();
+                        return;
+                      }
+                      setIsDialogOpen(open);
+                    }}
+                  >
                     <DialogTrigger asChild>
                       <Button
                         onClick={handleCreateClick}
@@ -1407,6 +1451,17 @@ const StudentsPage = () => {
                       <DropdownMenuItem
                         className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                         onClick={() => {
+                          if (classes.length === 0) {
+                            showAlert(
+                              `Belum Ada Data ${terminology.class}`,
+                              `Tidak dapat mengimport data ${terminology.student.toLowerCase()} karena belum ada data ${terminology.class.toLowerCase()}. Silakan buat data ${terminology.class.toLowerCase()} terlebih dahulu.`,
+                              "warning",
+                              () => navigate("/admin/classes"),
+                              true,
+                              `Buat ${terminology.class} Baru`
+                            );
+                            return;
+                          }
                           const input = document.getElementById("student-import-input") as HTMLInputElement;
                           if (input) input.click();
                         }}
@@ -1496,6 +1551,32 @@ const StudentsPage = () => {
             </>
           )}
         </div>
+
+      {/* ── Banner Peringatan jika belum ada Kelas ── */}
+      {classes.length === 0 && !loading && (
+        <div className="p-4 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/90 dark:bg-amber-950/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-amber-900 dark:text-amber-100">
+                Data {terminology.class} Belum Tersedia
+              </p>
+              <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">
+                Data {terminology.student.toLowerCase()} tidak dapat ditambahkan atau diimport sebelum minimal 1 {terminology.class.toLowerCase()} dibuat.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/admin/classes"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white shadow-xs transition-colors self-start sm:self-auto inline-flex items-center gap-1.5"
+          >
+            <span>Kelola {terminology.class}</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
 
       {/* ── Indikator Kuota Siswa (Tema Neon) ── */}
       {isOffline ? (
