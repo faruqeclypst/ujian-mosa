@@ -540,11 +540,13 @@ func startAttemptHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 
 var bulkCreateWhitelist = map[string]bool{
 	"questions": true, "students": true, "classes": true, "subjects": true,
+	"teachers": true, "users": true,
 }
 
 var bulkDeleteWhitelist = map[string]bool{
 	"questions": true, "attempts": true, "exams": true, "exam_rooms": true,
 	"students": true, "classes": true, "subjects": true,
+	"teachers": true, "users": true,
 }
 
 // POST /api/bulk/create { collection, records: [...] } — khusus staf.
@@ -591,14 +593,15 @@ func bulkCreateHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 			}
 			for i, m := range body.Records {
 				rec := core.NewRecord(coll)
-				if body.Collection == "students" {
-					// Samakan perilaku jalur request: lengkapi passwordConfirm
-					// dan precompute fastHash agar login pertama langsung cepat.
+				if body.Collection == "students" || body.Collection == "users" {
+					// Samakan perilaku jalur request untuk collection auth:
+					// lengkapi passwordConfirm. fastHash hanya untuk students
+					// (fast-login memang hanya mencari di students).
 					if pw, ok := m["password"].(string); ok && pw != "" {
 						if _, has := m["passwordConfirm"]; !has {
 							m["passwordConfirm"] = pw
 						}
-						if pepper != "" {
+						if body.Collection == "students" && pepper != "" {
 							if un, ok := m["username"].(string); ok && strings.TrimSpace(un) != "" {
 								if _, has := m["fastHash"]; !has {
 									m["fastHash"] = sha256Hex(pepper + strings.TrimSpace(un) + pw)

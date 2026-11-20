@@ -54,6 +54,7 @@ import { ExportButton } from "../components/ui/export-button";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
 import { downloadTeacherImportTemplate, exportTeacherToExcel, parseTeacherImportExcel } from "../lib/teacherExcel";
+import { bulkCreateOrFallback, bulkDeleteOrFallback } from "../lib/bulkApi";
 import type { Teacher } from "../types/exam";
 import { NeonStatGrid, NeonStatCard } from "../components/ui/NeonStats";
 
@@ -324,49 +325,85 @@ const TeachersPage = () => {
       });
 
       const failures: string[] = [];
-      for (let i = 0; i < parsed.length; i++) {
-        const row = parsed[i];
-        try {
-          // Logika Generate: Hapus gelar (setelah koma)
-          const namePart = row.name.split(',')[0].trim();
 
-          // 1. Generate Username: kecilkan, ganti spasi jadi _
-          const generatedUsername = namePart.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      // Siapkan payload guru: generate username/kode adalah hitungan lokal
+      // (cepat), penyimpanan ke server dilakukan sekaligus di bawah.
+      const teacherPayloads = parsed.map((row) => {
+        // Logika Generate: Hapus gelar (setelah koma)
+        const namePart = row.name.split(',')[0].trim();
 
-          // 2. Generate Kode: Ambil inisial (Alfaruq Asri -> AA)
-          const generatedCode = namePart
-            .split(/\s+/)
-            .map(word => word[0])
-            .join('')
-            .toUpperCase()
-            .replace(/[^A-Z]/g, '');
+        // 1. Generate Username: kecilkan, ganti spasi jadi _
+        const generatedUsername = namePart.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 
-          let finalUsername = row.username ? row.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') : '';
-          if (!finalUsername || finalUsername.length < 3) {
-            finalUsername = generatedUsername;
-          }
-          if (!finalUsername || finalUsername.length < 3) {
-            const safeCode = (row.code || generatedCode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            finalUsername = safeCode ? `guru_${safeCode}` : `guru_${Math.floor(100 + Math.random() * 900)}`;
-          }
+        // 2. Generate Kode: Ambil inisial (Alfaruq Asri -> AA)
+        const generatedCode = namePart
+          .split(/\s+/)
+          .map(word => word[0])
+          .join('')
+          .toUpperCase()
+          .replace(/[^A-Z]/g, '');
 
-          await createTeacher({
-            name: row.name,
-            code: row.code || generatedCode,
-            username: finalUsername,
-            subjects: row.subjects,
-          });
+        let finalUsername = row.username ? row.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') : '';
+        if (!finalUsername || finalUsername.length < 3) {
+          finalUsername = generatedUsername;
+        }
+        if (!finalUsername || finalUsername.length < 3) {
+          const safeCode = (row.code || generatedCode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          finalUsername = safeCode ? `guru_${safeCode}` : `guru_${Math.floor(100 + Math.random() * 900)}`;
+        }
 
-          setBatchProgress(prev => ({
-            ...prev,
-            current: i + 1,
-            message: `Mengimport ${terminology.teacher.toLowerCase()} (${i + 1}/${parsed.length})`
-          }));
-        } catch (err: any) {
-          console.error(`Gagal import ${row.name}:`, err);
-          failures.push(`${row.name} - ${err.message || "Error"}`);
+        return {
+          name: row.name,
+          code: row.code || generatedCode,
+          username: finalUsername,
+          subjects: row.subjects,
+        };
+      });
+
+      // 1. Buat semua record guru sekaligus lewat bulk native
+      // (1 request + 1 transaksi, menggantikan create satu per satu).
+      const teacherRes = await bulkCreateOrFallback(pb, "teachers", teacherPayloads);
+      teacherRes.errors.forEach((e) => {
+        const row = parsed[e.index];
+        if (row) failures.push(`${row.name} - ${e.message || "Error"}`);
+      });
+      setBatchProgress(prev => ({
+        ...prev,
+        current: teacherRes.created,
+        message: `Mengimport ${terminology.teacher.toLowerCase()} (${teacherRes.created}/${parsed.length})`
+      }));
+
+      // 2. Buat akun login (users) untuk guru yang berhasil dibuat, sekaligus.
+      // Sama seperti alur lama: kegagalan akun hanya peringatan —
+      // record guru tetap terhitung berhasil.
+      const errIdx = new Set(teacherRes.errors.map(e => e.index));
+      const userPayloads: any[] = [];
+      let k = 0;
+      teacherPayloads.forEach((p, idx) => {
+        if (errIdx.has(idx)) return;
+        const teacherId = teacherRes.ids[k++];
+        if (!teacherId) return;
+        userPayloads.push({
+          username: p.username,
+          password: "12345678",
+          passwordConfirm: "12345678",
+          name: p.name,
+          role: "teacher",
+          teacherId,
+          hasChangedPassword: false,
+        });
+      });
+      if (userPayloads.length > 0) {
+        const userRes = await bulkCreateOrFallback(pb, "users", userPayloads);
+        if (userRes.errors.length > 0) {
+          console.warn(`${userRes.errors.length} akun login guru gagal dibuat:`, userRes.errors);
         }
       }
+      setBatchProgress(prev => ({
+        ...prev,
+        current: parsed.length,
+        message: `Mengimport ${terminology.teacher.toLowerCase()} (${parsed.length}/${parsed.length})`
+      }));
 
       let message = `${parsed.length - failures.length} ${terminology.teacher} berhasil diimport.`;
       if (failures.length > 0) {
@@ -402,18 +439,25 @@ const TeachersPage = () => {
         });
 
         try {
-          const chunkSize = 10;
-          for (let i = 0; i < selectedIds.length; i += chunkSize) {
-            const chunk = selectedIds.slice(i, i + chunkSize);
-            await Promise.all(chunk.map(id => deleteTeacher(id)));
-
-            const currentProcessed = Math.min(i + chunkSize, selectedIds.length);
-            setBatchProgress(prev => ({
-              ...prev,
-              current: currentProcessed,
-              message: `Menghapus data ${terminology.teacher.toLowerCase()} (${currentProcessed}/${selectedIds.length})`
-            }));
+          // Cari akun login (users) milik guru terpilih dalam 1 query, lalu
+          // hapus akun + record guru sekaligus lewat bulk native.
+          let userIds: string[] = [];
+          try {
+            const filter = selectedIds.map(id => `teacherId = "${id}"`).join(" || ");
+            const userRecs = await pb!.collection("users").getFullList({ filter, fields: "id" });
+            userIds = userRecs.map((u: any) => u.id);
+          } catch (e) {
+            console.warn("Gagal memuat akun login guru:", e);
           }
+          if (userIds.length > 0) {
+            await bulkDeleteOrFallback(pb, "users", userIds);
+          }
+          await bulkDeleteOrFallback(pb, "teachers", selectedIds);
+          setBatchProgress(prev => ({
+            ...prev,
+            current: selectedIds.length,
+            message: `Menghapus data ${terminology.teacher.toLowerCase()} (${selectedIds.length}/${selectedIds.length})`
+          }));
           setSelectedIds([]);
         } catch (error) {
           console.error(`Gagal menghapus ${terminology.teacher.toLowerCase()} massal`, error);
