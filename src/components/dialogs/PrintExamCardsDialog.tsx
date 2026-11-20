@@ -12,11 +12,13 @@ import {
   SlidersHorizontal,
   X,
   LayoutGrid,
+  Layers,
   Users,
   CheckCircle2,
   Calendar,
   Building,
   KeyRound,
+  Check,
   Loader2,
   RefreshCw
 } from "lucide-react";
@@ -88,7 +90,7 @@ export const PrintExamCardsDialog = ({
   };
 
   // Pengaturan Cepat
-  const [layoutMode] = useState<"4" | "6">("6"); // Dikunci 6 kartu (2x3) — opsi 4 kartu dihapus atas permintaan pemilik
+  const [layoutMode, setLayoutMode] = useState<"6" | "8">("6"); // 6 kartu (2x3) atau 8 kartu (2x4) per lembar A4
   const [printScope, setPrintScope] = useState<"selected" | "class" | "all">(
     selectedStudentIds.length > 0 ? "selected" : (filterClassId !== "ALL" ? "class" : "all")
   );
@@ -246,8 +248,8 @@ export const PrintExamCardsDialog = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, credentialMode, studentsToPrint, examPrefix]);
 
-  const is4Cards = layoutMode === "4";
-  const cardsPerPage = is4Cards ? 4 : 6;
+  const is8Cards = layoutMode === "8";
+  const cardsPerPage = is8Cards ? 8 : 6;
   const totalPages = Math.ceil(studentsToPrint.length / cardsPerPage);
 
   // Jaga batasan halaman aktif
@@ -364,7 +366,7 @@ export const PrintExamCardsDialog = ({
         }}
       >
         <span style={{
-          fontSize: is4Cards ? "7px" : "6px",
+          fontSize: is8Cards ? "5.5px" : "6px",
           fontWeight: 800,
           letterSpacing: "0.5px",
           color: "#334155",
@@ -374,7 +376,7 @@ export const PrintExamCardsDialog = ({
           LOGO
         </span>
         <span style={{
-          fontSize: is4Cards ? "6px" : "5px",
+          fontSize: is8Cards ? "4.5px" : "5px",
           fontWeight: 700,
           color: "#64748b",
           textTransform: "uppercase",
@@ -544,7 +546,7 @@ export const PrintExamCardsDialog = ({
               max-height: 282mm;
               display: grid;
               grid-template-columns: 1fr 1fr;
-              grid-template-rows: ${is4Cards ? "1fr 1fr" : "1fr 1fr 1fr"};
+              grid-template-rows: ${is8Cards ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr"};
               gap: 4mm;
               page-break-after: always;
               break-after: page;
@@ -562,7 +564,7 @@ export const PrintExamCardsDialog = ({
             .card-item {
               border: 1.2px solid #000000;
               border-radius: 0px;
-              padding: ${is4Cards ? "10px 14px" : "8px 10px"};
+              padding: ${is8Cards ? "6px 8px" : "8px 10px"};
               display: flex;
               flex-direction: column;
               justify-content: space-between;
@@ -623,8 +625,8 @@ export const PrintExamCardsDialog = ({
     const sessionVal = student.session || defaultSession;
     const roomSessionDisplay = [roomVal, sessionVal].filter(Boolean).join(" / ");
 
-    const headerHeight = is4Cards ? 54 : 44;
-    const logoSlotWidth = is4Cards ? 56 : 46;
+    const headerHeight = is8Cards ? 36 : 44;
+    const logoSlotWidth = is8Cards ? 38 : 46;
     const leftLogoNode = renderLeftLogoNode(headerHeight);
     const rightLogoNode = renderLogoNode(rightLogoType, customRightLogoUrl, headerHeight);
     const hasLeft = showLeftLogo && Boolean(leftLogoNode);
@@ -642,9 +644,9 @@ export const PrintExamCardsDialog = ({
       if (len <= 36) return base - 2;
       return base - 3;
     };
-    const kopTitleFontSize = fitFontSize("KARTU TANDA PESERTA UJIAN", is4Cards ? 11.5 : 9.5);
-    const kopExamTitleFontSize = fitFontSize(examTitle || "", is4Cards ? 9.5 : 8);
-    const kopSchoolFontSize = fitFontSize(schoolNameText, is4Cards ? 11.5 : 9.5);
+    const kopTitleFontSize = fitFontSize("KARTU TANDA PESERTA UJIAN", is8Cards ? 8 : 9.5);
+    const kopExamTitleFontSize = fitFontSize(examTitle || "", is8Cards ? 6.5 : 8);
+    const kopSchoolFontSize = fitFontSize(schoolNameText, is8Cards ? 8 : 9.5);
 
     return (
       <div
@@ -657,7 +659,7 @@ export const PrintExamCardsDialog = ({
           fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif",
           border: "1.2px solid #000000",
           borderRadius: "0px",
-          padding: is4Cards ? "10px 14px" : "7px 10px",
+          padding: is8Cards ? "5px 8px" : "7px 10px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -667,13 +669,13 @@ export const PrintExamCardsDialog = ({
         }}
       >
         {/* 1. KOP KARTU RESMI KEDINASAN (TEKS TENGAH SELALU PERSIS DI TENGAH SECARA MATEMATIS) */}
-        <div style={{ marginBottom: is4Cards ? "8px" : "5px" }}>
+        <div style={{ marginBottom: is8Cards ? "4.5px" : "5px" }}>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: `${sideColWidth} 1fr ${sideColWidth}`,
               alignItems: "stretch",
-              gap: isAnyLogoVisible ? (is4Cards ? "8px" : "6px") : "0px",
+              gap: isAnyLogoVisible ? (is8Cards ? "5.5px" : "6px") : "0px",
               height: headerHeight + "px",
               minHeight: headerHeight + "px",
               width: "100%",
@@ -752,7 +754,7 @@ export const PrintExamCardsDialog = ({
                 {schoolNameText}
               </div>
               <div style={{
-                fontSize: is4Cards ? "8.5px" : "7px",
+                fontSize: is8Cards ? "6px" : "7px",
                 fontWeight: 600,
                 color: "#475569",
                 lineHeight: 1,
@@ -782,7 +784,7 @@ export const PrintExamCardsDialog = ({
           </div>
 
           {/* Garis Kop Ganda Kedinasan */}
-          <div style={{ marginTop: is4Cards ? "5px" : "4px" }}>
+          <div style={{ marginTop: is8Cards ? "3.5px" : "4px" }}>
             <div style={{ borderBottom: "1.8px solid #000000" }} />
             <div style={{ borderBottom: "0.5px solid #000000", marginTop: "1.5px" }} />
           </div>
@@ -793,15 +795,15 @@ export const PrintExamCardsDialog = ({
           style={{
             display: "flex",
             alignItems: "flex-start",
-            gap: is4Cards ? "12px" : "8px",
-            marginBottom: is4Cards ? "8px" : "5px"
+            gap: is8Cards ? "7px" : "8px",
+            marginBottom: is8Cards ? "4.5px" : "5px"
           }}
         >
           {/* Pasfoto 3x4 Formal */}
           <div
             style={{
-              width: is4Cards ? "24mm" : "20mm",
-              height: is4Cards ? "32mm" : "26mm",
+              width: is8Cards ? "17mm" : "20mm",
+              height: is8Cards ? "22mm" : "26mm",
               border: "1px solid #64748b",
               borderRadius: "0px",
               backgroundColor: "#f8fafc",
@@ -821,10 +823,10 @@ export const PrintExamCardsDialog = ({
               />
             ) : (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2px", textAlign: "center", color: "#94a3b8" }}>
-                <span style={{ fontSize: is4Cards ? "8.5px" : "7.5px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", color: "#475569" }}>
+                <span style={{ fontSize: is8Cards ? "6.5px" : "7.5px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", color: "#475569" }}>
                   FOTO
                 </span>
-                <span style={{ fontSize: is4Cards ? "7.5px" : "6.5px", fontWeight: 600, color: "#64748b" }}>
+                <span style={{ fontSize: is8Cards ? "6px" : "6.5px", fontWeight: 600, color: "#64748b" }}>
                   3 × 4
                 </span>
               </div>
@@ -837,17 +839,17 @@ export const PrintExamCardsDialog = ({
               flex: 1,
               width: "100%",
               borderCollapse: "collapse",
-              fontSize: is4Cards ? "9.5px" : "8.5px",
-              lineHeight: is4Cards ? "1.35" : "1.25"
+              fontSize: is8Cards ? "7.5px" : "8.5px",
+              lineHeight: is8Cards ? "1.25" : "1.25"
             }}
           >
             <tbody>
               <tr>
-                <td style={{ width: is4Cards ? "88px" : "72px", fontWeight: 600, color: "#334155", padding: "1.5px 0", whiteSpace: "nowrap" }}>
+                <td style={{ width: is8Cards ? "60px" : "72px", fontWeight: 600, color: "#334155", padding: "1.5px 0", whiteSpace: "nowrap" }}>
                   No. Peserta
                 </td>
                 <td style={{ width: "8px", fontWeight: 600, color: "#334155", textAlign: "center", padding: "1.5px 0" }}>:</td>
-                <td style={{ fontWeight: 800, color: "#000000", padding: "1.5px 0", fontFamily: "monospace", fontSize: is4Cards ? "10px" : "9px" }}>
+                <td style={{ fontWeight: 800, color: "#000000", padding: "1.5px 0", fontFamily: "monospace", fontSize: is8Cards ? "8px" : "9px" }}>
                   {displayUsername}
                 </td>
               </tr>
@@ -927,8 +929,8 @@ export const PrintExamCardsDialog = ({
             border: "1px solid #334155",
             borderRadius: "0px",
             backgroundColor: "#f8fafc",
-            padding: is4Cards ? "6px 10px" : "4px 8px",
-            marginBottom: is4Cards ? "8px" : "5px",
+            padding: is8Cards ? "2px 6px" : "4px 8px",
+            marginBottom: is8Cards ? "4.5px" : "5px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -937,17 +939,17 @@ export const PrintExamCardsDialog = ({
         >
           {/* Akun Login Text */}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: is4Cards ? "7.5px" : "6.5px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px", color: "#475569", marginBottom: "3px" }}>
+            <div style={{ fontSize: is8Cards ? "6px" : "6.5px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px", color: "#475569", marginBottom: "3px" }}>
               {isExamCred ? "Kredensial Sesi Ujian (CBT / Exambro)" : "Kredensial Akun Siswa (CBT / Exambro)"}
             </div>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: is4Cards ? "9px" : "8px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: is8Cards ? "7px" : "8px" }}>
               <tbody>
                 <tr>
-                  <td style={{ fontWeight: 700, color: "#1e293b", width: is4Cards ? "65px" : "55px", padding: "1px 0" }}>
+                  <td style={{ fontWeight: 700, color: "#1e293b", width: is8Cards ? "46px" : "55px", padding: "1px 0" }}>
                     Username
                   </td>
                   <td style={{ fontWeight: 700, color: "#1e293b", width: "8px", textAlign: "center", padding: "1px 0" }}>:</td>
-                  <td style={{ fontFamily: "monospace", fontSize: is4Cards ? "11.5px" : "10px", fontWeight: 900, color: "#000000", padding: "1px 0", letterSpacing: "0.5px" }}>
+                  <td style={{ fontFamily: "monospace", fontSize: is8Cards ? "9px" : "10px", fontWeight: 900, color: "#000000", padding: "1px 0", letterSpacing: "0.5px" }}>
                     {displayUsername}
                   </td>
                 </tr>
@@ -956,7 +958,7 @@ export const PrintExamCardsDialog = ({
                     Password
                   </td>
                   <td style={{ fontWeight: 700, color: "#1e293b", textAlign: "center", padding: "1px 0" }}>:</td>
-                  <td style={{ fontFamily: "monospace", fontSize: is4Cards ? "11.5px" : "10px", fontWeight: 900, color: "#000000", padding: "1px 0", letterSpacing: "0.5px" }}>
+                  <td style={{ fontFamily: "monospace", fontSize: is8Cards ? "9px" : "10px", fontWeight: 900, color: "#000000", padding: "1px 0", letterSpacing: "0.5px" }}>
                     {displayPassword}
                   </td>
                 </tr>
@@ -971,16 +973,16 @@ export const PrintExamCardsDialog = ({
                 src={qrCodes[student.id]}
                 alt="QR Login"
                 style={{
-                  width: is4Cards ? "23mm" : "18mm",
-                  height: is4Cards ? "23mm" : "18mm",
+                  width: is8Cards ? "15mm" : "18mm",
+                  height: is8Cards ? "15mm" : "18mm",
                   display: "block"
                 }}
               />
             ) : (
               <div
                 style={{
-                  width: is4Cards ? "23mm" : "18mm",
-                  height: is4Cards ? "23mm" : "18mm",
+                  width: is8Cards ? "15mm" : "18mm",
+                  height: is8Cards ? "15mm" : "18mm",
                   border: "1px solid #cbd5e1"
                 }}
               />
@@ -992,7 +994,7 @@ export const PrintExamCardsDialog = ({
         <div
           style={{
             borderTop: "1px solid #000000",
-            paddingTop: is4Cards ? "5px" : "3px",
+            paddingTop: is8Cards ? "2.5px" : "3px",
             display: "flex",
             alignItems: "flex-end",
             justifyContent: "space-between",
@@ -1001,7 +1003,7 @@ export const PrintExamCardsDialog = ({
           }}
         >
           {/* Ketentuan Peserta */}
-          <div style={{ fontSize: is4Cards ? "7.5px" : "6.5px", lineHeight: "1.3", color: "#334155", maxWidth: "58%" }}>
+          <div style={{ fontSize: is8Cards ? "6px" : "6.5px", lineHeight: "1.3", color: "#334155", maxWidth: "58%" }}>
             <div style={{ fontWeight: 800, color: "#000000", textTransform: "uppercase", marginBottom: "1px" }}>Ketentuan Peserta:</div>
             <ul style={{ margin: 0, paddingLeft: "10px" }}>
               <li>Kartu wajib dibawa selama pelaksanaan asesmen.</li>
@@ -1010,18 +1012,18 @@ export const PrintExamCardsDialog = ({
           </div>
 
           {/* Kolom Tanda Tangan */}
-          <div style={{ textAlign: "center", minWidth: is4Cards ? "105px" : "85px", lineHeight: "1.2" }}>
-            <div style={{ fontSize: is4Cards ? "7.5px" : "6.5px", color: "#1e293b" }}>
+          <div style={{ textAlign: "center", minWidth: is8Cards ? "70px" : "85px", lineHeight: "1.2" }}>
+            <div style={{ fontSize: is8Cards ? "6px" : "6.5px", color: "#1e293b" }}>
               {cityDate}
             </div>
-            <div style={{ fontSize: is4Cards ? "8px" : "7px", fontWeight: 800, color: "#000000", marginTop: "1px" }}>
+            <div style={{ fontSize: is8Cards ? "6px" : "7px", fontWeight: 800, color: "#000000", marginTop: "1px" }}>
               {signerRole},
             </div>
-            <div style={{ height: is4Cards ? "24px" : "18px" }} />
-            <div style={{ fontSize: is4Cards ? "8px" : "7px", fontWeight: 800, textDecoration: "underline", color: "#000000" }}>
+            <div style={{ height: is8Cards ? "13px" : "18px" }} />
+            <div style={{ fontSize: is8Cards ? "6px" : "7px", fontWeight: 800, textDecoration: "underline", color: "#000000" }}>
               {signerName || "( ........................................ )"}
             </div>
-            <div style={{ fontSize: is4Cards ? "6.5px" : "5.5px", color: "#475569", marginTop: "1px" }}>
+            <div style={{ fontSize: is8Cards ? "5px" : "5.5px", color: "#475569", marginTop: "1px" }}>
               {signerNip ? `NIP. ${signerNip}` : ""}
             </div>
           </div>
@@ -1158,7 +1160,69 @@ export const PrintExamCardsDialog = ({
                 </Select>
               </div>
 
-              {/* 2. Judul Ujian */}
+              {/* 2. Format Kertas A4 (Interactive Visual Cards) */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
+                  Format Kertas A4
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* 6 Kartu (2x3) */}
+                  <button
+                    type="button"
+                    onClick={() => setLayoutMode("6")}
+                    className={cn(
+                      "p-2.5 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between h-[68px]",
+                      layoutMode === "6"
+                        ? "border-emerald-500 bg-emerald-500/10 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500"
+                        : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850/60 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 text-neutral-700 dark:text-neutral-300"
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1.5">
+                        <LayoutGrid className={cn("w-4 h-4", layoutMode === "6" ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-400")} />
+                        <span className="font-bold text-xs">6 Kartu</span>
+                      </div>
+                      {layoutMode === "6" && (
+                        <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                      Standar (2×3) • Lega
+                    </div>
+                  </button>
+
+                  {/* 8 Kartu (2x4) */}
+                  <button
+                    type="button"
+                    onClick={() => setLayoutMode("8")}
+                    className={cn(
+                      "p-2.5 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between h-[68px]",
+                      layoutMode === "8"
+                        ? "border-emerald-500 bg-emerald-500/10 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500"
+                        : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-850/60 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 text-neutral-700 dark:text-neutral-300"
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1.5">
+                        <Layers className={cn("w-4 h-4", layoutMode === "8" ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-400")} />
+                        <span className="font-bold text-xs">8 Kartu</span>
+                      </div>
+                      {layoutMode === "8" && (
+                        <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                      Hemat (2×4) • Paling Irit
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Judul Ujian */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
                   Nama Asesmen / Ujian
@@ -1170,7 +1234,7 @@ export const PrintExamCardsDialog = ({
                   className="h-8.5 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-lg shadow-2xs font-semibold uppercase"
                 />
               </div>
-              {/* 3. Format Kredensial Login (Sesi Ujian vs Akun Siswa) */}
+              {/* 4. Format Kredensial Login (Sesi Ujian vs Akun Siswa) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
@@ -1267,7 +1331,7 @@ export const PrintExamCardsDialog = ({
                 )}
               </div>
 
-              {/* 4. Opsi Tampilkan Password */}
+              {/* 5. Opsi Tampilkan Password */}
               <div className="p-3 rounded-xl bg-white dark:bg-neutral-850/80 border border-neutral-200 dark:border-neutral-800 flex items-center justify-between shadow-2xs">
                 <div>
                   <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200">Tampilkan Password</div>
@@ -1288,7 +1352,7 @@ export const PrintExamCardsDialog = ({
                 </button>
               </div>
 
-              {/* 5. Ringkasan Cetak */}
+              {/* 6. Ringkasan Cetak */}
               <div className="p-3.5 rounded-xl bg-neutral-100/90 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 space-y-2 shadow-2xs">
                 <div className="flex justify-between items-center">
                   <span>Total Kartu:</span>
@@ -1300,7 +1364,7 @@ export const PrintExamCardsDialog = ({
                 </div>
                 <div className="flex justify-between items-center text-[10px] text-neutral-400 pt-1 border-t border-neutral-200 dark:border-neutral-800">
                   <span>Tata Letak:</span>
-                  <span className="font-semibold text-neutral-700 dark:text-neutral-300">6 Kartu (2×3)</span>
+                  <span className="font-semibold text-neutral-700 dark:text-neutral-300">{layoutMode === "8" ? "8 Kartu (2×4)" : "6 Kartu (2×3)"}</span>
                 </div>
               </div>
             </div>
@@ -1343,8 +1407,8 @@ export const PrintExamCardsDialog = ({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">Logo Kiri</div>
-                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                    <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 whitespace-nowrap">Logo Kiri</div>
+                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">
                       {!showLeftLogo
                         ? "Tidak ditampilkan"
                         : customLeftLogoUrl
@@ -1412,8 +1476,8 @@ export const PrintExamCardsDialog = ({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">Logo Kanan</div>
-                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                    <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 whitespace-nowrap">Logo Kanan</div>
+                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">
                       {rightLogoType === "none"
                         ? "Tidak ditampilkan"
                         : rightLogoType === "custom"
@@ -1423,10 +1487,15 @@ export const PrintExamCardsDialog = ({
                             : "Logo sekolah belum diatur"}
                     </div>
                   </div>
+                </div>
+                {/* Pilihan sumber logo kanan ditaruh di baris sendiri selebar
+                    kartu: komponen Select membungkus dirinya dalam div
+                    w-full, sehingga tidak aman dipasang sebaris dengan teks. */}
+                <div className="mt-2">
                   <Select
                     value={rightLogoType}
                     onChange={(e) => setRightLogoType(e.target.value as any)}
-                    className="h-7 w-[92px] shrink-0 text-[11px] bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 rounded-md font-semibold cursor-pointer"
+                    className="h-8 sm:h-8 text-xs sm:text-xs font-semibold bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 rounded-md cursor-pointer"
                   >
                     <option value="school">Sekolah</option>
                     <option value="custom">Upload</option>
@@ -1673,7 +1742,7 @@ export const PrintExamCardsDialog = ({
                         fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif",
                         display: "grid",
                         gridTemplateColumns: "1fr 1fr",
-                        gridTemplateRows: is4Cards ? "1fr 1fr" : "1fr 1fr 1fr",
+                        gridTemplateRows: is8Cards ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr",
                         gap: "4mm",
                         backgroundColor: "#ffffff",
                         overflow: "hidden"
@@ -1708,7 +1777,7 @@ export const PrintExamCardsDialog = ({
                   maxHeight: "282mm",
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gridTemplateRows: is4Cards ? "1fr 1fr" : "1fr 1fr 1fr",
+                  gridTemplateRows: is8Cards ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr",
                   gap: "4mm",
                   pageBreakAfter: pageIdx === totalPages - 1 ? "avoid" : "always",
                   boxSizing: "border-box",
