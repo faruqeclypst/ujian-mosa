@@ -174,6 +174,37 @@ onBootstrap((e) => {
                             .bind({ l: targetQList, v: targetQView, c: targetQCreate, u: targetQUpdate, d: targetQDelete }).execute();
                     }
                 }
+
+                // Ensure field select options in questions collection
+                try {
+                    const qRow = db.newQuery("SELECT fields FROM _collections WHERE name = 'questions'").one();
+                    if (qRow && qRow.fields) {
+                        const qFields = JSON.parse(qRow.fields);
+                        let qfMod = false;
+                        const allFieldTypes = [
+                            "multiple_choice", "complex_choice", "true_false", "matching",
+                            "short_answer", "essay", "sequence", "drag_drop",
+                            "klasifikasi", "hotspot", "isian_rumpang", "matriks"
+                        ];
+                        for (let fi = 0; fi < qFields.length; fi++) {
+                            if (qFields[fi].name === "field" && qFields[fi].type === "select") {
+                                const curVals = qFields[fi].values || [];
+                                for (let ti = 0; ti < allFieldTypes.length; ti++) {
+                                    if (curVals.indexOf(allFieldTypes[ti]) === -1) {
+                                        curVals.push(allFieldTypes[ti]);
+                                        qfMod = true;
+                                    }
+                                }
+                                qFields[fi].values = curVals;
+                            }
+                        }
+                        if (qfMod) {
+                            db.newQuery("UPDATE _collections SET fields = {:f} WHERE name = 'questions'")
+                                .bind({ f: JSON.stringify(qFields) }).execute();
+                            console.log("[SCHEMA_SYNC] Ensured all question field types in questions collection");
+                        }
+                    }
+                } catch (eQFields) {}
             }
         } catch (errGroup) {
             // Notice only

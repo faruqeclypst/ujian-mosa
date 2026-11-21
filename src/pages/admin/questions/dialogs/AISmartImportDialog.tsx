@@ -17,7 +17,10 @@ import {
   Check,
   Forward,
   FileJson,
+  Copy,
+  Download,
 } from "lucide-react";
+import { QUESTION_TEMPLATE_JSON } from "../utils/questionNormalize";
 
 export interface AISmartImportDialogProps {
   open: boolean;
@@ -62,6 +65,18 @@ export const AISmartImportDialog: React.FC<AISmartImportDialogProps> = ({
   handleSaveAIImport,
   cancelAIGeneration,
 }) => {
+  const [copiedTemplate, setCopiedTemplate] = React.useState(false);
+
+  const handleCopyTemplate = () => {
+    navigator.clipboard.writeText(QUESTION_TEMPLATE_JSON);
+    setCopiedTemplate(true);
+    setTimeout(() => setCopiedTemplate(false), 2000);
+  };
+
+  const handleLoadTemplate = () => {
+    setImportText(QUESTION_TEMPLATE_JSON);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl bg-white dark:bg-slate-900 max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
@@ -235,6 +250,53 @@ export const AISmartImportDialog: React.FC<AISmartImportDialogProps> = ({
                   </div>
                 </div>
               </div>
+              {importMode === "json" && (
+                <div className="flex flex-wrap items-center justify-between gap-2.5 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <FileJson className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-amber-900 dark:text-amber-200">Template JSON Lengkap (11 Tipe Soal)</p>
+                      <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80">PG, PG Kompleks, Benar/Salah, Menjodohkan, Urutkan, Matriks, Klasifikasi, dll.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCopyTemplate}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
+                    >
+                      {copiedTemplate ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3px]" />
+                          <span className="text-emerald-600">Tersalin!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Salin Template</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLoadTemplate}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-2xs"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Muat ke Kotak</span>
+                    </button>
+                    <a
+                      href="/templates/template_soal_lengkap.json"
+                      download="template_soal_lengkap.json"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
+                      title="Download file template_soal_lengkap.json"
+                    >
+                      <Download className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Unduh .json</span>
+                    </a>
+                  </div>
+                </div>
+              )}
               <div className="relative group">
                 <textarea
                   className="w-full h-[400px] p-6 bg-slate-50/50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-2xl text-xs font-mono focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all resize-none shadow-inner"
@@ -278,25 +340,33 @@ export const AISmartImportDialog: React.FC<AISmartImportDialogProps> = ({
                         )}
                         {/* Type badge */}
                         {q.type && q.type !== "pilihan_ganda" && (
-                          <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full border ${q.type === "pilihan_ganda_kompleks" ? "bg-blue-50 text-blue-600 border-blue-200" :
-                            q.type === "benar_salah" ? "bg-green-50 text-green-600 border-green-200" :
-                              q.type === "menjodohkan" ? "bg-purple-50 text-purple-600 border-purple-200" :
-                                q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200" :
-                                  q.type === "uraian" ? "bg-rose-50 text-rose-600 border-rose-200" :
-                                    q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200" :
-                                      "bg-cyan-50 text-cyan-600 border-cyan-200"
-                            }`}>
+                          <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                            q.type === "pilihan_ganda_kompleks" ? "bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800" :
+                            q.type === "benar_salah" ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800" :
+                            q.type === "menjodohkan" ? "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800" :
+                            q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800" :
+                            q.type === "uraian" ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800" :
+                            q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-800" :
+                            q.type === "drag_drop" ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800" :
+                            q.type === "matriks" ? "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-400 dark:border-teal-800" :
+                            q.type === "klasifikasi" ? "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-400 dark:border-violet-800" :
+                            q.type === "isian_rumpang" ? "bg-lime-50 text-lime-700 border-lime-200 dark:bg-lime-950/40 dark:text-lime-400 dark:border-lime-800" :
+                            "bg-cyan-50 text-cyan-600 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-400 dark:border-cyan-800"
+                          }`}>
                             {q.type === "pilihan_ganda_kompleks" ? "PG Kompleks" :
-                              q.type === "benar_salah" ? "Benar/Salah" :
-                                q.type === "menjodohkan" ? "Menjodohkan" :
-                                  q.type === "isian_singkat" ? "Isian Singkat" :
-                                    q.type === "uraian" ? "Uraian" :
-                                      q.type === "urutkan" ? "Urutkan" :
-                                        q.type === "drag_drop" ? "Drag & Drop" : q.type}
+                              q.type === "benar_salah" ? "Benar / Salah" :
+                              q.type === "menjodohkan" ? "Menjodohkan" :
+                              q.type === "isian_singkat" ? "Isian Singkat" :
+                              q.type === "uraian" ? "Uraian / Esai" :
+                              q.type === "urutkan" ? "Urutkan" :
+                              q.type === "drag_drop" ? "Drag & Drop" :
+                              q.type === "matriks" ? "Matriks" :
+                              q.type === "klasifikasi" ? "Klasifikasi" :
+                              q.type === "isian_rumpang" ? "Isian Rumpang" : q.type}
                           </span>
                         )}
                         {/* Statements (benar_salah tabel matriks) */}
-                        {q.statements && q.statements.length > 0 && (
+                        {q.type === "benar_salah" && q.statements && q.statements.length > 0 && (
                           <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs mt-2">
                             <table className="w-full text-left border-collapse">
                               <thead>
@@ -321,6 +391,101 @@ export const AISmartImportDialog: React.FC<AISmartImportDialogProps> = ({
                                 ))}
                               </tbody>
                             </table>
+                          </div>
+                        )}
+                        {/* Matriks Preview */}
+                        {q.type === "matriks" && (
+                          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs mt-2">
+                            <div className="px-4 py-2 bg-teal-50/50 dark:bg-teal-950/20 border-b border-teal-100 dark:border-teal-800/40 flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-teal-700 dark:text-teal-300">Kolom Matriks:</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {(q.columns || []).map((col: any, cIdx: number) => (
+                                  <span key={col.id || cIdx} className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-200">
+                                    {col.text}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Pernyataan</th>
+                                  <th className="w-40 px-4 py-2.5 text-center text-xs font-semibold text-teal-600 uppercase tracking-wide">Kunci Kolom</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {(q.statements || []).map((s: any, sIdx: number) => {
+                                  const matchedCol = (q.columns || []).find((c: any) => c.id === s.answer || c.text === s.answer);
+                                  return (
+                                    <tr key={s.id || sIdx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                      <td className="px-4 py-2.5 text-xs text-slate-700 dark:text-slate-300">
+                                        <span className="font-bold mr-1.5 text-slate-400">{sIdx + 1}.</span>
+                                        <MathText content={s.text} disableJustify={true} className="inline !p-0 [&_p]:inline" />
+                                      </td>
+                                      <td className="px-4 py-2.5 text-center">
+                                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300">
+                                          {matchedCol ? matchedCol.text : s.answer || "-"}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                        {/* Klasifikasi Preview */}
+                        {q.type === "klasifikasi" && (
+                          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs mt-2">
+                            <div className="px-4 py-2 bg-violet-50/50 dark:bg-violet-950/20 border-b border-violet-100 dark:border-violet-800/40 flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-violet-700 dark:text-violet-300">Kategori:</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {(q.categories || []).map((cat: any, cIdx: number) => (
+                                  <span key={cat.id || cIdx} className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-violet-100 dark:bg-violet-900/60 text-violet-800 dark:text-violet-200">
+                                    {cat.text}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800 p-2 space-y-1.5">
+                              {(q.statements || []).map((s: any, sIdx: number) => {
+                                const matchedCat = (q.categories || []).find((c: any) => c.id === s.answer || c.text === s.answer);
+                                return (
+                                  <div key={s.id || sIdx} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-slate-50/60 dark:bg-slate-800/40">
+                                    <div className="text-xs text-slate-700 dark:text-slate-300 flex-1">
+                                      <span className="font-bold mr-1.5 text-slate-400">{sIdx + 1}.</span>
+                                      <MathText content={s.text} disableJustify={true} className="inline !p-0 [&_p]:inline" />
+                                    </div>
+                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300 shrink-0">
+                                      {matchedCat ? matchedCat.text : s.answer || "-"}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {/* Isian Rumpang Preview */}
+                        {q.type === "isian_rumpang" && q.blanks && q.blanks.length > 0 && (
+                          <div className="mt-2 p-3 rounded-xl bg-lime-50/50 dark:bg-lime-950/20 border border-lime-200 dark:border-lime-800/40 space-y-2">
+                            <p className="text-xs font-black text-lime-700 dark:text-lime-400 uppercase tracking-wider">Kunci Isian Rumpang</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {q.blanks.map((b: any, bIdx: number) => (
+                                <div key={b.id || bIdx} className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-800 border border-lime-100 dark:border-lime-800/30">
+                                  <span className="w-6 h-6 rounded bg-lime-600 text-white flex items-center justify-center text-xs font-black shrink-0">
+                                    [[{b.id || bIdx + 1}]]
+                                  </span>
+                                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex-1">
+                                    {(b.answers || []).join(" / ") || "(Belum diisi)"}
+                                  </span>
+                                  {b.caseSensitive && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                      Aa
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                         {/* Choices (pilihan ganda, atau benar/salah legacy tanpa statements) */}

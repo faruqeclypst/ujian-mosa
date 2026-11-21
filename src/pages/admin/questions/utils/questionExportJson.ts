@@ -27,6 +27,11 @@ export const exportQuestionsToJson = ({
     if (q.choices && Object.keys(q.choices).length > 0) clean.choices = q.choices;
     if (q.pairs && q.pairs.length > 0) clean.pairs = q.pairs;
     if (q.items && q.items.length > 0) clean.items = q.items;
+    if (q.statements && q.statements.length > 0) clean.statements = q.statements;
+    if (q.categories && q.categories.length > 0) clean.categories = q.categories;
+    if (q.columns && q.columns.length > 0) clean.columns = q.columns;
+    if (q.blanks && q.blanks.length > 0) clean.blanks = q.blanks;
+    if (q.shuffleStatements !== undefined) clean.shuffleStatements = q.shuffleStatements;
     if (q.answerKey) clean.answerKey = q.answerKey;
     if (q.order) clean.order = q.order;
     return clean;

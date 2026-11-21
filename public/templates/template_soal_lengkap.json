@@ -1,0 +1,132 @@
+[
+  {
+    "order": 1,
+    "type": "pilihan_ganda",
+    "text": "<p>Organel sel yang berfungsi sebagai tempat berlangsungnya respirasi seluler dan penghasil energi utama (ATP) adalah ....</p>",
+    "choices": {
+      "a": { "text": "<p>Ribosom</p>", "isCorrect": false },
+      "b": { "text": "<p>Mitokondria</p>", "isCorrect": true },
+      "c": { "text": "<p>Lisosom</p>", "isCorrect": false },
+      "d": { "text": "<p>Badan Golgi</p>", "isCorrect": false },
+      "e": { "text": "<p>Retikulum Endoplasma</p>", "isCorrect": false }
+    },
+    "answerKey": "b"
+  },
+  {
+    "order": 2,
+    "type": "pilihan_ganda_kompleks",
+    "text": "<p>Pilihlah pernyataan yang tepat mengenai ciri-ciri pembelahan meiosis pada sel eukariotik! <em>(Jawaban benar lebih dari satu)</em></p>",
+    "choices": {
+      "a": { "text": "<p>Menghasilkan 4 sel anakan yang bersifat haploid ($n$)</p>", "isCorrect": true },
+      "b": { "text": "<p>Terjadi pindah silang (<em>crossing over</em>) pada profase I</p>", "isCorrect": true },
+      "c": { "text": "<p>Berfungsi untuk pertumbuhan dan perbaikan jaringan tubuh yang rusak</p>", "isCorrect": false },
+      "d": { "text": "<p>Menghasilkan variasi genetik pada keturunan</p>", "isCorrect": true },
+      "e": { "text": "<p>Kromosom sel anakan identik dengan kromosom sel induk</p>", "isCorrect": false }
+    },
+    "answerKey": "a,b,d"
+  },
+  {
+    "order": 3,
+    "type": "benar_salah",
+    "text": "<p>Tentukan nilai kebenaran (<strong>Benar</strong> atau <strong>Salah</strong>) untuk setiap pernyataan mengenai hukum kekekalan energi berikut ini:</p>",
+    "statements": [
+      { "id": "1", "text": "Energi mekanik adalah penjumlahan antara energi kinetik dan energi potensial.", "answer": "benar" },
+      { "id": "2", "text": "Pada sistem tertutup tanpa gesekan, energi mekanik total dapat berkurang secara spontan.", "answer": "salah" },
+      { "id": "3", "text": "Satuan internasional (SI) untuk usaha dan energi adalah Joule ($J$).", "answer": "benar" }
+    ],
+    "answerKey": "1:benar,2:salah,3:benar"
+  },
+  {
+    "order": 4,
+    "type": "menjodohkan",
+    "text": "<p>Pasangkan besaran fisika berikut dengan satuan SI yang tepat:</p>",
+    "pairs": [
+      { "id": "1", "left": "Gaya", "right": "Newton (N)" },
+      { "id": "2", "left": "Tekanan", "right": "Pascal (Pa)" },
+      { "id": "3", "left": "Daya", "right": "Watt (W)" },
+      { "id": "4", "left": "Frekuensi", "right": "Hertz (Hz)" }
+    ],
+    "answerKey": "1:Newton (N),2:Pascal (Pa),3:Watt (W),4:Hertz (Hz)"
+  },
+  {
+    "order": 5,
+    "type": "urutkan",
+    "text": "<p>Urutkan tahapan metode ilmiah berikut dari awal hingga akhir dengan benar:</p>",
+    "items": [
+      { "id": "1", "text": "Merumuskan masalah" },
+      { "id": "2", "text": "Mengumpulkan data dan observasi" },
+      { "id": "3", "text": "Menyusun hipotesis" },
+      { "id": "4", "text": "Melakukan eksperimen" },
+      { "id": "5", "text": "Menarik kesimpulan" }
+    ],
+    "answerKey": "1,2,3,4,5"
+  },
+  {
+    "order": 6,
+    "type": "drag_drop",
+    "text": "<p>Susunlah alur transmisi sinyal listrik pada neuron dari penerimaan impuls hingga penghantaran:</p>",
+    "items": [
+      { "id": "1", "text": "Dendrit" },
+      { "id": "2", "text": "Badan Sel (Soma)" },
+      { "id": "3", "text": "Akson (Neurit)" },
+      { "id": "4", "text": "Terminal Sinapsis" }
+    ],
+    "answerKey": "1,2,3,4"
+  },
+  {
+    "order": 7,
+    "type": "matriks",
+    "text": "<p>Kelompokkan besaran-besaran berikut ke dalam jenis besaran skalar atau besaran vektor:</p>",
+    "columns": [
+      { "id": "c1", "text": "Besaran Skalar" },
+      { "id": "c2", "text": "Besaran Vektor" }
+    ],
+    "statements": [
+      { "id": "s1", "text": "Kelajuan mobil $60\\text{ km/jam}$", "answer": "c1" },
+      { "id": "s2", "text": "Kecepatan angin $20\\text{ knot}$ ke arah utara", "answer": "c2" },
+      { "id": "s3", "text": "Perpindahan sejauh $5\\text{ meter}$ ke barat", "answer": "c2" },
+      { "id": "s4", "text": "Massa benda $10\\text{ kg}$", "answer": "c1" }
+    ],
+    "answerKey": "s1:c1,s2:c2,s3:c2,s4:c1"
+  },
+  {
+    "order": 8,
+    "type": "klasifikasi",
+    "text": "<p>Kelompokkan organisme-organisme berikut ke dalam kingdom yang tepat:</p>",
+    "categories": [
+      { "id": "cat1", "text": "Plantae" },
+      { "id": "cat2", "text": "Animalia" },
+      { "id": "cat3", "text": "Fungi" }
+    ],
+    "statements": [
+      { "id": "s1", "text": "Lumut daun (<em>Bryophyta</em>)", "answer": "cat1" },
+      { "id": "s2", "text": "Jamur tiram (<em>Pleurotus ostreatus</em>)", "answer": "cat3" },
+      { "id": "s3", "text": "Burung merpati (<em>Columba livia</em>)", "answer": "cat2" },
+      { "id": "s4", "text": "Paku tanduk rusa (<em>Platycerium bifurcatum</em>)", "answer": "cat1" }
+    ],
+    "shuffleStatements": true,
+    "answerKey": "s1:cat1,s2:cat3,s3:cat2,s4:cat1"
+  },
+  {
+    "order": 9,
+    "type": "isian_rumpang",
+    "text": "<p>Dalam proses fotosintesis, tumbuhan hijau menyerap gas [[1]] dari udara dan air dari tanah untuk menghasilkan molekul gula dan melepaskan gas [[2]] ke atmosfer.</p>",
+    "blanks": [
+      { "id": "1", "answers": ["karbon dioksida", "CO2", "karbondioksida"], "caseSensitive": false },
+      { "id": "2", "answers": ["oksigen", "O2"], "caseSensitive": false }
+    ],
+    "answerKey": "1:karbon dioksida,2:oksigen"
+  },
+  {
+    "order": 10,
+    "type": "isian_singkat",
+    "text": "<p>Enzim pengikat $\\text{CO}_2$ yang bekerja pada tahap fiksasi karbon dalam Siklus Calvin tanaman $\\text{C}_3$ adalah ....</p>",
+    "answerKey": "RuBisCO"
+  },
+  {
+    "order": 11,
+    "type": "uraian",
+    "text": "<p>Jelaskan perbedaan mendasar antara reaksi terang dan reaksi gelap (Siklus Calvin) pada fotosintesis ditinjau dari tempat berlangsungnya, kebutuhan cahaya, dan produk akhir yang dihasilkan!</p>",
+    "answerKey": "Pedoman Penilaian: 1. Tempat: Reaksi terang di tilakoid/grana, Siklus Calvin di stroma (skor 30). 2. Kebutuhan cahaya: Reaksi terang memerlukan cahaya langsung untuk fotolisis, Siklus Calvin memerlukan ATP & NADPH hasil reaksi terang (skor 30). 3. Produk: Reaksi terang menghasilkan ATP, NADPH, dan O2; Siklus Calvin menghasilkan glukosa/karbohidrat (skor 40)."
+  }
+]

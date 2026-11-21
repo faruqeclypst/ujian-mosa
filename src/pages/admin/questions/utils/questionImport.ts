@@ -1,5 +1,6 @@
 import { parseQuestionsFromWord } from "../../../../lib/questionWordParser";
 import { parseQuestionImportExcel } from "../../../../lib/questionExcel";
+import { normalizeImportedQuestion, buildQuestionSavePayload } from "./questionNormalize";
 
 export const IMPORT_TYPE_MAP: Record<string, string> = {
   pilihan_ganda: "multiple_choice",
@@ -359,109 +360,18 @@ export const importQuestionsFromJson = async ({
   let importedCount = 0;
   const pendingPayloads: any[] = [];
   for (let i = 0; i < questionsArr.length; i++) {
-    const q = questionsArr[i];
-    if (!q.text && !q.question) continue;
+    const rawQ = questionsArr[i];
+    if (!rawQ || (!rawQ.text && !rawQ.question)) continue;
 
-    const qType = q.type || "pilihan_ganda";
-    const choices = q.choices || q.options || {};
-    let correctAnswer = q.correctAnswer || q.answerKey || "";
+    const normalized = normalizeImportedQuestion(rawQ, i);
+    if (!normalized) continue; // dilewati bila bertipe hotspot atau null
 
-    if (!correctAnswer && typeof choices === "object") {
-      const correctKeys = Object.entries(choices)
-        .filter(([_, c]: [string, any]) => c && typeof c === "object" && c.isCorrect)
-        .map(([k]) => k.toLowerCase());
-      if (correctKeys.length > 0) correctAnswer = correctKeys.join(",");
-    }
-
-    const qImageUrl = q.imageUrl || q.image_url || "";
-    const localizedQImageUrl = qImageUrl ? await localizeImage(qImageUrl, `json_q_${i}`) : "";
-    const finalQImageUrl = localizedQImageUrl || qImageUrl;
-    let localizedQText = await localizeInlineImages(q.text || q.question || "");
-    if (finalQImageUrl && !localizedQText.includes(finalQImageUrl)) {
-      localizedQText = `<p><img src="${finalQImageUrl}" alt="Gambar Soal" style="max-height:320px;max-width:100%;border-radius:16px;margin-bottom:12px;" /></p>` + localizedQText;
-    }
-
-    const rawGroupText = q.groupText || q.group_text || "";
-    const localizedGroupText = rawGroupText ? await localizeInlineImages(rawGroupText) : "";
-
-    const payload: any = {
+    const payload = await buildQuestionSavePayload(
+      normalized,
       examId,
-      examid: examId,
-      text: localizedQText,
-      type: qType,
-      field: IMPORT_TYPE_MAP[qType] || "multiple_choice",
-      options: {},
-      correctAnswer: correctAnswer,
-      imageUrl: localizedQImageUrl,
-      order: q.order || jsonMaxOrder + i + 1,
-      groupId: q.groupId || q.group_id || "",
-      group_id: q.groupId || q.group_id || "",
-      groupText: localizedGroupText,
-      group_text: localizedGroupText,
-    };
-
-    if ((qType === "benar_salah" || qType === "true_false") && q.statements && Array.isArray(q.statements) && q.statements.length > 0) {
-      const validStatements = await Promise.all(
-        q.statements.map(async (st: any) => ({
-          id: String(st.id || Math.random()),
-          text: await localizeInlineImages(st.text || ""),
-          answer: st.answer === "benar" || st.answer === "salah" ? st.answer : "benar",
-        }))
-      );
-      payload.options = { statements: validStatements };
-      if (!correctAnswer) {
-        payload.correctAnswer = validStatements.map((s: any) => `${s.id}:${s.answer}`).join(",");
-      }
-    } else if (choices && Object.keys(choices).length > 0) {
-      const localizedChoices: Record<string, any> = {};
-      const keys = Object.keys(choices);
-      for (const k of keys) {
-        const val = choices[k];
-        if (typeof val === "object" && val !== null) {
-          const choiceImg = val.imageUrl || val.image_url || "";
-          const localizedChoiceImg = choiceImg ? await localizeImage(choiceImg, `json_opt_${i}_${k}`) : "";
-          localizedChoices[k] = {
-            text: await localizeInlineImages(val.text || ""),
-            isCorrect: !!val.isCorrect,
-            imageUrl: localizedChoiceImg || choiceImg,
-          };
-        } else {
-          localizedChoices[k] = { text: await localizeInlineImages(String(val || "")), isCorrect: false };
-        }
-      }
-      payload.options = localizedChoices;
-      payload.choices = localizedChoices;
-    }
-
-    if (q.pairs && Array.isArray(q.pairs)) {
-      const localizedPairs = await Promise.all(
-        q.pairs.map(async (p: any) => ({
-          id: p.id || String(Math.random()),
-          left: await localizeInlineImages(p.left || ""),
-          right: await localizeInlineImages(p.right || ""),
-        }))
-      );
-      payload.options.pairs = localizedPairs;
-      payload.pairs = localizedPairs;
-    }
-
-    if (q.items && Array.isArray(q.items)) {
-      const localizedItems = await Promise.all(
-        q.items.map(async (it: any) => {
-          const itemImg = it.imageUrl || it.image_url || "";
-          const localizedItemImg = itemImg ? await localizeImage(itemImg, `json_item_${i}_${it.id}`) : "";
-          return {
-            id: it.id || String(Math.random()),
-            text: await localizeInlineImages(it.text || ""),
-            imageUrl: localizedItemImg || itemImg,
-          };
-        })
-      );
-      payload.options.items = localizedItems;
-      payload.items = localizedItems;
-    }
-
-    payload.answerKey = payload.correctAnswer;
+      rawQ.order || jsonMaxOrder + i + 1,
+      { localizeImage, localizeInlineImages }
+    );
 
     pendingPayloads.push(payload);
     if (pendingPayloads.length >= 100) {

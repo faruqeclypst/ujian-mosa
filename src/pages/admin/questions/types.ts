@@ -153,7 +153,13 @@ export const mapRawQuestionToQuestionData = (q: any): QuestionData => {
             { id: "2", text: "", answer: "salah" },
             { id: "3", text: "", answer: "benar" },
           ]
+        : mappedType === "matriks" || mappedType === "klasifikasi"
+        ? q.statements || options.statements
         : undefined,
+    categories: mappedType === "klasifikasi" ? (q.categories || options.categories) : undefined,
+    columns: (mappedType === "matriks" || mappedType === "klasifikasi") ? (q.columns || options.columns) : undefined,
+    blanks: mappedType === "isian_rumpang" ? (q.blanks || options.blanks) : undefined,
+    shuffleStatements: q.shuffleStatements ?? options.shuffleStatements,
     options: options,
     answerKey: q.correctAnswer || q.answerKey || "",
     order: q.order,

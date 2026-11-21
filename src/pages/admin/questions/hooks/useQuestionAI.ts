@@ -13,6 +13,10 @@ import {
   localizeImage as localizeImageHelper,
   localizeInlineImages as localizeInlineImagesHelper
 } from "../utils/imageLocalizer";
+import {
+  normalizeImportedQuestion,
+  buildQuestionSavePayload
+} from "../utils/questionNormalize";
 
 export interface UseQuestionAIOptions {
   pb: any;
@@ -535,47 +539,15 @@ export function useQuestionAI({
           return;
         }
 
-        const results = questionsArr.map((q: any) => {
-          const choices = q.choices || q.options || {};
-          let correctKey = q.answerKey || q.answer_key || q.correctAnswer || q.correct_answer || "";
+        const results = questionsArr
+          .map((q: any, i: number) => normalizeImportedQuestion(q, i))
+          .filter((q: any) => q && q.text);
 
-          // Normalize choices
-          const normalizedChoices: any = {};
-          if (choices && typeof choices === 'object') {
-            Object.keys(choices).forEach(k => {
-              const val = choices[k];
-              if (typeof val === 'string') {
-                normalizedChoices[k] = { text: val, isCorrect: correctKey.includes(k) };
-              } else if (typeof val === 'object' && val) {
-                normalizedChoices[k] = { text: val.text || "", imageUrl: val.imageUrl || val.image_url || undefined, isCorrect: !!val.isCorrect };
-                if (val.isCorrect && !correctKey) correctKey = k;
-              }
-            });
-          }
-
-          if (!correctKey && normalizedChoices) {
-            const correctKeys = Object.keys(normalizedChoices).filter(k => normalizedChoices[k].isCorrect);
-            correctKey = correctKeys.join(",");
-          }
-
-          return {
-            text: q.text || q.question || "",
-            type: q.type || "pilihan_ganda",
-            choices: normalizedChoices,
-            answerKey: correctKey,
-            imageUrl: q.imageUrl || q.image_url || "",
-            groupId: q.groupId || q.group_id || "",
-            groupText: q.groupText || q.group_text || "",
-            pairs: q.pairs || undefined,
-            items: q.items || undefined,
-            statements: q.statements || (q.options?.statements ? q.options.statements : undefined),
-          };
-        }).filter((q: any) => q.text);
-
+        const skippedHotspot = questionsArr.length - results.length;
         setParsedResults(results);
         addToast({
           title: "Parsing Berhasil",
-          description: `Ditemukan ${results.length} soal dari JSON. Silakan tinjau sebelum menyimpan.`,
+          description: `Ditemukan ${results.length} soal dari JSON.${skippedHotspot > 0 ? ` (${skippedHotspot} soal hotspot dilewati)` : ""} Silakan tinjau sebelum menyimpan.`,
           type: "success"
         });
       } catch (err: any) {
@@ -630,23 +602,9 @@ export function useQuestionAI({
 
 
   const handleSaveAIImport = async () => {
-    if (parsedResults.length === 0 || !pb) return;
+    if (parsedResults.length === 0 || !pb || !examId) return;
     setIsParsing(true);
     try {
-      const typeMap: Record<string, string> = {
-        pilihan_ganda: "multiple_choice",
-        pilihan_ganda_kompleks: "complex_choice",
-        menjodohkan: "matching",
-        benar_salah: "true_false",
-        isian_singkat: "short_answer",
-        uraian: "essay",
-        urutkan: "sequence",
-        drag_drop: "drag_drop",
-        klasifikasi: "klasifikasi",
-        hotspot: "hotspot",
-        isian_rumpang: "isian_rumpang",
-        matriks: "matriks"
-      };
 
       setBatchProgress({
         isOpen: true,
@@ -665,119 +623,10 @@ export function useQuestionAI({
       const payloads = [];
       for (let idx = 0; idx < parsedResults.length; idx++) {
         const q = parsedResults[idx];
-        const type = q.type || "pilihan_ganda";
-        const field = typeMap[type] || "multiple_choice";
-
-        // Localize inline images
-        let localizedQText = await localizeInlineImages(q.text || "Pertanyaan Tanpa Judul");
-        const qImageUrl = q.imageUrl || q.image_url || "";
-        if (qImageUrl && !localizedQText.includes(qImageUrl)) {
-          const localizedImg = await localizeImage(qImageUrl, `ai_q_${idx}`);
-          if (localizedImg) {
-            localizedQText = `<p><img src="${localizedImg}" alt="Gambar Soal" style="max-height:320px;max-width:100%;border-radius:16px;margin-bottom:12px;" /></p>` + localizedQText;
-          }
-        }
-        const rawGroupText = q.groupText || q.group_text || "";
-        const localizedGroupText = rawGroupText ? await localizeInlineImages(rawGroupText) : "";
-
-        // Localize options
-        let options: any = {};
-        if (type === "benar_salah" && q.statements && Array.isArray(q.statements) && q.statements.length > 0) {
-          const validStatements = await Promise.all(q.statements.map(async (st: any) => ({
-            id: String(st.id || Math.random()),
-            text: await localizeInlineImages(st.text || ""),
-            answer: (st.answer || "benar").toLowerCase() === "salah" ? "salah" : "benar"
-          })));
-          options = { statements: validStatements };
-        } else if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
-          const rawChoices = q.choices || {};
-          const opts: any = {};
-          const keys = Object.keys(rawChoices);
-          for (let kIdx = 0; kIdx < keys.length; kIdx++) {
-            const k = keys[kIdx];
-            const val = rawChoices[k];
-            const choiceImg = val.imageUrl || val.image_url || "";
-            const localizedChoiceImg = choiceImg ? await localizeImage(choiceImg, `ai_opt_${idx}_${k}`) : undefined;
-            opts[k] = {
-              text: val.text ? await localizeInlineImages(val.text) : "",
-              imageUrl: localizedChoiceImg,
-              isCorrect: !!val.isCorrect
-            };
-          }
-          options = opts;
-        } else if (type === "menjodohkan") {
-          const pairs = q.pairs || [];
-          const localizedPairs = [];
-          for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
-            const p = pairs[pIdx];
-            localizedPairs.push({
-              ...p,
-              left: await localizeInlineImages(p.left || ""),
-              right: await localizeInlineImages(p.right || "")
-            });
-          }
-          options = { pairs: localizedPairs };
-        } else if (type === "urutkan" || type === "drag_drop") {
-          const items = q.items || [];
-          const localizedItems = [];
-          for (let itIdx = 0; itIdx < items.length; itIdx++) {
-            const it = items[itIdx];
-            const itemImg = it.imageUrl || it.image_url || "";
-            const localizedItemImg = itemImg ? await localizeImage(itemImg, `ai_item_${idx}_${itIdx}`) : undefined;
-            localizedItems.push({
-              ...it,
-              text: await localizeInlineImages(it.text || ""),
-              imageUrl: localizedItemImg
-            });
-          }
-          options = { items: localizedItems };
-        } else if (type === "klasifikasi") {
-          options = {
-            categories: q.categories || (q.options?.categories ? q.options.categories : []),
-            statements: q.statements || (q.options?.statements ? q.options.statements : []),
-            shuffleStatements: q.shuffleStatements !== undefined ? q.shuffleStatements : true
-          };
-        } else if (type === "matriks") {
-          options = {
-            columns: q.columns || (q.options?.columns ? q.options.columns : []),
-            statements: q.statements || (q.options?.statements ? q.options.statements : [])
-          };
-        } else if (type === "isian_rumpang") {
-          options = {
-            text: q.text,
-            blanks: q.blanks || (q.options?.blanks ? q.options.blanks : [])
-          };
-        }
-
-        let correctAnswer = "";
-        if (type === "benar_salah" && options?.statements && Array.isArray(options.statements)) {
-          correctAnswer = options.statements.map((s: any) => `${s.id}:${s.answer}`).join(",");
-        } else if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
-          correctAnswer = q.correctAnswer || q.answerKey || "";
-          if (!correctAnswer && options) {
-            const correctKeys = Object.keys(options).filter(k => options[k].isCorrect);
-            correctAnswer = correctKeys.join(",");
-          }
-        } else if (type === "isian_singkat" || type === "uraian") {
-          correctAnswer = q.answerKey || "";
-        }
-
-        // Localize main question imageUrl
-        const localizedQImageUrl = qImageUrl ? await localizeImage(qImageUrl, `ai_q_${idx}`) : "";
-
-        const createPayload: any = {
-          examId,
-          type,
-          text: localizedQText,
-          field,
-          options,
-          correctAnswer,
-          imageUrl: localizedQImageUrl,
-          order: maxOrder + idx + 1
-        };
-        if (q.groupId) { createPayload.groupId = q.groupId; createPayload.group_id = q.groupId; }
-        if (q.groupText) { createPayload.groupText = localizedGroupText; createPayload.group_text = localizedGroupText; }
-
+        const createPayload = await buildQuestionSavePayload(q, examId, maxOrder + idx + 1, {
+          localizeImage,
+          localizeInlineImages,
+        });
         payloads.push(createPayload);
       }
 

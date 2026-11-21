@@ -157,7 +157,32 @@ def fix_db(db_path):
                 conn.commit()
                 print(f"[OK] Successfully updated _collections for students in {db_path}")
 
-        # 5. Update koleksi exam_rooms rules
+        # 5. Update koleksi questions field select types
+        cur.execute("SELECT id, fields FROM _collections WHERE name='questions'")
+        q_row = cur.fetchone()
+        if q_row:
+            q_col_id, q_fields_json = q_row
+            q_fields = json.loads(q_fields_json) if q_fields_json else []
+            q_mod = False
+            target_types = [
+                "multiple_choice", "complex_choice", "true_false", "matching", 
+                "short_answer", "essay", "sequence", "drag_drop", 
+                "klasifikasi", "hotspot", "isian_rumpang", "matriks"
+            ]
+            for f in q_fields:
+                if f.get("name") == "field" and f.get("type") == "select":
+                    cur_vals = f.get("values", [])
+                    for tt in target_types:
+                        if tt not in cur_vals:
+                            cur_vals.append(tt)
+                            q_mod = True
+                    f["values"] = cur_vals
+            if q_mod:
+                cur.execute("UPDATE _collections SET fields=? WHERE name='questions'", (json.dumps(q_fields),))
+                conn.commit()
+                print(f"[OK] Successfully updated question field types in {db_path}")
+
+        # 6. Update koleksi exam_rooms rules
         cur.execute("SELECT listRule, viewRule, createRule, updateRule, deleteRule FROM _collections WHERE name='exam_rooms'")
         er_row = cur.fetchone()
         if er_row:
