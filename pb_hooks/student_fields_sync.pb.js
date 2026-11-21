@@ -175,10 +175,16 @@ onBootstrap((e) => {
                     }
                 }
 
-                // Ensure field select options in questions collection
+                // Ensure field select options in questions collection.
+                // PENTING: .one() WAJIB menerima objek penampung (DynamicModel),
+                // persis pola fast_restore.pb.js. Memanggil .one() tanpa argumen
+                // memicu panic nil-pointer Go di dalam goja yang TIDAK bisa
+                // ditangkap try/catch JS dan mematikan proses saat bootstrap
+                // (insiden 2026-11-21: semua tenant down serentak).
                 try {
-                    const qRow = db.newQuery("SELECT fields FROM _collections WHERE name = 'questions'").one();
-                    if (qRow && qRow.fields) {
+                    const qRow = new DynamicModel({ fields: "" });
+                    db.newQuery("SELECT fields FROM _collections WHERE name = 'questions'").one(qRow);
+                    if (qRow.fields) {
                         const qFields = JSON.parse(qRow.fields);
                         let qfMod = false;
                         const allFieldTypes = [
