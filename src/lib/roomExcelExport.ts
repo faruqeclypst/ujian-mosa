@@ -2,6 +2,24 @@ import JSZip from "jszip";
 import * as XLSX from "xlsx-js-style";
 
 // 🛡️ Fuzzy Match Helper for Short Answers
+export const getSafeSheetName = (wb: any, rawName: string): string => {
+  let clean = (rawName || "Sheet")
+    .replace(/[\\\/\?\*\[\]\:]/g, "_")
+    .trim();
+  if (!clean) clean = "Sheet";
+  clean = clean.substring(0, 31);
+
+  let finalName = clean;
+  let counter = 1;
+  const existingNames: string[] = Array.isArray(wb?.SheetNames) ? wb.SheetNames : [];
+  while (existingNames.some((n: string) => n.toLowerCase() === finalName.toLowerCase())) {
+    const suffix = `_${counter}`;
+    finalName = `${clean.substring(0, 31 - suffix.length)}${suffix}`;
+    counter++;
+  }
+  return finalName;
+};
+
 const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   if (typeof studentAns !== "string" || !correctKey) return false;
   const stripHtml = (s: string) => s.replace(/<[^>]*>/g, '');
@@ -444,14 +462,15 @@ export async function exportActiveRoomsToZip({
 
   // Fetch attempts per room
   for (const room of rooms) {
-    let attempts: any[] = [];
     try {
-      attempts = await pb.collection('attempts').getFullList({
-        filter: `examRoomId = "${room.id}"`
-      });
-    } catch (err) {
-      console.error(`Gagal mengambil pengerjaan untuk ruangan ${room.room_name || room.id}:`, err);
-    }
+      let attempts: any[] = [];
+      try {
+        attempts = await pb.collection('attempts').getFullList({
+          filter: `examRoomId = "${room.id}"`
+        });
+      } catch (err) {
+        console.error(`Gagal mengambil pengerjaan untuk ruangan ${room.room_name || room.id}:`, err);
+      }
 
     const monitorQuestions = questionsByExam[room.examId] || [];
 
@@ -473,7 +492,7 @@ export async function exportActiveRoomsToZip({
     const filteredStudents = students
       .map(s => ({
         ...s,
-        className: examClasses.find(c => c.id === s.classId)?.name || "N/A"
+        className: examClasses.find(c => c.id === s.classId)?.name || "Tanpa Kelas"
       }))
       .filter(s => {
         if (room.allClasses) return true;
@@ -644,7 +663,8 @@ export async function exportActiveRoomsToZip({
       const ws = XLSX.utils.aoa_to_sheet(rows);
       ws["!cols"] = COL_WIDTHS;
       ws["!merges"] = merges;
-      XLSX.utils.book_append_sheet(workbook, ws, sheetName.substring(0, 31));
+      const safeSheetName = getSafeSheetName(workbook, sheetName);
+      XLSX.utils.book_append_sheet(workbook, ws, safeSheetName);
     };
 
     if (classesArray.length > 1) {
@@ -682,7 +702,8 @@ export async function exportActiveRoomsToZip({
       });
       const wsAbsent = XLSX.utils.aoa_to_sheet(absentRows);
       wsAbsent["!cols"] = [{ wch: 4 }, { wch: 15 }, { wch: 30 }, { wch: 12 }];
-      XLSX.utils.book_append_sheet(workbook, wsAbsent, "Belum Ujian");
+      const safeAbsentSheetName = getSafeSheetName(workbook, "Belum Ujian");
+      XLSX.utils.book_append_sheet(workbook, wsAbsent, safeAbsentSheetName);
     }
 
     // Write Excel workbook to binary buffer
@@ -696,6 +717,9 @@ export async function exportActiveRoomsToZip({
     const cleanTeacherName = cleanFileNamePart(room.teacherName || "Guru");
     const cleanRoomName = cleanFileNamePart(room.room_name || `Ruang_${room.id}`);
     zip.file(`${cleanTeacherName} - (${cleanRoomName}).xlsx`, excelBuffer);
+    } catch (roomErr) {
+      console.error(`Gagal mengekspor file Excel untuk ruangan ${room?.room_name || room?.id}:`, roomErr);
+    }
   }
 
   // Generate ZIP and trigger download

@@ -538,3 +538,28 @@ export const getQuestionDetailInfo = (q: any, ans: any, overrides?: Record<strin
   return { score: 0, status: "empty", badgeLabel: "Kosong" };
 };
 
+/**
+ * Membersihkan dan memastikan nama sheet aman untuk format Excel (.xlsx):
+ * - Maksimal 31 karakter
+ * - Menghilangkan karakter terlarang: \ / ? * : [ ]
+ * - Tidak boleh kosong (fallback ke "Sheet")
+ * - Menghindari duplikasi nama sheet di dalam workbook (case-insensitive)
+ */
+export const getSafeSheetName = (wb: any, rawName: string): string => {
+  let clean = (rawName || "Sheet")
+    .replace(/[\\\/\?\*\[\]\:]/g, "_")
+    .trim();
+  if (!clean) clean = "Sheet";
+  clean = clean.substring(0, 31);
+
+  let finalName = clean;
+  let counter = 1;
+  const existingNames: string[] = Array.isArray(wb?.SheetNames) ? wb.SheetNames : [];
+  while (existingNames.some((n: string) => n.toLowerCase() === finalName.toLowerCase())) {
+    const suffix = `_${counter}`;
+    finalName = `${clean.substring(0, 31 - suffix.length)}${suffix}`;
+    counter++;
+  }
+  return finalName;
+};
+

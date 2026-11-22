@@ -984,9 +984,9 @@ const ExamRoomsPage = () => {
         filename: customFilename
       });
       addToast({ title: "Ekspor Berhasil", description: `File ZIP berisi rekap ujian berhasil diunduh.`, type: "success" });
-    } catch (e) {
-      console.error(e);
-      showAlert("Gagal", "Gagal mengekspor data ke ZIP.", "danger");
+    } catch (e: any) {
+      console.error("Gagal export ZIP ruang:", e);
+      showAlert("Gagal", `Gagal mengekspor data ke ZIP: ${e?.message || "Terjadi kesalahan"}`, "danger");
     } finally {
       setIsExporting(false);
     }

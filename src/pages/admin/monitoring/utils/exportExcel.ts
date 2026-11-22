@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx-js-style";
-import { checkAns, getTargetQuestions, computeQuestionScore, stripHtmlTags } from "./helpers";
+import { checkAns, getTargetQuestions, computeQuestionScore, stripHtmlTags, getSafeSheetName } from "./helpers";
 
 export interface ExportExcelParams {
   monitorRoom: any;
@@ -225,7 +225,7 @@ export function exportRecapExcel({ monitorRoom, students, attempts, monitorQuest
   const filteredStudents = students
     .map(s => ({
       ...s,
-      className: examClasses.find(c => c.id === s.classId)?.name || "N/A"
+      className: examClasses.find(c => c.id === s.classId)?.name || "Tanpa Kelas"
     }))
     .filter(s => {
       if (monitorRoom?.allClasses) {
@@ -400,7 +400,8 @@ export function exportRecapExcel({ monitorRoom, students, attempts, monitorQuest
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws["!cols"] = COL_WIDTHS;
     ws["!merges"] = merges;
-    XLSX.utils.book_append_sheet(workbook, ws, sheetName.substring(0, 31));
+    const safeSheetName = getSafeSheetName(workbook, sheetName);
+    XLSX.utils.book_append_sheet(workbook, ws, safeSheetName);
   };
 
   // Build Master Sheet if multiple classes
@@ -440,7 +441,8 @@ export function exportRecapExcel({ monitorRoom, students, attempts, monitorQuest
     });
     const wsAbsent = XLSX.utils.aoa_to_sheet(absentRows);
     wsAbsent["!cols"] = [{ wch: 4 }, { wch: 15 }, { wch: 30 }, { wch: 12 }];
-    XLSX.utils.book_append_sheet(workbook, wsAbsent, "Belum Ujian");
+    const safeAbsentSheetName = getSafeSheetName(workbook, "Belum Ujian");
+    XLSX.utils.book_append_sheet(workbook, wsAbsent, safeAbsentSheetName);
   }
 
   XLSX.writeFile(workbook, `Rekap_${monitorRoom.room_name || "Monitoring"}_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -539,7 +541,7 @@ export function exportEssayExcel({ monitorRoom, students, attempts, monitorQuest
   const filteredStudents = students
     .map(s => ({
       ...s,
-      className: examClasses.find(c => c.id === s.classId)?.name || "N/A"
+      className: examClasses.find(c => c.id === s.classId)?.name || "Tanpa Kelas"
     }))
     .filter(s => {
       if (monitorRoom?.allClasses) {
@@ -679,7 +681,8 @@ export function exportEssayExcel({ monitorRoom, students, attempts, monitorQuest
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws["!cols"] = COL_WIDTHS;
     ws["!merges"] = merges;
-    XLSX.utils.book_append_sheet(workbook, ws, sheetName.substring(0, 31));
+    const safeSheetName = getSafeSheetName(workbook, sheetName);
+    XLSX.utils.book_append_sheet(workbook, ws, safeSheetName);
   };
 
   if (classesArray.length > 1) {
