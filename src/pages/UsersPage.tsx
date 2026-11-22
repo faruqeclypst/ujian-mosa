@@ -38,6 +38,7 @@ import {
   DialogTitle,
   DialogFooter
 } from "../components/ui/dialog";
+import { NeonModal } from "../components/ui/NeonModal";
 import FormField from "../components/forms/FormField";
 import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
 import { NeonTabs, type NeonTabItem } from "../components/ui/NeonTabs";
@@ -823,106 +824,75 @@ const UsersPage = () => {
       </div>
 
       {/* ── Create / Edit User Dialog ── */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md bg-white dark:bg-[#0f1115] border border-neutral-200 dark:border-neutral-800 rounded-xl p-0 overflow-hidden shadow-2xl">
-          <DialogHeader className="p-5 pb-4 border-b border-neutral-100 dark:border-neutral-800">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-                <UserCog className="h-4 w-4" />
-              </div>
-              <div>
-                <DialogTitle className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-                  {dialogMode === "create" ? "Tambah Akun Baru" : "Edit Akun Pengguna"}
-                </DialogTitle>
-                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                  {dialogMode === "create" ? "Daftarkan akun administrator atau guru baru" : "Perbarui informasi akun dan kata sandi"}
-                </p>
-              </div>
+      <NeonModal
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        title={dialogMode === "create" ? "Tambah Akun Baru" : "Edit Akun Pengguna"}
+        subtitle={dialogMode === "create" ? "Daftarkan akun administrator atau guru baru" : "Perbarui informasi akun dan kata sandi"}
+        icon={UserCog}
+        size="md"
+        asForm
+        onSubmit={handleSaveUser}
+        submitLabel={isSubmitting ? "Menyimpan..." : (dialogMode === "create" ? "Simpan Akun" : "Perbarui Akun")}
+        cancelLabel="Batal"
+        isSubmitting={isSubmitting}
+      >
+        <div className="space-y-4">
+          {formError && (
+            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
+              {formError}
             </div>
-          </DialogHeader>
+          )}
 
-          <form onSubmit={handleSaveUser} className="p-5 space-y-4">
-            {formError && (
-              <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
-                {formError}
-              </div>
-            )}
-
-            <FormField id="role" label="Role / Hak Akses">
-              <select
-                id="role"
-                value={formData.role}
-                onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as any }))}
-                className="w-full h-9 px-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-xs font-medium text-neutral-900 dark:text-neutral-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
-              >
-                <option value="admin">Administrator (Akses Penuh)</option>
-                <option value="teacher">{terminology.teacher} (Akses Guru & Nilai)</option>
-              </select>
-            </FormField>
-
-            <FormField id="name" label="Nama Lengkap">
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder={`Contoh: Nama ${formData.role === "admin" ? "Administrator" : terminology.teacher}`}
-                required
-                className="h-9 text-xs"
-              />
-            </FormField>
-
-            <FormField id="email" label="Email Login (Opsional)">
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="admin@sekolah.sch.id"
-                className="h-9 text-xs"
-              />
-            </FormField>
-
-            <FormField
-              id="password"
-              label={dialogMode === "edit" ? "Kata Sandi Baru (Opsional)" : "Kata Sandi Awal"}
+          <FormField id="role" label="Role / Hak Akses">
+            <select
+              id="role"
+              value={formData.role}
+              onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as any }))}
+              className="w-full h-9 px-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-xs font-medium text-neutral-900 dark:text-neutral-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
             >
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                placeholder={dialogMode === "edit" ? "Kosongkan jika tidak ingin mengubah" : "Minimal 8 karakter (default: 12345678)"}
-                className="h-9 text-xs"
-              />
-            </FormField>
+              <option value="admin">Administrator (Akses Penuh)</option>
+              <option value="teacher">{terminology.teacher} (Akses Guru & Nilai)</option>
+            </select>
+          </FormField>
 
-            <DialogFooter className="pt-3 border-t border-neutral-100 dark:border-neutral-800 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-                className="h-8 text-xs font-semibold rounded-lg"
-              >
-                Batal
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="h-8 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs cursor-pointer"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                    Menyimpan...
-                  </>
-                ) : (
-                  "Simpan Akun"
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          <FormField id="name" label="Nama Lengkap">
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder={`Contoh: Nama ${formData.role === "admin" ? "Administrator" : terminology.teacher}`}
+              required
+              className="h-9 text-xs"
+            />
+          </FormField>
+
+          <FormField id="email" label="Email Login (Opsional)">
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              placeholder="admin@sekolah.sch.id"
+              className="h-9 text-xs"
+            />
+          </FormField>
+
+          <FormField
+            id="password"
+            label={dialogMode === "edit" ? "Kata Sandi Baru (Opsional)" : "Kata Sandi Awal"}
+          >
+            <Input
+              id="password"
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+              placeholder={dialogMode === "edit" ? "Kosongkan jika tidak ingin mengubah" : "Minimal 8 karakter (default: 12345678)"}
+              className="h-9 text-xs"
+            />
+          </FormField>
+        </div>
+      </NeonModal>
 
       {/* ── Delete Confirmation Dialog ── */}
       <ConfirmationDialog

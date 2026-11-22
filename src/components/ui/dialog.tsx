@@ -37,7 +37,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-[calc(100vw-2rem)] max-w-xs sm:max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-5xl max-h-[calc(100vh-2rem)] translate-x-[-50%] translate-y-[-50%] gap-3 sm:gap-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 p-4 sm:p-6 shadow-2xl duration-150 overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+        "fixed left-1/2 top-1/2 z-50 grid w-[calc(100vw-1.5rem)] sm:w-full max-w-xs sm:max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-5xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] translate-x-[-50%] translate-y-[-50%] gap-3 sm:gap-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 p-4 sm:p-6 shadow-2xl duration-150 overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
         className
       )}
       {...props}
@@ -60,7 +60,7 @@ const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 DialogHeader.displayName = "DialogHeader";
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0 pt-3 sm:pt-4 border-t border-neutral-100 dark:border-neutral-850", className)} {...props} />
+  <div className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0 pt-3 sm:pt-4 border-t border-neutral-100 dark:border-neutral-850 shrink-0", className)} {...props} />
 );
 DialogFooter.displayName = "DialogFooter";
 

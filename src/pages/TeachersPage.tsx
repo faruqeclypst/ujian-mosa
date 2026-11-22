@@ -46,6 +46,7 @@ import { useExamData } from "../context/ExamDataContext";
 import { useTenant } from "../context/TenantContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "../components/ui/dialog";
+import { NeonModal } from "../components/ui/NeonModal";
 import { TeacherForm, TeacherSubmitPayload } from "../components/forms/TeacherForm";
 import { TeacherTable } from "../components/tables/TeacherTable";
 import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
@@ -54,7 +55,6 @@ import { ExportButton } from "../components/ui/export-button";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
 import { downloadTeacherImportTemplate, exportTeacherToExcel, parseTeacherImportExcel } from "../lib/teacherExcel";
-import { bulkCreateOrFallback, bulkDeleteOrFallback } from "../lib/bulkApi";
 import type { Teacher } from "../types/exam";
 import { NeonStatGrid, NeonStatCard } from "../components/ui/NeonStats";
 
@@ -325,85 +325,49 @@ const TeachersPage = () => {
       });
 
       const failures: string[] = [];
+      for (let i = 0; i < parsed.length; i++) {
+        const row = parsed[i];
+        try {
+          // Logika Generate: Hapus gelar (setelah koma)
+          const namePart = row.name.split(',')[0].trim();
 
-      // Siapkan payload guru: generate username/kode adalah hitungan lokal
-      // (cepat), penyimpanan ke server dilakukan sekaligus di bawah.
-      const teacherPayloads = parsed.map((row) => {
-        // Logika Generate: Hapus gelar (setelah koma)
-        const namePart = row.name.split(',')[0].trim();
+          // 1. Generate Username: kecilkan, ganti spasi jadi _
+          const generatedUsername = namePart.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 
-        // 1. Generate Username: kecilkan, ganti spasi jadi _
-        const generatedUsername = namePart.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+          // 2. Generate Kode: Ambil inisial (Alfaruq Asri -> AA)
+          const generatedCode = namePart
+            .split(/\s+/)
+            .map(word => word[0])
+            .join('')
+            .toUpperCase()
+            .replace(/[^A-Z]/g, '');
 
-        // 2. Generate Kode: Ambil inisial (Alfaruq Asri -> AA)
-        const generatedCode = namePart
-          .split(/\s+/)
-          .map(word => word[0])
-          .join('')
-          .toUpperCase()
-          .replace(/[^A-Z]/g, '');
+          let finalUsername = row.username ? row.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') : '';
+          if (!finalUsername || finalUsername.length < 3) {
+            finalUsername = generatedUsername;
+          }
+          if (!finalUsername || finalUsername.length < 3) {
+            const safeCode = (row.code || generatedCode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            finalUsername = safeCode ? `guru_${safeCode}` : `guru_${Math.floor(100 + Math.random() * 900)}`;
+          }
 
-        let finalUsername = row.username ? row.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') : '';
-        if (!finalUsername || finalUsername.length < 3) {
-          finalUsername = generatedUsername;
-        }
-        if (!finalUsername || finalUsername.length < 3) {
-          const safeCode = (row.code || generatedCode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          finalUsername = safeCode ? `guru_${safeCode}` : `guru_${Math.floor(100 + Math.random() * 900)}`;
-        }
+          await createTeacher({
+            name: row.name,
+            code: row.code || generatedCode,
+            username: finalUsername,
+            subjects: row.subjects,
+          });
 
-        return {
-          name: row.name,
-          code: row.code || generatedCode,
-          username: finalUsername,
-          subjects: row.subjects,
-        };
-      });
-
-      // 1. Buat semua record guru sekaligus lewat bulk native
-      // (1 request + 1 transaksi, menggantikan create satu per satu).
-      const teacherRes = await bulkCreateOrFallback(pb, "teachers", teacherPayloads);
-      teacherRes.errors.forEach((e) => {
-        const row = parsed[e.index];
-        if (row) failures.push(`${row.name} - ${e.message || "Error"}`);
-      });
-      setBatchProgress(prev => ({
-        ...prev,
-        current: teacherRes.created,
-        message: `Mengimport ${terminology.teacher.toLowerCase()} (${teacherRes.created}/${parsed.length})`
-      }));
-
-      // 2. Buat akun login (users) untuk guru yang berhasil dibuat, sekaligus.
-      // Sama seperti alur lama: kegagalan akun hanya peringatan —
-      // record guru tetap terhitung berhasil.
-      const errIdx = new Set(teacherRes.errors.map(e => e.index));
-      const userPayloads: any[] = [];
-      let k = 0;
-      teacherPayloads.forEach((p, idx) => {
-        if (errIdx.has(idx)) return;
-        const teacherId = teacherRes.ids[k++];
-        if (!teacherId) return;
-        userPayloads.push({
-          username: p.username,
-          password: "12345678",
-          passwordConfirm: "12345678",
-          name: p.name,
-          role: "teacher",
-          teacherId,
-          hasChangedPassword: false,
-        });
-      });
-      if (userPayloads.length > 0) {
-        const userRes = await bulkCreateOrFallback(pb, "users", userPayloads);
-        if (userRes.errors.length > 0) {
-          console.warn(`${userRes.errors.length} akun login guru gagal dibuat:`, userRes.errors);
+          setBatchProgress(prev => ({
+            ...prev,
+            current: i + 1,
+            message: `Mengimport ${terminology.teacher.toLowerCase()} (${i + 1}/${parsed.length})`
+          }));
+        } catch (err: any) {
+          console.error(`Gagal import ${row.name}:`, err);
+          failures.push(`${row.name} - ${err.message || "Error"}`);
         }
       }
-      setBatchProgress(prev => ({
-        ...prev,
-        current: parsed.length,
-        message: `Mengimport ${terminology.teacher.toLowerCase()} (${parsed.length}/${parsed.length})`
-      }));
 
       let message = `${parsed.length - failures.length} ${terminology.teacher} berhasil diimport.`;
       if (failures.length > 0) {
@@ -439,25 +403,18 @@ const TeachersPage = () => {
         });
 
         try {
-          // Cari akun login (users) milik guru terpilih dalam 1 query, lalu
-          // hapus akun + record guru sekaligus lewat bulk native.
-          let userIds: string[] = [];
-          try {
-            const filter = selectedIds.map(id => `teacherId = "${id}"`).join(" || ");
-            const userRecs = await pb!.collection("users").getFullList({ filter, fields: "id" });
-            userIds = userRecs.map((u: any) => u.id);
-          } catch (e) {
-            console.warn("Gagal memuat akun login guru:", e);
+          const chunkSize = 10;
+          for (let i = 0; i < selectedIds.length; i += chunkSize) {
+            const chunk = selectedIds.slice(i, i + chunkSize);
+            await Promise.all(chunk.map(id => deleteTeacher(id)));
+
+            const currentProcessed = Math.min(i + chunkSize, selectedIds.length);
+            setBatchProgress(prev => ({
+              ...prev,
+              current: currentProcessed,
+              message: `Menghapus data ${terminology.teacher.toLowerCase()} (${currentProcessed}/${selectedIds.length})`
+            }));
           }
-          if (userIds.length > 0) {
-            await bulkDeleteOrFallback(pb, "users", userIds);
-          }
-          await bulkDeleteOrFallback(pb, "teachers", selectedIds);
-          setBatchProgress(prev => ({
-            ...prev,
-            current: selectedIds.length,
-            message: `Menghapus data ${terminology.teacher.toLowerCase()} (${selectedIds.length}/${selectedIds.length})`
-          }));
           setSelectedIds([]);
         } catch (error) {
           console.error(`Gagal menghapus ${terminology.teacher.toLowerCase()} massal`, error);
@@ -747,40 +704,32 @@ const TeachersPage = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Dialog 
-                  open={isDialogOpen} 
-                  onOpenChange={(open) => {
-                    if (open && !selectedTeacher && subjects.length === 0) {
-                      handleCreateClick();
-                      return;
-                    }
-                    setIsDialogOpen(open);
-                  }}
+                <Button
+                  onClick={handleCreateClick}
+                  size="sm"
+                  className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  <DialogTrigger asChild>
-                    <Button
-                      onClick={handleCreateClick}
-                      size="sm"
-                      className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Tambah {terminology.teacher}</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md bg-white dark:bg-[#0c0d0e] border border-neutral-200 dark:border-neutral-800">
-                    <DialogHeader>
-                      <DialogTitle className="text-sm font-bold text-neutral-900 dark:text-white">
-                        {dialogMode === "edit" ? `Edit Data ${terminology.teacher}` : `Tambah Data ${terminology.teacher}`}
-                      </DialogTitle>
-                    </DialogHeader>
-                    <TeacherForm
-                      defaultValues={defaultValues}
-                      onSubmit={handleSubmitTeacher}
-                      submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
-                      onCancel={() => setIsDialogOpen(false)}
-                    />
-                  </DialogContent>
-                </Dialog>
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Tambah {terminology.teacher}</span>
+                </Button>
+
+                <NeonModal
+                  isOpen={isDialogOpen}
+                  onClose={() => setIsDialogOpen(false)}
+                  title={dialogMode === "edit" ? `Edit Data ${terminology.teacher}` : `Tambah Data ${terminology.teacher}`}
+                  subtitle={`Konfigurasi data guru pengampu mata pelajaran & penugasan`}
+                  icon={Users}
+                  size="md"
+                  noPadding
+                  hideFooter
+                >
+                  <TeacherForm
+                    defaultValues={defaultValues}
+                    onSubmit={handleSubmitTeacher}
+                    submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
+                    onCancel={() => setIsDialogOpen(false)}
+                  />
+                </NeonModal>
               </>
             )}
           </div>

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
 import { useExamData } from "../../context/ExamDataContext";
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Input } from "../ui/input";
 import FormField from "./FormField";
 import { useTenant } from "../../context/TenantContext";
@@ -95,15 +95,16 @@ export const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
   };
 
   return (
-    <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
-      {subjects.length === 0 && (
-        <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-900 dark:text-amber-200 text-xs flex items-center gap-2.5">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span>
-            Data {terminology.subject.toLowerCase()} belum ada. Data {terminology.teacher.toLowerCase()} tidak dapat disimpan tanpa mata pelajaran.
-          </span>
-        </div>
-      )}
+    <form onSubmit={handleSubmit(submitHandler)} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="p-5 sm:p-6 space-y-4 flex-1 min-h-0 overflow-y-auto">
+        {subjects.length === 0 && (
+          <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-900 dark:text-amber-200 text-xs flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              Data {terminology.subject.toLowerCase()} belum ada. Data {terminology.teacher.toLowerCase()} tidak dapat disimpan tanpa mata pelajaran.
+            </span>
+          </div>
+        )}
 
       <FormField id="name" label={`Nama ${terminology.teacher}`} error={errors.name}>
         <Input id="name" placeholder={`Masukkan nama ${terminology.teacher.toLowerCase()}`} {...register("name")} />
@@ -175,24 +176,30 @@ export const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
         )}
       </FormField>
       
-      <div className="flex justify-end gap-2 pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
+      </div>
+      
+      <div className="px-5 sm:px-6 py-3 sm:py-3.5 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/70 dark:bg-[#111214]/80 flex items-center justify-end gap-2.5 shrink-0 z-10">
         {onCancel && (
-          <Button 
+          <NeonButton 
             type="button" 
-            variant="outline" 
+            variant="secondary" 
+            size="sm"
             onClick={onCancel}
-            className="border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg text-xs font-semibold text-neutral-700 dark:text-neutral-300 shadow-2xs transition-colors cursor-pointer"
+            disabled={isSubmitting}
           >
             Batal
-          </Button>
+          </NeonButton>
         )}
-        <Button
+        <NeonButton
           type="submit"
+          variant="primary"
+          color="brand"
+          size="sm"
+          loading={isSubmitting}
           disabled={isSubmitting || subjects.length === 0}
-          className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition-colors cursor-pointer px-5 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? "Menyimpan..." : submitLabel}
-        </Button>
+          {submitLabel}
+        </NeonButton>
       </div>
     </form>
   );

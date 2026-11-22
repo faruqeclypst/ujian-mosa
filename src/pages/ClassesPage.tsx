@@ -41,6 +41,7 @@ import { useExamData } from "../context/ExamDataContext";
 import { useTenant } from "../context/TenantContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "../components/ui/dialog";
+import { NeonModal } from "../components/ui/NeonModal";
 import { ClassForm, ClassFormValues } from "../components/forms/ClassForm";
 import { ClassTable } from "../components/tables/ClassTable";
 import { useAsyncAction } from "../hooks/useAsyncAction";
@@ -429,31 +430,32 @@ const ClassesPage = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      onClick={handleCreateClick}
-                      size="sm"
-                      className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Tambah {terminology.class}</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md bg-white dark:bg-[#0c0d0e] border border-neutral-200 dark:border-neutral-800">
-                    <DialogHeader>
-                      <DialogTitle className="text-sm font-bold text-neutral-900 dark:text-white">
-                        {dialogMode === "edit" ? `Edit Data ${terminology.class}` : `Tambah Data ${terminology.class}`}
-                      </DialogTitle>
-                    </DialogHeader>
-                    <ClassForm
-                      defaultValues={defaultValues}
-                      onSubmit={handleSubmitClass}
-                      submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
-                      onCancel={() => setIsDialogOpen(false)}
-                    />
-                  </DialogContent>
-                </Dialog>
+                <Button
+                  onClick={handleCreateClick}
+                  size="sm"
+                  className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Tambah {terminology.class}</span>
+                </Button>
+
+                <NeonModal
+                  isOpen={isDialogOpen}
+                  onClose={() => setIsDialogOpen(false)}
+                  title={dialogMode === "edit" ? `Edit Data ${terminology.class}` : `Tambah Data ${terminology.class}`}
+                  subtitle={`Konfigurasi data master ${terminology.class.toLowerCase()} peserta ujian`}
+                  icon={GraduationCap}
+                  size="sm"
+                  noPadding
+                  hideFooter
+                >
+                  <ClassForm
+                    defaultValues={defaultValues}
+                    onSubmit={handleSubmitClass}
+                    submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
+                    onCancel={() => setIsDialogOpen(false)}
+                  />
+                </NeonModal>
               </>
             )}
           </div>

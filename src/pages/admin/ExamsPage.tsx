@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
+import { NeonButton } from "../../components/ui/NeonButton";
+import { NeonModal } from "../../components/ui/NeonModal";
 import { NeonSwitch } from "../../components/ui/NeonSwitch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Progress } from "../../components/ui/progress";
@@ -2525,7 +2527,7 @@ const ExamsPage = () => {
 
       {/* Dialog Create/Edit (Neon Console Style) */}
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open && !isSubmitting) setIsDialogOpen(false); }}>
-        <DialogContent className="max-w-lg w-[95vw] overflow-hidden p-0 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shadow-2xl flex flex-col gap-0">
+        <DialogContent className="max-w-lg w-[calc(100vw-1.5rem)] sm:w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] overflow-hidden p-0 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shadow-2xl flex flex-col gap-0">
           {/* Header Dialog */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 shrink-0 pr-12">
             <div className="flex items-center gap-3">
@@ -2551,8 +2553,8 @@ const ExamsPage = () => {
           </div>
 
           {/* Form Body */}
-          <form onSubmit={handleSubmit} className="flex flex-col">
-            <div className="p-5 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div className="p-5 sm:p-6 space-y-4 flex-1 min-h-0 overflow-y-auto">
               {/* Field 1: Judul Bank Soal & Group */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -2741,31 +2743,25 @@ const ExamsPage = () => {
 
             {/* Footer Bar */}
             <div className="px-5 py-3.5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 flex items-center justify-between shrink-0">
-              <Button
+              <NeonButton
                 type="button"
-                variant="ghost"
+                variant="secondary"
+                size="sm"
                 disabled={isSubmitting}
                 onClick={() => setIsDialogOpen(false)}
-                className="h-8.5 px-3.5 text-xs font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 cursor-pointer disabled:opacity-50"
               >
                 Batal
-              </Button>
-              <Button
+              </NeonButton>
+              <NeonButton
                 type="submit"
+                variant="primary"
+                color="brand"
+                size="sm"
                 disabled={(role !== "admin" && availableSubjectsForForm.length === 0) || isSubmitting}
-                className="h-8.5 px-4 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                loading={isSubmitting}
               >
-                {isSubmitting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-                ) : (
-                  <Check className="h-3.5 w-3.5 shrink-0" />
-                )}
-                <span>
-                  {isSubmitting
-                    ? "Menyimpan..."
-                    : (dialogMode === "edit" ? "Perbarui Bank Soal" : "Simpan Bank Soal")}
-                </span>
-              </Button>
+                {dialogMode === "edit" ? "Perbarui Bank Soal" : "Simpan Bank Soal"}
+              </NeonButton>
             </div>
           </form>
         </DialogContent>
@@ -2805,104 +2801,92 @@ const ExamsPage = () => {
       />
 
       {/* Modal Atur Group Massal */}
-      <Dialog open={batchGroupDialogOpen} onOpenChange={setBatchGroupDialogOpen}>
-        <DialogContent className="max-w-md w-[calc(100vw-2rem)] bg-white dark:bg-[#0c0d0e] rounded-2xl overflow-hidden p-0 border border-neutral-200/90 dark:border-neutral-800 shadow-2xl dark:shadow-[0_0_50px_rgba(16,185,129,0.08)]">
-          <div className="px-5 py-4 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-[#111214] flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-              <Folder className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)] shrink-0" />
-                <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight truncate">
-                  Atur Group Bank Soal
-                </h3>
-              </div>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
-                Terapkan group untuk <span className="font-semibold text-neutral-800 dark:text-neutral-200">{selectedIds.length} bank soal</span> terpilih.
-              </p>
-            </div>
-          </div>
-
-          <div className="p-5 space-y-4 bg-white dark:bg-[#0c0d0e]">
-            <div>
-              <label className="block text-xs font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
-                Nama Group Bank Soal
-              </label>
-              <Input
-                list="batch-group-suggestions-ex"
-                placeholder="Contoh: Ujian Semester 2 2026 / Latihan Mandiri"
-                value={batchGroupInput}
-                onChange={(e) => setBatchGroupInput(e.target.value)}
-                className="h-10 text-xs rounded-xl bg-neutral-50/70 dark:bg-neutral-900/80 border-neutral-200 dark:border-neutral-800 focus-visible:ring-2 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
-                autoFocus
-              />
-              <datalist id="batch-group-suggestions-ex">
-                {availableGroups.map((grp) => (
-                  <option key={grp} value={grp} />
-                ))}
-              </datalist>
-            </div>
-
-            {availableGroups.length > 0 && (
-              <div>
-                <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 block mb-1.5">
-                  Atau klik group yang sudah ada:
-                </span>
-                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800">
-                  {availableGroups.map((grp) => (
-                    <button
-                      key={grp}
-                      type="button"
-                      onClick={() => setBatchGroupInput(grp)}
-                      className={cn(
-                        "px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer border select-none",
-                        batchGroupInput.trim() === grp
-                          ? "bg-emerald-600 text-white border-emerald-600 font-semibold shadow-xs"
-                          : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-emerald-500"
-                      )}
-                    >
-                      {grp}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="p-3.5 bg-neutral-50/70 dark:bg-neutral-900/50 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between sm:justify-between gap-2">
-            <Button
+      <NeonModal
+        isOpen={batchGroupDialogOpen}
+        onClose={() => setBatchGroupDialogOpen(false)}
+        title="Atur Group Bank Soal"
+        subtitle={`Terapkan group untuk ${selectedIds.length} bank soal terpilih.`}
+        icon={Folder}
+        size="sm"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <NeonButton
               type="button"
-              variant="outline"
+              variant="dangerGhost"
               size="sm"
               onClick={() => handleApplyBatchGroup("")}
-              className="h-8.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/40 rounded-xl"
             >
               Kosongkan Group
-            </Button>
+            </NeonButton>
             <div className="flex items-center gap-2">
-              <Button
+              <NeonButton
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 size="sm"
                 onClick={() => setBatchGroupDialogOpen(false)}
-                className="h-8.5 text-xs rounded-xl"
               >
                 Batal
-              </Button>
-              <Button
+              </NeonButton>
+              <NeonButton
                 type="button"
+                variant="primary"
+                color="brand"
                 size="sm"
                 onClick={() => handleApplyBatchGroup(batchGroupInput)}
                 disabled={!batchGroupInput.trim()}
-                className="h-8.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/25 disabled:opacity-40"
               >
                 Terapkan Group
-              </Button>
+              </NeonButton>
             </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+              Nama Group Bank Soal
+            </label>
+            <Input
+              list="batch-group-suggestions-ex"
+              placeholder="Contoh: Ujian Semester 2 2026 / Latihan Mandiri"
+              value={batchGroupInput}
+              onChange={(e) => setBatchGroupInput(e.target.value)}
+              className="h-10 text-xs rounded-xl bg-neutral-50/70 dark:bg-neutral-900/80 border-neutral-200 dark:border-neutral-800 focus-visible:ring-2 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
+              autoFocus
+            />
+            <datalist id="batch-group-suggestions-ex">
+              {availableGroups.map((grp) => (
+                <option key={grp} value={grp} />
+              ))}
+            </datalist>
+          </div>
+
+          {availableGroups.length > 0 && (
+            <div>
+              <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 block mb-1.5">
+                Atau klik group yang sudah ada:
+              </span>
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800">
+                {availableGroups.map((grp) => (
+                  <button
+                    key={grp}
+                    type="button"
+                    onClick={() => setBatchGroupInput(grp)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer border select-none",
+                      batchGroupInput.trim() === grp
+                        ? "bg-emerald-600 text-white border-emerald-600 font-semibold shadow-xs"
+                        : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-emerald-500"
+                    )}
+                  >
+                    {grp}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </NeonModal>
 
       {/* Batch Operation Progress Dialog */}
       <BatchProgressDialog progress={batchProgress} />

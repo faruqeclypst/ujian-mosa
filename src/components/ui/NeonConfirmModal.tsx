@@ -136,11 +136,11 @@ export const NeonConfirmModal: React.FC<NeonConfirmModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !effectiveLoading) onClose(); }}>
       <DialogContent
-        className="max-w-md w-[calc(100vw-2rem)] bg-white dark:bg-[#0c0d0e] border border-neutral-200/90 dark:border-neutral-800 rounded-2xl shadow-2xl p-0 overflow-hidden"
+        className="max-w-md w-[calc(100vw-1.5rem)] sm:w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] bg-white dark:bg-[#0c0d0e] border border-neutral-200/90 dark:border-neutral-800 rounded-2xl shadow-2xl p-0 flex flex-col overflow-hidden"
         hideClose={effectiveLoading}
       >
         {/* Header Bar */}
-        <div className="px-5 sm:px-6 py-4 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-[#111214] flex items-center gap-3">
+        <div className="px-5 sm:px-6 py-4 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-[#111214] flex items-center gap-3 shrink-0">
           <div
             className={`w-10 h-10 rounded-xl ${config.iconBoxClass} flex items-center justify-center shrink-0`}
           >
@@ -157,7 +157,7 @@ export const NeonConfirmModal: React.FC<NeonConfirmModalProps> = ({
         </div>
 
         {/* Body Content */}
-        <div className="p-5 sm:p-6 space-y-4 bg-white dark:bg-[#0c0d0e]">
+        <div className="p-5 sm:p-6 space-y-4 bg-white dark:bg-[#0c0d0e] flex-1 min-h-0 overflow-y-auto">
           <DialogDescription asChild>
             <div className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed text-left">
               {description}
@@ -187,7 +187,7 @@ export const NeonConfirmModal: React.FC<NeonConfirmModalProps> = ({
         </div>
 
         {/* Footer Bar */}
-        <div className="px-5 sm:px-6 py-3.5 sm:py-4 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-[#111214]/60 flex items-center justify-end gap-2.5">
+        <div className="px-5 sm:px-6 py-3.5 sm:py-4 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-[#111214]/60 flex items-center justify-end gap-2.5 shrink-0">
           {showCancel && (
             <NeonButton
               type="button"

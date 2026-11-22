@@ -26,5 +26,6 @@ export * from "./NeonSwitch";
 export * from "./NeonProgress";
 export * from "./NeonProgressModal";
 export * from "./NeonConfirmModal";
+export * from "./NeonModal";
 export * from "./NeonButton";
 export * from "./NeonFilterPopover";

@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-import { Button } from "../ui/button";
+import { NeonButton } from "../ui/NeonButton";
 import { Input } from "../ui/input";
 import FormField from "./FormField";
 import { useTenant } from "../../context/TenantContext";
@@ -61,29 +61,35 @@ export const SubjectForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
   };
 
   return (
-    <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
-      <FormField id="name" label={terminology.subject} error={errors.name}>
-        <Input id="name" placeholder="Contoh: Matematika, Bahasa Inggris" {...register("name")} />
-      </FormField>
+    <form onSubmit={handleSubmit(submitHandler)} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="p-5 sm:p-6 space-y-4 flex-1 min-h-0 overflow-y-auto">
+        <FormField id="name" label={terminology.subject} error={errors.name}>
+          <Input id="name" placeholder="Contoh: Matematika, Bahasa Inggris" {...register("name")} />
+        </FormField>
+      </div>
       
-      <div className="flex justify-end gap-2 pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
+      <div className="px-5 sm:px-6 py-3 sm:py-3.5 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/70 dark:bg-[#111214]/80 flex items-center justify-end gap-2.5 shrink-0 z-10">
         {onCancel && (
-          <Button 
+          <NeonButton 
             type="button" 
-            variant="outline" 
+            variant="secondary" 
+            size="sm"
             onClick={onCancel}
-            className="border-neutral-200 dark:border-neutral-750 bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg text-xs font-semibold text-neutral-700 dark:text-neutral-300 shadow-2xs transition-colors cursor-pointer"
+            disabled={isSubmitting}
           >
             Batal
-          </Button>
+          </NeonButton>
         )}
-        <Button
+        <NeonButton
           type="submit"
+          variant="primary"
+          color="brand"
+          size="sm"
+          loading={isSubmitting}
           disabled={isSubmitting}
-          className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
         >
-          {isSubmitting ? "Menyimpan..." : submitLabel}
-        </Button>
+          {submitLabel}
+        </NeonButton>
       </div>
     </form>
   );

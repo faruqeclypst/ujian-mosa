@@ -30,7 +30,8 @@ import {
   Info,
   ClipboardList,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  UserPlus
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { bulkCreateOrFallback, bulkUpdateOrFallback } from "../lib/bulkApi";
@@ -62,6 +63,7 @@ import { useTenant } from "../context/TenantContext";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "../components/ui/dialog";
+import { NeonModal } from "../components/ui/NeonModal";
 import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
 import { downloadStudentImportTemplate, exportStudentToExcel, exportStudentLoginsToExcel, parseStudentImportExcel, exportAllStudentScores } from "../lib/studentExcel";
 import type { StudentData } from "../types/exam";
@@ -1342,32 +1344,26 @@ const StudentsPage = () => {
                 )}
 
                 {role === "admin" && (
-                  <Dialog 
-                    open={isDialogOpen} 
-                    onOpenChange={(open) => {
-                      if (open && dialogMode === "create" && classes.length === 0) {
-                        handleCreateClick();
-                        return;
-                      }
-                      setIsDialogOpen(open);
-                    }}
-                  >
-                    <DialogTrigger asChild>
-                      <Button
-                        onClick={handleCreateClick}
-                        size="sm"
-                        className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span>Tambah {terminology.student}</span>
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#0c0d0e] border border-neutral-200 dark:border-neutral-800">
-                      <DialogHeader>
-                        <DialogTitle className="text-sm font-bold text-neutral-900 dark:text-white">
-                          {dialogMode === "edit" ? `Edit Data ${terminology.student}` : `Tambah Data ${terminology.student}`}
-                        </DialogTitle>
-                      </DialogHeader>
+                  <>
+                    <Button
+                      onClick={handleCreateClick}
+                      size="sm"
+                      className="h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Tambah {terminology.student}</span>
+                    </Button>
+
+                    <NeonModal
+                      isOpen={isDialogOpen}
+                      onClose={() => setIsDialogOpen(false)}
+                      title={dialogMode === "edit" ? `Edit Data ${terminology.student}` : `Tambah Data ${terminology.student}`}
+                      subtitle={`Kelola profil, pembagian kelas, dan akun ujian ${terminology.student.toLowerCase()}`}
+                      icon={UserPlus}
+                      size="lg"
+                      noPadding
+                      hideFooter
+                    >
                       <StudentForm
                         classes={classes}
                         defaultValues={defaultValues}
@@ -1375,8 +1371,8 @@ const StudentsPage = () => {
                         submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
                         onCancel={() => setIsDialogOpen(false)}
                       />
-                    </DialogContent>
-                  </Dialog>
+                    </NeonModal>
+                  </>
                 )}
               </>
             )}
