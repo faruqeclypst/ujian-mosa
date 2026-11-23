@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Reorder } from "framer-motion";
+import { Reorder, useDragControls } from "framer-motion";
 import { MathText } from "../ui/MathText";
 import { SmartImage } from "../ui/smart-image";
 import { Card, CardHeader, CardContent } from "../ui/card";
@@ -12,6 +12,8 @@ import {
   X,
   ArrowRight,
   GripVertical,
+  ChevronUp,
+  ChevronDown,
   Lock,
 } from "lucide-react";
 
@@ -787,6 +789,78 @@ export interface QuestionRendererProps {
 }
 
 /**
+ * SortableItem — satu baris soal urutkan/drag_drop.
+ * Drag hanya dimulai dari pegangan (grip) di kanan kartu, supaya badan
+ * kartu tetap bisa dipakai untuk scroll halaman di layar sentuh.
+ * Tombol panah naik/turun disediakan sebagai cara pindah yang pasti
+ * terjangkau di semua perangkat.
+ */
+function SortableItem({
+  id,
+  index,
+  total,
+  text,
+  hasBeenTouched,
+  fontSize = 1,
+  onMove,
+}: {
+  id: string;
+  index: number;
+  total: number;
+  text: string;
+  hasBeenTouched: boolean;
+  fontSize?: number;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  const controls = useDragControls();
+  return (
+    <Reorder.Item
+      value={id}
+      dragListener={false}
+      dragControls={controls}
+      className={`flex items-center gap-3 sm:gap-6 p-4 sm:p-5 border rounded-2xl shadow-sm group relative overflow-hidden transition-colors ${hasBeenTouched ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40" : "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700"}`}
+    >
+      <div className={`w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm ${hasBeenTouched ? "bg-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400"}`}>
+        {String.fromCharCode(65 + index)}
+      </div>
+      <div className="flex-1 font-serif text-slate-800 dark:text-slate-200" style={{ fontSize: `${15 * fontSize}px` }}>
+        {text}
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <div className="flex flex-col">
+          <button
+            type="button"
+            aria-label="Geser ke atas"
+            disabled={index === 0}
+            onClick={() => onMove(-1)}
+            className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-30 disabled:hover:bg-transparent transition-all active:scale-90"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Geser ke bawah"
+            disabled={index === total - 1}
+            onClick={() => onMove(1)}
+            className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-30 disabled:hover:bg-transparent transition-all active:scale-90"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
+        <div
+          role="button"
+          aria-label="Tahan dan geser untuk mengurutkan"
+          onPointerDown={(e) => controls.start(e)}
+          className={`p-2.5 rounded-lg cursor-grab active:cursor-grabbing touch-none ${hasBeenTouched ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-slate-50 dark:bg-slate-900"}`}
+        >
+          <GripVertical className={`w-5 h-5 ${hasBeenTouched ? "text-emerald-400" : "text-slate-300"}`} />
+        </div>
+      </div>
+    </Reorder.Item>
+  );
+}
+
+/**
  * QuestionRenderer — kartu soal lengkap (header + badan jawaban) yang IDENTIK
  * antara CBT siswa dan mode simulasi guru. Satu-satunya sumber kebenaran
  * tampilan soal.
@@ -811,6 +885,8 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
   // State drag-and-drop untuk menjodohkan (transient, per soal)
   const [draggingOption, setDraggingOption] = useState<string | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+  // Opsi menjodohkan yang dipilih lewat ketukan (alur sentuh: pilih dulu, lalu ketuk slot)
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
   return (
       <Card className="rounded-[20px] sm:rounded-[35px] border border-slate-100 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-sm transition-all duration-300">
@@ -1376,9 +1452,9 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                       });
                     }}
                     placeholder="..."
-                    className="inline-block mx-1 px-1.5 py-0.5 rounded-md border border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-slate-800 dark:text-slate-200 font-medium shadow-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 outline-none transition-all align-middle"
+                    className="inline-block mx-1 px-1.5 py-1 rounded-md border border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-slate-800 dark:text-slate-200 font-medium shadow-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 outline-none transition-all align-middle"
                     style={{
-                      width: `${Math.max(3, blankVal.length + 1)}ch`,
+                      width: `${Math.max(4.5, blankVal.length + 1)}ch`,
                       maxWidth: "100%",
                       fontSize: "16px",
                       lineHeight: 1
@@ -1538,7 +1614,11 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
             })()
           )}
           {question.type === "menjodohkan" && (
-            <div className="flex flex-col lg:flex-row gap-6">
+            <div className="space-y-3">
+              <p className="text-xs text-slate-400 dark:text-slate-500 font-medium px-1">
+                Ketuk jawaban hingga terpilih, lalu ketuk kotak pasangannya. Ketuk kotak yang sudah terisi untuk mengosongkannya.
+              </p>
+              <div className="flex flex-col lg:flex-row gap-6">
               <div className="flex-1 space-y-3">
                 {(question.pairs || []).map(p => {
                   const sA = answer || {}; const v = sA[p.id];
@@ -1556,17 +1636,29 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                           e.preventDefault();
                           setDragOverSlot(null);
                           if (draggingOption) {
-                            onAnswer( { ...(answer || {}), [p.id]: draggingOption });
+                            onAnswer({ ...(answer || {}), [p.id]: draggingOption });
                             setDraggingOption(null);
                           }
                         }}
-                        onClick={() => { if (v) { const n = { ...sA }; delete n[p.id]; onAnswer( n); } }}
-                        className={`flex-1 p-1 rounded-xl border-2 border-dashed flex items-center justify-center min-h-[50px] transition-all ${dragOverSlot === p.id && !v ? "bg-emerald-100/50 dark:bg-emerald-900/30 border-emerald-500 scale-[1.02]" :
+                        onClick={() => {
+                          if (selectedOption) {
+                            const next = { ...(answer || {}) };
+                            // Lepas dulu dari kotak lain bila jawaban yang sama sudah terpasang
+                            Object.keys(next).forEach(k => { if (next[k] === selectedOption) delete next[k]; });
+                            next[p.id] = selectedOption;
+                            onAnswer(next);
+                            setSelectedOption(null);
+                          } else if (v) {
+                            const n = { ...sA }; delete n[p.id]; onAnswer(n);
+                          }
+                        }}
+                        className={`flex-1 p-1 rounded-xl border-2 border-dashed flex items-center justify-center min-h-[52px] transition-all ${dragOverSlot === p.id && !v ? "bg-emerald-100/50 dark:bg-emerald-900/30 border-emerald-500 scale-[1.02]" :
                             v ? "bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-400/50 cursor-pointer" :
-                              "bg-slate-50/30 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"
+                              selectedOption ? "bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-400 cursor-pointer" :
+                                "bg-slate-50/30 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"
                           }`}
                       >
-                        {v ? <div className="w-full h-full flex items-center justify-center bg-emerald-600 text-white rounded-lg p-2 font-serif shadow-sm" style={{ fontSize: `${14 * fontSize}px` }}>{v}</div> : <span className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase">Drop Disini</span>}
+                        {v ? <div className="w-full h-full flex items-center justify-center bg-emerald-600 text-white rounded-lg p-2 font-serif shadow-sm" style={{ fontSize: `${14 * fontSize}px` }}>{v}</div> : <span className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase">{selectedOption ? "Ketuk untuk memasang" : "Drop Disini"}</span>}
                       </div>
                     </div>
                   );
@@ -1579,11 +1671,15 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                     draggable
                     onDragStart={() => setDraggingOption(o)}
                     onDragEnd={() => { setDraggingOption(null); setDragOverSlot(null); }}
-                    onClick={() => { const p = (question.pairs || []).find(x => !(answer || {})[x.id]); if (p) onAnswer( { ...(answer || {}), [p.id]: o }); }}
-                    className={`px-3 py-2 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl font-serif text-emerald-600 dark:text-emerald-400 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all cursor-grab active:cursor-grabbing select-none ${draggingOption === o ? "opacity-50 scale-95" : ""}`}
+                    onClick={() => setSelectedOption(selectedOption === o ? null : o)}
+                    className={`px-3 py-2.5 bg-white dark:bg-slate-800 border-2 rounded-xl font-serif text-emerald-600 dark:text-emerald-400 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing select-none ${selectedOption === o ? "border-emerald-500 ring-2 ring-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/40 scale-[1.03]" : "border-slate-100 dark:border-slate-700 hover:border-emerald-300"} ${draggingOption === o ? "opacity-50 scale-95" : ""}`}
                     style={{ fontSize: `${14 * fontSize}px` }}
                   >{o}</div>
                 ))}
+                {(matchingOptions || []).filter(o => !Object.values(answer || {}).includes(o)).length === 0 && (
+                  <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">Semua jawaban sudah terpasang.</p>
+                )}
+              </div>
               </div>
             </div>
           )}
@@ -1600,22 +1696,46 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                 </p>
               </div>
             ) : (
-              <textarea value={answer || ""} onChange={(e) => onAnswer( e.target.value)} placeholder={question.type === "uraian" ? 'Tuliskan jawaban Anda di sini secara lengkap...\n\n(Isi "lembar ujian" jika Anda mengerjakan di lembar ujian kertas)' : 'Tuliskan jawaban Anda...\n(Isi "lembar ujian" jika Anda mengerjakan di lembar ujian)'} rows={question.type === "uraian" ? 10 : 3} className="w-full p-6 sm:p-8 rounded-[30px] border-2 border-slate-100 dark:border-slate-800 bg-[#f8fafc] dark:bg-slate-950 font-bold text-sm sm:text-base resize-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all outline-none" />
+              <textarea value={answer || ""} onChange={(e) => onAnswer( e.target.value)} placeholder={question.type === "uraian" ? 'Tuliskan jawaban Anda di sini secara lengkap...\n\n(Isi "lembar ujian" jika Anda mengerjakan di lembar ujian kertas)' : 'Tuliskan jawaban Anda...\n(Isi "lembar ujian" jika Anda mengerjakan di lembar ujian)'} rows={question.type === "uraian" ? 10 : 3} className="w-full p-6 sm:p-8 rounded-[30px] border-2 border-slate-100 dark:border-slate-800 bg-[#f8fafc] dark:bg-slate-950 font-bold text-base resize-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all outline-none" />
             )
           )}
           {(question.type === "urutkan" || question.type === "drag_drop") && (() => {
             const savedOrder = Array.isArray(answer) ? answer : null;
             const shuffledOrder = Array.isArray(itemsOrder) ? itemsOrder : null;
             const defaultOrder = (question.items || []).map(it => it.id);
-            const displayOrder = savedOrder || shuffledOrder || defaultOrder;
+            const displayOrder: string[] = savedOrder || shuffledOrder || defaultOrder;
             const hasBeenTouched = !!savedOrder; // Siswa sudah pernah geser
             if (!displayOrder || displayOrder.length === 0) return null;
+            const moveItem = (idx: number, dir: -1 | 1) => {
+              const target = idx + dir;
+              if (target < 0 || target >= displayOrder.length) return;
+              const next = [...displayOrder];
+              [next[idx], next[target]] = [next[target], next[idx]];
+              onAnswer(next);
+            };
             return (
-              <Reorder.Group axis="y" values={displayOrder} onReorder={(o: string[]) => onAnswer( o)} className="space-y-2">
-                {displayOrder.map((id: string, i: number) => {
-                  const it = question.items?.find(x => x.id === id); return <Reorder.Item key={id} value={id} className={`flex items-center gap-4 sm:gap-6 p-4 sm:p-5 border rounded-2xl shadow-sm cursor-grab active:cursor-grabbing group relative overflow-hidden transition-colors ${hasBeenTouched ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40" : "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700"}`}><div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm ${hasBeenTouched ? "bg-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400"}`}>{String.fromCharCode(65 + i)}</div><div className="flex-1 font-serif text-slate-800 dark:text-slate-200" style={{ fontSize: `${15 * fontSize}px` }}>{it?.text || ""}</div><div className={`p-2 rounded-lg ${hasBeenTouched ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-slate-50 dark:bg-slate-900"}`}><GripVertical className={`w-4 h-4 sm:w-5 sm:h-5 ${hasBeenTouched ? "text-emerald-400" : "text-slate-300"}`} /></div></Reorder.Item>;
-                })}
-              </Reorder.Group>
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400 dark:text-slate-500 font-medium px-1">
+                  Tahan pegangan di kanan kartu lalu geser untuk mengurutkan, atau gunakan tombol panah naik/turun.
+                </p>
+                <Reorder.Group axis="y" values={displayOrder} onReorder={(o: string[]) => onAnswer(o)} className="space-y-2">
+                  {displayOrder.map((id: string, i: number) => {
+                    const it = question.items?.find(x => x.id === id);
+                    return (
+                      <SortableItem
+                        key={id}
+                        id={id}
+                        index={i}
+                        total={displayOrder.length}
+                        text={it?.text || ""}
+                        hasBeenTouched={hasBeenTouched}
+                        fontSize={fontSize}
+                        onMove={(dir) => moveItem(i, dir)}
+                      />
+                    );
+                  })}
+                </Reorder.Group>
+              </div>
             );
           })()}
         </CardContent>
