@@ -23,6 +23,7 @@ interface TeacherTableProps {
   activeKey?: string;
   onRowClick?: (teacher: Teacher) => void;
   subjectsCount?: number;
+  batchActions?: React.ReactNode;
 }
 
 export const TeacherTable = ({ 
@@ -35,7 +36,8 @@ export const TeacherTable = ({
   isLoading,
   activeKey,
   onRowClick,
-  subjectsCount
+  subjectsCount,
+  batchActions
 }: TeacherTableProps) => {
   const { terminology } = useTenant();
   const [search, setSearch] = useState("");
@@ -216,6 +218,7 @@ export const TeacherTable = ({
       selectable
       selectedKeys={selectedIds}
       onSelectionChange={onSelectChange}
+      batchActions={batchActions}
       searchValue={search}
       onSearchChange={setSearch}
       searchPlaceholder={`Cari nama ${terminology.teacher.toLowerCase()}, kode, atau username...`}

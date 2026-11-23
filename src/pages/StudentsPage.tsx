@@ -1132,105 +1132,6 @@ const StudentsPage = () => {
               </>
             ) : (
               <>
-                {selectedIds.length > 0 && role === "admin" && (
-                  <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="h-8 px-3 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                        >
-                          <Users2 className="h-3.5 w-3.5" />
-                          <span>Aksi ({selectedIds.length})</span>
-                          <ChevronDown className="h-3 w-3 opacity-60" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl shadow-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0f1115] z-[100]">
-                        <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 px-2.5 py-1.5 text-left">Opsi Massal</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => setTimeout(() => setIsBatchOpen(true), 150)}
-                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                        >
-                          <ArrowLeftRight className="h-4 w-4 text-orange-600 shrink-0" />
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Pindah {terminology.class}</span>
-                            <span className="text-[10px] text-neutral-400">Pindahkan ke {terminology.class.toLowerCase()} lain</span>
-                          </div>
-                        </DropdownMenuItem>
-
-                        <DropdownMenuItem
-                          onClick={() => setTimeout(handleMoveToAlumni, 150)}
-                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                        >
-                          <Check className="h-4 w-4 text-emerald-600 shrink-0" />
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Luluskan (Alumni)</span>
-                            <span className="text-[10px] text-neutral-400">Pindahkan ke daftar alumni</span>
-                          </div>
-                        </DropdownMenuItem>
-
-                        <DropdownMenuItem
-                          onClick={() => setTimeout(handleBatchResetPassword, 150)}
-                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                        >
-                          <KeyRound className="h-4 w-4 text-amber-600 shrink-0" />
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Reset Password</span>
-                            <span className="text-[10px] text-neutral-400">Reset {selectedIds.length} terpilih</span>
-                          </div>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setTimeout(() => handleBatchRegenerateExamCredentials(selectedIds), 150)}
-                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                        >
-                          <Sparkles className="h-4 w-4 text-purple-600 shrink-0" />
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Generate Sandi Ujian</span>
-                            <span className="text-[10px] text-neutral-400">Sandi sesi untuk {selectedIds.length} terpilih</span>
-                          </div>
-                        </DropdownMenuItem>
-
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSingleStudentForCard(null);
-                            setPrintCardsOpen(true);
-                          }}
-                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                        >
-                          <Printer className="h-4 w-4 text-sky-600 shrink-0" />
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Cetak Kartu ({selectedIds.length})</span>
-                            <span className="text-[10px] text-neutral-400">Kartu ujian terpilih</span>
-                          </div>
-                        </DropdownMenuItem>
-
-                        <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-
-                        <DropdownMenuItem
-                          onClick={() => setTimeout(handleBatchDelete, 150)}
-                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4 text-rose-600 shrink-0" />
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-semibold">Hapus Terpilih</span>
-                            <span className="text-[10px] opacity-70">Hapus permanen {selectedIds.length} data</span>
-                          </div>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="h-8 px-3 text-xs font-semibold bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                      onClick={handleBatchDelete}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span>Hapus ({selectedIds.length})</span>
-                    </Button>
-                  </div>
-                )}
 
                 {role === "admin" && (
                   <DropdownMenu>
@@ -1265,7 +1166,7 @@ const StudentsPage = () => {
                           if (input) input.click();
                         }}
                       >
-                        <Upload className="h-4 w-4 text-indigo-600 shrink-0" />
+                        <Upload className="h-4 w-4 text-emerald-600 shrink-0" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                             {isImporting ? "Mengimport..." : "Import dari Excel"}
@@ -1307,7 +1208,7 @@ const StudentsPage = () => {
                         onClick={() => setIsGenerateCredsModalOpen(true)}
                         className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                       >
-                        <Sparkles className="h-4 w-4 text-purple-600 shrink-0" />
+                        <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Generate Sandi Ujian</span>
                           <span className="text-[10px] text-neutral-400">Per kelas, terpilih, atau semua</span>
@@ -1346,7 +1247,7 @@ const StudentsPage = () => {
                         onClick={() => setIsBatchPhotoOpen(true)}
                         className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                       >
-                        <Camera className="h-4 w-4 text-purple-600 shrink-0" />
+                        <Camera className="h-4 w-4 text-emerald-600 shrink-0" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Upload Foto Massal</span>
                           <span className="text-[10px] text-neutral-400">File ZIP / {terminology.id}</span>
@@ -1485,7 +1386,7 @@ const StudentsPage = () => {
                           if (input) input.click();
                         }}
                       >
-                        <Upload className="h-4 w-4 text-indigo-600 shrink-0" />
+                        <Upload className="h-4 w-4 text-emerald-600 shrink-0" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                             {isImporting ? "Mengimport..." : "Import dari Excel"}
@@ -1544,7 +1445,7 @@ const StudentsPage = () => {
                         onClick={() => setIsBatchPhotoOpen(true)}
                         className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                       >
-                        <Camera className="h-4 w-4 text-purple-600 shrink-0" />
+                        <Camera className="h-4 w-4 text-emerald-600 shrink-0" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Upload Foto Massal</span>
                           <span className="text-[10px] text-neutral-400">File ZIP / {terminology.id}</span>
@@ -1782,6 +1683,93 @@ const StudentsPage = () => {
               tableLoading={!tableLoadedOnce ? (loading || tableLoading) : tableLoading}
               activeKey={inspectedStudent?.id}
               onRowClick={(student) => setInspectedStudentId(student.id)}
+              batchActions={role === "admin" ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2.5 text-[11px] font-semibold bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-200 rounded-md shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Users2 className="h-3.5 w-3.5" />
+                      <span>Aksi ({selectedIds.length})</span>
+                      <ChevronDown className="h-3 w-3 opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl shadow-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0f1115] z-[100]">
+                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 px-2.5 py-1.5 text-left">Opsi Massal</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={() => setTimeout(() => setIsBatchOpen(true), 150)}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <ArrowLeftRight className="h-4 w-4 text-orange-600 shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Pindah {terminology.class}</span>
+                        <span className="text-[10px] text-neutral-400">Pindahkan ke {terminology.class.toLowerCase()} lain</span>
+                      </div>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => setTimeout(handleMoveToAlumni, 150)}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Luluskan (Alumni)</span>
+                        <span className="text-[10px] text-neutral-400">Pindahkan ke daftar alumni</span>
+                      </div>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => setTimeout(handleBatchResetPassword, 150)}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <KeyRound className="h-4 w-4 text-amber-600 shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Reset Password</span>
+                        <span className="text-[10px] text-neutral-400">Reset {selectedIds.length} terpilih</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setTimeout(() => handleBatchRegenerateExamCredentials(selectedIds), 150)}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Generate Sandi Ujian</span>
+                        <span className="text-[10px] text-neutral-400">Sandi sesi untuk {selectedIds.length} terpilih</span>
+                      </div>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSingleStudentForCard(null);
+                        setPrintCardsOpen(true);
+                      }}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <Printer className="h-4 w-4 text-sky-600 shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Cetak Kartu ({selectedIds.length})</span>
+                        <span className="text-[10px] text-neutral-400">Kartu ujian terpilih</span>
+                      </div>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+
+                    <DropdownMenuItem
+                      onClick={() => setTimeout(handleBatchDelete, 150)}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4 text-rose-600 shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold">Hapus Terpilih</span>
+                        <span className="text-[10px] opacity-70">Hapus permanen {selectedIds.length} data</span>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : undefined}
               filterActions={
                 <NeonFilterPopover
                   title={`Filter ${terminology.student}`}
@@ -1881,7 +1869,7 @@ const StudentsPage = () => {
                       <div className="space-y-1.5 pt-1 w-full">
                         <div className="flex items-center justify-between gap-2 text-xs font-mono bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1.5 rounded-lg border border-neutral-200/80 dark:border-neutral-700/80">
                           <span className="text-neutral-500 text-[10px] uppercase font-sans font-medium tracking-wider shrink-0">User Ujian</span>
-                          <span className="font-bold text-indigo-600 dark:text-indigo-400 select-all tracking-tight truncate">{inspectedStudent.examUsername}</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 select-all tracking-tight truncate">{inspectedStudent.examUsername}</span>
                         </div>
                         <div className="flex items-center justify-between gap-2 text-xs font-mono bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1.5 rounded-lg border border-neutral-200/80 dark:border-neutral-700/80">
                           <span className="text-neutral-500 text-[10px] uppercase font-sans font-medium tracking-wider shrink-0">Sandi Sesi</span>

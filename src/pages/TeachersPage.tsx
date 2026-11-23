@@ -587,45 +587,6 @@ const TeachersPage = () => {
               </>
             ) : (
               <>
-                {selectedIds.length > 0 && (
-                  <div className="flex items-center gap-1.5 animate-in fade-in">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="h-8 px-3 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                        >
-                          <span>{selectedIds.length} - Aksi Masal</span>
-                          <ChevronDown className="h-3 w-3 opacity-70" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-60 p-1.5 rounded-xl shadow-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0f1115] z-[100]">
-                        <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2.5 py-1">
-                          Aksi ({selectedIds.length} {terminology.teacher})
-                        </DropdownMenuLabel>
-
-                        <DropdownMenuItem
-                          onClick={handleBatchResetPassword}
-                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-                        >
-                          <KeyRound className="h-4 w-4" />
-                          <span>Reset Password</span>
-                        </DropdownMenuItem>
-
-                        <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-
-                        <DropdownMenuItem
-                          onClick={handleBatchDelete}
-                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                        >
-                          <Trash className="h-4 w-4" />
-                          <span>Hapus Data {terminology.teacher}</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                )}
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -695,7 +656,7 @@ const TeachersPage = () => {
                       onClick={handleSyncAllUsers}
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                     >
-                      <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                      <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                       <div className="flex flex-col min-w-0">
                         <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Sinkronkan Akun</span>
                         <span className="text-[10px] text-neutral-400">Pulihkan akun login yang hilang</span>
@@ -794,6 +755,43 @@ const TeachersPage = () => {
               teachers={teachers}
               selectedIds={selectedIds}
               onSelectChange={setSelectedIds}
+              batchActions={
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2.5 text-[11px] font-semibold bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-200 rounded-md shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <span>Aksi ({selectedIds.length})</span>
+                      <ChevronDown className="h-3 w-3 opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-60 p-1.5 rounded-xl shadow-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0f1115] z-[100]">
+                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2.5 py-1">
+                      Aksi ({selectedIds.length} {terminology.teacher})
+                    </DropdownMenuLabel>
+
+                    <DropdownMenuItem
+                      onClick={handleBatchResetPassword}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      <span>Reset Password</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+
+                    <DropdownMenuItem
+                      onClick={handleBatchDelete}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                    >
+                      <Trash className="h-4 w-4" />
+                      <span>Hapus Data {terminology.teacher}</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              }
               onEdit={handleEditClick}
               onDelete={handleDeleteClick}
               onResetPassword={handleResetPassword}
@@ -959,7 +957,7 @@ const TeachersPage = () => {
           showCancel={alertDialog.showCancel}
         />
 
-        <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
+        <BatchProgressDialog progress={batchProgress} colorClass="bg-emerald-600" />
       </div>
     </div>
   );

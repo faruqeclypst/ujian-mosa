@@ -27,6 +27,7 @@ interface StudentTableProps {
   onPrintExamCard?: (student: StudentData) => void;
   onRegenerateExamCredentials?: (student: StudentData) => void;
   filterActions?: React.ReactNode;
+  batchActions?: React.ReactNode;
   customActions?: (student: StudentData) => React.ReactNode;
   // ── Mode server-side ──
   serverSide?: boolean;
@@ -58,6 +59,7 @@ export const StudentTable = ({
   onPrintExamCard,
   onRegenerateExamCredentials,
   filterActions,
+  batchActions,
   customActions,
   title,
   serverSide = false,
@@ -288,6 +290,7 @@ export const StudentTable = ({
       onSearchChange={serverSide ? (onServerSearchChange || (() => {})) : setLocalSearch}
       searchPlaceholder={`Cari nama ${terminology.student.toLowerCase()} atau ${terminology.id}...`}
       filterSlot={filterActions}
+      batchActions={batchActions}
       compact
       tableLayout="fixed"
       title={displayTitle}
