@@ -338,7 +338,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       // Gunakan waktu client yang dikoreksi dengan offset server
       const now = Date.now() - serverOffset;
       const updatedDate = new Date(tokenUpdatedAt).getTime();
-      const nextUpdate = updatedDate + 5 * 60 * 1000;
+      const nextUpdate = updatedDate + 10 * 60 * 1000;
       const diff = nextUpdate - now;
 
       if (diff <= 0) {
