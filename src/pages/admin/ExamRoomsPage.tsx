@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare, MoreVertical, MoreHorizontal, Folder, Layers, Loader2 } from "lucide-react";
+import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare, MoreVertical, MoreHorizontal, Folder, Layers, Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { NeonButton } from "../../components/ui/NeonButton";
@@ -1593,19 +1593,6 @@ const ExamRoomsPage = () => {
 
               {/* Action Buttons Top Right: Bersih & Tidak Semak */}
               <div className="flex items-center gap-2 shrink-0">
-                {filteredRooms.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => handleExportZip()}
-                    disabled={isExporting}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
-                    title="Export seluruh rekap hasil ujian ke ZIP"
-                  >
-                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span>{isExporting ? "Mengekspor..." : "Export ZIP"}</span>
-                  </button>
-                )}
-
                 {canCreate && (
                   <button
                     type="button"
@@ -1795,7 +1782,8 @@ const ExamRoomsPage = () => {
                             const chosen = rooms.filter(r => selectedIds.includes(r.id));
                             handleExportZip(chosen);
                           }}
-                          className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-950/40 text-[11px] transition-colors cursor-pointer"
+                          disabled={isExporting}
+                          className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-950/40 text-[11px] transition-colors cursor-pointer disabled:opacity-50"
                         >
                           Export Rekap
                         </button>
@@ -1815,6 +1803,17 @@ const ExamRoomsPage = () => {
                           className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-indigo-600 dark:text-indigo-400 font-medium hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-[11px] transition-colors cursor-pointer"
                         >
                           Pulihkan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const chosen = rooms.filter(r => selectedIds.includes(r.id));
+                            handleExportZip(chosen);
+                          }}
+                          disabled={isExporting}
+                          className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-950/40 text-[11px] transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Export Rekap
                         </button>
                         <button
                           type="button"
