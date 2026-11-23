@@ -216,8 +216,8 @@ cronAdd("autoFinishAndScore", "* * * * *", () => {
     }
 });
 
-// 🕒 3. ROTASI TOKEN UNIVERSAL (Setiap 5 Menit)
-cronAdd("rotateUniversalToken", "*/5 * * * *", () => {
+// 🕒 3. ROTASI TOKEN UNIVERSAL (Setiap 10 Menit)
+cronAdd("rotateUniversalToken", "*/10 * * * *", () => {
     try {
         const settings = $app.findFirstRecordByFilter("settings", "1=1");
         if (!settings) return;

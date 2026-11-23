@@ -206,7 +206,7 @@ const TokenViewPage = () => {
   // Countdown timer with auto-rotation when expired
   useEffect(() => {
     if (!tokenUpdatedAt) return;
-    const INTERVAL_MS = 5 * 60 * 1000;
+    const INTERVAL_MS = 10 * 60 * 1000;
     let didAutoRotate = false;
 
     const tick = () => {
