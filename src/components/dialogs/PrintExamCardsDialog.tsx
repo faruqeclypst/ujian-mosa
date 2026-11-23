@@ -34,6 +34,36 @@ import { useExamData } from "../../context/ExamDataContext";
 import { generateExamUsername } from "../../utils/examCredentials";
 import { getStudentPortalOrigin, encodeStudentCardVerifyPayload } from "../../utils/domainHelper";
 
+// Pengaturan kop kartu yang disimpan di browser (bukan database): logo kiri
+// hasil unggahan + nama & NIP pejabat penandatangan. Sengaja hanya tiga ini
+// agar tidak hilang saat halaman ditutup/dimuat ulang; localStorage bersifat
+// per-origin sehingga otomatis terpisah antar tenant.
+const CARD_SETTINGS_KEYS = {
+  leftLogo: "examku:card-settings:left-logo",
+  signerName: "examku:card-settings:signer-name",
+  signerNip: "examku:card-settings:signer-nip",
+} as const;
+
+function readCardSetting(key: string): string {
+  try {
+    return localStorage.getItem(key) || "";
+  } catch {
+    return "";
+  }
+}
+
+function writeCardSetting(key: string, value: string) {
+  try {
+    if (value) {
+      localStorage.setItem(key, value);
+    } else {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // Penyimpanan penuh/diblokir browser: pengaturan tetap berlaku sesi ini.
+  }
+}
+
 export interface PrintExamCardsDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -117,8 +147,8 @@ export const PrintExamCardsDialog = ({
     return `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
   });
   const [signerRole, setSignerRole] = useState<"Kepala Sekolah" | "Ketua Panitia" | "Proktor">("Kepala Sekolah");
-  const [signerName, setSignerName] = useState("");
-  const [signerNip, setSignerNip] = useState("");
+  const [signerName, setSignerName] = useState(() => readCardSetting(CARD_SETTINGS_KEYS.signerName));
+  const [signerNip, setSignerNip] = useState(() => readCardSetting(CARD_SETTINGS_KEYS.signerNip));
 
   const [showRoomSession, setShowRoomSession] = useState(false);
   const [defaultRoom, setDefaultRoom] = useState("");
@@ -127,11 +157,16 @@ export const PrintExamCardsDialog = ({
 
   // Logo Kiri & Logo Kanan
   const [showLeftLogo, setShowLeftLogo] = useState(true);
-  const [customLeftLogoUrl, setCustomLeftLogoUrl] = useState<string>("");
+  const [customLeftLogoUrl, setCustomLeftLogoUrl] = useState<string>(() => readCardSetting(CARD_SETTINGS_KEYS.leftLogo));
   const [rightLogoType, setRightLogoType] = useState<"school" | "custom" | "none">("school");
   const [customRightLogoUrl, setCustomRightLogoUrl] = useState<string>("");
   const [schoolLogoFailed, setSchoolLogoFailed] = useState(false);
   const [resolvedSchoolLogoUrl, setResolvedSchoolLogoUrl] = useState<string>("");
+
+  // Simpan logo kiri + nama & NIP pejabat ke browser setiap berubah
+  useEffect(() => { writeCardSetting(CARD_SETTINGS_KEYS.leftLogo, customLeftLogoUrl); }, [customLeftLogoUrl]);
+  useEffect(() => { writeCardSetting(CARD_SETTINGS_KEYS.signerName, signerName); }, [signerName]);
+  useEffect(() => { writeCardSetting(CARD_SETTINGS_KEYS.signerNip, signerNip); }, [signerNip]);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
   // Logo sekolah untuk kartu diambil dari record settings tenant — sumber
