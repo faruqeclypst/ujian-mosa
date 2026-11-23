@@ -193,7 +193,7 @@ const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
       }
       className={cn(
         portal ? "" : "absolute mt-2",
-        "min-w-[8rem] max-w-[calc(100vw-1.5rem)] rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-1 text-neutral-900 dark:text-neutral-100 shadow-xl",
+        "min-w-[8rem] max-w-[calc(100vw-1.5rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-1 text-neutral-900 dark:text-neutral-100 shadow-xl",
         "animate-in fade-in-0 zoom-in-95",
         className
       )}

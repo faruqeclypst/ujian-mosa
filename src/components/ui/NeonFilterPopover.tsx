@@ -94,7 +94,7 @@ export const NeonFilterPopover: React.FC<NeonFilterPopoverProps> = ({
       {isOpen && (
         <div
           className={cn(
-            "absolute top-full mt-1.5 z-50 w-72 sm:w-80 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl p-3.5 space-y-3 animate-in fade-in zoom-in-95 duration-150",
+            "absolute top-full mt-1.5 z-50 w-72 sm:w-80 max-h-[min(34rem,calc(100dvh-8rem))] overflow-y-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl p-3.5 space-y-3 animate-in fade-in zoom-in-95 duration-150",
             align === "right" ? "right-0" : "left-0"
           )}
         >
