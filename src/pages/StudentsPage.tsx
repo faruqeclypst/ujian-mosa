@@ -1936,14 +1936,16 @@ const StudentsPage = () => {
                           Buat Sesi
                         </InspectorButton>
                       )}
-                      <InspectorButton
-                        variant="secondary"
-                        icon={Printer}
-                        onClick={() => navigate(`/admin/cetak-kartu?studentId=${inspectedStudent.id}`)}
-                        title="Buka Studio Cetak Kartu Peserta"
-                      >
-                        Cetak Kartu
-                      </InspectorButton>
+                      {role === "admin" && (
+                        <InspectorButton
+                          variant="secondary"
+                          icon={Printer}
+                          onClick={() => navigate(`/admin/cetak-kartu?studentId=${inspectedStudent.id}`)}
+                          title="Buka Studio Cetak Kartu Peserta"
+                        >
+                          Cetak Kartu
+                        </InspectorButton>
+                      )}
                       <InspectorButton
                         variant="secondary"
                         icon={BarChart2}

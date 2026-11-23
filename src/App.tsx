@@ -283,7 +283,7 @@ const SchoolAppContent = () => {
               <Route path="subjects" element={<AdminOnlyRoute><SubjectsPage /></AdminOnlyRoute>} />
               <Route path="teachers" element={<AdminOnlyRoute><TeachersPage /></AdminOnlyRoute>} />
               <Route path="student" element={<StudentsPage />} />
-              <Route path="cetak-kartu" element={<PrintExamCardsPage />} />
+              <Route path="cetak-kartu" element={<AdminOnlyRoute><PrintExamCardsPage /></AdminOnlyRoute>} />
               <Route path="alumni" element={<AdminOnlyRoute><AlumniPage /></AdminOnlyRoute>} />
               <Route path="classes" element={<AdminOnlyRoute><ClassesPage /></AdminOnlyRoute>} />
               <Route path="kelola-akun" element={<AdminOnlyRoute><UsersPage /></AdminOnlyRoute>} />
