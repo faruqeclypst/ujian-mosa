@@ -11,7 +11,6 @@ import {
   Filter,
   ChevronDown,
   Loader2,
-  Users2,
   FileSpreadsheet,
   Download,
   Upload,
@@ -1684,91 +1683,56 @@ const StudentsPage = () => {
               activeKey={inspectedStudent?.id}
               onRowClick={(student) => setInspectedStudentId(student.id)}
               batchActions={role === "admin" ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2.5 text-[11px] font-semibold bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-200 rounded-md shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <Users2 className="h-3.5 w-3.5" />
-                      <span>Aksi ({selectedIds.length})</span>
-                      <ChevronDown className="h-3 w-3 opacity-60" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl shadow-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0f1115] z-[100]">
-                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 px-2.5 py-1.5 text-left">Opsi Massal</DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onClick={() => setTimeout(() => setIsBatchOpen(true), 150)}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                    >
-                      <ArrowLeftRight className="h-4 w-4 text-orange-600 shrink-0" />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Pindah {terminology.class}</span>
-                        <span className="text-[10px] text-neutral-400">Pindahkan ke {terminology.class.toLowerCase()} lain</span>
-                      </div>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem
-                      onClick={() => setTimeout(handleMoveToAlumni, 150)}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                    >
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0" />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Luluskan (Alumni)</span>
-                        <span className="text-[10px] text-neutral-400">Pindahkan ke daftar alumni</span>
-                      </div>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem
-                      onClick={() => setTimeout(handleBatchResetPassword, 150)}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                    >
-                      <KeyRound className="h-4 w-4 text-amber-600 shrink-0" />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Reset Password</span>
-                        <span className="text-[10px] text-neutral-400">Reset {selectedIds.length} terpilih</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setTimeout(() => handleBatchRegenerateExamCredentials(selectedIds), 150)}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                    >
-                      <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Generate Sandi Ujian</span>
-                        <span className="text-[10px] text-neutral-400">Sandi sesi untuk {selectedIds.length} terpilih</span>
-                      </div>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setSingleStudentForCard(null);
-                        setPrintCardsOpen(true);
-                      }}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                    >
-                      <Printer className="h-4 w-4 text-sky-600 shrink-0" />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Cetak Kartu ({selectedIds.length})</span>
-                        <span className="text-[10px] text-neutral-400">Kartu ujian terpilih</span>
-                      </div>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-
-                    <DropdownMenuItem
-                      onClick={() => setTimeout(handleBatchDelete, 150)}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4 text-rose-600 shrink-0" />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold">Hapus Terpilih</span>
-                        <span className="text-[10px] opacity-70">Hapus permanen {selectedIds.length} data</span>
-                      </div>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsBatchOpen(true)}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-orange-600 dark:text-orange-400 font-medium hover:bg-orange-50 dark:hover:bg-orange-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <ArrowLeftRight className="h-3 w-3" />
+                    <span>Pindah {terminology.class}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleMoveToAlumni}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-emerald-600 dark:text-emerald-400 font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Check className="h-3 w-3" />
+                    <span>Luluskan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchResetPassword}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-amber-600 dark:text-amber-400 font-medium hover:bg-amber-50 dark:hover:bg-amber-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <KeyRound className="h-3 w-3" />
+                    <span>Reset Password</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBatchRegenerateExamCredentials(selectedIds)}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-emerald-600 dark:text-emerald-400 font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    <span>Generate Sandi</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSingleStudentForCard(null); setPrintCardsOpen(true); }}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Printer className="h-3 w-3" />
+                    <span>Cetak Kartu</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchDelete}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-rose-600 dark:text-rose-400 font-medium hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    <span>Hapus</span>
+                  </button>
+                </>
               ) : undefined}
               filterActions={
                 <NeonFilterPopover

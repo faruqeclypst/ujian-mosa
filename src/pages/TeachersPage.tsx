@@ -756,41 +756,24 @@ const TeachersPage = () => {
               selectedIds={selectedIds}
               onSelectChange={setSelectedIds}
               batchActions={
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2.5 text-[11px] font-semibold bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-200 rounded-md shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <span>Aksi ({selectedIds.length})</span>
-                      <ChevronDown className="h-3 w-3 opacity-60" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-60 p-1.5 rounded-xl shadow-xl border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0f1115] z-[100]">
-                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-2.5 py-1">
-                      Aksi ({selectedIds.length} {terminology.teacher})
-                    </DropdownMenuLabel>
-
-                    <DropdownMenuItem
-                      onClick={handleBatchResetPassword}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-                    >
-                      <KeyRound className="h-4 w-4" />
-                      <span>Reset Password</span>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
-
-                    <DropdownMenuItem
-                      onClick={handleBatchDelete}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                    >
-                      <Trash className="h-4 w-4" />
-                      <span>Hapus Data {terminology.teacher}</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleBatchResetPassword}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-amber-600 dark:text-amber-400 font-medium hover:bg-amber-50 dark:hover:bg-amber-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <KeyRound className="h-3 w-3" />
+                    <span>Reset Password</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchDelete}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-rose-600 dark:text-rose-400 font-medium hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Trash className="h-3 w-3" />
+                    <span>Hapus</span>
+                  </button>
+                </>
               }
               onEdit={handleEditClick}
               onDelete={handleDeleteClick}
