@@ -73,6 +73,7 @@ import StudentInterestDialog from "../components/dialogs/StudentInterestDialog";
 import StudentScoresDialog from "../components/dialogs/StudentScoresDialog";
 import BatchClassMoveDialog from "../components/dialogs/BatchClassMoveDialog";
 import ResetStudentPasswordDialog from "../components/dialogs/ResetStudentPasswordDialog";
+import GenerateExamCredentialsDialog from "../components/dialogs/GenerateExamCredentialsDialog";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
 import PrintExamCardsDialog from "../components/dialogs/PrintExamCardsDialog";
@@ -249,6 +250,7 @@ const StudentsPage = () => {
   const [targetClassId, setTargetClassId] = useState<string>("");
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isGenerateCredsModalOpen, setIsGenerateCredsModalOpen] = useState(false);
   const [printCardsOpen, setPrintCardsOpen] = useState(false);
   const [singleStudentForCard, setSingleStudentForCard] = useState<StudentData | null>(null);
   const [isBatchPhotoOpen, setIsBatchPhotoOpen] = useState(false);
@@ -565,6 +567,37 @@ const StudentsPage = () => {
       true,
       "Ya, Generate"
     );
+  };
+
+  const handleGenerateExamCredentialsForClass = async (classId: string, onlyEmpty: boolean) => {
+    if (!pb) return;
+    const targetClass = classes.find(c => c.id === classId);
+    const classLabel = targetClass ? `${terminology.class} ${targetClass.name}` : terminology.class;
+    // Ambil siswa kelas ini on-demand (tidak menunggu context 10k)
+    let rows: any[] = [];
+    try {
+      rows = await pb.collection("students").getFullList({
+        filter: `classId = "${classId}"`,
+        fields: "id,examUsername,examPassword",
+      });
+    } catch (e: any) {
+      console.error("Gagal mengambil data siswa kelas:", e);
+      showAlert("Gagal", "Gagal mengambil data siswa: " + (e.message || "Error"), "danger");
+      return;
+    }
+    if (rows.length === 0) {
+      showAlert("Informasi", `${classLabel} belum memiliki ${terminology.student.toLowerCase()}.`, "info");
+      return;
+    }
+    let ids = rows.map((r: any) => r.id);
+    if (onlyEmpty) {
+      ids = rows.filter((r: any) => !r.examUsername || !r.examPassword).map((r: any) => r.id);
+      if (ids.length === 0) {
+        showAlert("Informasi", `Semua ${terminology.student.toLowerCase()} di ${classLabel} sudah memiliki kredensial sesi ujian.`, "info");
+        return;
+      }
+    }
+    await handleBatchRegenerateExamCredentials(ids, onlyEmpty);
   };
 
   const handleResetClassPassword = async (classId: string) => {
@@ -1271,23 +1304,13 @@ const StudentsPage = () => {
                         </div>
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => handleBatchRegenerateExamCredentials(undefined, false)}
+                        onClick={() => setIsGenerateCredsModalOpen(true)}
                         className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                       >
                         <Sparkles className="h-4 w-4 text-purple-600 shrink-0" />
                         <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Generate Sandi Ujian (Semua)</span>
-                          <span className="text-[10px] text-neutral-400">Regenerate akun kartu ujian</span>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleBatchRegenerateExamCredentials(undefined, true)}
-                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                      >
-                        <KeyRound className="h-4 w-4 text-emerald-600 shrink-0" />
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Generate Sandi Ujian (Kosong)</span>
-                          <span className="text-[10px] text-neutral-400">Hanya siswa tanpa sandi sesi</span>
+                          <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Generate Sandi Ujian</span>
+                          <span className="text-[10px] text-neutral-400">Per kelas, terpilih, atau semua</span>
                         </div>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
@@ -2007,6 +2030,23 @@ const StudentsPage = () => {
         targetClassId={targetClassId}
         onTargetClassChange={setTargetClassId}
         onSubmit={handleBatchUpdateClass}
+      />
+
+      <GenerateExamCredentialsDialog
+        isOpen={isGenerateCredsModalOpen}
+        onOpenChange={setIsGenerateCredsModalOpen}
+        selectedCount={selectedIds.length}
+        classes={sortedClasses}
+        students={students}
+        onConfirm={(scope, selectedClassId, onlyEmpty) => {
+          if (scope === "selected") {
+            handleBatchRegenerateExamCredentials(selectedIds, onlyEmpty ?? true);
+          } else if (scope === "class" && selectedClassId) {
+            handleGenerateExamCredentialsForClass(selectedClassId, onlyEmpty ?? true);
+          } else if (scope === "all") {
+            handleBatchRegenerateExamCredentials(undefined, onlyEmpty ?? true);
+          }
+        }}
       />
 
       <ResetStudentPasswordDialog
