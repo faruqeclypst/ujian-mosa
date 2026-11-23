@@ -94,6 +94,9 @@ export const PrintExamCardsDialog = ({
   const [printScope, setPrintScope] = useState<"selected" | "class" | "all">(
     selectedStudentIds.length > 0 ? "selected" : (filterClassId !== "ALL" ? "class" : "all")
   );
+  const [targetClassId, setTargetClassId] = useState<string>(
+    filterClassId !== "ALL" ? filterClassId : ""
+  );
   const [examTitle, setExamTitle] = useState("ASESMEN SUMATIF SEKOLAH");
   const [showPassword, setShowPassword] = useState(true);
 
@@ -184,21 +187,29 @@ export const PrintExamCardsDialog = ({
       setPrintScope("selected");
     } else if (filterClassId !== "ALL") {
       setPrintScope("class");
+      setTargetClassId(filterClassId);
     } else {
       setPrintScope("all");
     }
   }, [selectedStudentIds, filterClassId, isOpen]);
+
+  // Kelas bawaan untuk mode per kelas: kelas pertama yang tersedia
+  useEffect(() => {
+    if (!targetClassId && classes.length > 0) {
+      setTargetClassId(classes[0].id);
+    }
+  }, [classes, targetClassId]);
 
   // Filter daftar siswa
   const studentsToPrint = useMemo(() => {
     if (printScope === "selected" && selectedStudentIds.length > 0) {
       return students.filter(s => selectedStudentIds.includes(s.id));
     }
-    if (printScope === "class" && filterClassId !== "ALL") {
-      return students.filter(s => s.classId === filterClassId);
+    if (printScope === "class" && targetClassId) {
+      return students.filter(s => s.classId === targetClassId);
     }
     return students;
-  }, [students, printScope, selectedStudentIds, filterClassId]);
+  }, [students, printScope, selectedStudentIds, targetClassId]);
 
   const missingCredsCount = useMemo(() => {
     return studentsToPrint.filter(s => !s.examUsername || !s.examPassword).length;
@@ -1153,11 +1164,25 @@ export const PrintExamCardsDialog = ({
                   {selectedStudentIds.length > 0 && (
                     <option value="selected">{terminology.student} Terpilih ({selectedStudentIds.length})</option>
                   )}
-                  {filterClassId !== "ALL" && (
-                    <option value="class">{terminology.class} ({classes.find(c => c.id === filterClassId)?.name || filterClassId})</option>
-                  )}
+                  <option value="class">Per {terminology.class}</option>
                   <option value="all">Semua {terminology.student} ({students.length})</option>
                 </Select>
+                {printScope === "class" && (
+                  <Select
+                    value={targetClassId}
+                    onChange={(e) => setTargetClassId(e.target.value)}
+                    className="h-9 text-xs bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-lg shadow-2xs font-medium cursor-pointer"
+                  >
+                    {classes.map((cls) => {
+                      const count = students.filter(s => s.classId === cls.id).length;
+                      return (
+                        <option key={cls.id} value={cls.id}>
+                          {terminology.class} {cls.name} ({count})
+                        </option>
+                      );
+                    })}
+                  </Select>
+                )}
               </div>
 
               {/* 2. Format Kertas A4 (Interactive Visual Cards) */}
