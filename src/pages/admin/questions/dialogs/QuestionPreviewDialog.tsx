@@ -121,7 +121,7 @@ export const QuestionPreviewDialog: React.FC<QuestionPreviewDialogProps> = ({
 
                     <MathText
                       content={firstWithText.groupText || ""}
-                      className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 !overflow-visible selection:bg-blue-100 dark:selection:bg-blue-900/40`}
+                      className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 !overflow-visible selection:bg-blue-100 dark:selection:bg-blue-900/40 [&_p]:mb-3 last:[&_p]:mb-0`}
                     />
 
                     <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50 dark:opacity-100 text-right">

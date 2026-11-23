@@ -108,7 +108,7 @@ export const quillFormats = [
   "list", "bullet", "indent",
   "link", "image", "video", "formula",
   "color", "background",
-  "align", "code-block",
+  "align", "code-block", "code",
   "line-height",
   "tableEmbed",
   "width", "height", "style", "alt", "class",
@@ -120,6 +120,7 @@ export const quillFormatsChoice = [
   "list",
   "formula",
   "image",
+  "code",
   "tableEmbed",
   "width", "height", "style", "alt", "class",
 ];

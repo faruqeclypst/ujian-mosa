@@ -858,7 +858,7 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                 <div style={{ fontSize: `${15 * fontSize}px` }}>
                   <MathText
                     content={f.groupText || f.text}
-                    className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 !overflow-visible selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
+                    className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 !overflow-visible selection:bg-emerald-100 dark:selection:bg-emerald-900/40 [&_p]:mb-2.5 last:[&_p]:mb-0`}
                   />
                 </div>
 
