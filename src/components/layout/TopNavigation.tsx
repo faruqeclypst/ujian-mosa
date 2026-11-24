@@ -54,13 +54,16 @@ const TopNavigation = () => {
 
   useEffect(() => {
     const updateTime = () => {
-      const now = new Date();
+      // Jam topbar mengikuti waktu SERVER (dikoreksi serverOffset), bukan
+      // jam perangkat mentah — jam laptop/HP yang meleset atau terkoreksi
+      // sistem tidak lagi membuat jam di sini mundur/maju sendiri.
+      const now = new Date(Date.now() - (serverOffset || 0));
       setCurrentTime(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     };
     updateTime();
     const timer = setInterval(updateTime, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [serverOffset]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -195,6 +198,7 @@ const TopNavigation = () => {
     classes,
     universalToken,
     timeLeft,
+    serverOffset,
     resetStudentPassword,
     dismissResetRequest,
     resetStudentPasswordBatch,

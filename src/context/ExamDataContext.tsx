@@ -53,6 +53,9 @@ interface ExamDataContextType {
   timeLeft: string;
   teacherFullAccess: boolean;
   teacherAIAccess: boolean;
+
+  // Selisih jam perangkat terhadap jam server (ms): Date.now() - offset = waktu server
+  serverOffset: number;
 }
 
 const ExamDataContext = createContext<ExamDataContextType | undefined>(undefined);
@@ -286,18 +289,6 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       try {
         pb.autoCancellation(false);
 
-        // 🕒 Sinkronisasi Waktu Server yang Akurat
-        // Kita ambil jam asli server dari response header
-        const healthResponse = await fetch(`${pb.baseUrl}/api/health`, { method: 'GET' });
-        const serverDateStr = healthResponse.headers.get('Date');
-        if (serverDateStr) {
-          const serverTime = new Date(serverDateStr).getTime();
-          const localTime = Date.now();
-          const offset = localTime - serverTime;
-          setServerOffset(offset);
-          console.log("🕒 Server Time Sync Offset:", offset, "ms");
-        }
-
         const records = await pb.collection('settings').getFullList({ limit: 1, sort: 'created' });
         if (records.length > 0) {
           const s = records[0];
@@ -328,6 +319,33 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => { unsubscribe.then(unsub => unsub()); };
+  }, [pb]);
+
+  // 🕒 Sinkronisasi waktu server: offset diambil dari header Date /api/health,
+  // disegarkan berkala + setiap tab aktif lagi. Jam perangkat yang meleset,
+  // terkoreksi NTP, atau berpindah zona tidak lagi menggeser jam aplikasi
+  // (topbar & hitung mundur token sama-sama memakai waktu server).
+  useEffect(() => {
+    if (!pb) return;
+    let cancelled = false;
+    const syncTime = async () => {
+      try {
+        const res = await fetch(`${pb.baseUrl}/api/health`, { method: 'GET' });
+        const serverDateStr = res.headers.get('Date');
+        if (!cancelled && serverDateStr) {
+          setServerOffset(Date.now() - new Date(serverDateStr).getTime());
+        }
+      } catch { /* gagal sinkron: pertahankan offset terakhir */ }
+    };
+    syncTime();
+    const iv = setInterval(syncTime, 5 * 60 * 1000);
+    const onVis = () => { if (document.visibilityState === 'visible') syncTime(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [pb]);
 
   useEffect(() => {
@@ -737,7 +755,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         createClass, updateClass, deleteClass,
         createSubject, updateSubject, deleteSubject,
         createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch, dismissResetRequest, resetUserPassword, updateStudentClassBatch, deleteStudentsBatch, regenerateExamCredentials, regenerateExamCredentialsBatch,
-        universalToken, timeLeft, teacherFullAccess, teacherAIAccess
+        universalToken, timeLeft, teacherFullAccess, teacherAIAccess, serverOffset
       }}
     >
       {children}
