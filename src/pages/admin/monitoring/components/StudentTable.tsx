@@ -426,15 +426,21 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
           const sisAnswers = (attempt && detailAnswers[attempt.id]) || attempt?.answers || {};
           const hasFullAnswers = Object.keys(sisAnswers).length > 0;
 
+          // Attempt selesai: SELALU tampilkan nilai resmi yang tersimpan,
+          // jangan hitung ulang dari jawaban. Hitung ulang memakai penilai
+          // monitoring yang bisa berbeda hasil dari penilai resmi, sehingga
+          // angka di tabel berubah-ubah begitu lembar jawaban dibuka.
+          // Hitung ulang live hanya untuk attempt yang masih berjalan.
+          if (attempt.status === "finished") {
+            return (
+              <div className="flex flex-col items-center justify-center gap-0.5 py-1 font-mono">
+                <span className="text-neutral-900 dark:text-neutral-100 font-bold text-xs">{attempt.score ?? "-"}</span>
+                <span className="text-[10px] text-neutral-400 dark:text-neutral-500">{attempt.objectiveCorrect ?? attempt.correct ?? "-"}/{attempt.objectiveTotal ?? attempt.total ?? "-"}</span>
+              </div>
+            );
+          }
+
           if (!hasFullAnswers) {
-            if (attempt.status === "finished") {
-              return (
-                <div className="flex flex-col items-center justify-center gap-0.5 py-1 font-mono">
-                  <span className="text-neutral-900 dark:text-neutral-100 font-bold text-xs">{attempt.score ?? "-"}</span>
-                  <span className="text-[10px] text-neutral-400 dark:text-neutral-500">{attempt.objectiveCorrect ?? attempt.correct ?? "-"}/{attempt.objectiveTotal ?? attempt.total ?? "-"}</span>
-                </div>
-              );
-            }
             return <div className="py-1 text-center"><span className="text-neutral-400 font-mono text-xs">-</span></div>;
           }
 

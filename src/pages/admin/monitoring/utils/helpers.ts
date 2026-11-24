@@ -62,6 +62,18 @@ export const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   return dist <= maxAllowed;
 };
 
+// Kecocokan PERSIS untuk isian singkat — mengikuti penilai resmi saat
+// submit (trim + lowercase, tanpa toleransi). isFuzzyMatch TIDAK boleh
+// dipakai untuk skor: toleransi typo/mengandung kata membuat nilai hasil
+// hitung ulang monitoring berbeda dari nilai resmi siswa.
+export const isExactShortAnswerMatch = (studentAns: any, correctKey: string): boolean => {
+  if (studentAns === null || studentAns === undefined || !correctKey) return false;
+  const stripHtml = (s: string) => s.replace(/<[^>]*>/g, '');
+  const given = stripHtml(String(studentAns)).trim().toLowerCase();
+  const expected = stripHtml(String(correctKey)).trim().toLowerCase();
+  return expected !== "" && given === expected;
+};
+
 // Helper to get target questions for a student attempt
 export const getTargetQuestions = (
   allQuestions: any[],
@@ -150,7 +162,7 @@ export const computeQuestionScore = (q: any, ans: any, overrides?: Record<string
   }
 
   if (type === "isian_singkat" || type === "short_answer") {
-    return isFuzzyMatch(ans, q.answerKey) ? 1 : 0;
+    return isExactShortAnswerMatch(ans, q.answerKey) ? 1 : 0;
   }
 
   if (type === "urutkan" || type === "drag_drop" || type === "ordering" || type === "sequence") {
@@ -363,7 +375,7 @@ export const getQuestionDetailInfo = (q: any, ans: any, overrides?: Record<strin
   }
 
   if (type === "isian_singkat" || type === "short_answer") {
-    const isCorrect = isFuzzyMatch(ans, q.answerKey);
+    const isCorrect = isExactShortAnswerMatch(ans, q.answerKey);
     return {
       score: isCorrect ? 1 : 0,
       status: isCorrect ? "correct" : "wrong",
