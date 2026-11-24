@@ -290,7 +290,7 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "", dis
       );
       processed = processed.replace(
         /<span\s+dir="rtl"([^>]*)>/g,
-        `<span dir="rtl" style="font-family:'Amiri','Noto Sans Arabic',serif;font-size:145%;line-height:2;direction:rtl;unicode-bidi:isolate;"$1>`
+        `<span dir="rtl" style="font-family:'Amiri','Noto Sans Arabic',serif;font-size:120%;line-height:inherit;direction:rtl;unicode-bidi:isolate;"$1>`
       );
       return processed;
     }
@@ -301,29 +301,15 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "", dis
     processed = processed.replace(arabicRegex, (match) => {
       const cleanMatch = match.trim();
       if (cleanMatch.length < 2 && !/[\u0621-\u064A]/.test(cleanMatch)) return match;
-      
-      // Jika teks Arab cukup panjang (ayat/kalimat), buatkan blok khusus rata kanan
-      const isVerse = cleanMatch.length > 20;
-      
-      if (isVerse) {
-        return `<span dir="rtl" class="arabic-text arabic-verse" style="
-          font-family: 'Amiri', 'Noto Sans Arabic', serif; 
-          font-size: 145%; 
-          line-height: 2.4; 
-          display: block; 
-          padding: 12px 0; 
-          text-align: right;
-          direction: rtl;
-          unicode-bidi: isolate;
-        ">${match}</span>`;
-      }
-      
+
+      // Teks Arab di dalam kalimat campuran SELALU inline mengikuti aliran
+      // kalimat — tidak pernah dijadikan blok/baris baru, sepanjang apa pun.
+      // Blok ayat besar rata kanan hanya untuk paragraf yang memang berdiri
+      // sendiri dengan dir="rtl" eksplisit (cabang di atas).
       return `<span dir="rtl" class="arabic-text" style="
-        font-family: 'Amiri', 'Noto Sans Arabic', serif; 
-        font-size: 130%; 
-        line-height: 2; 
-        display: inline-block; 
-        padding: 0 4px; 
+        font-family: 'Amiri', 'Noto Sans Arabic', serif;
+        font-size: 120%;
+        line-height: inherit;
         direction: rtl;
         unicode-bidi: isolate;
       ">${match}</span>`;
