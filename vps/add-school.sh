@@ -53,6 +53,7 @@ if [ "$SERVER_HOST" != "127.0.0.1" ] && [ "$SERVER_HOST" != "localhost" ]; then
   # Pasang Caddy Reverse Proxy ke Worker Node
   cat > "/etc/caddy/conf.d/${SLUG}.caddy" << CADDY
 $DOMAINS {
+    import quiz_proxy
     root * /opt/frontend/ujian/dist
     file_server
     handle /api/* {
@@ -178,6 +179,7 @@ systemctl restart "pb-${SLUG}.service"
 if [ -d "/etc/caddy/conf.d" ]; then
 cat > "/etc/caddy/conf.d/${SLUG}.caddy" << CADDY
 $DOMAINS {
+    import quiz_proxy
     root * /opt/frontend/ujian/dist
     file_server
     handle /api/* {

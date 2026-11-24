@@ -238,14 +238,19 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
   const waygroundApi = `https://wayground.com/api/main/quiz/${quizId}`;
   const quizizzApi = `https://quizizz.com/api/main/quiz/${quizId}`;
 
-  // Candidate Proxy URLs (1st priority: VPS Caddy /api-quiz/ reverse proxy to wayground.com)
+  // Semua jalur dicoba paralel, yang pertama berhasil dipakai:
+  // 1) Langsung dari browser guru — API Wayground terbuka (CORS *) dan
+  //    AWS WAF di depannya hanya menantang IP datacenter, bukan koneksi
+  //    rumahan/sekolah, jadi jalur langsung justru yang paling bisa diandalkan.
+  // 2) Proxy Caddy VPS /api-quiz/ (cadangan; egress VPS sering kena WAF).
+  // 3) Proxy CORS publik sebagai jalan terakhir.
   const candidateUrls = [
-    `/api-quiz/${quizId}`
+    waygroundApi,
+    quizizzApi,
+    `/api-quiz/${quizId}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(waygroundApi)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(waygroundApi)}`
   ];
-
-  if (urlOrId.startsWith("http") && (urlOrId.includes("api") || urlOrId.includes("json"))) {
-    candidateUrls.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(urlOrId)}`);
-  }
 
   const fetchSingle = async (url: string): Promise<any> => {
     const controller = new AbortController();
@@ -288,7 +293,7 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
     rawData = await promiseAny(candidateUrls.map(url => fetchSingle(url)));
   } catch (err) {
     // All candidates failed or timed out
-    throw new Error("Gagal mengambil kuis secara otomatis dari server VPS. Silakan gunakan opsi Paste JSON.");
+    throw new Error("Gagal mengambil kuis secara otomatis. Silakan gunakan opsi Paste JSON.");
   }
 
   return parseWaygroundQuizData(rawData, quizId);
