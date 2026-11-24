@@ -317,6 +317,12 @@ const ImageZoomOverlay = ({ src, onClose }: { src: string; onClose: () => void }
   );
 };
 
+// Kunci meta di dalam objek answers — bukan jawaban soal, jangan dihitung
+// sebagai progres. Daftar ini sama dengan yang dikecualikan kolom MONITORING.
+const ANSWER_META_KEYS = ["__meta", "__order__", "__activeQuestionId__", "__delta", "__overrides__", "__choices__"];
+const countAnsweredAnswers = (all: Record<string, any> | null | undefined): number =>
+  Object.keys(all || {}).filter(k => !ANSWER_META_KEYS.includes(k)).length;
+
 const formatStudentName = (name?: string) => {
   if (!name) return "";
   const parts = name.trim().split(/\s+/);
@@ -755,9 +761,7 @@ const CBTPage = () => {
         // Payload kecil (tanpa answers) agar monitoring tampil realtime tanpa membebani DB.
         if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
         progressTimeoutRef.current = setTimeout(() => {
-          const SKIP_KEYS = ["__meta", "__order__", "__activeQuestionId__", "__delta"];
-          const all = answersRef.current || {};
-          const count = Object.keys(all).filter(k => !SKIP_KEYS.includes(k)).length;
+          const count = countAnsweredAnswers(answersRef.current);
           safeUpdateAttempt(currentAttempt.id, {
             answeredCount: count,
             isOnline: getOnlineFlag(),
@@ -783,6 +787,9 @@ const CBTPage = () => {
               ...toSync,
               __delta: true,
             },
+            // Progres monitoring ikut di payload yang sama (tanpa request
+            // tambahan) — tanpa ini kolom MONITORING selalu 0 di ruang kecil.
+            answeredCount: countAnsweredAnswers(answersRef.current),
             isOnline: getOnlineFlag(),
             lastHeartbeat: new Date().toISOString()
           }).catch((err: any) => {
@@ -2083,6 +2090,7 @@ const CBTPage = () => {
 
       const finalPayload: Record<string, any> = {
         answers: answersWithMeta,
+        answeredCount: countAnsweredAnswers(answersRef.current),
         isOnline: getOnlineFlag(),
         lastHeartbeat: submittedAt,
         score,
