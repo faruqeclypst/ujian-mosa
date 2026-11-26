@@ -1,5 +1,28 @@
 import PocketBase from "pocketbase";
 import { fetchAI, robustJSONParse } from "./ai";
+import {
+  getDefaultAcademicPeriod,
+  normalizeAcademicYear,
+  normalizeSemester,
+  resolveAcademicPeriod,
+} from "./academicPeriod";
+
+async function resolveActiveSchoolPeriod(pb: PocketBase) {
+  const def = getDefaultAcademicPeriod();
+  try {
+    const res = await pb.collection("settings").getList(1, 1, { sort: "created" });
+    if (res.items.length > 0) {
+      const s = res.items[0] as any;
+      return {
+        academicYear: normalizeAcademicYear(s.active_academic_year) || def.academicYear,
+        semester: normalizeSemester(s.active_semester) || def.semester,
+      };
+    }
+  } catch {
+    // Fallback to calendar default when settings is unreadable.
+  }
+  return def;
+}
 
 export type CopilotActionType =
   | "create_bank_soal"
@@ -868,11 +891,14 @@ export const executeCreateBankSoal = async (
       }
     }
 
+    const activePeriod = await resolveActiveSchoolPeriod(pb);
     const createdExam = await pb.collection("exams").create({
       title,
       subjectId,
       examType,
       status: "active",
+      academic_year: normalizeAcademicYear(payload.academic_year) || activePeriod.academicYear,
+      semester: normalizeSemester(payload.semester) || activePeriod.semester,
       group_name: payload.bab || ""
     });
 
@@ -939,13 +965,15 @@ export const executeCreateExamRoom = async (
   try {
     let examId = payload.examId || "";
     let examTitle = payload.examTitle || "Ujian";
+    let linkedExamPeriod: { academicYear: string; semester: string; groupName: string } | null = null;
 
     // 1. Verifikasi apakah examId benar-benar ada di collection exams
     if (examId) {
       try {
-        const existing = await pb.collection("exams").getOne(examId, { fields: "id,title" });
+        const existing = await pb.collection("exams").getOne(examId, { fields: "id,title,academic_year,semester,group_name" });
         examId = existing.id;
         examTitle = existing.title;
+        linkedExamPeriod = resolveAcademicPeriod(existing as any);
       } catch {
         // ID tidak valid / tidak ditemukan di DB, reset agar dicari / dibuat
         examId = "";
@@ -967,6 +995,7 @@ export const executeCreateExamRoom = async (
         if (matched) {
           examId = matched.id;
           examTitle = matched.title;
+          linkedExamPeriod = resolveAcademicPeriod(matched as any);
         }
       } catch {}
     }
@@ -980,6 +1009,7 @@ export const executeCreateExamRoom = async (
         if (fallbackList.items.length > 0) {
           examId = fallbackList.items[0].id;
           examTitle = fallbackList.items[0].title;
+          linkedExamPeriod = resolveAcademicPeriod(fallbackList.items[0] as any);
         }
       } catch {}
     }
@@ -1051,10 +1081,19 @@ export const executeCreateExamRoom = async (
       roomCode += chars.charAt(Math.floor(Math.random() * chars.length));
     }
 
+    const activePeriod = await resolveActiveSchoolPeriod(pb);
     const roomData = {
       title: roomName,
       room_name: roomName,
-      group_name: (payload.group_name || "").trim(),
+      academic_year:
+        normalizeAcademicYear(payload.academic_year) ||
+        linkedExamPeriod?.academicYear ||
+        activePeriod.academicYear,
+      semester:
+        normalizeSemester(payload.semester) ||
+        linkedExamPeriod?.semester ||
+        activePeriod.semester,
+      group_name: (payload.group_name || linkedExamPeriod?.groupName || "").trim(),
       examId,
       startTime: startISO,
       start_time: startISO,

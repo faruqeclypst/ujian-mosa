@@ -13,13 +13,21 @@ import {
   AlertCircle,
   CheckCircle2,
   FileText,
-  Folder,
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import { useAuth } from "../../context/AuthContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { NeonPageHeader } from "../ui/NeonPageHeader";
 import { cn } from "../../lib/utils";
+import { AcademicPeriodBadges, AcademicPeriodFilterFields, ActivePeriodFilterChips } from "./AcademicPeriodControls";
+import { NeonFilterPopover, NeonFilterField, NeonFilterSelect } from "../ui/NeonFilterPopover";
+import {
+  type AcademicYearFilterValue,
+  type SemesterFilterValue,
+  getStructuredGroupOptions,
+  matchesPeriodAndGroupFilter,
+  resolveAcademicPeriod,
+} from "../../lib/academicPeriod";
 
 export interface ExamRoomPickerItem {
   id: string;
@@ -38,6 +46,8 @@ export interface ExamRoomPickerItem {
   token?: string;
   created?: string;
   group_name?: string;
+  academic_year?: string;
+  semester?: string;
 }
 
 interface ExamRoomPickerProps {
@@ -59,13 +69,15 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
 }) => {
   const { pb, terminology } = useTenant();
   const { role, teacherId } = useAuth();
-  const { teachers, subjects, classes: masterClasses, teacherFullAccess } = useExamData();
+  const { teachers, subjects, classes: masterClasses, teacherFullAccess, activeAcademicYear, activeSemester, managedAcademicYears, managedExamGroups } = useExamData();
 
   const [rooms, setRooms] = useState<ExamRoomPickerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "finished" | "archive">("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [yearFilter, setYearFilter] = useState<AcademicYearFilterValue>("all");
+  const [semesterFilter, setSemesterFilter] = useState<SemesterFilterValue>("all");
 
   const fetchRooms = useCallback(async () => {
     if (!pb) return;
@@ -129,6 +141,8 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
           token: r.token,
           created: r.created,
           group_name: r.group_name || "",
+          academic_year: r.academic_year || "",
+          semester: r.semester || "",
         };
       });
 
@@ -191,22 +205,17 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
     return { all, active, finished, archive };
   }, [rooms]);
 
-  // Groups available
-  const availableGroups = useMemo(() => {
-    const set = new Set<string>();
-    rooms.forEach((r) => {
-      if (r.group_name && r.group_name.trim()) {
-        set.add(r.group_name.trim());
-      }
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "id"));
-  }, [rooms]);
+  // Groups available (structured agenda only)
+  const structuredGroupOptions = useMemo(
+    () => getStructuredGroupOptions(managedExamGroups),
+    [managedExamGroups]
+  );
 
   // Filtered rooms
   const filteredRooms = useMemo(() => {
     return rooms.filter((r) => {
-      // 0. Group Filter
-      if (groupFilter !== "all" && (r.group_name || "") !== groupFilter) return false;
+      // 0. Period & Group Filter
+      if (!matchesPeriodAndGroupFilter(r, yearFilter, semesterFilter, groupFilter, managedExamGroups)) return false;
 
       // 1. Status Filter
       if (statusFilter === "archive" && r.status !== "archive") return false;
@@ -225,18 +234,21 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
       // 2. Search query
       if (search.trim()) {
         const q = search.trim().toLowerCase();
+        const resolved = resolveAcademicPeriod(r, managedExamGroups);
         const matchesName = (r.name || "").toLowerCase().includes(q);
         const matchesExam = (r.examTitle || "").toLowerCase().includes(q);
         const matchesSubj = (r.subjectName || "").toLowerCase().includes(q);
         const matchesTeach = (r.teacherName || "").toLowerCase().includes(q);
         const matchesClass = (r.className || "").toLowerCase().includes(q);
-        const matchesGroup = (r.group_name || "").toLowerCase().includes(q);
-        return matchesName || matchesExam || matchesSubj || matchesTeach || matchesClass || matchesGroup;
+        const matchesGroup = resolved.structuredGroup.toLowerCase().includes(q);
+        const matchesYear = resolved.academicYear.toLowerCase().includes(q);
+        const matchesSem = resolved.semester.toLowerCase().includes(q);
+        return matchesName || matchesExam || matchesSubj || matchesTeach || matchesClass || matchesGroup || matchesYear || matchesSem;
       }
 
       return true;
     });
-  }, [rooms, statusFilter, groupFilter, search]);
+  }, [rooms, statusFilter, yearFilter, semesterFilter, groupFilter, search, managedExamGroups]);
 
   return (
     <div className="space-y-6">
@@ -264,152 +276,183 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
         }
       />
 
-      {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white dark:bg-[#111214] p-2.5 sm:p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-2xs">
-        {/* Status Tabs & Group Selector */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-xs -mx-0.5 px-0.5">
-            <button
-              type="button"
-              onClick={() => setStatusFilter("all")}
+      {/* Unified Filter & Search Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 bg-white dark:bg-[#111214] p-2.5 sm:p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+        {/* Status Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-xs -mx-0.5 px-0.5">
+          <button
+            type="button"
+            onClick={() => setStatusFilter("all")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
+              statusFilter === "all"
+                ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
+                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
+            )}
+          >
+            <span>Semua</span>
+            <span
               className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
+                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
                 statusFilter === "all"
-                  ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
-                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
+                  ? "bg-white/20 text-white"
+                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
               )}
             >
-              <span>Semua</span>
-              <span
-                className={cn(
-                  "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
-                  statusFilter === "all"
-                    ? "bg-white/20 text-white"
-                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
-                )}
-              >
-                {statusCounts.all}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter("active")}
+              {statusCounts.all}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("active")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
+              statusFilter === "active"
+                ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
+                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
+            )}
+          >
+            <span
               className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
+                "h-1.5 w-1.5 rounded-full shrink-0",
+                statusFilter === "active" ? "bg-white animate-pulse" : "bg-emerald-500"
+              )}
+            />
+            <span>Aktif</span>
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
                 statusFilter === "active"
-                  ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
-                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
+                  ? "bg-white/20 text-white"
+                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
               )}
             >
-              <span
-                className={cn(
-                  "h-1.5 w-1.5 rounded-full shrink-0",
-                  statusFilter === "active" ? "bg-white animate-pulse" : "bg-emerald-500"
-                )}
-              />
-              <span>Aktif</span>
-              <span
-                className={cn(
-                  "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
-                  statusFilter === "active"
-                    ? "bg-white/20 text-white"
-                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
-                )}
-              >
-                {statusCounts.active}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter("finished")}
+              {statusCounts.active}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("finished")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
+              statusFilter === "finished"
+                ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
+                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
+            )}
+          >
+            <span>Selesai</span>
+            <span
               className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
+                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
                 statusFilter === "finished"
-                  ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
-                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
+                  ? "bg-white/20 text-white"
+                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
               )}
             >
-              <span>Selesai</span>
-              <span
-                className={cn(
-                  "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
-                  statusFilter === "finished"
-                    ? "bg-white/20 text-white"
-                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
-                )}
-              >
-                {statusCounts.finished}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter("archive")}
+              {statusCounts.finished}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("archive")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
+              statusFilter === "archive"
+                ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
+                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
+            )}
+          >
+            <span>Arsip</span>
+            <span
               className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md font-medium text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 select-none",
+                "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
                 statusFilter === "archive"
-                  ? "bg-emerald-600 text-white font-semibold shadow-xs shadow-emerald-600/25"
-                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-200"
+                  ? "bg-white/20 text-white"
+                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
               )}
             >
-              <span>Arsip</span>
-              <span
-                className={cn(
-                  "px-1.5 py-0.2 rounded-full text-[10px] font-semibold tabular-nums",
-                  statusFilter === "archive"
-                    ? "bg-white/20 text-white"
-                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
-                )}
-              >
-                {statusCounts.archive}
-              </span>
-            </button>
-          </div>
-
-          {availableGroups.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-neutral-300 dark:text-neutral-700 hidden sm:inline">|</span>
-              <div className="relative">
-                <select
-                  value={groupFilter}
-                  onChange={(e) => setGroupFilter(e.target.value)}
-                  className="h-8 pl-2 pr-7 text-xs font-medium rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111214] text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer transition-colors"
-                  title="Filter berdasarkan group ujian"
-                >
-                  <option value="all">Semua Group ({rooms.length})</option>
-                  {availableGroups.map((grp) => {
-                    const count = rooms.filter((r) => r.group_name === grp).length;
-                    return (
-                      <option key={grp} value={grp}>
-                        {grp} ({count})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            </div>
-          )}
+              {statusCounts.archive}
+            </span>
+          </button>
         </div>
 
-        {/* Search Input */}
-        <div className="relative w-full sm:w-72 shrink-0">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari ruang, mapel, paket soal..."
-            className="w-full h-9 pl-8 pr-8 text-xs bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-md text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-colors"
+        {/* Filter Popover + Active Chips + Search */}
+        <div className="flex flex-wrap items-center gap-2">
+          <NeonFilterPopover
+            title="Filter Ruang Ujian"
+            align="right"
+            activeCount={
+              (yearFilter !== "all" ? 1 : 0) +
+              (semesterFilter !== "all" ? 1 : 0) +
+              (groupFilter !== "all" ? 1 : 0)
+            }
+            onReset={() => {
+              setYearFilter("all");
+              setSemesterFilter("all");
+              setGroupFilter("all");
+            }}
+          >
+            <AcademicPeriodFilterFields
+              yearFilter={yearFilter}
+              semesterFilter={semesterFilter}
+              onYearChange={setYearFilter}
+              onSemesterChange={setSemesterFilter}
+              activeAcademicYear={activeAcademicYear}
+              activeSemester={activeSemester}
+              managedAcademicYears={managedAcademicYears}
+              managedGroups={managedExamGroups}
+              records={rooms}
+            />
+
+            <NeonFilterField label="Agenda / Group">
+              <NeonFilterSelect
+                value={groupFilter}
+                onChange={(e) => setGroupFilter(e.target.value)}
+              >
+                <option value="all">Semua Agenda ({rooms.length})</option>
+                {structuredGroupOptions.map((grp) => {
+                  const count = rooms.filter((r) => resolveAcademicPeriod(r, managedExamGroups).structuredGroup === grp).length;
+                  return (
+                    <option key={grp} value={grp}>
+                      {grp} ({count})
+                    </option>
+                  );
+                })}
+                <option value="__none__">Tanpa Agenda</option>
+              </NeonFilterSelect>
+            </NeonFilterField>
+          </NeonFilterPopover>
+
+          <ActivePeriodFilterChips
+            yearFilter={yearFilter}
+            semesterFilter={semesterFilter}
+            groupFilter={groupFilter}
+            onClearYear={() => setYearFilter("all")}
+            onClearSemester={() => setSemesterFilter("all")}
+            onClearGroup={() => setGroupFilter("all")}
           />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
-              title="Hapus pencarian"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
+
+          {/* Search Input */}
+          <div className="relative w-full sm:w-64 shrink-0">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari ruang, mapel, paket soal..."
+              className="w-full h-8 pl-8 pr-8 text-xs bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-md text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-colors"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                title="Hapus pencarian"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -476,15 +519,7 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
                         <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
                           {room.name}
                         </h3>
-                        {room.group_name && (
-                          <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 shrink-0 max-w-[140px] truncate"
-                            title={`Group: ${room.group_name}`}
-                          >
-                            <Folder className="h-2.5 w-2.5 shrink-0" />
-                            <span className="truncate">{room.group_name}</span>
-                          </span>
-                        )}
+                        <AcademicPeriodBadges record={room} managedGroups={managedExamGroups} compact />
                       </div>
                       <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
                         {room.subjectName} {room.teacherName && room.teacherName !== "-" ? `• ${room.teacherName}` : ""}
@@ -519,11 +554,11 @@ export const ExamRoomPicker: React.FC<ExamRoomPickerProps> = ({
                         <span className="truncate">
                           {room.start_time
                             ? new Date(room.start_time).toLocaleDateString("id-ID", {
-                                day: "numeric",
-                                month: "short",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
                             : "-"}
                           {room.duration ? ` (${room.duration} mnt)` : ""}
                         </span>

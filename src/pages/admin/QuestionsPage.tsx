@@ -36,6 +36,11 @@ import {
 import { NeonTabs } from "../../components/ui/NeonTabs";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { getExamTypeColorClass } from "./ExamsPage";
+import {
+  AcademicPeriodBadges,
+  DuplicateExamModal,
+} from "../../components/common/AcademicPeriodControls";
+import type { SemesterType } from "../../lib/academicPeriod";
 import { cn } from "../../lib/utils";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import BatchProgressDialog from "../../components/dialogs/BatchProgressDialog";
@@ -143,7 +148,7 @@ const QuestionsPage = () => {
   const { user, role, teacherId } = useAuth();
   const { school, pb, terminology } = useTenant();
   const { addToast } = useToast();
-  const { subjects, teachers, teacherFullAccess, teacherAIAccess } = useExamData();
+  const { subjects, teachers, teacherFullAccess, teacherAIAccess, activeAcademicYear, activeSemester, managedAcademicYears, managedExamGroups } = useExamData();
 
   // Manage Allowed Question Types
   const [allowedTypes, setAllowedTypes] = useState<Record<string, boolean>>({
@@ -1092,61 +1097,62 @@ const QuestionsPage = () => {
   }, [isOwner, exam?.is_mgmp_shared, isMgmpExam]);
 
   const [isDuplicatingExam, setIsDuplicatingExam] = useState(false);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
 
-  const handleDuplicateCurrentExam = async () => {
+  const executeDuplicateCurrentExam = async (target: {
+    title: string;
+    academic_year: string;
+    semester: SemesterType | "";
+    group_name: string;
+  }) => {
     if (!exam || !pb || isDuplicatingRef.current) return;
-    const isMine = isOwner;
-    const targetTitle = isMine ? `(Salinan) ${exam.title}` : `${exam.title} (Salinan Saya)`;
+    isDuplicatingRef.current = true;
+    try {
+      setIsDuplicatingExam(true);
+      const newTeacherId = (role !== "admin" && (teacherId || user?.id)) ? (teacherId || user?.id) : exam.teacherId;
+      const newExam = await pb.collection('exams').create({
+        title: target.title,
+        subjectId: exam.subjectId,
+        teacherId: newTeacherId,
+        examType: exam.examType || "Latihan",
+        academic_year: target.academic_year,
+        semester: target.semester,
+        group_name: target.group_name,
+        is_mgmp_shared: false,
+      });
 
-    showAlert(
-      isMine ? "Duplikat Bank Soal" : "Salin ke Bank Soal Saya",
-      isMine
-        ? `Apakah Anda yakin ingin menduplikasi bank soal "${exam.title}" beserta seluruh (${questions.length}) butir soalnya?`
-        : `Salin bank soal "${exam.title}" karya ${exam.teacherName || "rekan guru"} ke koleksi Anda? Anda akan menjadi pemilik penuh salinan ini dan bebas mengedit serta menggunakannya di Ruang Ujian.`,
-      "info",
-      async () => {
-        if (isDuplicatingRef.current) return;
-        isDuplicatingRef.current = true;
-        try {
-          setIsDuplicatingExam(true);
-          const newTeacherId = (role !== "admin" && (teacherId || user?.id)) ? (teacherId || user?.id) : exam.teacherId;
-          const newExam = await pb.collection('exams').create({
-            title: targetTitle,
-            subjectId: exam.subjectId,
-            teacherId: newTeacherId,
-            examType: exam.examType || "Latihan",
-            group_name: exam.group_name || "",
-            is_mgmp_shared: false,
+      const CHUNK_SIZE = 5;
+      for (let i = 0; i < questions.length; i += CHUNK_SIZE) {
+        const chunk = questions.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map((q) => {
+          const { id, created, updated, collectionId, collectionName, ...rest } = q as any;
+          return pb.collection('questions').create({
+            ...rest,
+            examId: newExam.id,
           });
-
-          const CHUNK_SIZE = 5;
-          for (let i = 0; i < questions.length; i += CHUNK_SIZE) {
-            const chunk = questions.slice(i, i + CHUNK_SIZE);
-            await Promise.all(chunk.map((q) => {
-              const { id, created, updated, collectionId, collectionName, ...rest } = q as any;
-              return pb.collection('questions').create({
-                ...rest,
-                examId: newExam.id,
-              });
-            }));
-          }
-
-          addToast({
-            type: "success",
-            title: "Berhasil Menyalin Bank Soal",
-            description: `Bank soal "${targetTitle}" berhasil disalin beserta ${questions.length} butir soal.`
-          });
-
-          sessionStorage.setItem("activeQuestionsExamId", newExam.id);
-          window.location.href = `/admin/bank-soal/questions`;
-        } catch (err: any) {
-          showAlert("Gagal", err?.message || "Gagal menyalin bank soal.", "danger");
-        } finally {
-          isDuplicatingRef.current = false;
-          setIsDuplicatingExam(false);
-        }
+        }));
       }
-    );
+
+      setIsDuplicateModalOpen(false);
+      addToast({
+        type: "success",
+        title: "Berhasil Menyalin Bank Soal",
+        description: `Bank soal "${target.title}" berhasil disalin beserta ${questions.length} butir soal.`
+      });
+
+      sessionStorage.setItem("activeQuestionsExamId", newExam.id);
+      window.location.href = `/admin/bank-soal/questions`;
+    } catch (err: any) {
+      showAlert("Gagal", err?.message || "Gagal menyalin bank soal.", "danger");
+    } finally {
+      isDuplicatingRef.current = false;
+      setIsDuplicatingExam(false);
+    }
+  };
+
+  const handleDuplicateCurrentExam = () => {
+    if (!exam || !pb || isDuplicatingRef.current) return;
+    setIsDuplicateModalOpen(true);
   };
 
   const handleCreateClick = () => {
@@ -1968,6 +1974,8 @@ const QuestionsPage = () => {
                     {exam.examType}
                   </span>
                 )}
+
+                {exam && <AcademicPeriodBadges record={exam} managedGroups={managedExamGroups} compact />}
               </div>
 
               {/* Clean Subtitle Line: Mapel • Guru • Kepemilikan (Simpel & Rapi) */}
@@ -3104,6 +3112,20 @@ const QuestionsPage = () => {
           if (file) handleImportJson(file);
           e.target.value = "";
         }} />
+        <DuplicateExamModal
+          isOpen={isDuplicateModalOpen}
+          onClose={() => setIsDuplicateModalOpen(false)}
+          sourceExam={exam}
+          isMine={isOwner}
+          activeAcademicYear={activeAcademicYear}
+          activeSemester={activeSemester}
+          managedAcademicYears={managedAcademicYears}
+          managedGroups={managedExamGroups}
+          allowCustomYear={role === "admin"}
+          isSubmitting={isDuplicatingExam}
+          onConfirm={executeDuplicateCurrentExam}
+        />
+
         <QuestionRepositoryDialog
           isOpen={isRepoDialogOpen}
           onOpenChange={setIsRepoDialogOpen}

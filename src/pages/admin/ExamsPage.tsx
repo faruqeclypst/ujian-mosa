@@ -20,11 +20,28 @@ import {
   User,
   CheckSquare,
   GitBranch,
-  Folder,
   Layers,
   Share2,
   Lightbulb,
+  Calendar,
 } from "lucide-react";
+import {
+  AcademicPeriodBadges,
+  AcademicPeriodFilterFields,
+  AcademicPeriodFormFields,
+  ActivePeriodFilterChips,
+  DuplicateExamModal,
+} from "../../components/common/AcademicPeriodControls";
+import {
+  type AcademicYearFilterValue,
+  type SemesterFilterValue,
+  type SemesterType,
+  getStructuredGroupOptions,
+  matchesPeriodAndGroupFilter,
+  normalizeAcademicYear,
+  normalizeSemester,
+  resolveAcademicPeriod,
+} from "../../lib/academicPeriod";
 import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
 import { NeonButton } from "../../components/ui/NeonButton";
@@ -89,6 +106,8 @@ export interface ExamData {
   examType?: string;
   status?: "archive" | null;
   group_name?: string;
+  academic_year?: string;
+  semester?: string;
   is_mgmp_shared?: boolean;
 }
 
@@ -371,7 +390,7 @@ const ExamsPage = () => {
   const { pb, terminology, school } = useTenant();
   const { user, role, teacherId } = useAuth();
   const { addToast } = useToast();
-  const { subjects, teachers, teacherFullAccess, loading: dataLoading } = useExamData();
+  const { subjects, teachers, teacherFullAccess, activeAcademicYear, activeSemester, managedAcademicYears, managedExamGroups, loading: dataLoading } = useExamData();
   const [exams, setExams] = useState<any[]>(() => examsCache?.exams || []);
   const [loading, setLoading] = useState(() => !examsCache);
   const isLoading = loading || (dataLoading && !examsCache);
@@ -386,6 +405,8 @@ const ExamsPage = () => {
     subjectId: "",
     teacherId: "",
     examType: "Latihan",
+    academic_year: "",
+    semester: "" as SemesterType | "",
     group_name: "",
     is_mgmp_shared: false,
   });
@@ -407,8 +428,14 @@ const ExamsPage = () => {
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState("all");
+  const [yearFilter, setYearFilter] = useState<AcademicYearFilterValue>("all");
+  const [semesterFilter, setSemesterFilter] = useState<SemesterFilterValue>("all");
   const [batchGroupDialogOpen, setBatchGroupDialogOpen] = useState(false);
+  const [batchAcademicYear, setBatchAcademicYear] = useState("");
+  const [batchSemester, setBatchSemester] = useState<SemesterType | "">("");
   const [batchGroupInput, setBatchGroupInput] = useState("");
+  const [batchKeepExistingGroup, setBatchKeepExistingGroup] = useState(false);
+  const [duplicateModalExam, setDuplicateModalExam] = useState<ExamData | null>(null);
   const [inspectedExamId, setInspectedExamId] = useState<string | null>(null);
 
   // Batch Export State
@@ -442,6 +469,8 @@ const ExamsPage = () => {
     setSubjectFilter("all");
     setTypeFilter("all");
     setGroupFilter("all");
+    setYearFilter("all");
+    setSemesterFilter("all");
   }, [activeTab]);
 
   const fetchQuestionCounts = useCallback(async () => {
@@ -597,15 +626,19 @@ const ExamsPage = () => {
     return base;
   }, [exams, activeTab, role, isRealOwner, isMgmpExam]);
 
-  const availableGroups = useMemo(() => {
+  const structuredGroupOptions = useMemo(
+    () => getStructuredGroupOptions(managedExamGroups),
+    [managedExamGroups]
+  );
+
+  const availableYears = useMemo(() => {
     const set = new Set<string>();
     tabExams.forEach(e => {
-      if (e.group_name && e.group_name.trim()) {
-        set.add(e.group_name.trim());
-      }
+      const resolved = resolveAcademicPeriod(e, managedExamGroups);
+      if (resolved.academicYear) set.add(resolved.academicYear);
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [tabExams]);
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [tabExams, managedExamGroups]);
 
   const myExamsCount = useMemo(() => {
     return tabExams.filter(e => isRealOwner(e)).length;
@@ -634,12 +667,8 @@ const ExamsPage = () => {
         const t = exam.examType || "Latihan";
         if (t !== typeFilter) return false;
       }
-      if (groupFilter !== "all") {
-        if (groupFilter === "__none__") {
-          if (exam.group_name && exam.group_name.trim()) return false;
-        } else {
-          if ((exam.group_name || "").trim().toLowerCase() !== groupFilter.trim().toLowerCase()) return false;
-        }
+      if (!matchesPeriodAndGroupFilter(exam, yearFilter, semesterFilter, groupFilter, managedExamGroups)) {
+        return false;
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -647,14 +676,25 @@ const ExamsPage = () => {
         const teacher = teachers.find((t: any) => t.id === exam.teacherId)?.name?.toLowerCase() || "";
         const title = (exam.title || "").toLowerCase();
         const examType = (exam.examType || "").toLowerCase();
-        const groupName = (exam.group_name || "").toLowerCase();
-        if (!title.includes(q) && !subject.includes(q) && !teacher.includes(q) && !examType.includes(q) && !groupName.includes(q)) {
+        const resolved = resolveAcademicPeriod(exam, managedExamGroups);
+        const groupName = resolved.structuredGroup.toLowerCase();
+        const yearStr = resolved.academicYear.toLowerCase();
+        const semStr = resolved.semester.toLowerCase();
+        if (
+          !title.includes(q) &&
+          !subject.includes(q) &&
+          !teacher.includes(q) &&
+          !examType.includes(q) &&
+          !groupName.includes(q) &&
+          !yearStr.includes(q) &&
+          !semStr.includes(q)
+        ) {
           return false;
         }
       }
       return true;
     });
-  }, [tabExams, role, ownerFilter, isRealOwner, isMgmpExam, subjectFilter, typeFilter, groupFilter, searchQuery, subjects, teachers]);
+  }, [tabExams, role, ownerFilter, isRealOwner, isMgmpExam, subjectFilter, typeFilter, yearFilter, semesterFilter, groupFilter, searchQuery, subjects, teachers, managedExamGroups]);
 
   const filteredExams = displayExams;
 
@@ -1131,23 +1171,31 @@ const ExamsPage = () => {
       subjectId: defaultSubjectId,
       teacherId: role === "admin" ? "" : (teacherId || user?.id || ""),
       examType: "Latihan",
+      academic_year: activeAcademicYear,
+      semester: activeSemester,
       group_name: "",
       is_mgmp_shared: false,
     });
     setIsDialogOpen(true);
   };
 
-  const [executeDuplicateExam, isDuplicating] = useAsyncAction(async (exam: ExamData) => {
+  const [executeDuplicateExam, isDuplicating] = useAsyncAction(async (
+    exam: ExamData,
+    target?: { title: string; academic_year: string; semester: SemesterType | ""; group_name: string }
+  ) => {
     if (!pb) return;
     const mine = isOwner(exam);
-    const targetTitle = mine ? `(Salinan) ${exam.title}` : `${exam.title} (Salinan Saya)`;
+    const targetTitle = target?.title || (mine ? `(Salinan) ${exam.title}` : `${exam.title} (Salinan Saya)`);
     const newTeacherId = (role !== "admin" && (teacherId || user?.id)) ? (teacherId || user?.id) : exam.teacherId;
+    const fallbackResolved = resolveAcademicPeriod(exam, managedExamGroups);
     const newExam = await pb.collection('exams').create({
       title: targetTitle,
       subjectId: exam.subjectId,
       teacherId: newTeacherId,
       examType: exam.examType || "Latihan",
-      group_name: exam.group_name || "",
+      academic_year: target?.academic_year ?? (fallbackResolved.academicYear || activeAcademicYear),
+      semester: target?.semester ?? (fallbackResolved.semester || activeSemester),
+      group_name: target?.group_name ?? fallbackResolved.structuredGroup,
       is_mgmp_shared: false,
     });
 
@@ -1172,31 +1220,19 @@ const ExamsPage = () => {
       title: "Berhasil Menyalin Bank Soal",
       description: `Bank soal "${targetTitle}" berhasil disalin ke koleksi Anda (${questions.length} butir soal).`
     });
+    setDuplicateModalExam(null);
     await fetchExams();
   }, {
     errorMessage: "Gagal menyalin bank soal."
   });
 
   const handleDuplicateExam = (exam: ExamData) => {
-    const mine = isOwner(exam);
     const teacherAuthor = teachers.find((t: any) => t.id === exam.teacherId)?.name || "rekan guru";
-
-    setConfirmDialog({
-      isOpen: true,
-      title: mine ? "Duplikat Bank Soal" : "Salin ke Bank Soal Saya",
-      description: mine
-        ? `Apakah Anda yakin ingin menduplikasi "${exam.title}" beserta semua soalnya?`
-        : `Salin bank soal "${exam.title}" karya ${teacherAuthor} ke koleksi Anda? Anda akan menjadi pemilik salinan ini dan memiliki akses penuh untuk mengeditnya.`,
-      type: "info",
-      confirmLabel: mine ? "Duplikat" : "Salin ke Koleksi Saya",
-      isLoading: isDuplicating,
-      onConfirm: async () => {
-        await executeDuplicateExam(exam);
-      }
-    });
+    setDuplicateModalExam({ ...exam, teacherName: teacherAuthor } as any);
   };
 
   const handleEditClick = (exam: ExamData) => {
+    const resolved = resolveAcademicPeriod(exam, managedExamGroups);
     setDialogMode("edit");
     setSelectedExam(exam);
     setFormValues({
@@ -1204,30 +1240,62 @@ const ExamsPage = () => {
       subjectId: exam.subjectId,
       teacherId: exam.teacherId || "",
       examType: exam.examType || "Latihan",
-      group_name: exam.group_name || "",
+      academic_year: resolved.academicYear,
+      semester: resolved.semester,
+      group_name: resolved.structuredGroup,
       is_mgmp_shared: Boolean(exam.is_mgmp_shared),
     });
     setIsDialogOpen(true);
   };
 
-  const handleApplyBatchGroup = async (targetGroupName: string) => {
+  const openBatchPeriodModal = () => {
+    const selectedRows = exams.filter((e) => selectedIds.includes(e.id));
+    const resolvedList = selectedRows.map((e) => resolveAcademicPeriod(e, managedExamGroups));
+    const years = Array.from(new Set(resolvedList.map((r) => r.academicYear).filter(Boolean)));
+    const sems = Array.from(new Set(resolvedList.map((r) => r.semester).filter(Boolean)));
+    const groups = Array.from(new Set(resolvedList.map((r) => r.structuredGroup).filter(Boolean)));
+
+    setBatchAcademicYear(years.length === 1 ? years[0] : activeAcademicYear);
+    setBatchSemester(sems.length === 1 ? sems[0] : activeSemester);
+    setBatchGroupInput(groups.length === 1 ? groups[0] : "");
+    setBatchKeepExistingGroup(groups.length > 1);
+    setBatchGroupDialogOpen(true);
+  };
+
+  const handleApplyBatchGroup = async (mode: "apply" | "clear") => {
     if (selectedIds.length === 0 || !pb) return;
     setBatchGroupDialogOpen(false);
-    const cleanedGroup = targetGroupName.trim();
+
+    const cleanedYear = mode === "clear" ? "" : normalizeAcademicYear(batchAcademicYear);
+    const cleanedSemester = mode === "clear" ? "" : normalizeSemester(batchSemester);
+    const cleanedGroup = mode === "clear" ? "" : batchGroupInput.trim();
+    const keepGroup = mode === "apply" && batchKeepExistingGroup;
 
     setBatchProgress({
       isOpen: true,
       total: selectedIds.length,
       current: 0,
-      message: `Mengatur group ${cleanedGroup ? `"${cleanedGroup}"` : "kosong"}...`,
-      title: "Atur Group Bank Soal"
+      message: mode === "clear" ? "Mengosongkan periode dan group..." : "Memperbarui periode dan group...",
+      title: "Atur Periode & Group Bank Soal"
     });
 
     try {
+      const updatedMap: Record<string, { academic_year: string; semester: string; group_name?: string }> = {};
       for (let i = 0; i < selectedIds.length; i++) {
-        await pb.collection('exams').update(selectedIds[i], {
-          group_name: cleanedGroup
-        });
+        const id = selectedIds[i];
+        const updatePayload: Record<string, any> = {
+          academic_year: cleanedYear,
+          semester: cleanedSemester,
+        };
+        if (!keepGroup) {
+          updatePayload.group_name = cleanedGroup;
+        }
+        await pb.collection('exams').update(id, updatePayload);
+        updatedMap[id] = {
+          academic_year: cleanedYear,
+          semester: cleanedSemester,
+          ...(keepGroup ? {} : { group_name: cleanedGroup }),
+        };
         setBatchProgress(prev => ({
           ...prev,
           current: i + 1,
@@ -1235,18 +1303,18 @@ const ExamsPage = () => {
         }));
       }
 
-      setExams(prev => prev.map(e => selectedIds.includes(e.id) ? { ...e, group_name: cleanedGroup } : e));
+      setExams(prev => prev.map(e => (updatedMap[e.id] ? { ...e, ...updatedMap[e.id] } : e)));
       showAlert(
         "Berhasil",
-        cleanedGroup
-          ? `${selectedIds.length} bank soal berhasil dimasukkan ke group "${cleanedGroup}".`
-          : `${selectedIds.length} bank soal berhasil dikeluarkan dari group.`,
+        mode === "clear"
+          ? `${selectedIds.length} bank soal berhasil dikosongkan periode dan group-nya.`
+          : `${selectedIds.length} bank soal berhasil diperbarui periode dan group-nya.`,
         "success"
       );
       setSelectedIds([]);
       setBatchGroupInput("");
     } catch (e: any) {
-      showAlert("Gagal", e.message || "Gagal mengatur group massal.", "danger");
+      showAlert("Gagal", e.message || "Gagal mengatur periode & group massal.", "danger");
     } finally {
       setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
@@ -1280,6 +1348,8 @@ const ExamsPage = () => {
     try {
       const payload: any = {
         ...formValues,
+        academic_year: normalizeAcademicYear(formValues.academic_year),
+        semester: normalizeSemester(formValues.semester),
         group_name: (formValues.group_name || "").trim(),
         is_mgmp_shared: Boolean(formValues.is_mgmp_shared),
       };
@@ -1825,6 +1895,8 @@ const ExamsPage = () => {
                   Kolaborasi
                 </span>
               )}
+
+              <AcademicPeriodBadges record={exam} managedGroups={managedExamGroups} compact />
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">
               <span className="font-semibold text-emerald-600 dark:text-emerald-400">
@@ -2185,31 +2257,47 @@ const ExamsPage = () => {
                   <NeonFilterPopover
                     title="Filter Bank Soal"
                     activeCount={
+                      (yearFilter !== "all" ? 1 : 0) +
+                      (semesterFilter !== "all" ? 1 : 0) +
+                      (groupFilter !== "all" ? 1 : 0) +
                       (subjectFilter !== "all" ? 1 : 0) +
                       (typeFilter !== "all" ? 1 : 0) +
-                      (groupFilter !== "all" ? 1 : 0) +
-                      (ownerFilter !== (role === "admin" ? "all" : "mine") ? 1 : 0)
+                      (role !== "admin" && ownerFilter !== "mine" ? 1 : 0)
                     }
                     onReset={() => {
                       setSubjectFilter("all");
                       setTypeFilter("all");
                       setGroupFilter("all");
+                      setYearFilter("all");
+                      setSemesterFilter("all");
                       setOwnerFilter(role === "admin" ? "all" : "mine");
                     }}
                   >
-                    {/* Filter Kepemilikan & MGMP */}
-                    {(role !== "admin" || mySubjectIds.length > 0) && (
-                      <NeonFilterField label="Kepemilikan">
-                        <NeonFilterSelect
-                          value={ownerFilter}
-                          onChange={(e) => setOwnerFilter(e.target.value as any)}
-                        >
-                          <option value="mine">⭐ Bank Soal Saya Saja ({myExamsCount})</option>
-                          <option value="mgmp">👥 Rekan Se-Mapel / MGMP ({mgmpExamsCount})</option>
-                          <option value="all">Semua Bank Soal ({tabExams.length})</option>
-                        </NeonFilterSelect>
-                      </NeonFilterField>
-                    )}
+                    <AcademicPeriodFilterFields
+                      yearFilter={yearFilter}
+                      semesterFilter={semesterFilter}
+                      onYearChange={setYearFilter}
+                      onSemesterChange={setSemesterFilter}
+                      activeAcademicYear={activeAcademicYear}
+                      activeSemester={activeSemester}
+                      managedAcademicYears={managedAcademicYears}
+                      managedGroups={managedExamGroups}
+                      records={tabExams}
+                    />
+
+                    {/* Group filter */}
+                    <NeonFilterField label="Agenda / Group">
+                      <NeonFilterSelect
+                        value={groupFilter}
+                        onChange={(e) => setGroupFilter(e.target.value)}
+                      >
+                        <option value="all">Semua Agenda</option>
+                        {structuredGroupOptions.map((grp) => (
+                          <option key={grp} value={grp}>{grp}</option>
+                        ))}
+                        <option value="__none__">Tanpa Agenda</option>
+                      </NeonFilterSelect>
+                    </NeonFilterField>
 
                     {/* Subject filter */}
                     <NeonFilterField label={terminology.subject}>
@@ -2240,22 +2328,29 @@ const ExamsPage = () => {
                       </NeonFilterSelect>
                     </NeonFilterField>
 
-                    {/* Group filter */}
-                    {availableGroups.length > 0 && (
-                      <NeonFilterField label="Group Bank Soal">
+                    {/* Filter Kepemilikan & MGMP (khusus guru) */}
+                    {role !== "admin" && (
+                      <NeonFilterField label="Kepemilikan">
                         <NeonFilterSelect
-                          value={groupFilter}
-                          onChange={(e) => setGroupFilter(e.target.value)}
+                          value={ownerFilter}
+                          onChange={(e) => setOwnerFilter(e.target.value as any)}
                         >
-                          <option value="all">Semua Group</option>
-                          {availableGroups.map((grp) => (
-                            <option key={grp} value={grp}>{grp}</option>
-                          ))}
-                          <option value="__none__">Tanpa Group</option>
+                          <option value="mine">Bank Soal Saya ({myExamsCount})</option>
+                          <option value="mgmp">Rekan Se-Mapel / MGMP ({mgmpExamsCount})</option>
+                          <option value="all">Semua Bank Soal ({tabExams.length})</option>
                         </NeonFilterSelect>
                       </NeonFilterField>
                     )}
                   </NeonFilterPopover>
+
+                  <ActivePeriodFilterChips
+                    yearFilter={yearFilter}
+                    semesterFilter={semesterFilter}
+                    groupFilter={groupFilter}
+                    onClearYear={() => setYearFilter("all")}
+                    onClearSemester={() => setSemesterFilter("all")}
+                    onClearGroup={() => setGroupFilter("all")}
+                  />
                 </>
               }
               selectable={true}
@@ -2263,17 +2358,14 @@ const ExamsPage = () => {
               onSelectionChange={setSelectedIds}
               isItemSelectable={isOwner}
               batchActions={
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => {
-                      setBatchGroupInput("");
-                      setBatchGroupDialogOpen(true);
-                    }}
-                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-purple-600 dark:text-purple-400 font-medium hover:bg-purple-50 dark:hover:bg-purple-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                    onClick={openBatchPeriodModal}
+                    className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-emerald-700 dark:text-emerald-400 font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
                   >
-                    <Folder className="h-3 w-3" />
-                    <span>Set Group</span>
+                    <Calendar className="h-3 w-3" />
+                    <span>Atur Periode &amp; Group</span>
                   </button>
                   {activeTab === "aktif" ? (
                     <>
@@ -2391,10 +2483,21 @@ const ExamsPage = () => {
                     />
                   </InspectorGrid>
 
-                  <InspectorField
-                    label="Group Bank Soal"
-                    value={inspectedExam.group_name || "Tanpa Group"}
-                  />
+                  <InspectorGrid>
+                    <InspectorField label="Periode Akademik">
+                      <AcademicPeriodBadges
+                        record={inspectedExam}
+                        managedGroups={managedExamGroups}
+                        showGroup={false}
+                        showUnsetHint
+                        className="mt-0.5"
+                      />
+                    </InspectorField>
+                    <InspectorField
+                      label="Agenda / Group"
+                      value={resolveAcademicPeriod(inspectedExam, managedExamGroups).structuredGroup || "Tanpa Agenda"}
+                    />
+                  </InspectorGrid>
 
                   <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800 space-y-2">
                     <InspectorField
@@ -2574,42 +2677,23 @@ const ExamsPage = () => {
                 />
               </div>
 
-              {/* Field 1b: Group Bank Soal */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="exam-group-input" className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                    Group Bank Soal
-                  </label>
-                  <span className="text-[10px] text-neutral-400">Opsional</span>
-                </div>
-                <Input
-                  id="exam-group-input"
-                  list="exam-group-form-suggestions"
-                  value={formValues.group_name}
-                  onChange={(e) => setFormValues({ ...formValues, group_name: e.target.value })}
-                  placeholder="Contoh: Ujian Semester 2 2026 / Latihan Mandiri"
-                  className="h-10 px-3.5 rounded-lg border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/60 text-xs text-neutral-900 dark:text-neutral-100 focus-visible:ring-1 focus-visible:ring-emerald-500 placeholder:text-neutral-400 transition-all"
+              {/* Field 1b: Periode Akademik & Group */}
+              <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-900/30 p-3.5">
+                <AcademicPeriodFormFields
+                  academicYear={formValues.academic_year}
+                  semester={formValues.semester}
+                  groupName={formValues.group_name}
+                  onAcademicYearChange={(val) => setFormValues({ ...formValues, academic_year: val })}
+                  onSemesterChange={(val) => setFormValues({ ...formValues, semester: val })}
+                  onGroupNameChange={(val) => setFormValues({ ...formValues, group_name: val })}
+                  activeAcademicYear={activeAcademicYear}
+                  activeSemester={activeSemester}
+                  managedAcademicYears={managedAcademicYears}
+                  managedGroups={managedExamGroups}
+                  existingYears={availableYears}
+                  allowCustomYear={role === "admin"}
+                  groupLabel="Agenda / Group Bank Soal"
                 />
-                <datalist id="exam-group-form-suggestions">
-                  {availableGroups.map((grp) => (
-                    <option key={grp} value={grp} />
-                  ))}
-                </datalist>
-                {availableGroups.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1 mt-1">
-                    <span className="text-[10px] text-neutral-400">Saran:</span>
-                    {availableGroups.slice(0, 3).map((grp) => (
-                      <button
-                        key={grp}
-                        type="button"
-                        onClick={() => setFormValues({ ...formValues, group_name: grp })}
-                        className="px-1.5 py-0.5 rounded text-[10px] bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 transition-colors cursor-pointer"
-                      >
-                        +{grp}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
               {/* Grid 2 Kolom: Jenis Evaluasi & Mata Pelajaran */}
@@ -2800,23 +2884,23 @@ const ExamsPage = () => {
         }}
       />
 
-      {/* Modal Atur Group Massal */}
+      {/* Modal Atur Periode & Group Massal */}
       <NeonModal
         isOpen={batchGroupDialogOpen}
         onClose={() => setBatchGroupDialogOpen(false)}
-        title="Atur Group Bank Soal"
-        subtitle={`Terapkan group untuk ${selectedIds.length} bank soal terpilih.`}
-        icon={Folder}
-        size="sm"
+        title="Atur Periode & Group Bank Soal"
+        subtitle={`Tetapkan Tahun Ajaran, Semester, dan Group untuk ${selectedIds.length} bank soal terpilih.`}
+        icon={Calendar}
+        size="md"
         footer={
-          <div className="flex items-center justify-between w-full">
+          <div className="flex flex-wrap items-center justify-between gap-2 w-full">
             <NeonButton
               type="button"
               variant="dangerGhost"
               size="sm"
-              onClick={() => handleApplyBatchGroup("")}
+              onClick={() => handleApplyBatchGroup("clear")}
             >
-              Kosongkan Group
+              Kosongkan Periode &amp; Group
             </NeonButton>
             <div className="flex items-center gap-2">
               <NeonButton
@@ -2832,61 +2916,67 @@ const ExamsPage = () => {
                 variant="primary"
                 color="brand"
                 size="sm"
-                onClick={() => handleApplyBatchGroup(batchGroupInput)}
-                disabled={!batchGroupInput.trim()}
+                onClick={() => handleApplyBatchGroup("apply")}
+                disabled={!batchAcademicYear && !batchSemester && !batchGroupInput.trim() && batchKeepExistingGroup}
               >
-                Terapkan Group
+                Terapkan ke {selectedIds.length} Paket
               </NeonButton>
             </div>
           </div>
         }
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
-              Nama Group Bank Soal
-            </label>
-            <Input
-              list="batch-group-suggestions-ex"
-              placeholder="Contoh: Ujian Semester 2 2026 / Latihan Mandiri"
-              value={batchGroupInput}
-              onChange={(e) => setBatchGroupInput(e.target.value)}
-              className="h-10 text-xs rounded-xl bg-neutral-50/70 dark:bg-neutral-900/80 border-neutral-200 dark:border-neutral-800 focus-visible:ring-2 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
-              autoFocus
-            />
-            <datalist id="batch-group-suggestions-ex">
-              {availableGroups.map((grp) => (
-                <option key={grp} value={grp} />
-              ))}
-            </datalist>
-          </div>
+          <AcademicPeriodFormFields
+            academicYear={batchAcademicYear}
+            semester={batchSemester}
+            groupName={batchKeepExistingGroup ? "" : batchGroupInput}
+            onAcademicYearChange={setBatchAcademicYear}
+            onSemesterChange={setBatchSemester}
+            onGroupNameChange={(val) => {
+              setBatchKeepExistingGroup(false);
+              setBatchGroupInput(val);
+            }}
+            activeAcademicYear={activeAcademicYear}
+            activeSemester={activeSemester}
+            managedAcademicYears={managedAcademicYears}
+            managedGroups={managedExamGroups}
+            existingYears={availableYears}
+            allowCustomYear={role === "admin"}
+            groupLabel="Agenda / Group Ujian"
+          />
 
-          {availableGroups.length > 0 && (
-            <div>
-              <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 block mb-1.5">
-                Atau klik group yang sudah ada:
-              </span>
-              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800">
-                {availableGroups.map((grp) => (
-                  <button
-                    key={grp}
-                    type="button"
-                    onClick={() => setBatchGroupInput(grp)}
-                    className={cn(
-                      "px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer border select-none",
-                      batchGroupInput.trim() === grp
-                        ? "bg-emerald-600 text-white border-emerald-600 font-semibold shadow-xs"
-                        : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-emerald-500"
-                    )}
-                  >
-                    {grp}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={batchKeepExistingGroup}
+              onChange={(e) => setBatchKeepExistingGroup(e.target.checked)}
+              className="mt-0.5 rounded border-neutral-300 dark:border-neutral-700 text-emerald-600 focus:ring-emerald-500"
+            />
+            <span className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+              Pertahankan agenda masing-masing bank soal (hanya perbarui Tahun Ajaran dan Semester).
+            </span>
+          </label>
         </div>
       </NeonModal>
+
+      {/* Modal Duplikat / Salin Bank Soal dengan Target Periode */}
+      <DuplicateExamModal
+        isOpen={Boolean(duplicateModalExam)}
+        onClose={() => setDuplicateModalExam(null)}
+        sourceExam={duplicateModalExam}
+        isMine={duplicateModalExam ? isOwner(duplicateModalExam) : true}
+        activeAcademicYear={activeAcademicYear}
+        activeSemester={activeSemester}
+        managedAcademicYears={managedAcademicYears}
+        managedGroups={managedExamGroups}
+        existingYears={availableYears}
+        allowCustomYear={role === "admin"}
+        isSubmitting={isDuplicating}
+        onConfirm={async (values) => {
+          if (!duplicateModalExam) return;
+          await executeDuplicateExam(duplicateModalExam, values);
+        }}
+      />
 
       {/* Batch Operation Progress Dialog */}
       <BatchProgressDialog progress={batchProgress} />

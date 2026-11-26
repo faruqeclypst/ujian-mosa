@@ -78,7 +78,22 @@ import {
   Terminal,
   Eye,
   EyeOff,
+  Calendar,
+  Plus,
+  X,
+  Tag,
 } from "lucide-react";
+import {
+  GROUP_AGENDA_PRESETS,
+  getAcademicYearOptions,
+  getDefaultAcademicPeriod,
+  getDefaultManagedAcademicYears,
+  getStructuredGroupOptions,
+  normalizeAcademicYear,
+  normalizeSemester,
+  parseStringArraySetting,
+  type SemesterType,
+} from "../lib/academicPeriod";
 import { forceHardReload } from "../utils/hardReload";
 import { getSchoolDomain, getSchoolUrl } from "../utils/domainHelper";
 import { ExambroGuideModal } from "../components/dialogs/ExambroGuideModal";
@@ -124,6 +139,12 @@ const SettingsPage = () => {
   const [isExambroGuideOpen, setIsExambroGuideOpen] = useState(false);
   const [teacherFullAccess, setTeacherFullAccess] = useState(false);
   const [teacherAIAccess, setTeacherAIAccess] = useState(false);
+  const [activeAcademicYear, setActiveAcademicYear] = useState(() => getDefaultAcademicPeriod().academicYear);
+  const [activeSemester, setActiveSemester] = useState<SemesterType>(() => getDefaultAcademicPeriod().semester);
+  const [academicYears, setAcademicYears] = useState<string[]>(() => getDefaultManagedAcademicYears());
+  const [newAcademicYearInput, setNewAcademicYearInput] = useState("");
+  const [examGroups, setExamGroups] = useState<string[]>(() => [...GROUP_AGENDA_PRESETS]);
+  const [newExamGroupInput, setNewExamGroupInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isTestingAI, setIsTestingAI] = useState(false);
@@ -422,6 +443,17 @@ const SettingsPage = () => {
         setIsExambroEnabled(data.is_exambro_enabled ?? false);
         setTeacherFullAccess(data.teacher_full_access || false);
         setTeacherAIAccess(data.teacher_ai_access ?? false);
+        const defPeriod = getDefaultAcademicPeriod();
+        const resolvedActiveYear = normalizeAcademicYear(data.active_academic_year) || defPeriod.academicYear;
+        setActiveAcademicYear(resolvedActiveYear);
+        setActiveSemester(normalizeSemester(data.active_semester) || defPeriod.semester);
+        const parsedYears = parseStringArraySetting(data.academic_years);
+        setAcademicYears(
+          parsedYears.length > 0
+            ? getAcademicYearOptions(parsedYears, [], resolvedActiveYear)
+            : getAcademicYearOptions(getDefaultManagedAcademicYears(), [], resolvedActiveYear)
+        );
+        setExamGroups(getStructuredGroupOptions(parseStringArraySetting(data.exam_groups)));
 
         const logoUrl = data.logoUrl || data.logo || "";
         setSchoolLogo(logoUrl);
@@ -708,7 +740,13 @@ const SettingsPage = () => {
         teacher_ai_access: !!teacherAIAccess,
         isExambroEnabled: !!isExambroEnabled,
         teacherFullAccess: !!teacherFullAccess,
-        aiModel: aiModel || "llama-3.3-70b-versatile"
+        aiModel: aiModel || "llama-3.3-70b-versatile",
+        active_academic_year: normalizeAcademicYear(activeAcademicYear) || getDefaultAcademicPeriod().academicYear,
+        active_semester: normalizeSemester(activeSemester) || getDefaultAcademicPeriod().semester,
+        academic_years: JSON.stringify(
+          getAcademicYearOptions(academicYears, [], activeAcademicYear)
+        ),
+        exam_groups: JSON.stringify(getStructuredGroupOptions(examGroups)),
       };
 
       if (!pb) return;
@@ -1228,6 +1266,236 @@ const SettingsPage = () => {
                             {schoolName || "EXAMKU"}
                           </span>
                         </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Periode Akademik Aktif & Agenda Terstruktur */}
+                  <div className="space-y-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+                          Periode Akademik &amp; Agenda Ujian
+                        </h4>
+                      </div>
+                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Menjadi pilihan baku dan periode bawaan di Bank Soal dan Ruang Ujian.
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="activeAcademicYearSelect"
+                          className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 block"
+                        >
+                          Tahun Ajaran Aktif
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="activeAcademicYearSelect"
+                            value={activeAcademicYear}
+                            onChange={(e) => setActiveAcademicYear(e.target.value)}
+                            className="w-full h-10 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/80 text-xs font-semibold px-3.5 pr-8 text-neutral-900 dark:text-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 appearance-none cursor-pointer"
+                          >
+                            {getAcademicYearOptions(academicYears, [], activeAcademicYear).map((yr) => (
+                              <option key={yr} value={yr}>
+                                Tahun Ajaran {yr}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 block">
+                          Semester Aktif
+                        </span>
+                        <div
+                          role="group"
+                          aria-label="Pilih Semester Aktif"
+                          className="grid grid-cols-2 gap-1.5 p-1 h-10 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/60"
+                        >
+                          {(["Ganjil", "Genap"] as const).map((sem) => {
+                            const selected = activeSemester === sem;
+                            return (
+                              <button
+                                key={sem}
+                                type="button"
+                                onClick={() => setActiveSemester(sem)}
+                                className={cn(
+                                  "rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40",
+                                  selected
+                                    ? sem === "Ganjil"
+                                      ? "bg-amber-100 text-amber-900 dark:bg-amber-900/70 dark:text-amber-100 border border-amber-300 dark:border-amber-700"
+                                      : "bg-sky-100 text-sky-900 dark:bg-sky-900/70 dark:text-sky-100 border border-sky-300 dark:border-sky-700"
+                                    : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                )}
+                              >
+                                {selected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                                <span>Semester {sem}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Kelola Daftar Tahun Ajaran (Dinamis, tidak hardcoded) */}
+                    <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 p-3.5 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 block">
+                            Daftar Tahun Ajaran Sekolah
+                          </span>
+                          <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                            Tambahkan tahun ajaran baru kapan saja tanpa menunggu perubahan kode.
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            value={newAcademicYearInput}
+                            onChange={(e) => setNewAcademicYearInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                const norm = normalizeAcademicYear(newAcademicYearInput);
+                                if (!norm) return;
+                                setAcademicYears((prev) => getAcademicYearOptions(prev, [norm], activeAcademicYear));
+                                setActiveAcademicYear(norm);
+                                setNewAcademicYearInput("");
+                              }
+                            }}
+                            placeholder="cth: 2027/2028"
+                            className="h-8 w-32 text-xs font-mono rounded-lg bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const norm = normalizeAcademicYear(newAcademicYearInput);
+                              if (!norm) return;
+                              setAcademicYears((prev) => getAcademicYearOptions(prev, [norm], activeAcademicYear));
+                              setActiveAcademicYear(norm);
+                              setNewAcademicYearInput("");
+                            }}
+                            disabled={!newAcademicYearInput.trim()}
+                            className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 transition-colors cursor-pointer shrink-0"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>Tambah</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {getAcademicYearOptions(academicYears, [], activeAcademicYear).map((yr) => {
+                          const isActive = yr === activeAcademicYear;
+                          return (
+                            <div
+                              key={yr}
+                              className={cn(
+                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono border",
+                                isActive
+                                  ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 font-semibold"
+                                  : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700"
+                              )}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setActiveAcademicYear(yr)}
+                                className="cursor-pointer hover:underline"
+                                title={isActive ? "Tahun ajaran aktif" : "Jadikan tahun ajaran aktif"}
+                              >
+                                {yr}{isActive ? " (Aktif)" : ""}
+                              </button>
+                              {!isActive && academicYears.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setAcademicYears((prev) => prev.filter((item) => item !== yr))}
+                                  aria-label={`Hapus tahun ajaran ${yr}`}
+                                  className="text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Kelola Agenda / Group Terstruktur */}
+                    <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 p-3.5 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <Tag className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                              Daftar Group / Agenda Terstruktur
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block mt-0.5">
+                            Guru hanya memilih dari daftar agenda ini agar nama group tidak campur aduk.
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            value={newExamGroupInput}
+                            onChange={(e) => setNewExamGroupInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                const clean = newExamGroupInput.trim();
+                                if (!clean) return;
+                                setExamGroups((prev) =>
+                                  prev.some((g) => g.toLowerCase() === clean.toLowerCase()) ? prev : [...prev, clean]
+                                );
+                                setNewExamGroupInput("");
+                              }
+                            }}
+                            placeholder="Tambah agenda, cth: Asesmen"
+                            className="h-8 w-44 text-xs rounded-lg bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const clean = newExamGroupInput.trim();
+                              if (!clean) return;
+                              setExamGroups((prev) =>
+                                prev.some((g) => g.toLowerCase() === clean.toLowerCase()) ? prev : [...prev, clean]
+                              );
+                              setNewExamGroupInput("");
+                            }}
+                            disabled={!newExamGroupInput.trim()}
+                            className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 transition-colors cursor-pointer shrink-0"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>Tambah</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {getStructuredGroupOptions(examGroups).map((grp) => (
+                          <div
+                            key={grp}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
+                          >
+                            <span>{grp}</span>
+                            {examGroups.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setExamGroups((prev) => prev.filter((item) => item !== grp))}
+                                aria-label={`Hapus agenda ${grp}`}
+                                className="text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>

@@ -73,22 +73,34 @@ onBootstrap((e) => {
             // Notice only
         }
 
-        // Auto-ensure group_name in exam_rooms & exams
+        // Auto-ensure group_name, academic_year, and semester in exam_rooms & exams
         try {
             try { db.newQuery("ALTER TABLE exam_rooms ADD COLUMN group_name TEXT DEFAULT ''").execute(); } catch (_) {}
+            try { db.newQuery("ALTER TABLE exam_rooms ADD COLUMN academic_year TEXT DEFAULT ''").execute(); } catch (_) {}
+            try { db.newQuery("ALTER TABLE exam_rooms ADD COLUMN semester TEXT DEFAULT ''").execute(); } catch (_) {}
             try { db.newQuery("ALTER TABLE exams ADD COLUMN group_name TEXT DEFAULT ''").execute(); } catch (_) {}
+            try { db.newQuery("ALTER TABLE exams ADD COLUMN academic_year TEXT DEFAULT ''").execute(); } catch (_) {}
+            try { db.newQuery("ALTER TABLE exams ADD COLUMN semester TEXT DEFAULT ''").execute(); } catch (_) {}
 
             const erCol = $app.findCollectionByNameOrId("exam_rooms");
             if (erCol) {
                 let modEr = false;
-                if (!erCol.fields.getByName("group_name")) {
-                    const tf = new TextField();
-                    tf.name = "group_name";
-                    tf.required = false;
-                    tf.max = 150;
-                    erCol.fields.add(tf);
-                    modEr = true;
-                    console.log("[SCHEMA_SYNC] Ensured group_name field in exam_rooms collection");
+                const erTextFields = [
+                    { name: "group_name", max: 150 },
+                    { name: "academic_year", max: 30 },
+                    { name: "semester", max: 20 }
+                ];
+                for (let fi = 0; fi < erTextFields.length; fi++) {
+                    const fDef = erTextFields[fi];
+                    if (!erCol.fields.getByName(fDef.name)) {
+                        const tf = new TextField();
+                        tf.name = fDef.name;
+                        tf.required = false;
+                        tf.max = fDef.max;
+                        erCol.fields.add(tf);
+                        modEr = true;
+                        console.log("[SCHEMA_SYNC] Ensured " + fDef.name + " field in exam_rooms collection");
+                    }
                 }
                 const targetErList = '(@request.auth.role = "admin") || (@request.auth.role = "teacher" && (examId.teacherId = @request.auth.teacherId || examId.teacherId = @request.auth.id || examId.is_mgmp_shared = true)) || (@request.auth.id != "" && @request.auth.role = "") || (@request.auth.collectionName = "students")';
                 const targetErView = '(@request.auth.role = "admin") || (@request.auth.role = "teacher" && (examId.teacherId = @request.auth.teacherId || examId.teacherId = @request.auth.id || examId.is_mgmp_shared = true)) || (@request.auth.id != "" && @request.auth.role = "") || (@request.auth.collectionName = "students")';
@@ -112,20 +124,28 @@ onBootstrap((e) => {
             }
 
             const exCol = $app.findCollectionByNameOrId("exams");
-            if (exCol && !exCol.fields.getByName("group_name")) {
-                const tf = new TextField();
-                tf.name = "group_name";
-                tf.required = false;
-                tf.max = 150;
-                exCol.fields.add(tf);
-                $app.save(exCol);
-                console.log("[SCHEMA_SYNC] Ensured group_name field in exams collection");
-            }
-
-            // Auto-ensure is_mgmp_shared in exams
-            try { db.newQuery("ALTER TABLE exams ADD COLUMN is_mgmp_shared BOOLEAN DEFAULT 0").execute(); } catch (_) {}
             if (exCol) {
                 let modEx = false;
+                const exTextFields = [
+                    { name: "group_name", max: 150 },
+                    { name: "academic_year", max: 30 },
+                    { name: "semester", max: 20 }
+                ];
+                for (let fi = 0; fi < exTextFields.length; fi++) {
+                    const fDef = exTextFields[fi];
+                    if (!exCol.fields.getByName(fDef.name)) {
+                        const tf = new TextField();
+                        tf.name = fDef.name;
+                        tf.required = false;
+                        tf.max = fDef.max;
+                        exCol.fields.add(tf);
+                        modEx = true;
+                        console.log("[SCHEMA_SYNC] Ensured " + fDef.name + " field in exams collection");
+                    }
+                }
+
+                // Auto-ensure is_mgmp_shared in exams
+                try { db.newQuery("ALTER TABLE exams ADD COLUMN is_mgmp_shared BOOLEAN DEFAULT 0").execute(); } catch (_) {}
                 if (!exCol.fields.getByName("is_mgmp_shared")) {
                     const bf = new BoolField();
                     bf.name = "is_mgmp_shared";
@@ -272,8 +292,13 @@ onBootstrap((e) => {
             // Notice only
         }
 
-        // Auto-ensure max character limits on text fields for offline Data URLs / image uploads
+        // Auto-ensure max character limits and active academic period fields on settings
         try {
+            try { db.newQuery("ALTER TABLE settings ADD COLUMN active_academic_year TEXT DEFAULT ''").execute(); } catch (_) {}
+            try { db.newQuery("ALTER TABLE settings ADD COLUMN active_semester TEXT DEFAULT ''").execute(); } catch (_) {}
+            try { db.newQuery("ALTER TABLE settings ADD COLUMN academic_years TEXT DEFAULT ''").execute(); } catch (_) {}
+            try { db.newQuery("ALTER TABLE settings ADD COLUMN exam_groups TEXT DEFAULT ''").execute(); } catch (_) {}
+
             const settingsCol = $app.findCollectionByNameOrId("settings");
             if (settingsCol) {
                 let modSettings = false;
@@ -287,9 +312,27 @@ onBootstrap((e) => {
                     luField.max = 3000000;
                     modSettings = true;
                 }
+                const periodFields = [
+                    { name: "active_academic_year", max: 30 },
+                    { name: "active_semester", max: 20 },
+                    { name: "academic_years", max: 2000 },
+                    { name: "exam_groups", max: 2000 }
+                ];
+                for (let pi = 0; pi < periodFields.length; pi++) {
+                    const pDef = periodFields[pi];
+                    if (!settingsCol.fields.getByName(pDef.name)) {
+                        const tf = new TextField();
+                        tf.name = pDef.name;
+                        tf.required = false;
+                        tf.max = pDef.max;
+                        settingsCol.fields.add(tf);
+                        modSettings = true;
+                        console.log("[SCHEMA_SYNC] Ensured " + pDef.name + " field in settings collection");
+                    }
+                }
                 if (modSettings) {
                     $app.save(settingsCol);
-                    console.log("[SCHEMA_SYNC] Ensured settings.logo & logoUrl max length: 3000000");
+                    console.log("[SCHEMA_SYNC] Ensured settings schema fields");
                 }
             }
         } catch (errSet) {

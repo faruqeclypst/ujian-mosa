@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare, MoreVertical, MoreHorizontal, Folder, Layers, Loader2 } from "lucide-react";
+import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare, MoreVertical, MoreHorizontal, Layers, Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { NeonButton } from "../../components/ui/NeonButton";
@@ -11,6 +11,23 @@ import FormField from "../../components/forms/FormField";
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { getExamTypeColorClass } from "./ExamsPage";
+import {
+  AcademicPeriodBadges,
+  AcademicPeriodFilterFields,
+  AcademicPeriodFormFields,
+  ActivePeriodFilterChips,
+} from "../../components/common/AcademicPeriodControls";
+import {
+  type AcademicYearFilterValue,
+  type SemesterFilterValue,
+  type SemesterType,
+  getAcademicYearOptions,
+  getStructuredGroupOptions,
+  matchesPeriodAndGroupFilter,
+  normalizeAcademicYear,
+  normalizeSemester,
+  resolveAcademicPeriod,
+} from "../../lib/academicPeriod";
 import { useTenant } from "../../context/TenantContext";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import { BatchProgressDialog, type BatchProgressState } from "../../components/dialogs/BatchProgressDialog";
@@ -83,6 +100,11 @@ export interface ExamRoomData {
   isActive?: boolean;
   is_exambro?: boolean;
   group_name?: string;
+  academic_year?: string;
+  semester?: string;
+  examAcademicYear?: string;
+  examSemester?: string;
+  examGroupName?: string;
 }
 
 // Sub-komponen terisolasi untuk countdown sisa waktu token agar tidak memicu re-render seluruh halaman tiap detik
@@ -131,8 +153,15 @@ const ExamRoomsPage = () => {
   const [tableSearch, setTableSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "ongoing" | "waiting" | "finished" | "disabled">("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [yearFilter, setYearFilter] = useState<AcademicYearFilterValue>("all");
+  const [semesterFilter, setSemesterFilter] = useState<SemesterFilterValue>("all");
+  const [examPickerYearFilter, setExamPickerYearFilter] = useState<AcademicYearFilterValue>("all");
+  const [examPickerSemesterFilter, setExamPickerSemesterFilter] = useState<SemesterFilterValue>("all");
   const [batchGroupDialogOpen, setBatchGroupDialogOpen] = useState(false);
+  const [batchAcademicYear, setBatchAcademicYear] = useState("");
+  const [batchSemester, setBatchSemester] = useState<SemesterType | "">("");
   const [batchGroupInput, setBatchGroupInput] = useState("");
+  const [batchKeepExistingGroup, setBatchKeepExistingGroup] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
   const [batchProgress, setBatchProgress] = useState<BatchProgressState>({
     isOpen: false,
@@ -148,10 +177,14 @@ const ExamRoomsPage = () => {
     setTableSearch("");
     setStatusFilter("all");
     setGroupFilter("all");
+    setYearFilter("all");
+    setSemesterFilter("all");
   }, [activeTab]);
 
   const [formValues, setFormValues] = useState({
     room_name: "",
+    academic_year: "",
+    semester: "" as SemesterType | "",
     group_name: "",
     examId: "",
     classId: "all",
@@ -191,7 +224,8 @@ const ExamRoomsPage = () => {
 
   const {
     classes: examClasses, subjects, teachers: masterTeachers,
-    universalToken, teacherFullAccess, loading: dataLoading,
+    universalToken, teacherFullAccess, activeAcademicYear, activeSemester,
+    managedAcademicYears, managedExamGroups, loading: dataLoading,
     students
   } = useExamData();
 
@@ -259,15 +293,28 @@ const ExamRoomsPage = () => {
     return filteredRooms.filter(r => isOwner(r));
   }, [filteredRooms, isOwner]);
 
-  const availableGroups = useMemo(() => {
-    const set = new Set<string>();
-    rooms.forEach(r => {
-      if (r.group_name && r.group_name.trim()) {
-        set.add(r.group_name.trim());
-      }
+  const structuredGroupOptions = useMemo(
+    () => getStructuredGroupOptions(managedExamGroups),
+    [managedExamGroups]
+  );
+
+  const availableYears = useMemo(() => {
+    const existing: string[] = [];
+    filteredRooms.forEach((r) => {
+      const resolved = resolveAcademicPeriod(r, managedExamGroups);
+      if (resolved.academicYear) existing.push(resolved.academicYear);
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [rooms]);
+    return getAcademicYearOptions(managedAcademicYears, existing, activeAcademicYear);
+  }, [filteredRooms, managedExamGroups, managedAcademicYears, activeAcademicYear]);
+
+  const availableExamYears = useMemo(() => {
+    const existing: string[] = [];
+    exams.forEach((e: any) => {
+      const resolved = resolveAcademicPeriod(e, managedExamGroups);
+      if (resolved.academicYear) existing.push(resolved.academicYear);
+    });
+    return getAcademicYearOptions(managedAcademicYears, existing, activeAcademicYear);
+  }, [exams, managedExamGroups, managedAcademicYears, activeAcademicYear]);
 
   // Counter siswa aktif diambil dari agregasi SQL backend (/api/room-stats).
   // Cara lama (getFullList attempts terurut -updated + hitung di browser) rusak
@@ -381,9 +428,9 @@ const ExamRoomsPage = () => {
         }
 
         const isAll = Boolean(
-          room.allClasses || 
-          (room as any).all_classes || 
-          classList.length === 0 || 
+          room.allClasses ||
+          (room as any).all_classes ||
+          classList.length === 0 ||
           (examClasses.length > 0 && classList.length >= examClasses.length)
         );
 
@@ -420,7 +467,12 @@ const ExamRoomsPage = () => {
           max_questions: Number(room.max_questions) || 0,
           randomize_questions: room.randomize_questions !== false,
           is_exambro: room.is_exambro || (room as any).isExambro || false,
-          group_name: (room as any).group_name || ""
+          group_name: (room as any).group_name || "",
+          academic_year: (room as any).academic_year || "",
+          semester: (room as any).semester || "",
+          examAcademicYear: (examObj as any)?.academic_year || "",
+          examSemester: (examObj as any)?.semester || "",
+          examGroupName: (examObj as any)?.group_name || "",
         } as any as ExamRoomData;
       });
 
@@ -485,11 +537,15 @@ const ExamRoomsPage = () => {
 
   const handleCreateClick = () => {
     setExamSearch("");
+    setExamPickerYearFilter("all");
+    setExamPickerSemesterFilter("all");
     setLastSelectedClassIndex(null);
     setDialogMode("create");
     setSelectedRoom(null);
     setFormValues({
       room_name: "",
+      academic_year: activeAcademicYear,
+      semester: activeSemester,
       group_name: "",
       examId: "",
       classId: "all",
@@ -511,12 +567,17 @@ const ExamRoomsPage = () => {
 
   const handleEditClick = (room: ExamRoomData) => {
     setExamSearch("");
+    setExamPickerYearFilter("all");
+    setExamPickerSemesterFilter("all");
     setLastSelectedClassIndex(null);
     setDialogMode("edit");
     setSelectedRoom(room);
+    const resolved = resolveAcademicPeriod(room, managedExamGroups);
     setFormValues({
       room_name: room.room_name || "",
-      group_name: room.group_name || "",
+      academic_year: resolved.academicYear,
+      semester: resolved.semester,
+      group_name: resolved.structuredGroup,
       examId: room.examId,
       classId: room.allClasses ? "" : (Array.isArray(room.classId) ? room.classId.join(",") : (room.classId || "")),
       allClasses: room.allClasses || false,
@@ -794,24 +855,53 @@ const ExamRoomsPage = () => {
     });
   };
 
-  const handleApplyBatchGroup = async (targetGroupName: string) => {
+  const openBatchPeriodModal = () => {
+    const selectedRows = rooms.filter((r) => selectedIds.includes(r.id));
+    const resolvedList = selectedRows.map((r) => resolveAcademicPeriod(r, managedExamGroups));
+    const years = Array.from(new Set(resolvedList.map((r) => r.academicYear).filter(Boolean)));
+    const sems = Array.from(new Set(resolvedList.map((r) => r.semester).filter(Boolean)));
+    const groups = Array.from(new Set(resolvedList.map((r) => r.structuredGroup).filter(Boolean)));
+
+    setBatchAcademicYear(years.length === 1 ? years[0] : activeAcademicYear);
+    setBatchSemester(sems.length === 1 ? sems[0] : activeSemester);
+    setBatchGroupInput(groups.length === 1 ? groups[0] : "");
+    setBatchKeepExistingGroup(groups.length > 1);
+    setBatchGroupDialogOpen(true);
+  };
+
+  const handleApplyBatchGroup = async (mode: "apply" | "clear") => {
     if (selectedIds.length === 0 || !pb) return;
     setBatchGroupDialogOpen(false);
-    const cleanedGroup = targetGroupName.trim();
+    const cleanedYear = mode === "clear" ? "" : normalizeAcademicYear(batchAcademicYear);
+    const cleanedSemester = mode === "clear" ? "" : normalizeSemester(batchSemester);
+    const cleanedGroup = mode === "clear" ? "" : batchGroupInput.trim();
+    const keepGroup = mode === "apply" && batchKeepExistingGroup;
 
     setBatchProgress({
       isOpen: true,
       total: selectedIds.length,
       current: 0,
-      message: `Mengatur group ${cleanedGroup ? `"${cleanedGroup}"` : "kosong"}...`,
-      title: "Atur Group Ruang Ujian"
+      message: mode === "clear" ? "Mengosongkan periode dan group..." : "Memperbarui periode dan group...",
+      title: "Atur Periode & Group Ruang Ujian"
     });
 
     try {
+      const updatedMap: Record<string, { academic_year: string; semester: string; group_name?: string }> = {};
       for (let i = 0; i < selectedIds.length; i++) {
-        await pb.collection('exam_rooms').update(selectedIds[i], {
-          group_name: cleanedGroup
-        });
+        const id = selectedIds[i];
+        const updatePayload: Record<string, any> = {
+          academic_year: cleanedYear,
+          semester: cleanedSemester,
+        };
+        if (!keepGroup) {
+          updatePayload.group_name = cleanedGroup;
+        }
+        await pb.collection('exam_rooms').update(id, updatePayload);
+        updatedMap[id] = {
+          academic_year: cleanedYear,
+          semester: cleanedSemester,
+          ...(keepGroup ? {} : { group_name: cleanedGroup }),
+        };
         setBatchProgress(prev => ({
           ...prev,
           current: i + 1,
@@ -819,18 +909,18 @@ const ExamRoomsPage = () => {
         }));
       }
 
-      setRooms(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, group_name: cleanedGroup } : r));
+      setRooms(prev => prev.map(r => (updatedMap[r.id] ? { ...r, ...updatedMap[r.id] } : r)));
       showAlert(
         "Berhasil",
-        cleanedGroup
-          ? `${selectedIds.length} ruang ujian berhasil dimasukkan ke group "${cleanedGroup}".`
-          : `${selectedIds.length} ruang ujian berhasil dikeluarkan dari group.`,
+        mode === "clear"
+          ? `${selectedIds.length} ruang ujian berhasil dikosongkan periode dan group-nya.`
+          : `${selectedIds.length} ruang ujian berhasil diperbarui periode dan group-nya.`,
         "success"
       );
       setSelectedIds([]);
       setBatchGroupInput("");
     } catch (e: any) {
-      showAlert("Gagal", e.message || "Gagal mengatur group massal.", "danger");
+      showAlert("Gagal", e.message || "Gagal mengatur periode & group massal.", "danger");
     } finally {
       setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
@@ -850,6 +940,8 @@ const ExamRoomsPage = () => {
     const data = {
       title: formValues.room_name,
       room_name: formValues.room_name,
+      academic_year: normalizeAcademicYear(formValues.academic_year),
+      semester: normalizeSemester(formValues.semester),
       group_name: (formValues.group_name || "").trim(),
       examId: formValues.examId,
       startTime: new Date(formValues.start_time).toISOString(),
@@ -915,13 +1007,22 @@ const ExamRoomsPage = () => {
     return exams
       .filter((e) => e.status !== "archive") // Sembunyikan bank soal yang diarsipkan
       .filter((e) => role === "admin" || e.teacherId === teacherId || e.id === formValues.examId)
+      .filter((e) => matchesPeriodAndGroupFilter(e, examPickerYearFilter, examPickerSemesterFilter, "all", managedExamGroups))
       .filter((e) => {
         if (!q) return true;
         const subjectName = subjects.find((s: any) => s.id === (e.subjectId || e.subjectid))?.name || "";
         const teacherName = masterTeachers.find((t: any) => t.id === (e.teacherId || e.teacherid))?.name || "";
-        return [e.title, subjectName, teacherName].some((v) => String(v || "").toLowerCase().includes(q));
+        const resolved = resolveAcademicPeriod(e, managedExamGroups);
+        return [
+          e.title,
+          subjectName,
+          teacherName,
+          resolved.academicYear,
+          resolved.semester,
+          resolved.structuredGroup,
+        ].some((v) => String(v || "").toLowerCase().includes(q));
       });
-  }, [examSearch, exams, role, teacherId, subjects, masterTeachers, formValues.examId]);
+  }, [examSearch, examPickerYearFilter, examPickerSemesterFilter, exams, role, teacherId, subjects, masterTeachers, formValues.examId, managedExamGroups]);
 
   const visibleExamOptions = useMemo(() => {
     const selected = exams.find((e) => e.id === formValues.examId);
@@ -1033,14 +1134,7 @@ const ExamRoomsPage = () => {
       });
     }
 
-    if (groupFilter !== "all") {
-      if (groupFilter === "__none__") {
-        list = list.filter(r => !r.group_name || !r.group_name.trim());
-      } else {
-        const target = groupFilter.trim().toLowerCase();
-        list = list.filter(r => (r.group_name || "").trim().toLowerCase() === target);
-      }
-    }
+    list = list.filter((r) => matchesPeriodAndGroupFilter(r, yearFilter, semesterFilter, groupFilter, managedExamGroups));
 
     const q = tableSearch.trim().toLowerCase();
     if (q) {
@@ -1052,7 +1146,10 @@ const ExamRoomsPage = () => {
         const roomCode = String(r.room_code || "").toLowerCase();
         const token = String(r.token || "").toLowerCase();
         const examTitle = String(r.examTitle || "").toLowerCase();
-        const groupName = String(r.group_name || "").toLowerCase();
+        const resolved = resolveAcademicPeriod(r, managedExamGroups);
+        const groupName = resolved.structuredGroup.toLowerCase();
+        const yearStr = resolved.academicYear.toLowerCase();
+        const semStr = resolved.semester.toLowerCase();
         return (
           roomName.includes(q) ||
           teacherName.includes(q) ||
@@ -1061,13 +1158,15 @@ const ExamRoomsPage = () => {
           roomCode.includes(q) ||
           token.includes(q) ||
           examTitle.includes(q) ||
-          groupName.includes(q)
+          groupName.includes(q) ||
+          yearStr.includes(q) ||
+          semStr.includes(q)
         );
       });
     }
 
     return list;
-  }, [filteredRooms, statusFilter, groupFilter, tableSearch]);
+  }, [filteredRooms, statusFilter, yearFilter, semesterFilter, groupFilter, tableSearch, managedExamGroups]);
 
   // ── Helper: Hitung status, jadwal & kelas ruang ujian ──
   const getRoomScheduleMeta = (room: ExamRoomData) => {
@@ -1109,8 +1208,8 @@ const ExamRoomsPage = () => {
     }
 
     const isAll = Boolean(
-      room.allClasses || 
-      (room as any).all_classes || 
+      room.allClasses ||
+      (room as any).all_classes ||
       room.className === `Semua ${terminology.class}` ||
       room.className?.toLowerCase()?.includes("semua")
     );
@@ -1118,9 +1217,9 @@ const ExamRoomsPage = () => {
     const classList = isAll
       ? (examClasses || []).map(c => c.name)
       : (room.className || "")
-          .split(", ")
-          .map(s => s.trim())
-          .filter(s => s && !s.toLowerCase().startsWith("semua"));
+        .split(", ")
+        .map(s => s.trim())
+        .filter(s => s && !s.toLowerCase().startsWith("semua"));
 
     const totalCount = isAll ? (examClasses.length || classList.length) : classList.length;
 
@@ -1162,15 +1261,7 @@ const ExamRoomsPage = () => {
                 {room.room_name || room.examTitle || "Tanpa Nama"}
               </span>
 
-              {room.group_name && (
-                <span
-                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 shrink-0 max-w-[130px] truncate"
-                  title={`Group: ${room.group_name}`}
-                >
-                  <Folder className="h-2.5 w-2.5 shrink-0 text-purple-500" />
-                  <span className="truncate">{room.group_name}</span>
-                </span>
-              )}
+              <AcademicPeriodBadges record={room} managedGroups={managedExamGroups} compact />
 
               {/* Status Pill on Mobile */}
               <span
@@ -1699,66 +1790,88 @@ const ExamRoomsPage = () => {
                 onSearchChange={setTableSearch}
                 searchPlaceholder="Cari ruang ujian, pengampu, mapel, kelas, token..."
                 filterSlot={
-                  <NeonFilterPopover
-                    title="Filter Ruang Ujian"
-                    activeCount={
-                      (statusFilter !== "all" ? 1 : 0) +
-                      (groupFilter !== "all" ? 1 : 0)
-                    }
-                    onReset={() => {
-                      setStatusFilter("all");
-                      setGroupFilter("all");
-                    }}
-                  >
-                    {/* Status Filter */}
-                    <NeonFilterField label="Status Ruangan">
-                      <NeonFilterSelect
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value as any)}
-                      >
-                        <option value="all">Semua Status ({statusCounts.all})</option>
-                        <option value="ongoing">Sedang Berjalan ({statusCounts.ongoing})</option>
-                        <option value="waiting">Menunggu Dimulai ({statusCounts.waiting})</option>
-                        <option value="finished">Selesai ({statusCounts.finished})</option>
-                        {statusCounts.disabled > 0 && (
-                          <option value="disabled">Nonaktif ({statusCounts.disabled})</option>
-                        )}
-                      </NeonFilterSelect>
-                    </NeonFilterField>
+                  <>
+                    <NeonFilterPopover
+                      title="Filter Ruang Ujian"
+                      activeCount={
+                        (yearFilter !== "all" ? 1 : 0) +
+                        (semesterFilter !== "all" ? 1 : 0) +
+                        (groupFilter !== "all" ? 1 : 0) +
+                        (statusFilter !== "all" ? 1 : 0)
+                      }
+                      onReset={() => {
+                        setStatusFilter("all");
+                        setGroupFilter("all");
+                        setYearFilter("all");
+                        setSemesterFilter("all");
+                      }}
+                    >
+                      <AcademicPeriodFilterFields
+                        yearFilter={yearFilter}
+                        semesterFilter={semesterFilter}
+                        onYearChange={setYearFilter}
+                        onSemesterChange={setSemesterFilter}
+                        activeAcademicYear={activeAcademicYear}
+                        activeSemester={activeSemester}
+                        managedAcademicYears={managedAcademicYears}
+                        managedGroups={managedExamGroups}
+                        records={filteredRooms}
+                      />
 
-                    {/* Group Filter */}
-                    {availableGroups.length > 0 && (
-                      <NeonFilterField label="Group Ruangan">
+                      {/* Group Filter */}
+                      <NeonFilterField label="Agenda / Group">
                         <NeonFilterSelect
                           value={groupFilter}
                           onChange={(e) => setGroupFilter(e.target.value)}
                         >
-                          <option value="all">Semua Group</option>
-                          {availableGroups.map((grp) => (
+                          <option value="all">Semua Agenda</option>
+                          {structuredGroupOptions.map((grp) => (
                             <option key={grp} value={grp}>{grp}</option>
                           ))}
-                          <option value="__none__">Tanpa Group</option>
+                          <option value="__none__">Tanpa Agenda</option>
                         </NeonFilterSelect>
                       </NeonFilterField>
-                    )}
-                  </NeonFilterPopover>
+
+                      {/* Status Filter */}
+                      <NeonFilterField label="Status Ruangan">
+                        <NeonFilterSelect
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value as any)}
+                        >
+                          <option value="all">Semua Status ({statusCounts.all})</option>
+                          <option value="ongoing">Sedang Berjalan ({statusCounts.ongoing})</option>
+                          <option value="waiting">Menunggu Dimulai ({statusCounts.waiting})</option>
+                          <option value="finished">Selesai ({statusCounts.finished})</option>
+                          {statusCounts.disabled > 0 && (
+                            <option value="disabled">Nonaktif ({statusCounts.disabled})</option>
+                          )}
+                        </NeonFilterSelect>
+                      </NeonFilterField>
+                    </NeonFilterPopover>
+
+                    <ActivePeriodFilterChips
+                      yearFilter={yearFilter}
+                      semesterFilter={semesterFilter}
+                      groupFilter={groupFilter}
+                      onClearYear={() => setYearFilter("all")}
+                      onClearSemester={() => setSemesterFilter("all")}
+                      onClearGroup={() => setGroupFilter("all")}
+                    />
+                  </>
                 }
                 selectable={true}
                 selectedKeys={selectedIds}
                 onSelectionChange={setSelectedIds}
                 isItemSelectable={isOwner}
                 batchActions={
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => {
-                        setBatchGroupInput("");
-                        setBatchGroupDialogOpen(true);
-                      }}
-                      className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-purple-600 dark:text-purple-400 font-medium hover:bg-purple-50 dark:hover:bg-purple-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                      onClick={openBatchPeriodModal}
+                      className="px-2 py-1 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-emerald-700 dark:text-emerald-400 font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-[11px] transition-colors cursor-pointer flex items-center gap-1"
                     >
-                      <Folder className="h-3 w-3" />
-                      <span>Set Group</span>
+                      <Calendar className="h-3 w-3" />
+                      <span>Atur Periode &amp; Group</span>
                     </button>
                     {activeTab === "aktif" ? (
                       <>
@@ -1898,10 +2011,20 @@ const ExamRoomsPage = () => {
                     </button>
                   </InspectorField>
 
+                  <InspectorField label="Periode Akademik">
+                    <AcademicPeriodBadges
+                      record={inspectedRoom}
+                      managedGroups={managedExamGroups}
+                      showGroup={false}
+                      showUnsetHint
+                      className="mt-0.5"
+                    />
+                  </InspectorField>
+
                   <InspectorGrid>
                     <InspectorField
-                      label="Group Sesi"
-                      value={inspectedRoom.group_name || "Tanpa Group"}
+                      label="Agenda / Group"
+                      value={resolveAcademicPeriod(inspectedRoom, managedExamGroups).structuredGroup || "Tanpa Agenda"}
                     />
                     <InspectorField
                       label={`Alokasi ${terminology.student}`}
@@ -2089,8 +2212,8 @@ const ExamRoomsPage = () => {
                 </span>
               </div>
 
-              {/* Search Box Terintegrasi */}
-              <div className="p-2.5 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
+              {/* Search & Filter Periode Bank Soal */}
+              <div className="p-2.5 border-b border-neutral-200 dark:border-neutral-800 shrink-0 space-y-2">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
                   <Input
@@ -2100,6 +2223,44 @@ const ExamRoomsPage = () => {
                     disabled={isEditRestricted}
                     className="pl-8 pr-2.5 h-8 text-xs rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
                   />
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <select
+                    aria-label="Filter Tahun Ajaran Bank Soal"
+                    value={examPickerYearFilter}
+                    onChange={(e) => setExamPickerYearFilter(e.target.value)}
+                    disabled={isEditRestricted}
+                    className="h-7 px-2 text-[11px] rounded border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500"
+                  >
+                    <option value="all">Semua TA</option>
+                    {availableExamYears.map((yr) => (
+                      <option key={yr} value={yr}>
+                        TA {yr}{yr === activeAcademicYear ? " (Aktif)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="inline-flex items-center p-0.5 rounded bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
+                    {(["all", "Ganjil", "Genap"] as const).map((sem) => (
+                      <button
+                        key={sem}
+                        type="button"
+                        disabled={isEditRestricted}
+                        onClick={() => setExamPickerSemesterFilter(sem)}
+                        className={cn(
+                          "px-2 h-6 rounded text-[11px] transition-colors cursor-pointer",
+                          examPickerSemesterFilter === sem
+                            ? sem === "Ganjil"
+                              ? "bg-amber-100 text-amber-900 dark:bg-amber-900/70 dark:text-amber-100 font-semibold"
+                              : sem === "Genap"
+                                ? "bg-sky-100 text-sky-900 dark:bg-sky-900/70 dark:text-sky-100 font-semibold"
+                                : "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 font-semibold"
+                            : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        )}
+                      >
+                        {sem === "all" ? "Semua" : sem}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -2121,7 +2282,25 @@ const ExamRoomsPage = () => {
                       <button
                         key={e.id}
                         type="button"
-                        onClick={() => setFormValues({ ...formValues, examId: e.id })}
+                        onClick={() => {
+                          if (dialogMode === "create") {
+                            const resolved = resolveAcademicPeriod(e, managedExamGroups);
+                            const prevExam = exams.find((x: any) => x.id === formValues.examId);
+                            const prevGroup = prevExam
+                              ? resolveAcademicPeriod(prevExam, managedExamGroups).structuredGroup
+                              : "";
+                            const shouldSyncGroup = !formValues.group_name.trim() || formValues.group_name.trim() === prevGroup;
+                            setFormValues({
+                              ...formValues,
+                              examId: e.id,
+                              academic_year: resolved.academicYear || formValues.academic_year || activeAcademicYear,
+                              semester: resolved.semester || formValues.semester || activeSemester,
+                              group_name: shouldSyncGroup ? resolved.structuredGroup : formValues.group_name,
+                            });
+                          } else {
+                            setFormValues({ ...formValues, examId: e.id });
+                          }
+                        }}
                         className={cn(
                           "w-full text-left p-2.5 rounded-lg border transition-all cursor-pointer select-none relative group",
                           selected
@@ -2137,6 +2316,8 @@ const ExamRoomsPage = () => {
                             {e.examType || "PAS"}
                           </span>
                         </div>
+
+                        <AcademicPeriodBadges record={e} managedGroups={managedExamGroups} compact className="mt-1.5" />
 
                         <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 truncate">
                           <span className="font-medium text-neutral-700 dark:text-neutral-300">{subjectName}</span>
@@ -2199,8 +2380,8 @@ const ExamRoomsPage = () => {
 
                 <form id="room-form" onSubmit={handleSubmit} className="space-y-5">
 
-                  {/* 1. Nama Ruangan & Group */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* 1. Nama Ruangan & Periode Akademik */}
+                  <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                         Nama Ruang Ujian <span className="text-rose-500">*</span>
@@ -2210,44 +2391,60 @@ const ExamRoomsPage = () => {
                         value={formValues.room_name}
                         onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })}
                         required
-                        className="h-8.5 text-xs rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
+                        className="h-9 text-xs rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
                       />
                       <p className="text-[10px] text-neutral-400 mt-1">Muncul pada kartu tes &amp; login siswa.</p>
                     </div>
 
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                          Group Ujian
-                        </label>
-                        <span className="text-[10px] text-neutral-400">Opsional</span>
-                      </div>
-                      <Input
-                        list="room-group-form-suggestions"
-                        placeholder="Contoh: Ujian Semester 2 2026"
-                        value={formValues.group_name}
-                        onChange={(e) => setFormValues({ ...formValues, group_name: e.target.value })}
-                        className="h-8.5 text-xs rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus-visible:ring-1 focus-visible:ring-emerald-500"
-                      />
-                      <datalist id="room-group-form-suggestions">
-                        {availableGroups.map((grp) => (
-                          <option key={grp} value={grp} />
-                        ))}
-                      </datalist>
-                      {availableGroups.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1 mt-1">
-                          {availableGroups.slice(0, 3).map((grp) => (
+                    <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-900/30 p-3 space-y-2.5">
+                      {formValues.examId && (() => {
+                        const chosenExam = exams.find((x: any) => x.id === formValues.examId);
+                        if (!chosenExam) return null;
+                        const examRes = resolveAcademicPeriod(chosenExam, managedExamGroups);
+                        const differs =
+                          (examRes.academicYear && examRes.academicYear !== formValues.academic_year) ||
+                          (examRes.semester && examRes.semester !== formValues.semester) ||
+                          (examRes.structuredGroup && examRes.structuredGroup !== formValues.group_name.trim());
+                        if (!differs) return null;
+                        return (
+                          <div className="flex items-center justify-between gap-2 pb-2 border-b border-neutral-200/70 dark:border-neutral-800 text-[11px]">
+                            <span className="text-neutral-600 dark:text-neutral-400 truncate">
+                              Periode Bank Soal: {examRes.academicYear || "-"} {examRes.semester || ""} {examRes.structuredGroup ? `(${examRes.structuredGroup})` : ""}
+                            </span>
                             <button
-                              key={grp}
                               type="button"
-                              onClick={() => setFormValues({ ...formValues, group_name: grp })}
-                              className="px-1.5 py-0.2 rounded text-[9px] bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 transition-colors cursor-pointer"
+                              onClick={() =>
+                                setFormValues((prev) => ({
+                                  ...prev,
+                                  academic_year: examRes.academicYear || prev.academic_year,
+                                  semester: examRes.semester || prev.semester,
+                                  group_name: examRes.structuredGroup || prev.group_name,
+                                }))
+                              }
+                              className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline shrink-0 cursor-pointer"
                             >
-                              +{grp}
+                              Samakan
                             </button>
-                          ))}
-                        </div>
-                      )}
+                          </div>
+                        );
+                      })()}
+
+                      <AcademicPeriodFormFields
+                        academicYear={formValues.academic_year}
+                        semester={formValues.semester}
+                        groupName={formValues.group_name}
+                        onAcademicYearChange={(val) => setFormValues({ ...formValues, academic_year: val })}
+                        onSemesterChange={(val) => setFormValues({ ...formValues, semester: val })}
+                        onGroupNameChange={(val) => setFormValues({ ...formValues, group_name: val })}
+                        activeAcademicYear={activeAcademicYear}
+                        activeSemester={activeSemester}
+                        managedAcademicYears={managedAcademicYears}
+                        managedGroups={managedExamGroups}
+                        existingYears={availableYears}
+                        allowCustomYear={role === "admin"}
+                        groupLabel="Agenda / Group Ruang Ujian"
+                        compact
+                      />
                     </div>
                   </div>
 
@@ -2598,23 +2795,23 @@ const ExamRoomsPage = () => {
         </div>
       </NeonModal>
 
-      {/* Modal Atur Group Massal */}
+      {/* Modal Atur Periode & Group Massal */}
       <NeonModal
         isOpen={batchGroupDialogOpen}
         onClose={() => setBatchGroupDialogOpen(false)}
-        title="Atur Group Ruang Ujian"
-        subtitle={`Terapkan group untuk ${selectedIds.length} ruang ujian terpilih.`}
-        icon={Folder}
-        size="sm"
+        title="Atur Periode & Group Ruang Ujian"
+        subtitle={`Tetapkan Tahun Ajaran, Semester, dan Group untuk ${selectedIds.length} ruang ujian terpilih.`}
+        icon={Calendar}
+        size="md"
         footer={
-          <div className="flex items-center justify-between w-full">
+          <div className="flex flex-wrap items-center justify-between gap-2 w-full">
             <NeonButton
               type="button"
               variant="dangerGhost"
               size="sm"
-              onClick={() => handleApplyBatchGroup("")}
+              onClick={() => handleApplyBatchGroup("clear")}
             >
-              Kosongkan Group
+              Kosongkan Periode &amp; Group
             </NeonButton>
             <div className="flex items-center gap-2">
               <NeonButton
@@ -2630,59 +2827,46 @@ const ExamRoomsPage = () => {
                 variant="primary"
                 color="brand"
                 size="sm"
-                onClick={() => handleApplyBatchGroup(batchGroupInput)}
-                disabled={!batchGroupInput.trim()}
+                onClick={() => handleApplyBatchGroup("apply")}
+                disabled={!batchAcademicYear && !batchSemester && !batchGroupInput.trim() && batchKeepExistingGroup}
               >
-                Terapkan Group
+                Terapkan ke {selectedIds.length} Ruang
               </NeonButton>
             </div>
           </div>
         }
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
-              Nama Group Ujian
-            </label>
-            <Input
-              list="batch-group-suggestions-er"
-              placeholder="Contoh: Ujian Semester 2 2026 / Try Out 1"
-              value={batchGroupInput}
-              onChange={(e) => setBatchGroupInput(e.target.value)}
-              className="h-10 text-xs rounded-xl bg-neutral-50/70 dark:bg-neutral-900/80 border-neutral-200 dark:border-neutral-800 focus-visible:ring-2 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
-              autoFocus
-            />
-            <datalist id="batch-group-suggestions-er">
-              {availableGroups.map((grp) => (
-                <option key={grp} value={grp} />
-              ))}
-            </datalist>
-          </div>
+          <AcademicPeriodFormFields
+            academicYear={batchAcademicYear}
+            semester={batchSemester}
+            groupName={batchKeepExistingGroup ? "" : batchGroupInput}
+            onAcademicYearChange={setBatchAcademicYear}
+            onSemesterChange={setBatchSemester}
+            onGroupNameChange={(val) => {
+              setBatchKeepExistingGroup(false);
+              setBatchGroupInput(val);
+            }}
+            activeAcademicYear={activeAcademicYear}
+            activeSemester={activeSemester}
+            managedAcademicYears={managedAcademicYears}
+            managedGroups={managedExamGroups}
+            existingYears={availableYears}
+            allowCustomYear={role === "admin"}
+            groupLabel="Agenda / Group Ujian"
+          />
 
-          {availableGroups.length > 0 && (
-            <div>
-              <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 block mb-1.5">
-                Atau klik group yang sudah ada:
-              </span>
-              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800">
-                {availableGroups.map((grp) => (
-                  <button
-                    key={grp}
-                    type="button"
-                    onClick={() => setBatchGroupInput(grp)}
-                    className={cn(
-                      "px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer border select-none",
-                      batchGroupInput.trim() === grp
-                        ? "bg-emerald-600 text-white border-emerald-600 font-semibold shadow-xs"
-                        : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-emerald-500"
-                    )}
-                  >
-                    {grp}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={batchKeepExistingGroup}
+              onChange={(e) => setBatchKeepExistingGroup(e.target.checked)}
+              className="mt-0.5 rounded border-neutral-300 dark:border-neutral-700 text-emerald-600 focus:ring-emerald-500"
+            />
+            <span className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+              Pertahankan nama group masing-masing ruang ujian (hanya perbarui Tahun Ajaran dan Semester).
+            </span>
+          </label>
         </div>
       </NeonModal>
 

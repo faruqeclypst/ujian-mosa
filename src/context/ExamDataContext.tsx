@@ -1,4 +1,15 @@
 import { generateExamCredentials } from "../utils/examCredentials";
+import {
+  GROUP_AGENDA_PRESETS,
+  getAcademicYearOptions,
+  getDefaultAcademicPeriod,
+  getDefaultManagedAcademicYears,
+  getStructuredGroupOptions,
+  normalizeAcademicYear,
+  normalizeSemester,
+  parseStringArraySetting,
+  type SemesterType,
+} from "../lib/academicPeriod";
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 import { useTenant } from "./TenantContext";
@@ -53,6 +64,10 @@ interface ExamDataContextType {
   timeLeft: string;
   teacherFullAccess: boolean;
   teacherAIAccess: boolean;
+  activeAcademicYear: string;
+  activeSemester: SemesterType;
+  managedAcademicYears: string[];
+  managedExamGroups: string[];
 
   // Selisih jam perangkat terhadap jam server (ms): Date.now() - offset = waktu server
   serverOffset: number;
@@ -76,6 +91,10 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const [serverOffset, setServerOffset] = useState(0);
   const [teacherFullAccess, setTeacherFullAccess] = useState(false);
   const [teacherAIAccess, setTeacherAIAccess] = useState(false);
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>(() => getDefaultAcademicPeriod().academicYear);
+  const [activeSemester, setActiveSemester] = useState<SemesterType>(() => getDefaultAcademicPeriod().semester);
+  const [managedAcademicYears, setManagedAcademicYears] = useState<string[]>(() => getDefaultManagedAcademicYears());
+  const [managedExamGroups, setManagedExamGroups] = useState<string[]>(() => [...GROUP_AGENDA_PRESETS]);
   const { role } = useAuth();
   const { pb: tenantPb } = useTenant();
   const pb = tenantPb!;
@@ -296,6 +315,17 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           setTokenUpdatedAt(s.universal_token_updated_at || s.updated || "");
           setTeacherFullAccess(s.teacher_full_access ?? s.teacherFullAccess ?? false);
           setTeacherAIAccess(s.teacher_ai_access ?? false);
+          const defPeriod = getDefaultAcademicPeriod();
+          const resolvedActiveYear = normalizeAcademicYear(s.active_academic_year) || defPeriod.academicYear;
+          setActiveAcademicYear(resolvedActiveYear);
+          setActiveSemester(normalizeSemester(s.active_semester) || defPeriod.semester);
+          const parsedYears = parseStringArraySetting(s.academic_years);
+          setManagedAcademicYears(
+            parsedYears.length > 0
+              ? getAcademicYearOptions(parsedYears, [], resolvedActiveYear)
+              : getAcademicYearOptions(getDefaultManagedAcademicYears(), [], resolvedActiveYear)
+          );
+          setManagedExamGroups(getStructuredGroupOptions(parseStringArraySetting(s.exam_groups)));
           console.log("⚙️ Settings loaded:", s.universal_token, "FullAccess:", s.teacher_full_access ?? s.teacherFullAccess, "AIAccess:", s.teacher_ai_access);
         }
       } catch (e) {
@@ -313,6 +343,17 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         setTokenUpdatedAt(e.record.universal_token_updated_at || e.record.updated || "");
         setTeacherFullAccess(e.record.teacher_full_access ?? e.record.teacherFullAccess ?? false);
         setTeacherAIAccess(e.record.teacher_ai_access ?? false);
+        const defPeriod = getDefaultAcademicPeriod();
+        const resolvedActiveYear = normalizeAcademicYear(e.record.active_academic_year) || defPeriod.academicYear;
+        setActiveAcademicYear(resolvedActiveYear);
+        setActiveSemester(normalizeSemester(e.record.active_semester) || defPeriod.semester);
+        const parsedYears = parseStringArraySetting(e.record.academic_years);
+        setManagedAcademicYears(
+          parsedYears.length > 0
+            ? getAcademicYearOptions(parsedYears, [], resolvedActiveYear)
+            : getAcademicYearOptions(getDefaultManagedAcademicYears(), [], resolvedActiveYear)
+        );
+        setManagedExamGroups(getStructuredGroupOptions(parseStringArraySetting(e.record.exam_groups)));
       } else {
         fetchSettings();
       }
@@ -755,7 +796,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         createClass, updateClass, deleteClass,
         createSubject, updateSubject, deleteSubject,
         createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch, dismissResetRequest, resetUserPassword, updateStudentClassBatch, deleteStudentsBatch, regenerateExamCredentials, regenerateExamCredentialsBatch,
-        universalToken, timeLeft, teacherFullAccess, teacherAIAccess, serverOffset
+        universalToken, timeLeft, teacherFullAccess, teacherAIAccess, activeAcademicYear, activeSemester, managedAcademicYears, managedExamGroups, serverOffset
       }}
     >
       {children}

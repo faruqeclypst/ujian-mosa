@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { SlidersHorizontal, ChevronDown, RotateCcw } from "lucide-react";
 import { cn } from "../../lib/utils";
 
@@ -25,12 +26,68 @@ export const NeonFilterPopover: React.FC<NeonFilterPopoverProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
+
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const width = Math.min(336, Math.max(260, vw - 16));
+    const spaceBelow = vh - rect.bottom - 12;
+    const spaceAbove = rect.top - 12;
+    const openUpward = spaceBelow < 260 && spaceAbove > spaceBelow;
+
+    const rawLeft = align === "right" ? rect.right - width : rect.left;
+    const left = Math.max(8, Math.min(rawLeft, vw - width - 8));
+
+    if (openUpward) {
+      setCoords({
+        bottom: vh - rect.top + 6,
+        left,
+        width,
+        maxHeight: Math.min(540, Math.max(200, spaceAbove)),
+      });
+    } else {
+      setCoords({
+        top: rect.bottom + 6,
+        left,
+        width,
+        maxHeight: Math.min(540, Math.max(200, spaceBelow)),
+      });
+    }
+  }, [align]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen, updatePosition]);
 
   useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        (!popoverRef.current || !popoverRef.current.contains(target))
+      ) {
         setIsOpen(false);
       }
     };
@@ -38,6 +95,7 @@ export const NeonFilterPopover: React.FC<NeonFilterPopoverProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsOpen(false);
+        triggerRef.current?.focus();
       }
     };
 
@@ -55,12 +113,13 @@ export const NeonFilterPopover: React.FC<NeonFilterPopoverProps> = ({
     <div ref={containerRef} className={cn("relative inline-flex items-center gap-1.5 shrink-0 flex-nowrap", className)}>
       {/* 1. Main Trigger Button */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-label={`${buttonLabel} (${activeCount} aktif)`}
         className={cn(
-          "h-8 px-2.5 text-xs rounded-md border flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs select-none",
+          "h-8 px-2.5 text-xs rounded-md border flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40",
           hasActive
             ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 font-bold"
             : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-850 hover:text-neutral-900 dark:hover:text-neutral-100 font-medium",
@@ -90,39 +149,49 @@ export const NeonFilterPopover: React.FC<NeonFilterPopoverProps> = ({
         />
       </button>
 
-      {/* 2. Popover Card */}
-      {isOpen && (
-        <div
-          className={cn(
-            "absolute top-full mt-1.5 z-50 w-72 sm:w-80 max-h-[min(34rem,calc(100dvh-8rem))] overflow-y-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl p-3.5 space-y-3 animate-in fade-in zoom-in-95 duration-150",
-            align === "right" ? "right-0" : "left-0"
-          )}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between pb-2 border-b border-neutral-100 dark:border-neutral-800">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800 dark:text-neutral-200">
-              <SlidersHorizontal className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>{title}</span>
+      {/* 2. Portal Popover Card (tidak terpotong oleh overflow kartu tabel) */}
+      {isOpen &&
+        coords &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            style={{
+              position: "fixed",
+              top: coords.top,
+              bottom: coords.bottom,
+              left: coords.left,
+              width: coords.width,
+              maxHeight: coords.maxHeight,
+            }}
+            className="z-50 overflow-y-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl p-3.5 space-y-3"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-100 dark:border-neutral-800">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                <SlidersHorizontal className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>{title}</span>
+              </div>
+
+              {hasActive && onReset && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onReset();
+                  }}
+                  className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>Reset Filter</span>
+                </button>
+              )}
             </div>
 
-            {hasActive && onReset && (
-              <button
-                type="button"
-                onClick={() => {
-                  onReset();
-                }}
-                className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer flex items-center gap-1"
-              >
-                <RotateCcw className="h-3 w-3" />
-                <span>Reset Filter</span>
-              </button>
-            )}
-          </div>
-
-          {/* Form Fields / Controls */}
-          <div className="space-y-2.5">{children}</div>
-        </div>
-      )}
+            {/* Form Fields / Controls */}
+            <div className="space-y-3">{children}</div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

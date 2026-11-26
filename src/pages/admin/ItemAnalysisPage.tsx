@@ -44,6 +44,7 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
 import { ExamRoomPicker } from "../../components/common/ExamRoomPicker";
+import { formatAcademicPeriodLabel, resolveAcademicPeriod } from "../../lib/academicPeriod";
 import {
   NeonPageHeader,
   NeonCard,
@@ -252,6 +253,9 @@ interface ExamRoomOption {
   examTitle: string;
   subjectName: string;
   teacherName: string;
+  academic_year?: string;
+  semester?: string;
+  group_name?: string;
   totalAttempts?: number;
   created: string;
 }
@@ -261,7 +265,7 @@ export const ItemAnalysisPage: React.FC = () => {
   const navigate = useNavigate();
   const { pb, terminology, school } = useTenant();
   const { user } = useAuth();
-  const { subjects, teachers } = useExamData();
+  const { subjects, teachers, managedExamGroups } = useExamData();
 
   const currentRoomId = searchParams.get("roomId") || "";
   const currentExamId = searchParams.get("examId") || "";
@@ -412,6 +416,9 @@ export const ItemAnalysisPage: React.FC = () => {
             examTitle: foundExam?.title || "Ujian",
             subjectName: subj?.name || "-",
             teacherName: teach?.name || "-",
+            academic_year: r.academic_year || "",
+            semester: r.semester || "",
+            group_name: r.group_name || "",
             created: r.created
           };
         });
@@ -1946,11 +1953,17 @@ export const ItemAnalysisPage: React.FC = () => {
                   {roomList.length === 0 ? (
                     <option value="">Belum ada ruang ujian</option>
                   ) : (
-                    roomList.map((room) => (
-                      <option key={room.id} value={room.id}>
-                        {room.name} • {room.examTitle} ({room.subjectName})
-                      </option>
-                    ))
+                    roomList.map((room) => {
+                      const resolved = resolveAcademicPeriod(room, managedExamGroups);
+                      const periodLabel = (resolved.academicYear || resolved.semester)
+                        ? ` [${formatAcademicPeriodLabel(resolved.academicYear, resolved.semester)}]`
+                        : "";
+                      return (
+                        <option key={room.id} value={room.id}>
+                          {room.name} • {room.examTitle} ({room.subjectName}){periodLabel}
+                        </option>
+                      );
+                    })
                   )}
                 </select>
               </div>

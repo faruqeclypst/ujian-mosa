@@ -293,7 +293,7 @@ export function NeonTable<T>({
 
             {/* Filter Slot (e.g. status pills / select) */}
             {filterSlot && (
-              <div className="flex items-center gap-1.5 flex-nowrap shrink-0">
+              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                 {filterSlot}
               </div>
             )}
