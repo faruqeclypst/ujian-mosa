@@ -142,6 +142,7 @@ const ExamRoomsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedRoom, setSelectedRoom] = useState<ExamRoomData | null>(null);
+  const [duplicatedSourceRoom, setDuplicatedSourceRoom] = useState<ExamRoomData | null>(null);
 
   const [examSearch, setExamSearch] = useState("");
   const [lastSelectedClassIndex, setLastSelectedClassIndex] = useState<number | null>(null);
@@ -535,13 +536,55 @@ const ExamRoomsPage = () => {
     setFormValues(prev => ({ ...prev, start_time: formatLocalDateTime(now), end_time: formatLocalDateTime(end) }));
   };
 
-  const handleCreateClick = () => {
+  const buildRoomFormValues = (
+    room: ExamRoomData,
+    overrides: Partial<typeof formValues> = {}
+  ) => {
+    const resolved = resolveAcademicPeriod(room, managedExamGroups);
+    const rawClassIds = Array.isArray(room.classId)
+      ? room.classId.join(",")
+      : (room.classId || "");
+    return {
+      room_name: room.room_name || "",
+      academic_year: resolved.academicYear,
+      semester: resolved.semester,
+      group_name: resolved.structuredGroup,
+      examId: room.examId,
+      classId: room.allClasses ? "" : rawClassIds,
+      allClasses: room.allClasses || false,
+      token: room.token || "",
+      start_time:
+        room.start_time && !isNaN(new Date(room.start_time).getTime())
+          ? formatLocalDateTime(new Date(room.start_time))
+          : "",
+      end_time:
+        room.end_time && !isNaN(new Date(room.end_time).getTime())
+          ? formatLocalDateTime(new Date(room.end_time))
+          : "",
+      duration: room.duration,
+      cheat_limit: room.cheat_limit,
+      submit_window: room.submit_window || 0,
+      max_questions: room.max_questions || 0,
+      randomize_questions: room.randomize_questions !== false,
+      room_code: room.room_code || "",
+      show_result: room.show_result !== false,
+      is_exambro: room.is_exambro || false,
+      ...overrides,
+    };
+  };
+
+  const resetRoomPickerModalFilters = () => {
     setExamSearch("");
     setExamPickerYearFilter("all");
     setExamPickerSemesterFilter("all");
     setLastSelectedClassIndex(null);
+  };
+
+  const handleCreateClick = () => {
+    resetRoomPickerModalFilters();
     setDialogMode("create");
     setSelectedRoom(null);
+    setDuplicatedSourceRoom(null);
     setFormValues({
       room_name: "",
       academic_year: activeAcademicYear,
@@ -565,34 +608,29 @@ const ExamRoomsPage = () => {
     setIsDialogOpen(true);
   };
 
+  // Salin jadwal, durasi, aturan, periode, & alokasi kelas untuk mapel lain.
+  const handleDuplicateParamsClick = (room: ExamRoomData) => {
+    resetRoomPickerModalFilters();
+    setDialogMode("create");
+    setSelectedRoom(null);
+    setDuplicatedSourceRoom(room);
+    setFormValues(
+      buildRoomFormValues(room, {
+        room_name: "",
+        examId: "",
+        token: "",
+        room_code: "",
+      })
+    );
+    setIsDialogOpen(true);
+  };
+
   const handleEditClick = (room: ExamRoomData) => {
-    setExamSearch("");
-    setExamPickerYearFilter("all");
-    setExamPickerSemesterFilter("all");
-    setLastSelectedClassIndex(null);
+    resetRoomPickerModalFilters();
     setDialogMode("edit");
     setSelectedRoom(room);
-    const resolved = resolveAcademicPeriod(room, managedExamGroups);
-    setFormValues({
-      room_name: room.room_name || "",
-      academic_year: resolved.academicYear,
-      semester: resolved.semester,
-      group_name: resolved.structuredGroup,
-      examId: room.examId,
-      classId: room.allClasses ? "" : (Array.isArray(room.classId) ? room.classId.join(",") : (room.classId || "")),
-      allClasses: room.allClasses || false,
-      token: room.token || "",
-      start_time: room.start_time && !isNaN(new Date(room.start_time).getTime()) ? formatLocalDateTime(new Date(room.start_time)) : "",
-      end_time: room.end_time && !isNaN(new Date(room.end_time).getTime()) ? formatLocalDateTime(new Date(room.end_time)) : "",
-      duration: room.duration,
-      cheat_limit: room.cheat_limit,
-      submit_window: room.submit_window || 0,
-      max_questions: room.max_questions || 0,
-      randomize_questions: room.randomize_questions !== false,
-      room_code: room.room_code || "",
-      show_result: room.show_result !== false,
-      is_exambro: room.is_exambro || false,
-    });
+    setDuplicatedSourceRoom(null);
+    setFormValues(buildRoomFormValues(room));
     setIsDialogOpen(true);
   };
 
@@ -974,6 +1012,7 @@ const ExamRoomsPage = () => {
         await pb.collection('exam_rooms').create(data);
       }
       setIsDialogOpen(false);
+      setDuplicatedSourceRoom(null);
       await fetchRooms();
       showAlert("Berhasil", "Data berhasil disimpan.", "success");
     } catch (e) {
@@ -1536,7 +1575,7 @@ const ExamRoomsPage = () => {
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
                 {/* 0. Monitor (Tampil di layar mobile saat tombol quick monitor tersembunyi) */}
                 <DropdownMenuItem
                   onClick={() => handleMonitorClick(room)}
@@ -1581,6 +1620,17 @@ const ExamRoomsPage = () => {
                   >
                     <Edit className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
                     <span>Edit</span>
+                  </DropdownMenuItem>
+                )}
+
+                {/* 4b. Duplikat Parameter Ruang (untuk mapel lain di jadwal & durasi yang sama) */}
+                {canCreate && (
+                  <DropdownMenuItem
+                    onClick={() => handleDuplicateParamsClick(room)}
+                    className="text-xs font-medium cursor-pointer flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 focus:bg-neutral-100 dark:focus:bg-neutral-800"
+                  >
+                    <Copy className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>Duplikat Parameter</span>
                   </DropdownMenuItem>
                 )}
 
@@ -1647,7 +1697,7 @@ const ExamRoomsPage = () => {
         );
       },
     },
-  ], [inspectedRoom, liveBreakdown, terminology, isOwner, handleQuestionsClick, handleMonitorClick, navigate, handleEditClick, handleToggleDisabled, handleArchiveRoom, handleRestoreRoom, handleDeleteClick, activeTab]);
+  ], [inspectedRoom, liveBreakdown, terminology, isOwner, canCreate, handleQuestionsClick, handleMonitorClick, navigate, handleEditClick, handleDuplicateParamsClick, handleToggleDisabled, handleArchiveRoom, handleRestoreRoom, handleDeleteClick, activeTab]);
 
   return (
     <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans overflow-x-hidden">
@@ -2076,7 +2126,7 @@ const ExamRoomsPage = () => {
                       >
                         Penilaian
                       </InspectorButton>
-                      {isOwner(inspectedRoom) ? (
+                      {isOwner(inspectedRoom) && (
                         <InspectorButton
                           variant="secondary"
                           icon={Edit}
@@ -2085,27 +2135,28 @@ const ExamRoomsPage = () => {
                         >
                           Edit
                         </InspectorButton>
-                      ) : (
+                      )}
+                      {canCreate && (
                         <InspectorButton
                           variant="secondary"
-                          icon={BarChart2}
-                          onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${inspectedRoom.id}&examId=${inspectedRoom.examId || ""}`)}
-                          title="Buka Analisis Butir Soal"
+                          icon={Copy}
+                          onClick={() => handleDuplicateParamsClick(inspectedRoom)}
+                          title="Duplikat jadwal, durasi, aturan & kelas untuk mapel lain"
                         >
-                          Analisis
+                          Duplikat
                         </InspectorButton>
                       )}
-                      {isOwner(inspectedRoom) && (
-                        <InspectorButton
-                          variant="secondary"
-                          icon={BarChart2}
-                          onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${inspectedRoom.id}&examId=${inspectedRoom.examId || ""}`)}
-                          title="Buka Analisis Butir Soal"
-                          className="col-span-2"
-                        >
-                          Analisis
-                        </InspectorButton>
-                      )}
+                      <InspectorButton
+                        variant="secondary"
+                        icon={BarChart2}
+                        onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${inspectedRoom.id}&examId=${inspectedRoom.examId || ""}`)}
+                        title="Buka Analisis Butir Soal"
+                        className={
+                          isOwner(inspectedRoom) !== canCreate ? "col-span-2" : undefined
+                        }
+                      >
+                        Analisis
+                      </InspectorButton>
                     </div>
                   </InspectorActions>
                 </div>
@@ -2171,26 +2222,44 @@ const ExamRoomsPage = () => {
       </div>
 
       {/* Dialog Create/Edit (Neon Console Split Pane) */}
-      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open && !isSubmitting) setIsDialogOpen(false); }}>
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && !isSubmitting) {
+            setIsDialogOpen(false);
+            setDuplicatedSourceRoom(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-5xl w-[calc(100vw-1.5rem)] sm:w-full h-[min(88vh,720px)] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] overflow-hidden p-0 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shadow-2xl flex flex-col">
 
           {/* 1. Header Dialog */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0c0d0e] shrink-0">
             <div className="flex items-center gap-2.5">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                <BookOpen className="h-4 w-4" />
+                {duplicatedSourceRoom ? <Copy className="h-4 w-4" /> : <BookOpen className="h-4 w-4" />}
               </span>
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                    {dialogMode === "edit" ? "Edit Ruang Ujian" : "Buka Ruang Ujian Baru"}
+                    {dialogMode === "edit"
+                      ? "Edit Ruang Ujian"
+                      : duplicatedSourceRoom
+                        ? "Duplikat Parameter Ruang"
+                        : "Buka Ruang Ujian Baru"}
                   </h2>
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200/60 dark:border-neutral-700/60">
-                    {dialogMode === "edit" ? "Edit Mode" : "Sesi Ujian"}
+                    {dialogMode === "edit"
+                      ? "Edit Mode"
+                      : duplicatedSourceRoom
+                        ? "Salin Parameter"
+                        : "Sesi Ujian"}
                   </span>
                 </div>
                 <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                  Konfigurasikan bank soal, jadwal pelaksanaan, aturan anti-cheat, dan distribusi peserta.
+                  {duplicatedSourceRoom
+                    ? `Parameter jadwal, durasi, aturan & target kelas disalin dari "${duplicatedSourceRoom.room_name || duplicatedSourceRoom.examTitle}".`
+                    : "Konfigurasikan bank soal, jadwal pelaksanaan, aturan anti-cheat, dan distribusi peserta."}
                 </p>
               </div>
             </div>
@@ -2285,18 +2354,28 @@ const ExamRoomsPage = () => {
                         onClick={() => {
                           if (dialogMode === "create") {
                             const resolved = resolveAcademicPeriod(e, managedExamGroups);
-                            const prevExam = exams.find((x: any) => x.id === formValues.examId);
-                            const prevGroup = prevExam
-                              ? resolveAcademicPeriod(prevExam, managedExamGroups).structuredGroup
-                              : "";
-                            const shouldSyncGroup = !formValues.group_name.trim() || formValues.group_name.trim() === prevGroup;
-                            setFormValues({
-                              ...formValues,
-                              examId: e.id,
-                              academic_year: resolved.academicYear || formValues.academic_year || activeAcademicYear,
-                              semester: resolved.semester || formValues.semester || activeSemester,
-                              group_name: shouldSyncGroup ? resolved.structuredGroup : formValues.group_name,
-                            });
+                            if (duplicatedSourceRoom) {
+                              setFormValues((prev) => ({
+                                ...prev,
+                                examId: e.id,
+                                academic_year: prev.academic_year || resolved.academicYear || activeAcademicYear,
+                                semester: prev.semester || resolved.semester || activeSemester,
+                                group_name: prev.group_name.trim() ? prev.group_name : resolved.structuredGroup,
+                              }));
+                            } else {
+                              const prevExam = exams.find((x: any) => x.id === formValues.examId);
+                              const prevGroup = prevExam
+                                ? resolveAcademicPeriod(prevExam, managedExamGroups).structuredGroup
+                                : "";
+                              const shouldSyncGroup = !formValues.group_name.trim() || formValues.group_name.trim() === prevGroup;
+                              setFormValues({
+                                ...formValues,
+                                examId: e.id,
+                                academic_year: resolved.academicYear || formValues.academic_year || activeAcademicYear,
+                                semester: resolved.semester || formValues.semester || activeSemester,
+                                group_name: shouldSyncGroup ? resolved.structuredGroup : formValues.group_name,
+                              });
+                            }
                           } else {
                             setFormValues({ ...formValues, examId: e.id });
                           }
@@ -2378,16 +2457,50 @@ const ExamRoomsPage = () => {
                   </div>
                 )}
 
+                {duplicatedSourceRoom && (
+                  <div className="flex items-start gap-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 text-emerald-900 dark:text-emerald-200 p-2.5 rounded-lg text-xs">
+                    <Copy className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-700 dark:text-emerald-400" />
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="font-semibold leading-snug">
+                        Parameter disalin dari {duplicatedSourceRoom.room_name || duplicatedSourceRoom.examTitle}
+                      </p>
+                      <p className="text-[11px] text-emerald-800 dark:text-emerald-300 leading-snug">
+                        Pilih Bank Soal mapel baru di panel kiri lalu isi Nama Ruang Ujian. Jadwal, durasi ({formValues.duration} menit), aturan, periode, dan target kelas tetap dipertahankan.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <form id="room-form" onSubmit={handleSubmit} className="space-y-5">
 
                   {/* 1. Nama Ruangan & Periode Akademik */}
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                        Nama Ruang Ujian <span className="text-rose-500">*</span>
-                      </label>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                          Nama Ruang Ujian <span className="text-rose-500">*</span>
+                        </label>
+                        {!formValues.room_name.trim() && formValues.examId && (() => {
+                          const chosenTitle = exams.find((x: any) => x.id === formValues.examId)?.title;
+                          if (!chosenTitle) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setFormValues((prev) => ({ ...prev, room_name: chosenTitle }))}
+                              className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer truncate max-w-[220px]"
+                              title={`Isi dengan "${chosenTitle}"`}
+                            >
+                              Pakai judul bank soal
+                            </button>
+                          );
+                        })()}
+                      </div>
                       <Input
-                        placeholder="Contoh: Ruang 01 / Gelombang 1"
+                        placeholder={
+                          duplicatedSourceRoom
+                            ? "Contoh: Nama mapel & tingkat baru (cth: Bahasa Indonesia, X)"
+                            : "Contoh: Ruang 01 / Gelombang 1"
+                        }
                         value={formValues.room_name}
                         onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })}
                         required
@@ -2720,7 +2833,10 @@ const ExamRoomsPage = () => {
                 variant="secondary"
                 size="sm"
                 disabled={isSubmitting}
-                onClick={() => setIsDialogOpen(false)}
+                onClick={() => {
+                  setIsDialogOpen(false);
+                  setDuplicatedSourceRoom(null);
+                }}
               >
                 Batal
               </NeonButton>
