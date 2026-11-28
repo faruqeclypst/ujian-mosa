@@ -614,12 +614,15 @@ const ExamRoomsPage = () => {
     setDialogMode("create");
     setSelectedRoom(null);
     setDuplicatedSourceRoom(room);
+    const resolved = resolveAcademicPeriod(room, managedExamGroups);
     setFormValues(
       buildRoomFormValues(room, {
         room_name: "",
         examId: "",
         token: "",
         room_code: "",
+        academic_year: resolved.academicYear || activeAcademicYear,
+        semester: resolved.semester || activeSemester,
       })
     );
     setIsDialogOpen(true);
@@ -2465,7 +2468,7 @@ const ExamRoomsPage = () => {
                         Parameter disalin dari {duplicatedSourceRoom.room_name || duplicatedSourceRoom.examTitle}
                       </p>
                       <p className="text-[11px] text-emerald-800 dark:text-emerald-300 leading-snug">
-                        Pilih Bank Soal mapel baru di panel kiri lalu isi Nama Ruang Ujian. Jadwal, durasi ({formValues.duration} menit), aturan, periode, dan target kelas tetap dipertahankan.
+                        Pilih Bank Soal mapel baru di panel kiri lalu isi Nama Ruang Ujian. Jadwal, durasi ({formValues.duration} menit), aturan, periode ({formValues.academic_year || activeAcademicYear} - {formValues.semester || activeSemester}), dan target kelas tetap dipertahankan.
                       </p>
                     </div>
                   </div>
